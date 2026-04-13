@@ -29,6 +29,33 @@ If you prefer **cookie-only** sessions instead of `Authorization`, say so—the 
 
 Implement these **mutations** and **types** (names and shapes should match; if your stack uses different names, add field aliases or a thin resolver layer).
 
+### Error: `Cannot query field "googleLogin" on type "Mutation"`
+
+That message means the **GraphQL schema your server publishes does not define** `googleLogin` on `Mutation` (or the resolver is not registered, so the field never appears in the built schema).
+
+**You must do all of the following on the backend:**
+
+1. **Declare the field in the schema** — `googleLogin(idToken: String!): AuthPayload!` must exist on `Mutation` (see SDL below).
+2. **Implement the resolver** — a function that receives `idToken`, verifies it with Google, finds or creates the user, and returns `AuthPayload`.
+3. **Rebuild / restart** the server so introspection and clients see the new field.
+
+If you only implemented email/password auth so far, **`googleLogin` is an additional mutation** — it will not appear until you add it explicitly.
+
+**Schema-first (e.g. Apollo Server + `.graphql` file):** merge or import a definition like:
+
+```graphql
+type Mutation {
+  # ...existing mutations...
+  googleLogin(idToken: String!): AuthPayload!
+}
+```
+
+(or use `extend type Mutation { googleLogin(...) }` if your root `Mutation` is assembled from modules.)
+
+**Code-first (e.g. NestJS `@nestjs/graphql`, TypeGraphQL):** add a mutation method named **`googleLogin`** (exact name) on your mutations resolver class, with an argument **`idToken`** (or map with `@Args('idToken')`), returning the same shape as `login` / `signup`. The generated schema must expose `googleLogin`, not e.g. `signInWithGoogle`, unless you change the frontend to match.
+
+**Quick verification:** open GraphQL Playground / Apollo Sandbox / `curl` introspection and confirm `__schema.types` includes `Mutation` with field `googleLogin`, or run the mutation document from `frontend/src/graphql/auth.ts` against your server.
+
 ### Types
 
 ```graphql
@@ -83,11 +110,25 @@ extend type Mutation {
   3. **Find or create** the user linked to that Google account (`sub` is the stable id).
   4. Return the same `AuthPayload` shape as email/password login.
 
+**Resolver outline (language-agnostic)**
+
+1. Receive `idToken: string`.
+2. Call Google’s token verification (e.g. Node: `google-auth-library` `OAuth2Client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID })`).
+3. If verification fails → throw a GraphQL error (e.g. “Invalid Google token”) with **HTTP 200** if possible (recommended GraphQL style); if your framework returns **400**, the frontend will still show the error message.
+4. Upsert user by `sub` (and optionally sync email/name).
+5. Issue the same `accessToken` (and optional `refreshToken`) as `login` / `signup`.
+6. Return `{ accessToken, refreshToken, user }`.
+
 **Security notes**
 
 - Verify **audience** (`aud`) matches your Google **Web client ID** (the same value as frontend `VITE_GOOGLE_CLIENT_ID`).
 - Verify **issuer** (`iss`) and token expiry (`exp`).
 - Prefer linking by Google `sub`, not by email alone, unless you have a clear account-linking policy.
+
+**Environment (backend only, not in Vite)**
+
+- `GOOGLE_CLIENT_ID` — same Web client ID as the frontend (used as `audience` when verifying the ID token).
+- Client **secret** is **not** required for verifying ID tokens from the GIS button; only add secret-related config if you implement a separate OAuth **authorization-code** flow.
 
 ## Google Cloud Console
 
@@ -104,12 +145,83 @@ Share the **Client ID** with the frontend (env: `VITE_GOOGLE_CLIENT_ID`). The **
 - **Password**: never store plain text; use a strong hash and per-password salt (library defaults).
 - **`displayName`**: optional on signup; can map from Google `name` for `googleLogin`.
 
+## Feed posts & voting (real data for the home feed)
+
+The frontend loads the home feed with the **`feedPosts`** query and sends votes with **`voteOnPost`**. Without these, the feed stays empty (unless `VITE_USE_MOCK_FEED=true` for local demo data).
+
+### Types & enum
+
+```graphql
+enum VoteDirection {
+  UP
+  DOWN
+  NONE
+}
+
+type FeedPost {
+  id: ID!
+  authorUsername: String!
+  authorDisplayName: String
+  imageUrl: String!
+  caption: String
+  createdAt: String
+  upvoteCount: Int!
+  downvoteCount: Int!
+  """Current user's vote on this post, if any."""
+  viewerVote: VoteDirection
+}
+```
+
+- **`viewerVote`**: Return `UP` or `DOWN` if the authenticated user has voted; otherwise `null` (do not return `NONE` in query results—`NONE` is only for the mutation input to clear a vote).
+- **`createdAt`**: ISO-8601 string recommended so the client can show relative time.
+
+### Query
+
+```graphql
+extend type Query {
+  feedPosts: [FeedPost!]!
+}
+```
+
+- Return posts in feed order (e.g. newest first).
+- **Auth**: Either allow public read, or require a valid Bearer token—match your product rules. The vote mutation should use the same identity as `viewerVote`.
+
+### Mutation
+
+```graphql
+extend type Mutation {
+  """
+  Set or clear the current user's vote.
+  - UP / DOWN: set vote (switching from UP to DOWN should update counts accordingly).
+  - NONE: remove the user's vote.
+  """
+  voteOnPost(postId: ID!, direction: VoteDirection!): FeedPost!
+}
+```
+
+**Behaviour the frontend expects**
+
+1. Caller must be authenticated (Bearer token) so you know who is voting.
+2. `direction: NONE` removes that user’s vote and decrements the corresponding count.
+3. Changing from `UP` to `DOWN` (or the reverse) should adjust both tallies in one call.
+4. Return the updated `FeedPost` (at least `id`, `upvoteCount`, `downvoteCount`, `viewerVote`).
+
+**Security**
+
+- One row (or equivalent) per `(userId, postId)` for votes.
+- Validate `postId` exists; ignore or error on duplicate votes consistent with the rules above.
+
+### Frontend env
+
+- **`VITE_USE_MOCK_FEED`**: If `true`, the UI uses built-in demo posts and **local-only** votes (nothing is sent to the API). Use for UI work without a backend. For **real data**, omit it or set to `false` and implement `feedPosts` + `voteOnPost`.
+
 ## Optional follow-ups (not in the frontend yet)
 
 - **Refresh tokens** + `refreshToken` mutation.
 - **`me` query** returning `User` from the Bearer token (useful for profile UI).
 - **Email verification** and **password reset** flows.
 - **Rate limiting** on `login` / `signup` / `googleLogin`.
+- **Stories** API (the UI currently derives a simple story strip from unique authors in `feedPosts`, or uses demo stories in mock mode).
 
 ## Questions for the backend owner
 
@@ -117,4 +229,4 @@ Share the **Client ID** with the frontend (env: `VITE_GOOGLE_CLIENT_ID`). The **
 2. Do you need **httpOnly cookies** instead of (or in addition to) Bearer tokens?
 3. Exact GraphQL path: still `/graphql` only, or also subscriptions/file upload?
 
-Once these mutations exist and CORS + token validation are configured, the current frontend should work without further backend changes for the auth flows described here.
+Once **auth** mutations, **`feedPosts`**, and **`voteOnPost`** exist—and CORS + token validation are configured—the current frontend should work for login/signup, Google sign-in, feed, and voting as described here.
