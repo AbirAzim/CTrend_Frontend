@@ -13,6 +13,8 @@ export const FEED_POSTS = gql`
       upvoteCount
       downvoteCount
       viewerVote
+      votingEndsAt
+      isVotingOpen
       mySelectedOptionIndex
       optionStats {
         index
@@ -40,6 +42,8 @@ export const GET_POST_BY_ID = gql`
       upvoteCount
       downvoteCount
       viewerVote
+      votingEndsAt
+      isVotingOpen
       mySelectedOptionIndex
       optionStats {
         index
@@ -79,6 +83,28 @@ export const CREATE_POST = gql`
       upvoteCount
       downvoteCount
       viewerVote
+      votingEndsAt
+      isVotingOpen
+    }
+  }
+`;
+
+/** Categories for create-post dropdown (uses backend ObjectId as `id`). */
+export const CATEGORIES = gql`
+  query Categories {
+    categories {
+      id
+      name
+    }
+  }
+`;
+
+export const EXTEND_POST_VOTING = gql`
+  mutation ExtendVoting($postId: ID!, $newVotingEndsAt: DateTime!) {
+    extendPostVoting(postId: $postId, newVotingEndsAt: $newVotingEndsAt) {
+      id
+      votingEndsAt
+      isVotingOpen
     }
   }
 `;

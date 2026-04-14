@@ -11,6 +11,19 @@ function initialFromUser(name: string | undefined, email: string): string {
   return s ? s[0]!.toUpperCase() : "?";
 }
 
+function rel(iso?: string | null): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const d = t - Date.now();
+  const absMin = Math.floor(Math.abs(d) / 60000);
+  if (d <= 0) return "ended";
+  const h = Math.floor(absMin / 60);
+  const m = absMin % 60;
+  if (h > 0) return `${h}h ${m}m left`;
+  return `${Math.max(1, m)}m left`;
+}
+
 export function ProfilePage() {
   const { user, logout, patchUser } = useAuth();
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
@@ -38,6 +51,15 @@ export function ProfilePage() {
   const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
     id: string;
     imageUrls: string[];
+    caption?: string | null;
+    createdAt?: string | null;
+    totalVotes?: number | null;
+    upvoteCount?: number | null;
+    downvoteCount?: number | null;
+    isVotingOpen?: boolean | null;
+    votingEndsAt?: string | null;
+    options?: Array<{ label?: string | null }> | null;
+    category?: { id: string; name?: string | null; slug?: string | null } | null;
   }>;
 
   const playgroundPosts = useMemo(() => {
@@ -47,9 +69,28 @@ export function ProfilePage() {
     return mockPostsAsFeed();
   }, [useMockFeed]);
 
-  const gridPosts: Array<{ id: string; imageUrls: string[] }> = useMockFeed
+  const gridPosts: Array<{
+    id: string;
+    imageUrls: string[];
+    caption?: string | null;
+    createdAt?: string | null;
+    totalVotes?: number | null;
+    upvoteCount?: number | null;
+    downvoteCount?: number | null;
+    isVotingOpen?: boolean | null;
+    votingEndsAt?: string | null;
+    options?: Array<{ label?: string | null }> | null;
+    category?: { id: string; name?: string | null; slug?: string | null } | null;
+  }> = useMockFeed
     ? playgroundPosts
     : apiPosts;
+
+  const totalImages = gridPosts.reduce((a, p) => a + (p.imageUrls?.length ?? 0), 0);
+  const totalVotes = gridPosts.reduce(
+    (a, p) => a + (p.totalVotes ?? (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0)),
+    0,
+  );
+  const activeVoting = gridPosts.filter((p) => p.isVotingOpen !== false).length;
 
   const displayName =
     me?.displayName ?? user?.displayName ?? user?.email.split("@")[0] ?? "you";
@@ -124,9 +165,17 @@ export function ProfilePage() {
           <strong>{gridPosts.length}</strong>
           <span>compares</span>
         </div>
+        <div className="cx-profile-stat">
+          <strong>{totalImages}</strong>
+          <span>images</span>
+        </div>
+        <div className="cx-profile-stat">
+          <strong>{totalVotes.toLocaleString()}</strong>
+          <span>votes</span>
+        </div>
         <div className="cx-profile-stat cx-profile-stat--ghost">
-          <strong>+</strong>
-          <span>more soon</span>
+          <strong>{activeVoting}</strong>
+          <span>open</span>
         </div>
       </div>
 
@@ -229,25 +278,49 @@ export function ProfilePage() {
           </div>
         )}
         {gridPosts.length > 0 && (
-          <ul className="cx-profile-grid">
+          <ul className="cx-profile-grid cx-profile-grid--rich">
             {gridPosts.map((post) => {
               const thumb = post.imageUrls[0] ?? null;
+              const ended = post.isVotingOpen === false || rel(post.votingEndsAt) === "ended";
               return (
                 <li key={post.id}>
-                  <NavLink
-                    to={`/post/${post.id}`}
-                    className="cx-profile-grid-cell"
-                    style={
-                      thumb
-                        ? { backgroundImage: `url(${thumb})` }
-                        : undefined
-                    }
-                  >
-                    {!thumb ? (
-                      <span className="cx-profile-grid-fallback">?</span>
-                    ) : null}
-                    <span className="cx-profile-grid-shine" aria-hidden />
-                  </NavLink>
+                  <article className="cx-profile-drop-card">
+                    <NavLink to={`/post/${post.id}`} className="cx-profile-drop-link">
+                      <div className="cx-profile-drop-media-grid">
+                        {(post.imageUrls ?? []).map((u, idx) => (
+                          <span
+                            key={`${post.id}-img-${idx}`}
+                            className="cx-profile-grid-cell"
+                            style={{ backgroundImage: `url(${u})` }}
+                          />
+                        ))}
+                        {!thumb ? <span className="cx-profile-grid-fallback">?</span> : null}
+                      </div>
+                    </NavLink>
+                    <div className="cx-profile-drop-meta">
+                      <p className="cx-profile-drop-title">
+                        {post.caption?.trim() || "Untitled compare"}
+                      </p>
+                      <p className="cx-profile-drop-sub">
+                        {(post.category?.name ?? "General").toString()} ·{" "}
+                        {(post.totalVotes ?? 0).toLocaleString()} votes
+                      </p>
+                      <div className="cx-profile-drop-chips">
+                        {(post.options ?? [])
+                          .map((o) => o.label?.trim())
+                          .filter(Boolean)
+                          .slice(0, 4)
+                          .map((label) => (
+                            <span key={`${post.id}-${label}`} className="cx-profile-chip">
+                              {label}
+                            </span>
+                          ))}
+                      </div>
+                      <p className="cx-profile-drop-sub">
+                        {ended ? "Voting closed" : rel(post.votingEndsAt) || "Voting open"}
+                      </p>
+                    </div>
+                  </article>
                 </li>
               );
             })}
