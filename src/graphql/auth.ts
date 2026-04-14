@@ -9,6 +9,7 @@ export const LOGIN = gql`
         id
         email
         displayName
+        username
       }
     }
   }
@@ -31,6 +32,7 @@ export const SIGNUP = gql`
         id
         email
         displayName
+        username
       }
     }
   }
@@ -45,6 +47,7 @@ export const GOOGLE_LOGIN = gql`
         id
         email
         displayName
+        username
       }
     }
   }

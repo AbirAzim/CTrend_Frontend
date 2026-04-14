@@ -5,6 +5,8 @@ export type StoredUser = {
   id: string;
   email: string;
   displayName?: string | null;
+  username?: string | null;
+  bio?: string | null;
 };
 
 export function readStoredToken(): string | null {

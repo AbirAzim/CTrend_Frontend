@@ -1,0 +1,74 @@
+import type { FeedPostView, ViewerVote, VoteOptionStatView } from "../types/feed";
+
+function mapViewerVote(
+  viewerVote: string | null | undefined,
+  mySelected: number | null | undefined,
+): ViewerVote {
+  if (mySelected === 0) {
+    return "UP";
+  }
+  if (mySelected === 1) {
+    return "DOWN";
+  }
+  if (mySelected != null) {
+    return null;
+  }
+  const v = viewerVote?.toUpperCase();
+  if (v === "UP" || v === "DOWN") {
+    return v;
+  }
+  return null;
+}
+
+/** Maps a `PostGql`-shaped object from `feedPosts` or `getPostById` into `FeedPostView`. */
+export function mapGqlPostToFeedView(p: {
+  id: string;
+  authorUsername: string;
+  authorDisplayName?: string | null;
+  imageUrls?: string[] | null;
+  caption?: string | null;
+  createdAt?: string | null;
+  upvoteCount: number;
+  downvoteCount: number;
+  viewerVote?: string | null;
+  mySelectedOptionIndex?: number | null;
+  optionStats?: Array<{
+    index: number;
+    label: string;
+    count: number;
+    percentage: number;
+  }> | null;
+  options?: Array<{ label: string }> | null;
+}): FeedPostView {
+  const imageUrls = (p.imageUrls ?? []).filter(
+    (u) => typeof u === "string" && u.trim().length > 0,
+  );
+  const optionStats: VoteOptionStatView[] | null = p.optionStats?.length
+    ? p.optionStats.map((s) => ({
+        index: s.index,
+        label: s.label,
+        count: Math.round(s.count),
+        percentage: s.percentage,
+      }))
+    : null;
+  const postOptions =
+    p.options?.map((o) => ({ label: o.label })) ?? null;
+  return {
+    id: p.id,
+    authorUsername: p.authorUsername,
+    authorDisplayName: p.authorDisplayName ?? null,
+    imageUrls,
+    caption: p.caption ?? null,
+    createdAt: p.createdAt ?? null,
+    upvoteCount: p.upvoteCount,
+    downvoteCount: p.downvoteCount,
+    viewerVote: mapViewerVote(p.viewerVote, p.mySelectedOptionIndex),
+    mySelectedOptionIndex:
+      p.mySelectedOptionIndex === undefined || p.mySelectedOptionIndex === null
+        ? null
+        : p.mySelectedOptionIndex,
+    optionStats,
+    postOptions,
+    compareOptionLabels: null,
+  };
+}

@@ -20,6 +20,8 @@ type AuthContextValue = {
   token: string | null;
   isAuthenticated: boolean;
   setSession: (token: string, user: StoredUser) => void;
+  /** Merge fields into the stored user (after profile update or `me` refresh). */
+  patchUser: (patch: Partial<StoredUser>) => void;
   logout: () => void;
 };
 
@@ -43,15 +45,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ token: null, user: null });
   }, []);
 
+  const patchUser = useCallback((patch: Partial<StoredUser>) => {
+    const t = readStoredToken();
+    const u = readStoredUser();
+    if (!t || !u) {
+      return;
+    }
+    const next: StoredUser = { ...u, ...patch, id: u.id, email: u.email };
+    writeSession(t, next);
+    setState({ token: t, user: next });
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       token,
       isAuthenticated: Boolean(token && user),
       setSession,
+      patchUser,
       logout,
     }),
-    [user, token, setSession, logout],
+    [user, token, setSession, patchUser, logout],
   );
 
   return (

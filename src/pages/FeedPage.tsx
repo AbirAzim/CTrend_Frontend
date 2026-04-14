@@ -1,33 +1,9 @@
 import { useQuery } from "@apollo/client";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { FEED_POSTS } from "../graphql/feed";
+import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import type { FeedPostView } from "../types/feed";
-
-function mapGqlPost(p: {
-  id: string;
-  authorUsername: string;
-  authorDisplayName?: string | null;
-  imageUrl: string;
-  caption?: string | null;
-  createdAt?: string | null;
-  upvoteCount: number;
-  downvoteCount: number;
-  viewerVote?: string | null;
-}): FeedPostView {
-  return {
-    id: p.id,
-    authorUsername: p.authorUsername,
-    authorDisplayName: p.authorDisplayName ?? null,
-    imageUrl: p.imageUrl,
-    caption: p.caption ?? null,
-    createdAt: p.createdAt ?? null,
-    upvoteCount: p.upvoteCount,
-    downvoteCount: p.downvoteCount,
-    viewerVote:
-      p.viewerVote === "UP" || p.viewerVote === "DOWN" ? p.viewerVote : null,
-  };
-}
 
 export function FeedPage() {
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
@@ -38,7 +14,7 @@ export function FeedPage() {
   });
 
   const apiPosts: FeedPostView[] | null = data?.feedPosts
-    ? data.feedPosts.map(mapGqlPost)
+    ? data.feedPosts.map(mapGqlPostToFeedView)
     : null;
 
   const posts: FeedPostView[] = useMockFeed
@@ -84,12 +60,13 @@ export function FeedPage() {
           <>
             <strong>Demo mode:</strong> votes stay in this browser only. Set{" "}
             <code>VITE_USE_MOCK_FEED=false</code> and implement{" "}
-            <code>feedPosts</code> / <code>voteOnPost</code> on the backend.
+            <code>feedPosts</code> / <code>votePost</code> on the backend.
           </>
         ) : (
           <>
-            Live feed from <code>feedPosts</code>. Vote row sends{" "}
-            <code>voteOnPost</code> to your API.
+            Live feed from <code>feedPosts</code> (uses <code>imageUrls</code>).
+            Votes use <code>votePost(postId, selectedOptionIndex)</code>. Each
+            post has a shareable link under <code>/post/:id</code>.
           </>
         )}
       </p>

@@ -4,12 +4,35 @@ export type FeedPostView = {
   id: string;
   authorUsername: string;
   authorDisplayName: string | null;
-  imageUrl: string;
+  /** All post images from API (`imageUrls: [String!]!`). Order matters for compare / gallery. */
+  imageUrls: string[];
+  /**
+   * Vote totals per column when there are 3+ images (demo / local only).
+   * Length must match `imageUrls`.
+   */
+  compareOptionCounts?: number[] | null;
+  /** Selected compare column index for 3+ options (demo / local only). */
+  viewerCompareChoice?: number | null;
   caption: string | null;
   createdAt: string | null;
   upvoteCount: number;
   downvoteCount: number;
   viewerVote: ViewerVote;
+  /** Server vote choice (0-based option index); use for 3+ options — `viewerVote` is only A/B legacy. */
+  mySelectedOptionIndex?: number | null;
+  /** Per-option counts/percentages from API when present. */
+  optionStats?: VoteOptionStatView[] | null;
+  /** Option titles from API `options` (same order as voting indices / compare columns). */
+  postOptions?: { label: string }[] | null;
+  /** Demo-only labels when API `options` / `optionStats` are absent. */
+  compareOptionLabels?: string[] | null;
+};
+
+export type VoteOptionStatView = {
+  index: number;
+  label: string;
+  count: number;
+  percentage: number;
 };
 
 export type VoteDirectionGql = "UP" | "DOWN" | "NONE";

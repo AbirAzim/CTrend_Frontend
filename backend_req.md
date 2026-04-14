@@ -147,32 +147,36 @@ Share the **Client ID** with the frontend (env: `VITE_GOOGLE_CLIENT_ID`). The **
 
 ## Feed posts & voting (real data for the home feed)
 
-The frontend loads the home feed with the **`feedPosts`** query and sends votes with **`voteOnPost`**. Without these, the feed stays empty (unless `VITE_USE_MOCK_FEED=true` for local demo data).
+The frontend loads the home feed with the **`feedPosts`** query and sends votes with **`votePost(postId, selectedOptionIndex)`** (CTrend API). Without these, the feed stays empty (unless `VITE_USE_MOCK_FEED=true` for local demo data).
 
-### Types & enum
+### Types
 
 ```graphql
-enum VoteDirection {
-  UP
-  DOWN
-  NONE
-}
-
 type FeedPost {
   id: ID!
   authorUsername: String!
   authorDisplayName: String
-  imageUrl: String!
+  imageUrls: [String!]!
   caption: String
   createdAt: String
   upvoteCount: Int!
   downvoteCount: Int!
-  """Current user's vote on this post, if any."""
-  viewerVote: VoteDirection
+  """Legacy A/B label for the viewer’s choice when there are two options."""
+  viewerVote: String
+  mySelectedOptionIndex: Int
+  optionStats: [VoteOptionStat!]!
+}
+
+type VoteOptionStat {
+  index: Int!
+  label: String!
+  count: Float!
+  percentage: Float!
 }
 ```
 
-- **`viewerVote`**: Return `UP` or `DOWN` if the authenticated user has voted; otherwise `null` (do not return `NONE` in query results—`NONE` is only for the mutation input to clear a vote).
+- **`viewerVote`**: For two-option posts, legacy string `up` / `down` (or `UP` / `DOWN`) for the viewer’s side; otherwise `null`. For three or more options, prefer **`mySelectedOptionIndex`** (0-based); `viewerVote` may not distinguish options beyond the second.
+- **`mySelectedOptionIndex` / `optionStats`**: Returned by the CTrend API for accurate multi-option tallies and UI.
 - **`createdAt`**: ISO-8601 string recommended so the client can show relative time.
 
 ### Query
@@ -191,20 +195,19 @@ extend type Query {
 ```graphql
 extend type Mutation {
   """
-  Set or clear the current user's vote.
-  - UP / DOWN: set vote (switching from UP to DOWN should update counts accordingly).
-  - NONE: remove the user's vote.
+  Record or change the viewer’s vote for one option (0-based index).
+  CTrend returns aggregated stats; the client refetches `feedPosts` after success.
   """
-  voteOnPost(postId: ID!, direction: VoteDirection!): FeedPost!
+  votePost(postId: ID!, selectedOptionIndex: Int!): VoteResult!
 }
 ```
 
 **Behaviour the frontend expects**
 
 1. Caller must be authenticated (Bearer token) so you know who is voting.
-2. `direction: NONE` removes that user’s vote and decrements the corresponding count.
-3. Changing from `UP` to `DOWN` (or the reverse) should adjust both tallies in one call.
-4. Return the updated `FeedPost` (at least `id`, `upvoteCount`, `downvoteCount`, `viewerVote`).
+2. **`selectedOptionIndex`** must be valid for the post’s option list (`0` … `n-1`).
+3. Re-voting the **same** index may be a no-op; switching indices updates the stored choice (see your `VotesService` rules).
+4. Response should include enough data to refresh tallies, or the client will **refetch `feedPosts`** (current frontend refetches after `votePost`).
 
 **Security**
 
@@ -213,7 +216,7 @@ extend type Mutation {
 
 ### Frontend env
 
-- **`VITE_USE_MOCK_FEED`**: If `true`, the UI uses built-in demo posts and **local-only** votes (nothing is sent to the API). Use for UI work without a backend. For **real data**, omit it or set to `false` and implement `feedPosts` + `voteOnPost`.
+- **`VITE_USE_MOCK_FEED`**: If `true`, the UI uses built-in demo posts and **local-only** votes (nothing is sent to the API). Use for UI work without a backend. For **real data**, omit it or set to `false` and implement `feedPosts` + `votePost`.
 
 ## Optional follow-ups (not in the frontend yet)
 
@@ -229,4 +232,4 @@ extend type Mutation {
 2. Do you need **httpOnly cookies** instead of (or in addition to) Bearer tokens?
 3. Exact GraphQL path: still `/graphql` only, or also subscriptions/file upload?
 
-Once **auth** mutations, **`feedPosts`**, and **`voteOnPost`** exist—and CORS + token validation are configured—the current frontend should work for login/signup, Google sign-in, feed, and voting as described here.
+Once **auth** mutations, **`feedPosts`**, and **`votePost`** exist—and CORS + token validation are configured—the current frontend should work for login/signup, Google sign-in, feed, and voting as described here.

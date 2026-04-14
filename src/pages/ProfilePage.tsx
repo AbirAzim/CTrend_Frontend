@@ -1,4 +1,10 @@
+import { useMutation, useQuery } from "@apollo/client";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
+import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
@@ -6,53 +12,250 @@ function initialFromUser(name: string | undefined, email: string): string {
 }
 
 export function ProfilePage() {
-  const { user, logout } = useAuth();
-  if (!user) return null;
+  const { user, logout, patchUser } = useAuth();
+  const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
-  const label = user.displayName || user.email.split("@")[0] || "user";
+  const [editing, setEditing] = useState(false);
+  const [formDisplayName, setFormDisplayName] = useState("");
+  const [formBio, setFormBio] = useState("");
+  const [formInterests, setFormInterests] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
+    skip: !user,
+    fetchPolicy: "network-only",
+  });
+
+  const me = meData?.me;
+  const userId = me?.id ?? user?.id ?? "";
+
+  const { data: postsData, loading: postsLoading } = useQuery(USER_POSTS, {
+    variables: { userId },
+    skip: !userId || useMockFeed,
+    fetchPolicy: "network-only",
+  });
+
+  const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
+    id: string;
+    imageUrls: string[];
+  }>;
+
+  const playgroundPosts = useMemo(() => {
+    if (!useMockFeed) {
+      return [];
+    }
+    return mockPostsAsFeed();
+  }, [useMockFeed]);
+
+  const gridPosts: Array<{ id: string; imageUrls: string[] }> = useMockFeed
+    ? playgroundPosts
+    : apiPosts;
+
+  const displayName =
+    me?.displayName ?? user?.displayName ?? user?.email.split("@")[0] ?? "you";
+  const username =
+    me?.username ?? user?.username ?? user?.email.split("@")[0] ?? "user";
+  const bio = me?.bio ?? user?.bio ?? "";
+
+  useEffect(() => {
+    if (me) {
+      setFormDisplayName(me.displayName ?? "");
+      setFormBio(me.bio ?? "");
+      setFormInterests((me.interests ?? []).join(", "));
+    }
+  }, [me]);
+
+  const [saveProfile, { loading: saving }] = useMutation(UPDATE_PROFILE, {
+    refetchQueries: [{ query: ME }],
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  async function onSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    const interests = formInterests
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    try {
+      const { data } = await saveProfile({
+        variables: {
+          input: {
+            displayName: formDisplayName.trim() || undefined,
+            bio: formBio.trim() || undefined,
+            interests: interests.length ? interests : undefined,
+          },
+        },
+      });
+      const u = data?.updateProfile;
+      if (u) {
+        patchUser({
+          displayName: u.displayName ?? null,
+          username: u.username ?? null,
+          bio: u.bio ?? null,
+        });
+      }
+      setEditing(false);
+    } catch (err: unknown) {
+      setFormError(getApolloErrorMessage(err));
+    }
+  }
 
   return (
-    <div className="ig-profile">
-      <header className="ig-profile-header">
-        <span className="ig-profile-avatar lg">
-          {initialFromUser(user.displayName ?? undefined, user.email)}
+    <div className="cx-profile">
+      <header className="cx-profile-hero">
+        <div className="cx-profile-hero-blob" aria-hidden />
+        <span className="ig-profile-avatar lg cx-profile-avatar">
+          {initialFromUser(displayName, user.email)}
         </span>
-        <div className="ig-profile-stats">
-          <div className="ig-stat">
-            <strong>0</strong>
-            <span>posts</span>
-          </div>
-          <div className="ig-stat">
-            <strong>—</strong>
-            <span>followers</span>
-          </div>
-          <div className="ig-stat">
-            <strong>—</strong>
-            <span>following</span>
-          </div>
+        <div className="cx-profile-hero-text">
+          <p className="cx-profile-kicker">Your corner of CTrend</p>
+          <h1 className="cx-profile-title">{displayName}</h1>
+          <p className="cx-profile-handle">@{username}</p>
+          {bio ? <p className="cx-profile-bio-preview">{bio}</p> : null}
         </div>
       </header>
 
-      <div className="ig-profile-bio">
-        <p className="ig-profile-name">{label}</p>
-        <p className="ig-profile-email muted">{user.email}</p>
+      <div className="cx-profile-stats-row">
+        <div className="cx-profile-stat">
+          <strong>{gridPosts.length}</strong>
+          <span>compares</span>
+        </div>
+        <div className="cx-profile-stat cx-profile-stat--ghost">
+          <strong>+</strong>
+          <span>more soon</span>
+        </div>
       </div>
 
-      <div className="ig-profile-actions">
-        <button type="button" className="ig-btn-outline">
-          Edit profile
+      <div className="cx-profile-actions">
+        <button
+          type="button"
+          className="ig-btn-outline cx-profile-btn-primary"
+          onClick={() => {
+            setEditing((v) => !v);
+            setFormError(null);
+          }}
+        >
+          {editing ? "Close editor" : "Edit vibe"}
         </button>
-        <button type="button" className="ig-btn-outline">
-          Share profile
-        </button>
+        <NavLink to="/create" className="ig-btn-outline cx-profile-btn-accent">
+          New compare
+        </NavLink>
       </div>
 
-      <section className="ig-profile-grid" aria-label="Posts">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} className="ig-grid-cell" />
-        ))}
+      {editing ? (
+        <form className="cx-profile-editor" onSubmit={(ev) => void onSaveProfile(ev)}>
+          <h2 className="cx-profile-editor-title">Shape your profile</h2>
+          <label className="ig-field">
+            <span>Display name</span>
+            <input
+              className="ig-input"
+              value={formDisplayName}
+              onChange={(e) => setFormDisplayName(e.target.value)}
+              autoComplete="nickname"
+            />
+          </label>
+          <label className="ig-field">
+            <span>Bio</span>
+            <textarea
+              className="ig-input ig-input-textarea"
+              rows={3}
+              value={formBio}
+              onChange={(e) => setFormBio(e.target.value)}
+              placeholder="What do you love comparing?"
+            />
+          </label>
+          <label className="ig-field">
+            <span>Interests (comma separated)</span>
+            <input
+              className="ig-input"
+              value={formInterests}
+              onChange={(e) => setFormInterests(e.target.value)}
+              placeholder="coffee, sneakers, sunsets"
+            />
+          </label>
+          {formError ? (
+            <p className="error" role="alert">
+              {formError}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            className="ig-create-submit"
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save profile"}
+          </button>
+        </form>
+      ) : null}
+
+      {meLoading && !me && (
+        <p className="ig-feed-status">Loading your profile…</p>
+      )}
+      {meError && (
+        <div className="ig-feed-banner ig-feed-banner--error" role="alert">
+          Could not refresh profile. {meError.message}
+        </div>
+      )}
+
+      <section className="cx-profile-drops" aria-label="Your compares">
+        <h2 className="cx-profile-section-title">
+          <span className="cx-profile-section-emoji" aria-hidden>
+            &#10024;
+          </span>{" "}
+          Your drops
+        </h2>
+        {useMockFeed && (
+          <p className="cx-profile-demo-note">
+            <strong>Playground:</strong> sample compares below — connect the API
+            to see your real posts here.
+          </p>
+        )}
+        {!useMockFeed && postsLoading && (
+          <p className="muted small">Loading your compares…</p>
+        )}
+        {!useMockFeed && !postsLoading && gridPosts.length === 0 && (
+          <div className="cx-profile-empty">
+            <p className="cx-profile-empty-title">No compares yet</p>
+            <p className="muted">
+              Start a playful A/B post — your grid will light up here.
+            </p>
+            <NavLink to="/create" className="cx-profile-empty-cta">
+              Create your first compare
+            </NavLink>
+          </div>
+        )}
+        {gridPosts.length > 0 && (
+          <ul className="cx-profile-grid">
+            {gridPosts.map((post) => {
+              const thumb = post.imageUrls[0] ?? null;
+              return (
+                <li key={post.id}>
+                  <NavLink
+                    to={`/post/${post.id}`}
+                    className="cx-profile-grid-cell"
+                    style={
+                      thumb
+                        ? { backgroundImage: `url(${thumb})` }
+                        : undefined
+                    }
+                  >
+                    {!thumb ? (
+                      <span className="cx-profile-grid-fallback">?</span>
+                    ) : null}
+                    <span className="cx-profile-grid-shine" aria-hidden />
+                  </NavLink>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
-      <p className="ig-profile-empty muted">No posts yet</p>
+
+      <p className="muted small cx-profile-email">{user.email}</p>
 
       <button type="button" className="ig-logout" onClick={() => logout()}>
         Log out
