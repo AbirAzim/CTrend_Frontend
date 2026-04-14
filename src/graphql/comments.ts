@@ -17,18 +17,15 @@ export const COMMENTS_BY_POST = gql`
   }
 `;
 
+/** Variables: `{ postId, input: { content } }`; for replies add `input.parentId`. */
 export const COMMENT_POST = gql`
-  mutation CommentPost($input: CommentPostInput!) {
-    commentPost(input: $input) {
+  mutation CommentPost($postId: ID!, $input: CommentPostInput!) {
+    commentPost(postId: $postId, input: $input) {
       id
       content
-      createdAt
       postId
-      author {
-        id
-        username
-        displayName
-      }
+      parentId
+      createdAt
     }
   }
 `;
