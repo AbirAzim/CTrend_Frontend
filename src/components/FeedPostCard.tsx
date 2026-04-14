@@ -505,11 +505,6 @@ export function FeedPostCard({
               );
             })}
           </div>
-          <p className="ig-compare-hint">
-            {voteMode === "api"
-              ? "Tap an image to vote · tap another option to change your vote"
-              : "Tap an image to vote · tap again to remove your vote"}
-          </p>
         </>
       ) : post.imageUrls[0] ? (
         <div className="ig-post-media-wrap">
@@ -528,20 +523,137 @@ export function FeedPostCard({
         </div>
       )}
 
-      <div className="ig-post-toolbar">
-        <div className="ig-post-actions">
+      <div className="cx-post-footer">
+        {compareUrls ? (
+          <p className="cx-vote-hint-chip">
+            {voteMode === "api"
+              ? "Tap a side to vote — switch anytime with another tap"
+              : "Tap a side to vote — tap again to clear your pick"}
+          </p>
+        ) : null}
+
+        {post.caption ? (
+          <div className="cx-post-copy">
+            <span className="cx-post-handle">@{post.authorUsername}</span>
+            <p className="cx-post-caption-text">{post.caption}</p>
+          </div>
+        ) : null}
+
+        {isBinaryCompare ? (
+          <div className="cx-pulse-card" aria-live="polite">
+            <div className="cx-pulse-card-head">
+              <span className="cx-pulse-card-title">Live split</span>
+              <span className="cx-pulse-card-metric">
+                {binaryTotal > 0
+                  ? `${binaryTotal.toLocaleString()} votes`
+                  : "Be the first to break the tie"}
+              </span>
+            </div>
+            {([0, 1] as const).map((side) => {
+              const count = side === 0 ? up : down;
+              const pct = side === 0 ? leftPct : rightPct;
+              const label = compareOptionLabel(post, side);
+              return (
+                <div key={side} className="cx-pulse-row">
+                  <div className="cx-pulse-row-top">
+                    <span className="cx-pulse-name">{label}</span>
+                    <span className="cx-pulse-count">
+                      {count.toLocaleString()}
+                      {pct != null ? ` · ${pct}%` : ""}
+                    </span>
+                  </div>
+                  <div className="cx-pulse-track" aria-hidden>
+                    <div
+                      className={`cx-pulse-fill cx-pulse-fill--${side === 0 ? "a" : "b"}`}
+                      style={{ width: pct != null ? `${pct}%` : "0%" }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : isMultiCompare ? (
+          <div className="cx-pulse-card" aria-live="polite">
+            <div className="cx-pulse-card-head">
+              <span className="cx-pulse-card-title">Breakdown</span>
+              <span className="cx-pulse-card-metric">
+                {multiTotalVotes.toLocaleString()} votes
+              </span>
+            </div>
+            {compareUrls?.map((_, idx) => {
+              const pctVal = multiPercents[idx] ?? 0;
+              const label = compareOptionLabel(post, idx);
+              return (
+                <div key={`${post.id}-pulse-${idx}`} className="cx-pulse-row">
+                  <div className="cx-pulse-row-top">
+                    <span className="cx-pulse-name">{label}</span>
+                    <span className="cx-pulse-count">{pctVal}%</span>
+                  </div>
+                  <div className="cx-pulse-track" aria-hidden>
+                    <div
+                      className="cx-pulse-fill cx-pulse-fill--multi"
+                      style={{ width: `${pctVal}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : !compareUrls ? (
+          <div className="cx-pulse-card cx-pulse-card--compact" aria-live="polite">
+            <div className="cx-pulse-card-head">
+              <span className="cx-pulse-card-title">Pulse</span>
+              <span className="cx-pulse-card-metric">
+                {(up - down).toLocaleString()} net
+              </span>
+            </div>
+            <div className="cx-pulse-inline">
+              <span className="cx-pulse-up">{up.toLocaleString()} up</span>
+              <span className="cx-pulse-nub" aria-hidden />
+              <span className="cx-pulse-down">{down.toLocaleString()} down</span>
+            </div>
+          </div>
+        ) : null}
+
+        {showClassicVoteBar ? (
+          <div className="ig-vote-bar">
+            <span className="ig-vote-label">Vote</span>
+            <div className="ig-vote-actions">
+              <button
+                type="button"
+                className={`ig-vote-btn${viewer === "UP" ? " ig-vote-btn--active-up" : ""}`}
+                disabled={voteMode === "api" && voting}
+                aria-pressed={viewer === "UP"}
+                aria-label={viewer === "UP" ? "Remove upvote" : "Upvote"}
+                onClick={() => void handleVote("UP")}
+              >
+                <IconChevronUp active={viewer === "UP"} />
+                <span>{up.toLocaleString()}</span>
+              </button>
+              <button
+                type="button"
+                className={`ig-vote-btn${viewer === "DOWN" ? " ig-vote-btn--active-down" : ""}`}
+                disabled={voteMode === "api" && voting}
+                aria-pressed={viewer === "DOWN"}
+                aria-label={viewer === "DOWN" ? "Remove downvote" : "Downvote"}
+                onClick={() => void handleVote("DOWN")}
+              >
+                <IconChevronDown active={viewer === "DOWN"} />
+                <span>{down.toLocaleString()}</span>
+              </button>
+            </div>
+            <span className="ig-vote-hint">
+              {voteMode === "api"
+                ? "Tap the other button to change your vote"
+                : "Tap again to remove your vote"}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="cx-action-rail" role="toolbar" aria-label="Post actions">
           <button
             type="button"
-            className={`ig-action-btn${liked ? " ig-action-btn--liked" : ""}`}
-            aria-label={liked ? "Unlike" : "Like"}
-            aria-pressed={liked}
-            onClick={() => setLiked((v) => !v)}
-          >
-            <IconHeart filled={liked} />
-          </button>
-          <button
-            type="button"
-            className={`ig-action-btn${commentsOpen ? " ig-action-btn--comments-open" : ""}`}
+            className={`cx-action-chip${commentsOpen ? " cx-action-chip--pressed" : ""}`}
             aria-label={commentsOpen ? "Hide comments" : "Show comments"}
             aria-expanded={commentsOpen}
             onClick={() => {
@@ -550,124 +662,59 @@ export function FeedPostCard({
             }}
           >
             <IconComment />
+            <span className="cx-action-chip-label">Discuss</span>
           </button>
-          {showPermalinkToolbar ? (
-            <NavLink
-              to={`/post/${post.id}`}
-              className="ig-action-btn"
-              aria-label="View full post"
-              title="Open post on its own page"
-            >
-              <IconOpenPost />
-            </NavLink>
-          ) : null}
           <button
             type="button"
-            className="ig-action-btn"
+            className="cx-action-chip"
             aria-label="Share link to this post"
             title="Copy or share post link"
             onClick={() => void handleSharePostLink()}
           >
             <IconShare />
+            <span className="cx-action-chip-label">Share</span>
+          </button>
+          {showPermalinkToolbar ? (
+            <NavLink
+              to={`/post/${post.id}`}
+              className="cx-action-chip"
+              aria-label="View full post"
+              title="Open post on its own page"
+            >
+              <IconOpenPost />
+              <span className="cx-action-chip-label">Full page</span>
+            </NavLink>
+          ) : null}
+          <button
+            type="button"
+            className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
+            aria-label={liked ? "Unlike" : "Like"}
+            aria-pressed={liked}
+            onClick={() => setLiked((v) => !v)}
+          >
+            <IconHeart filled={liked} />
+            <span className="cx-action-chip-label">Hype</span>
+          </button>
+          <button
+            type="button"
+            className={`cx-action-chip${saved ? " cx-action-chip--saved" : ""}`}
+            aria-label={saved ? "Unsave" : "Save"}
+            aria-pressed={saved}
+            onClick={() => setSaved((v) => !v)}
+          >
+            <IconBookmark filled={saved} />
+            <span className="cx-action-chip-label">Keep</span>
           </button>
         </div>
-        <button
-          type="button"
-          className="ig-action-btn"
-          aria-label={saved ? "Unsave" : "Save"}
-          aria-pressed={saved}
-          onClick={() => setSaved((v) => !v)}
-        >
-          <IconBookmark filled={saved} />
-        </button>
+
+        {shareHint ? (
+          <p className="ig-share-hint" role="status">
+            {shareHint}
+          </p>
+        ) : null}
+
+        {timeLabel ? <p className="cx-post-meta-time">{timeLabel}</p> : null}
       </div>
-
-      {shareHint ? (
-        <p className="ig-share-hint" role="status">
-          {shareHint}
-        </p>
-      ) : null}
-
-      {showClassicVoteBar ? (
-        <div className="ig-vote-bar">
-          <span className="ig-vote-label">Vote</span>
-          <div className="ig-vote-actions">
-            <button
-              type="button"
-              className={`ig-vote-btn${viewer === "UP" ? " ig-vote-btn--active-up" : ""}`}
-              disabled={voteMode === "api" && voting}
-              aria-pressed={viewer === "UP"}
-              aria-label={viewer === "UP" ? "Remove upvote" : "Upvote"}
-              onClick={() => void handleVote("UP")}
-            >
-              <IconChevronUp active={viewer === "UP"} />
-              <span>{up.toLocaleString()}</span>
-            </button>
-            <button
-              type="button"
-              className={`ig-vote-btn${viewer === "DOWN" ? " ig-vote-btn--active-down" : ""}`}
-              disabled={voteMode === "api" && voting}
-              aria-pressed={viewer === "DOWN"}
-              aria-label={viewer === "DOWN" ? "Remove downvote" : "Downvote"}
-              onClick={() => void handleVote("DOWN")}
-            >
-              <IconChevronDown active={viewer === "DOWN"} />
-              <span>{down.toLocaleString()}</span>
-            </button>
-          </div>
-          <span className="ig-vote-hint">
-            {voteMode === "api"
-              ? "Tap the other button to change your vote"
-              : "Tap again to remove your vote"}
-          </span>
-        </div>
-      ) : null}
-
-      {isBinaryCompare ? (
-        <p className="ig-post-likes">
-          <strong>
-            {leftPct !== null && rightPct !== null
-              ? `${leftPct}% · ${rightPct}%`
-              : "No votes yet"}
-          </strong>
-          <span className="ig-post-likes-detail">
-            {" "}
-            · {up.toLocaleString()} — {compareOptionLabel(post, 0)} ·{" "}
-            {down.toLocaleString()} — {compareOptionLabel(post, 1)}
-          </span>
-        </p>
-      ) : isMultiCompare ? (
-        <p className="ig-post-likes">
-          <strong>
-            {multiTotalVotes.toLocaleString()} total votes
-          </strong>
-          <span className="ig-post-likes-detail">
-            {" "}
-            ·{" "}
-            {multiPercents.map((pctVal, idx) => (
-              <span key={`${post.id}-pct-${idx}`}>
-                {compareOptionLabel(post, idx)}: {pctVal}%
-                {idx < multiPercents.length - 1 ? " · " : ""}
-              </span>
-            ))}
-          </span>
-        </p>
-      ) : (
-        <p className="ig-post-likes">
-          <strong>{(up - down).toLocaleString()} score</strong>
-          <span className="ig-post-likes-detail">
-            {" "}
-            · {up.toLocaleString()} up · {down.toLocaleString()} down
-          </span>
-        </p>
-      )}
-
-      {post.caption ? (
-        <p className="ig-post-caption">
-          <strong>{post.authorUsername}</strong> {post.caption}
-        </p>
-      ) : null}
-      {timeLabel ? <p className="ig-post-time">{timeLabel}</p> : null}
 
       {commentsOpen ? (
         <section className="ig-post-comments" aria-label="Comments">
