@@ -596,6 +596,7 @@ a:hover {
 
 .cx-friend-meta {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   line-height: 1.25;
@@ -621,6 +622,12 @@ a:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.cx-side-panel--left .cx-friend-item > .btn-ghost {
+  margin-left: auto;
+  min-width: 54px;
+  flex-shrink: 0;
 }
 
 .cx-friend-request-content {
