@@ -4,7 +4,9 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
+import { MY_FRIENDS } from "../graphql/friends";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
+import { EXTEND_POST_VOTING } from "../graphql/feed";
 
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
@@ -24,8 +26,36 @@ function rel(iso?: string | null): string {
   return `${Math.max(1, m)}m left`;
 }
 
+function toLocalDateTimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function gmailAvatarFromEmail(email: string): string | null {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized.endsWith("@gmail.com")) {
+    return null;
+  }
+  return `https://www.google.com/s2/photos/profile/${encodeURIComponent(normalized)}?sz=256`;
+}
+
+type FriendRow = {
+  id: string;
+  username?: string | null;
+  displayName?: string | null;
+  profileImageUrl?: string | null;
+};
+
+function friendName(f: FriendRow): string {
+  return f.displayName?.trim() || f.username?.trim() || "User";
+}
+
+function friendInitial(f: FriendRow): string {
+  return friendName(f).slice(0, 1).toUpperCase();
+}
+
 export function ProfilePage() {
-  const { user, logout, patchUser } = useAuth();
+  const { user, patchUser } = useAuth();
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const [editing, setEditing] = useState(false);
@@ -33,6 +63,13 @@ export function ProfilePage() {
   const [formBio, setFormBio] = useState("");
   const [formInterests, setFormInterests] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [extendDraftByPost, setExtendDraftByPost] = useState<Record<string, string>>(
+    {},
+  );
+  const [extendErrorByPost, setExtendErrorByPost] = useState<Record<string, string>>(
+    {},
+  );
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
     skip: !user,
@@ -45,6 +82,10 @@ export function ProfilePage() {
   const { data: postsData, loading: postsLoading } = useQuery(USER_POSTS, {
     variables: { userId },
     skip: !userId || useMockFeed,
+    fetchPolicy: "network-only",
+  });
+  const { data: friendsData, loading: friendsLoading } = useQuery(MY_FRIENDS, {
+    skip: useMockFeed,
     fetchPolicy: "network-only",
   });
 
@@ -84,6 +125,7 @@ export function ProfilePage() {
   }> = useMockFeed
     ? playgroundPosts
     : apiPosts;
+  const friends = (friendsData?.myFriends ?? []) as FriendRow[];
 
   const totalImages = gridPosts.reduce((a, p) => a + (p.imageUrls?.length ?? 0), 0);
   const totalVotes = gridPosts.reduce(
@@ -97,6 +139,8 @@ export function ProfilePage() {
   const username =
     me?.username ?? user?.username ?? user?.email.split("@")[0] ?? "user";
   const bio = me?.bio ?? user?.bio ?? "";
+  const heroAvatarUrl =
+    me?.profileImageUrl?.trim() || gmailAvatarFromEmail(user?.email ?? "");
 
   useEffect(() => {
     if (me) {
@@ -106,9 +150,19 @@ export function ProfilePage() {
     }
   }, [me]);
 
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [heroAvatarUrl]);
+
   const [saveProfile, { loading: saving }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: ME }],
   });
+  const [extendVotingMut, { loading: extendingVoting }] = useMutation(
+    EXTEND_POST_VOTING,
+    {
+      refetchQueries: [{ query: USER_POSTS, variables: { userId } }],
+    },
+  );
 
   if (!user) {
     return null;
@@ -145,12 +199,71 @@ export function ProfilePage() {
     }
   }
 
+  async function onExtendVoting(postId: string, currentEnd?: string | null) {
+    const raw = (extendDraftByPost[postId] ?? "").trim();
+    setExtendErrorByPost((prev) => ({ ...prev, [postId]: "" }));
+    if (!raw) {
+      setExtendErrorByPost((prev) => ({
+        ...prev,
+        [postId]: "Pick a new date-time.",
+      }));
+      return;
+    }
+    const next = new Date(raw);
+    if (Number.isNaN(next.getTime())) {
+      setExtendErrorByPost((prev) => ({
+        ...prev,
+        [postId]: "Invalid datetime.",
+      }));
+      return;
+    }
+    if (next.getTime() <= Date.now()) {
+      setExtendErrorByPost((prev) => ({
+        ...prev,
+        [postId]: "New deadline must be in the future.",
+      }));
+      return;
+    }
+    if (currentEnd) {
+      const cur = new Date(currentEnd).getTime();
+      if (!Number.isNaN(cur) && next.getTime() <= cur) {
+        setExtendErrorByPost((prev) => ({
+          ...prev,
+          [postId]: "New deadline should be after current end time.",
+        }));
+        return;
+      }
+    }
+    try {
+      await extendVotingMut({
+        variables: {
+          postId,
+          newVotingEndsAt: next.toISOString(),
+        },
+      });
+      setExtendDraftByPost((prev) => ({ ...prev, [postId]: "" }));
+    } catch (err: unknown) {
+      setExtendErrorByPost((prev) => ({
+        ...prev,
+        [postId]: getApolloErrorMessage(err),
+      }));
+    }
+  }
+
   return (
     <div className="cx-profile">
       <header className="cx-profile-hero">
         <div className="cx-profile-hero-blob" aria-hidden />
         <span className="ig-profile-avatar lg cx-profile-avatar">
-          {initialFromUser(displayName, user.email)}
+          {heroAvatarUrl && !avatarLoadFailed ? (
+            <img
+              src={heroAvatarUrl}
+              alt={`${displayName} profile`}
+              onError={() => setAvatarLoadFailed(true)}
+            />
+          ) : (
+            initialFromUser(displayName, user.email)
+          )}
         </span>
         <div className="cx-profile-hero-text">
           <p className="cx-profile-kicker">Your corner of CTrend</p>
@@ -192,6 +305,9 @@ export function ProfilePage() {
         </button>
         <NavLink to="/create" className="ig-btn-outline cx-profile-btn-accent">
           New compare
+        </NavLink>
+        <NavLink to="/friends" className="ig-btn-outline cx-profile-btn-primary">
+          Friends
         </NavLink>
       </div>
 
@@ -319,6 +435,41 @@ export function ProfilePage() {
                       <p className="cx-profile-drop-sub">
                         {ended ? "Voting closed" : rel(post.votingEndsAt) || "Voting open"}
                       </p>
+                      {!useMockFeed ? (
+                        <div className="cx-profile-drop-actions">
+                          <NavLink
+                            to={`/post/${post.id}`}
+                            className="btn-ghost cx-profile-drop-edit"
+                          >
+                            Edit post
+                          </NavLink>
+                          <input
+                            type="datetime-local"
+                            className="ig-input cx-profile-drop-extend-input"
+                            value={extendDraftByPost[post.id] ?? ""}
+                            onChange={(e) =>
+                              setExtendDraftByPost((prev) => ({
+                                ...prev,
+                                [post.id]: e.target.value,
+                              }))
+                            }
+                            min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+                          />
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            disabled={extendingVoting}
+                            onClick={() => void onExtendVoting(post.id, post.votingEndsAt)}
+                          >
+                            {extendingVoting ? "Updating..." : "Extend voting"}
+                          </button>
+                          {extendErrorByPost[post.id] ? (
+                            <small className="error" role="alert">
+                              {extendErrorByPost[post.id]}
+                            </small>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </article>
                 </li>
@@ -328,11 +479,36 @@ export function ProfilePage() {
         )}
       </section>
 
-      <p className="muted small cx-profile-email">{user.email}</p>
+      <section className="cx-profile-friends" aria-label="Your friends">
+        <h2 className="cx-profile-section-title">Friends</h2>
+        {!useMockFeed && friendsLoading ? (
+          <p className="muted small">Loading friends…</p>
+        ) : null}
+        {!useMockFeed && !friendsLoading && friends.length === 0 ? (
+          <p className="muted small">No friends yet.</p>
+        ) : null}
+        {friends.length > 0 ? (
+          <ul className="cx-friend-list">
+            {friends.map((f) => (
+              <li key={f.id} className="cx-friend-item">
+                <span className="cx-friend-avatar">
+                  {f.profileImageUrl ? (
+                    <img src={f.profileImageUrl} alt="" />
+                  ) : (
+                    friendInitial(f)
+                  )}
+                </span>
+                <div className="cx-friend-meta">
+                  <strong>{friendName(f)}</strong>
+                  <span>@{f.username ?? "user"}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
-      <button type="button" className="ig-logout" onClick={() => logout()}>
-        Log out
-      </button>
+      <p className="muted small cx-profile-email">{user.email}</p>
     </div>
   );
 }

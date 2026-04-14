@@ -1,7 +1,31 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { IconHome, IconPlusSquare, IconUser } from "../components/IgIcons";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import type { MouseEvent } from "react";
+import { IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/IgIcons";
+import { useAuth } from "../context/AuthContext";
 
 export function AppShell() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  function onHomeClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (location.pathname !== "/") {
+      return;
+    }
+    event.preventDefault();
+    const isAtTop = window.scrollY <= 8;
+    if (!isAtTop) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("ctrend:refresh-feed"));
+  }
+
+  function onLogoutClick() {
+    logout();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="ig-app">
       <header className="ig-topbar">
@@ -11,16 +35,27 @@ export function AppShell() {
           </NavLink>
           <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
-        <NavLink
-          to="/create"
-          className="ig-topbar-cta"
-          title="Start a new compare"
-        >
-          <span className="ig-topbar-cta-glyph" aria-hidden>
-            &#10022;
-          </span>
-          <span className="ig-topbar-cta-label">New compare</span>
-        </NavLink>
+        <div className="ig-topbar-actions">
+          <NavLink
+            to="/create"
+            className="ig-topbar-cta"
+            title="Start a new compare"
+          >
+            <span className="ig-topbar-cta-glyph" aria-hidden>
+              &#10022;
+            </span>
+            <span className="ig-topbar-cta-label">New compare</span>
+          </NavLink>
+          <button
+            type="button"
+            className="ig-topbar-logout"
+            onClick={onLogoutClick}
+            aria-label="Logout"
+            title="Logout"
+          >
+            <IconLogout />
+          </button>
+        </div>
       </header>
 
       <main className="ig-main-scroll">
@@ -31,6 +66,7 @@ export function AppShell() {
         <NavLink
           to="/"
           end
+          onClick={onHomeClick}
           className={({ isActive }) =>
             `ig-nav-item${isActive ? " ig-nav-item--active" : ""}`
           }

@@ -25,6 +25,7 @@ export function mapGqlPostToFeedView(p: {
   id: string;
   authorUsername: string;
   authorDisplayName?: string | null;
+  authorEmail?: string | null;
   imageUrls?: string[] | null;
   caption?: string | null;
   createdAt?: string | null;
@@ -59,6 +60,7 @@ export function mapGqlPostToFeedView(p: {
     id: p.id,
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,
+    authorEmail: p.authorEmail ?? null,
     imageUrls,
     caption: p.caption ?? null,
     createdAt: p.createdAt ?? null,

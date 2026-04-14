@@ -1,4 +1,4 @@
-import { useLazyQuery, useMutation } from "@apollo/client";
+import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -14,9 +14,9 @@ import {
   IconShare,
 } from "./IgIcons";
 import {
-  EXTEND_POST_VOTING,
   FEED_POSTS,
   GET_POST_BY_ID,
+  POST_VOTE_UPDATED,
   VOTE_POST,
 } from "../graphql/feed";
 import { apolloClient } from "../lib/apolloClient";
@@ -27,6 +27,25 @@ import type { FeedPostView, VoteDirectionGql } from "../types/feed";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
+}
+
+function authorAvatarUrlCandidates(
+  authorProfileImageUrl?: string | null,
+  authorEmail?: string | null,
+): string[] {
+  const profileImage = authorProfileImageUrl?.trim();
+  if (profileImage) {
+    return [profileImage];
+  }
+  const email = authorEmail?.trim().toLowerCase();
+  if (!email) {
+    return [];
+  }
+  const encoded = encodeURIComponent(email);
+  return [
+    `https://profiles.google.com/s2/photos/profile/${encoded}?sz=96`,
+    `https://www.google.com/s2/photos/profile/${encoded}?sz=96`,
+  ];
 }
 
 function nextDirection(
@@ -75,11 +94,6 @@ function pctParts(counts: number[]): number[] {
   return out;
 }
 
-function toLocalDateTimeInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 function formatCountdown(targetIso: string): string {
   const end = new Date(targetIso).getTime();
   if (Number.isNaN(end)) {
@@ -87,19 +101,35 @@ function formatCountdown(targetIso: string): string {
   }
   const diff = end - Date.now();
   if (diff <= 0) {
-    return "0m left";
+    return "0m 00s left";
   }
-  const totalSec = Math.floor(diff / 1000);
+  const totalSec = Math.max(0, Math.floor(diff / 1000));
   const days = Math.floor(totalSec / 86400);
   const hours = Math.floor((totalSec % 86400) / 3600);
   const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const secText = `${String(secs).padStart(2, "0")}s`;
   if (days > 0) {
-    return `${days}d ${hours}h left`;
+    return `${days}d ${hours}h ${mins}m ${secText} left`;
   }
   if (hours > 0) {
-    return `${hours}h ${mins}m left`;
+    return `${hours}h ${mins}m ${secText} left`;
   }
-  return `${Math.max(1, mins)}m left`;
+  return `${mins}m ${secText} left`;
+}
+
+function formatAbsoluteDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }
 
 type LocalCommentRow = {
@@ -124,6 +154,34 @@ type CommentsByPostQueryData = {
   }>;
 };
 
+type VoteLiveState = {
+  upvoteCount: number;
+  downvoteCount: number;
+  viewerVote: FeedPostView["viewerVote"];
+  mySelectedOptionIndex: number | null;
+  optionStats: FeedPostView["optionStats"];
+  isVotingOpen: boolean | null;
+  votingEndsAt: string | null;
+};
+
+type PostVoteUpdatedData = {
+  postVoteUpdated: {
+    id: string;
+    upvoteCount: number;
+    downvoteCount: number;
+    viewerVote?: "UP" | "DOWN" | null;
+    mySelectedOptionIndex?: number | null;
+    isVotingOpen?: boolean | null;
+    votingEndsAt?: string | null;
+    optionStats?: Array<{
+      index: number;
+      label: string;
+      count: number;
+      percentage: number;
+    }> | null;
+  };
+};
+
 type Props = {
   post: FeedPostView;
   /** `local` = demo feed only; `api` = call GraphQL `votePost`. */
@@ -144,11 +202,12 @@ export function FeedPostCard({
   const [commentDraft, setCommentDraft] = useState("");
   const [localComments, setLocalComments] = useState<LocalCommentRow[]>([]);
   const [commentError, setCommentError] = useState<string | null>(null);
-  const [extendEndsAt, setExtendEndsAt] = useState("");
-  const [extendError, setExtendError] = useState<string | null>(null);
+  const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
+  const [voteFx, setVoteFx] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [shareHint, setShareHint] = useState<string | null>(null);
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [authorAvatarAttempt, setAuthorAvatarAttempt] = useState(0);
 
   const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
     useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, { fetchPolicy: "network-only" });
@@ -156,15 +215,37 @@ export function FeedPostCard({
   const [commentMut, { loading: commentPosting }] = useMutation(COMMENT_POST, {
     refetchQueries: [{ query: COMMENTS_BY_POST, variables: { postId: post.id } }],
   });
-  const [extendVotingMut, { loading: extendingVoting }] = useMutation(
-    EXTEND_POST_VOTING,
-    {
-      refetchQueries: [
-        { query: FEED_POSTS },
-        { query: GET_POST_BY_ID, variables: { id: post.id } },
-      ],
+
+  useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
+    skip: voteMode !== "api",
+    variables: { postId: post.id },
+    onData: ({ data }) => {
+      const next = data.data?.postVoteUpdated;
+      if (!next || next.id !== post.id) {
+        return;
+      }
+      setOptimisticVote({
+        upvoteCount: next.upvoteCount,
+        downvoteCount: next.downvoteCount,
+        viewerVote: next.viewerVote ?? null,
+        mySelectedOptionIndex: next.mySelectedOptionIndex ?? null,
+        optionStats:
+          next.optionStats?.map((s) => ({
+            index: s.index,
+            label: s.label,
+            count: Math.round(s.count),
+            percentage: s.percentage,
+          })) ?? null,
+        isVotingOpen:
+          next.isVotingOpen === undefined || next.isVotingOpen === null
+            ? null
+            : next.isVotingOpen,
+        votingEndsAt: next.votingEndsAt ?? null,
+      });
+      setVoteFx(true);
+      setTimeout(() => setVoteFx(false), 280);
     },
-  );
+  });
 
   useEffect(() => {
     if (commentsOpen && voteMode === "api") {
@@ -184,6 +265,19 @@ export function FeedPostCard({
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    setOptimisticVote(null);
+  }, [
+    post.id,
+    post.upvoteCount,
+    post.downvoteCount,
+    post.viewerVote,
+    post.mySelectedOptionIndex,
+    post.optionStats,
+    post.isVotingOpen,
+    post.votingEndsAt,
+  ]);
 
   async function handleSharePostLink() {
     const url = postPermalink(post.id);
@@ -259,20 +353,35 @@ export function FeedPostCard({
   const useApiMulti =
     voteMode === "api" &&
     isMultiCompare &&
-    Boolean(post.optionStats?.length) &&
-    (post.optionStats?.length ?? 0) >= (compareUrls?.length ?? 0);
+    Boolean((optimisticVote?.optionStats ?? post.optionStats)?.length) &&
+    ((optimisticVote?.optionStats ?? post.optionStats)?.length ?? 0) >=
+      (compareUrls?.length ?? 0);
 
-  const up = voteMode === "local" ? localUp : post.upvoteCount;
-  const down = voteMode === "local" ? localDown : post.downvoteCount;
-  const viewer = voteMode === "local" ? localViewer : post.viewerVote;
+  const up =
+    voteMode === "local"
+      ? localUp
+      : (optimisticVote?.upvoteCount ?? post.upvoteCount);
+  const down =
+    voteMode === "local"
+      ? localDown
+      : (optimisticVote?.downvoteCount ?? post.downvoteCount);
+  const viewer =
+    voteMode === "local"
+      ? localViewer
+      : (optimisticVote?.viewerVote ?? post.viewerVote);
+  const activeOptionStats = optimisticVote?.optionStats ?? post.optionStats;
+  const activeMySelectedOptionIndex =
+    optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
+  const activeVotingEndsAt = optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
+  const activeIsVotingOpen = optimisticVote?.isVotingOpen ?? post.isVotingOpen ?? null;
 
   const multiPercents = useMemo(() => {
     if (!isMultiCompare) {
       return [];
     }
-    if (useApiMulti && post.optionStats && compareUrls) {
+    if (useApiMulti && activeOptionStats && compareUrls) {
       return compareUrls.map((_, i) => {
-        const s = post.optionStats!.find((x) => x.index === i);
+        const s = activeOptionStats.find((x) => x.index === i);
         return s ? Math.round(s.percentage) : 0;
       });
     }
@@ -280,7 +389,7 @@ export function FeedPostCard({
   }, [
     isMultiCompare,
     useApiMulti,
-    post.optionStats,
+    activeOptionStats,
     compareUrls,
     multiCounts,
   ]);
@@ -289,40 +398,39 @@ export function FeedPostCard({
     if (!isMultiCompare) {
       return 0;
     }
-    if (useApiMulti && post.optionStats) {
-      return post.optionStats.reduce((a, s) => a + Math.round(s.count), 0);
+    if (useApiMulti && activeOptionStats) {
+      return activeOptionStats.reduce((a, s) => a + Math.round(s.count), 0);
     }
     return multiCounts.reduce((a, b) => a + b, 0);
-  }, [isMultiCompare, useApiMulti, post.optionStats, multiCounts]);
+  }, [isMultiCompare, useApiMulti, activeOptionStats, multiCounts]);
 
   const multiPickDisplayed = useApiMulti
-    ? (post.mySelectedOptionIndex ?? null)
+    ? activeMySelectedOptionIndex
     : multiPick;
 
   const timeLabel =
     formatRelativeTime(post.createdAt) || (voteMode === "local" ? "demo" : "");
-  const votingEndsDate = post.votingEndsAt ? new Date(post.votingEndsAt) : null;
+  const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
   const votingEndedByTime =
     votingHasEndDate && votingEndsDate.getTime() <= nowMs;
-  const isVotingClosed = post.isVotingOpen === false || votingEndedByTime;
+  const isVotingClosed = activeIsVotingOpen === false || votingEndedByTime;
   const countdownLabel =
-    votingHasEndDate && post.votingEndsAt && !isVotingClosed
-      ? formatCountdown(post.votingEndsAt)
+    votingHasEndDate && activeVotingEndsAt && !isVotingClosed
+      ? formatCountdown(activeVotingEndsAt)
+      : "";
+  const votingEndsAtText =
+    votingHasEndDate && activeVotingEndsAt
+      ? formatAbsoluteDateTime(activeVotingEndsAt)
       : "";
   const votingStatusLabel = isVotingClosed
     ? "Voting closed"
     : countdownLabel
       ? countdownLabel
       : votingHasEndDate
-        ? `Ends ${formatRelativeTime(post.votingEndsAt) || ""}`
+        ? `Ends ${formatRelativeTime(activeVotingEndsAt) || ""}`
       : "Voting open";
-  const isAuthor = Boolean(
-    authUser?.username &&
-      post.authorUsername &&
-      authUser.username.toLowerCase() === post.authorUsername.toLowerCase(),
-  );
   const voteControlsDisabled = (voteMode === "api" && voting) || isVotingClosed;
 
   const meLabel =
@@ -373,37 +481,83 @@ export function FeedPostCard({
     });
   }
 
-  async function onExtendVoting(e: React.FormEvent) {
-    e.preventDefault();
-    setExtendError(null);
-    if (!extendEndsAt) {
-      setExtendError("Pick a new deadline.");
+  function applyOptimisticBinaryVote(nextDirectionValue: VoteDirectionGql) {
+    let nextUp = up;
+    let nextDown = down;
+    let nextViewer: FeedPostView["viewerVote"] = viewer;
+    if (nextDirectionValue === "NONE") {
+      if (viewer === "UP") {
+        nextUp = Math.max(0, nextUp - 1);
+      } else if (viewer === "DOWN") {
+        nextDown = Math.max(0, nextDown - 1);
+      }
+      nextViewer = null;
+    } else if (nextDirectionValue === "UP") {
+      if (viewer === "DOWN") {
+        nextDown = Math.max(0, nextDown - 1);
+      }
+      if (viewer !== "UP") {
+        nextUp += 1;
+      }
+      nextViewer = "UP";
+    } else if (nextDirectionValue === "DOWN") {
+      if (viewer === "UP") {
+        nextUp = Math.max(0, nextUp - 1);
+      }
+      if (viewer !== "DOWN") {
+        nextDown += 1;
+      }
+      nextViewer = "DOWN";
+    }
+    setOptimisticVote({
+      upvoteCount: nextUp,
+      downvoteCount: nextDown,
+      viewerVote: nextViewer,
+      mySelectedOptionIndex: nextViewer === "UP" ? 0 : nextViewer === "DOWN" ? 1 : null,
+      optionStats: activeOptionStats ?? null,
+      isVotingOpen: activeIsVotingOpen,
+      votingEndsAt: activeVotingEndsAt,
+    });
+    setVoteFx(true);
+    setTimeout(() => setVoteFx(false), 240);
+  }
+
+  function applyOptimisticMultiVote(index: number) {
+    if (!compareUrls || compareUrls.length <= 2) {
       return;
     }
-    const newEnd = new Date(extendEndsAt);
-    if (Number.isNaN(newEnd.getTime())) {
-      setExtendError("Invalid datetime.");
-      return;
+    const len = compareUrls.length;
+    const baseCounts = activeOptionStats?.length
+      ? Array.from({ length: len }, (_, i) => {
+          const s = activeOptionStats.find((x) => x.index === i);
+          return s ? Math.round(s.count) : 0;
+        })
+      : [...multiCounts];
+    const currentSelected = activeMySelectedOptionIndex;
+    if (currentSelected !== null && currentSelected >= 0 && currentSelected < len) {
+      baseCounts[currentSelected] = Math.max(0, baseCounts[currentSelected] - 1);
     }
-    if (newEnd.getTime() <= Date.now()) {
-      setExtendError("New deadline must be in the future.");
-      return;
-    }
-    if (votingHasEndDate && newEnd.getTime() <= votingEndsDate!.getTime()) {
-      setExtendError("New deadline should be later than current end time.");
-      return;
-    }
-    try {
-      await extendVotingMut({
-        variables: {
-          postId: post.id,
-          newVotingEndsAt: newEnd.toISOString(),
-        },
-      });
-      setExtendEndsAt("");
-    } catch (err: unknown) {
-      setExtendError(getApolloErrorMessage(err));
-    }
+    baseCounts[index] += 1;
+    const total = baseCounts.reduce((a, b) => a + b, 0);
+    const percentages =
+      total > 0 ? baseCounts.map((c) => (100 * c) / total) : baseCounts.map(() => 0);
+    const labels = Array.from({ length: len }, (_, i) => compareOptionLabel(post, i));
+    setOptimisticVote({
+      upvoteCount: baseCounts[0] ?? up,
+      downvoteCount: baseCounts[1] ?? down,
+      viewerVote: index === 0 ? "UP" : index === 1 ? "DOWN" : null,
+      mySelectedOptionIndex: index,
+      optionStats: Array.from({ length: len }, (_, i) => ({
+        index: i,
+        label: labels[i],
+        count: baseCounts[i],
+        percentage: percentages[i],
+      })),
+      isVotingOpen: activeIsVotingOpen,
+      votingEndsAt: activeVotingEndsAt,
+    });
+    setVoteFx(true);
+    setTimeout(() => setVoteFx(false), 240);
   }
 
   async function handleVote(clicked: "UP" | "DOWN") {
@@ -455,6 +609,7 @@ export function FeedPostCard({
     }
 
     const selectedOptionIndex = clicked === "UP" ? 0 : 1;
+    applyOptimisticBinaryVote(direction);
     try {
       await voteMut({
         variables: {
@@ -464,8 +619,9 @@ export function FeedPostCard({
       });
     } catch (err: unknown) {
       const message = getApolloErrorMessage(err);
+      await refreshPostVotingState();
       if (/voting period has ended/i.test(message)) {
-        await refreshPostVotingState();
+        return;
       }
     }
   }
@@ -483,9 +639,10 @@ export function FeedPostCard({
     }
 
     if (voteMode === "api") {
-      if (post.mySelectedOptionIndex === index) {
+      if (activeMySelectedOptionIndex === index) {
         return;
       }
+      applyOptimisticMultiVote(index);
       try {
         await voteMut({
           variables: {
@@ -495,8 +652,9 @@ export function FeedPostCard({
         });
       } catch (err: unknown) {
         const message = getApolloErrorMessage(err);
+        await refreshPostVotingState();
         if (/voting period has ended/i.test(message)) {
-          await refreshPostVotingState();
+          return;
         }
       }
       return;
@@ -539,13 +697,38 @@ export function FeedPostCard({
     binaryTotal > 0 ? Math.round((100 * down) / binaryTotal) : null;
 
   const showClassicVoteBar = !compareUrls;
+  const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
+    post.authorProfileImageUrl,
+    post.authorEmail,
+  );
+  const postAuthorAvatar =
+    postAuthorAvatarCandidates[authorAvatarAttempt] ?? null;
+
+  useEffect(() => {
+    setAuthorAvatarAttempt(0);
+  }, [post.id, post.authorEmail]);
 
   return (
     <article className="ig-post">
       <header className="ig-post-header">
         <div className="ig-post-user">
           <span className="ig-avatar sm">
-            {storyInitial(post.authorUsername)}
+            {postAuthorAvatar ? (
+              <img
+                src={postAuthorAvatar}
+                alt={`${post.authorUsername} avatar`}
+                onError={() => {
+                  setAuthorAvatarAttempt((prev) => {
+                    if (prev + 1 < postAuthorAvatarCandidates.length) {
+                      return prev + 1;
+                    }
+                    return postAuthorAvatarCandidates.length;
+                  });
+                }}
+              />
+            ) : (
+              storyInitial(post.authorUsername)
+            )}
           </span>
           <div>
             <span className="ig-post-username">{post.authorUsername}</span>
@@ -666,10 +849,8 @@ export function FeedPostCard({
           {votingHasEndDate ? (
             <time className="cx-voting-time" dateTime={post.votingEndsAt ?? undefined}>
               {isVotingClosed
-                ? `Ended ${formatRelativeTime(post.votingEndsAt) || ""}`
-                : countdownLabel
-                  ? `Ends ${formatRelativeTime(post.votingEndsAt) || ""}`
-                  : `Ends ${formatRelativeTime(post.votingEndsAt) || ""}`}
+                ? `Ended ${votingEndsAtText || formatRelativeTime(post.votingEndsAt) || ""}`
+                : `Ends at ${votingEndsAtText || formatRelativeTime(post.votingEndsAt) || ""}`}
             </time>
           ) : null}
         </div>
@@ -682,7 +863,10 @@ export function FeedPostCard({
         ) : null}
 
         {isBinaryCompare ? (
-          <div className="cx-pulse-card" aria-live="polite">
+          <div
+            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}`}
+            aria-live="polite"
+          >
             <div className="cx-pulse-card-head">
               <span className="cx-pulse-card-title">Live split</span>
               <span className="cx-pulse-card-metric">
@@ -715,7 +899,10 @@ export function FeedPostCard({
             })}
           </div>
         ) : isMultiCompare ? (
-          <div className="cx-pulse-card" aria-live="polite">
+          <div
+            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}`}
+            aria-live="polite"
+          >
             <div className="cx-pulse-card-head">
               <span className="cx-pulse-card-title">Breakdown</span>
               <span className="cx-pulse-card-metric">
@@ -742,7 +929,10 @@ export function FeedPostCard({
             })}
           </div>
         ) : !compareUrls ? (
-          <div className="cx-pulse-card cx-pulse-card--compact" aria-live="polite">
+          <div
+            className={`cx-pulse-card cx-pulse-card--compact${voteFx ? " cx-pulse-card--votefx" : ""}`}
+            aria-live="polite"
+          >
             <div className="cx-pulse-card-head">
               <span className="cx-pulse-card-title">Pulse</span>
               <span className="cx-pulse-card-metric">
@@ -790,30 +980,6 @@ export function FeedPostCard({
                 : "Tap again to remove your vote"}
             </span>
           </div>
-        ) : null}
-
-        {voteMode === "api" && isAuthor ? (
-          <form className="cx-extend-voting-form" onSubmit={(ev) => void onExtendVoting(ev)}>
-            <label htmlFor={`extend-${post.id}`} className="cx-extend-voting-label">
-              Extend voting
-            </label>
-            <input
-              id={`extend-${post.id}`}
-              type="datetime-local"
-              className="ig-input"
-              value={extendEndsAt}
-              onChange={(ev) => setExtendEndsAt(ev.target.value)}
-              min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
-            />
-            <button type="submit" className="btn-ghost" disabled={extendingVoting}>
-              {extendingVoting ? "Updating..." : "Extend voting"}
-            </button>
-            {extendError ? (
-              <small className="error" role="alert">
-                {extendError}
-              </small>
-            ) : null}
-          </form>
         ) : null}
 
         <div className="cx-action-rail" role="toolbar" aria-label="Post actions">

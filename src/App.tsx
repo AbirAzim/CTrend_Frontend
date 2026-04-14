@@ -6,6 +6,7 @@ import { FeedPage } from "./pages/FeedPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { FriendsPage } from "./pages/FriendsPage";
 import { SignupPage } from "./pages/SignupPage";
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route index element={<FeedPage />} />
         <Route path="create" element={<CreatePostPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />
+        <Route path="friends" element={<FriendsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -4,6 +4,8 @@ export type FeedPostView = {
   id: string;
   authorUsername: string;
   authorDisplayName: string | null;
+  authorEmail?: string | null;
+  authorProfileImageUrl?: string | null;
   /** All post images from API (`imageUrls: [String!]!`). Order matters for compare / gallery. */
   imageUrls: string[];
   /**

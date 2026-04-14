@@ -110,6 +110,7 @@ export function CreatePostPage() {
       imageUrls: string[];
       options: Array<{ label: string; imageUrl: string }>;
       votingEndsAt?: string;
+      contentText?: string;
       caption?: string;
     } = {
       categoryId: category,
@@ -118,6 +119,7 @@ export function CreatePostPage() {
     };
     const cap = caption.trim();
     if (cap) {
+      input.contentText = cap;
       input.caption = cap;
     }
     if (votingEndsAtIso) {
