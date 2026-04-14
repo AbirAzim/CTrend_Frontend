@@ -7,6 +7,7 @@ export const FEED_POSTS = gql`
       id
       authorUsername
       authorDisplayName
+      authorEmail
       imageUrls
       caption
       createdAt
@@ -36,6 +37,7 @@ export const GET_POST_BY_ID = gql`
       id
       authorUsername
       authorDisplayName
+      authorEmail
       imageUrls
       caption
       createdAt
@@ -79,6 +81,7 @@ export const CREATE_POST = gql`
       caption
       authorUsername
       authorDisplayName
+      authorEmail
       createdAt
       upvoteCount
       downvoteCount
@@ -92,7 +95,7 @@ export const CREATE_POST = gql`
 /** Categories for create-post dropdown (uses backend ObjectId as `id`). */
 export const CATEGORIES = gql`
   query Categories {
-    categories {
+    categories: getAllCategories {
       id
       name
     }
@@ -105,6 +108,26 @@ export const EXTEND_POST_VOTING = gql`
       id
       votingEndsAt
       isVotingOpen
+    }
+  }
+`;
+
+export const POST_VOTE_UPDATED = gql`
+  subscription PostVoteUpdated($postId: ID!) {
+    postVoteUpdated(postId: $postId) {
+      id
+      upvoteCount
+      downvoteCount
+      viewerVote
+      mySelectedOptionIndex
+      votingEndsAt
+      isVotingOpen
+      optionStats {
+        index
+        label
+        count
+        percentage
+      }
     }
   }
 `;
