@@ -13,7 +13,13 @@ import {
   IconOpenPost,
   IconShare,
 } from "./IgIcons";
-import { FEED_POSTS, GET_POST_BY_ID, VOTE_POST } from "../graphql/feed";
+import {
+  EXTEND_POST_VOTING,
+  FEED_POSTS,
+  GET_POST_BY_ID,
+  VOTE_POST,
+} from "../graphql/feed";
+import { apolloClient } from "../lib/apolloClient";
 import { postPermalink } from "../lib/postPermalink";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -69,6 +75,33 @@ function pctParts(counts: number[]): number[] {
   return out;
 }
 
+function toLocalDateTimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatCountdown(targetIso: string): string {
+  const end = new Date(targetIso).getTime();
+  if (Number.isNaN(end)) {
+    return "";
+  }
+  const diff = end - Date.now();
+  if (diff <= 0) {
+    return "0m left";
+  }
+  const totalSec = Math.floor(diff / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  if (days > 0) {
+    return `${days}d ${hours}h left`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${mins}m left`;
+  }
+  return `${Math.max(1, mins)}m left`;
+}
+
 type LocalCommentRow = {
   id: string;
   content: string;
@@ -111,6 +144,9 @@ export function FeedPostCard({
   const [commentDraft, setCommentDraft] = useState("");
   const [localComments, setLocalComments] = useState<LocalCommentRow[]>([]);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [extendEndsAt, setExtendEndsAt] = useState("");
+  const [extendError, setExtendError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [shareHint, setShareHint] = useState<string | null>(null);
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -120,6 +156,15 @@ export function FeedPostCard({
   const [commentMut, { loading: commentPosting }] = useMutation(COMMENT_POST, {
     refetchQueries: [{ query: COMMENTS_BY_POST, variables: { postId: post.id } }],
   });
+  const [extendVotingMut, { loading: extendingVoting }] = useMutation(
+    EXTEND_POST_VOTING,
+    {
+      refetchQueries: [
+        { query: FEED_POSTS },
+        { query: GET_POST_BY_ID, variables: { id: post.id } },
+      ],
+    },
+  );
 
   useEffect(() => {
     if (commentsOpen && voteMode === "api") {
@@ -133,6 +178,11 @@ export function FeedPostCard({
         clearTimeout(shareHintTimer.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
   }, []);
 
   async function handleSharePostLink() {
@@ -251,6 +301,29 @@ export function FeedPostCard({
 
   const timeLabel =
     formatRelativeTime(post.createdAt) || (voteMode === "local" ? "demo" : "");
+  const votingEndsDate = post.votingEndsAt ? new Date(post.votingEndsAt) : null;
+  const votingHasEndDate =
+    votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
+  const votingEndedByTime =
+    votingHasEndDate && votingEndsDate.getTime() <= nowMs;
+  const isVotingClosed = post.isVotingOpen === false || votingEndedByTime;
+  const countdownLabel =
+    votingHasEndDate && post.votingEndsAt && !isVotingClosed
+      ? formatCountdown(post.votingEndsAt)
+      : "";
+  const votingStatusLabel = isVotingClosed
+    ? "Voting closed"
+    : countdownLabel
+      ? countdownLabel
+      : votingHasEndDate
+        ? `Ends ${formatRelativeTime(post.votingEndsAt) || ""}`
+      : "Voting open";
+  const isAuthor = Boolean(
+    authUser?.username &&
+      post.authorUsername &&
+      authUser.username.toLowerCase() === post.authorUsername.toLowerCase(),
+  );
+  const voteControlsDisabled = (voteMode === "api" && voting) || isVotingClosed;
 
   const meLabel =
     authUser?.displayName?.trim() ||
@@ -294,7 +367,49 @@ export function FeedPostCard({
     }
   }
 
+  async function refreshPostVotingState() {
+    await apolloClient.refetchQueries({
+      include: [FEED_POSTS, GET_POST_BY_ID],
+    });
+  }
+
+  async function onExtendVoting(e: React.FormEvent) {
+    e.preventDefault();
+    setExtendError(null);
+    if (!extendEndsAt) {
+      setExtendError("Pick a new deadline.");
+      return;
+    }
+    const newEnd = new Date(extendEndsAt);
+    if (Number.isNaN(newEnd.getTime())) {
+      setExtendError("Invalid datetime.");
+      return;
+    }
+    if (newEnd.getTime() <= Date.now()) {
+      setExtendError("New deadline must be in the future.");
+      return;
+    }
+    if (votingHasEndDate && newEnd.getTime() <= votingEndsDate!.getTime()) {
+      setExtendError("New deadline should be later than current end time.");
+      return;
+    }
+    try {
+      await extendVotingMut({
+        variables: {
+          postId: post.id,
+          newVotingEndsAt: newEnd.toISOString(),
+        },
+      });
+      setExtendEndsAt("");
+    } catch (err: unknown) {
+      setExtendError(getApolloErrorMessage(err));
+    }
+  }
+
   async function handleVote(clicked: "UP" | "DOWN") {
+    if (isVotingClosed) {
+      return;
+    }
     const direction = nextDirection(viewer, clicked);
 
     if (voteMode === "local") {
@@ -347,8 +462,11 @@ export function FeedPostCard({
           selectedOptionIndex,
         },
       });
-    } catch {
-      /* parent / toast could handle; keep UI stable */
+    } catch (err: unknown) {
+      const message = getApolloErrorMessage(err);
+      if (/voting period has ended/i.test(message)) {
+        await refreshPostVotingState();
+      }
     }
   }
 
@@ -357,6 +475,9 @@ export function FeedPostCard({
   }
 
   async function handleMultiCompareTap(index: number) {
+    if (isVotingClosed) {
+      return;
+    }
     if (!compareUrls || compareUrls.length <= 2) {
       return;
     }
@@ -372,8 +493,11 @@ export function FeedPostCard({
             selectedOptionIndex: index,
           },
         });
-      } catch {
-        /* keep UI stable */
+      } catch (err: unknown) {
+        const message = getApolloErrorMessage(err);
+        if (/voting period has ended/i.test(message)) {
+          await refreshPostVotingState();
+        }
       }
       return;
     }
@@ -457,7 +581,7 @@ export function FeedPostCard({
                     key={`${post.id}-cmp-${i}`}
                     type="button"
                     className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}`}
-                    disabled={voteMode === "api" && voting}
+                    disabled={voteControlsDisabled}
                     aria-pressed={picked}
                     aria-label={
                       picked
@@ -483,7 +607,7 @@ export function FeedPostCard({
                   key={`${post.id}-cmp-${i}`}
                   type="button"
                   className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}`}
-                  disabled={voteMode === "api" && voting}
+                  disabled={voteControlsDisabled}
                   aria-pressed={picked}
                   aria-label={
                     voteMode === "api"
@@ -526,11 +650,29 @@ export function FeedPostCard({
       <div className="cx-post-footer">
         {compareUrls ? (
           <p className="cx-vote-hint-chip">
-            {voteMode === "api"
+            {isVotingClosed
+              ? "Voting closed for this post."
+              : voteMode === "api"
               ? "Tap a side to vote — switch anytime with another tap"
               : "Tap a side to vote — tap again to clear your pick"}
           </p>
         ) : null}
+        <div className="cx-voting-state-row">
+          <span
+            className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
+          >
+            {votingStatusLabel}
+          </span>
+          {votingHasEndDate ? (
+            <time className="cx-voting-time" dateTime={post.votingEndsAt ?? undefined}>
+              {isVotingClosed
+                ? `Ended ${formatRelativeTime(post.votingEndsAt) || ""}`
+                : countdownLabel
+                  ? `Ends ${formatRelativeTime(post.votingEndsAt) || ""}`
+                  : `Ends ${formatRelativeTime(post.votingEndsAt) || ""}`}
+            </time>
+          ) : null}
+        </div>
 
         {post.caption ? (
           <div className="cx-post-copy">
@@ -622,7 +764,7 @@ export function FeedPostCard({
               <button
                 type="button"
                 className={`ig-vote-btn${viewer === "UP" ? " ig-vote-btn--active-up" : ""}`}
-                disabled={voteMode === "api" && voting}
+                disabled={voteControlsDisabled}
                 aria-pressed={viewer === "UP"}
                 aria-label={viewer === "UP" ? "Remove upvote" : "Upvote"}
                 onClick={() => void handleVote("UP")}
@@ -633,7 +775,7 @@ export function FeedPostCard({
               <button
                 type="button"
                 className={`ig-vote-btn${viewer === "DOWN" ? " ig-vote-btn--active-down" : ""}`}
-                disabled={voteMode === "api" && voting}
+                disabled={voteControlsDisabled}
                 aria-pressed={viewer === "DOWN"}
                 aria-label={viewer === "DOWN" ? "Remove downvote" : "Downvote"}
                 onClick={() => void handleVote("DOWN")}
@@ -648,6 +790,30 @@ export function FeedPostCard({
                 : "Tap again to remove your vote"}
             </span>
           </div>
+        ) : null}
+
+        {voteMode === "api" && isAuthor ? (
+          <form className="cx-extend-voting-form" onSubmit={(ev) => void onExtendVoting(ev)}>
+            <label htmlFor={`extend-${post.id}`} className="cx-extend-voting-label">
+              Extend voting
+            </label>
+            <input
+              id={`extend-${post.id}`}
+              type="datetime-local"
+              className="ig-input"
+              value={extendEndsAt}
+              onChange={(ev) => setExtendEndsAt(ev.target.value)}
+              min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+            />
+            <button type="submit" className="btn-ghost" disabled={extendingVoting}>
+              {extendingVoting ? "Updating..." : "Extend voting"}
+            </button>
+            {extendError ? (
+              <small className="error" role="alert">
+                {extendError}
+              </small>
+            ) : null}
+          </form>
         ) : null}
 
         <div className="cx-action-rail" role="toolbar" aria-label="Post actions">

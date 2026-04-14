@@ -37,6 +37,13 @@ export const USER_POSTS = gql`
       caption
       createdAt
       totalVotes
+      upvoteCount
+      downvoteCount
+      votingEndsAt
+      isVotingOpen
+      options {
+        label
+      }
       category {
         id
         name

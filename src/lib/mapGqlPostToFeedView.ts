@@ -28,6 +28,8 @@ export function mapGqlPostToFeedView(p: {
   imageUrls?: string[] | null;
   caption?: string | null;
   createdAt?: string | null;
+  votingEndsAt?: string | null;
+  isVotingOpen?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
   viewerVote?: string | null;
@@ -60,6 +62,11 @@ export function mapGqlPostToFeedView(p: {
     imageUrls,
     caption: p.caption ?? null,
     createdAt: p.createdAt ?? null,
+    votingEndsAt: p.votingEndsAt ?? null,
+    isVotingOpen:
+      p.isVotingOpen === undefined || p.isVotingOpen === null
+        ? null
+        : p.isVotingOpen,
     upvoteCount: p.upvoteCount,
     downvoteCount: p.downvoteCount,
     viewerVote: mapViewerVote(p.viewerVote, p.mySelectedOptionIndex),

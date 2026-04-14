@@ -15,6 +15,8 @@ export type FeedPostView = {
   viewerCompareChoice?: number | null;
   caption: string | null;
   createdAt: string | null;
+  votingEndsAt?: string | null;
+  isVotingOpen?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
   viewerVote: ViewerVote;
