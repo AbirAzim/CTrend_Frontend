@@ -282,8 +282,8 @@ export function FeedPostCard({
     try {
       await commentMut({
         variables: {
+          postId: post.id,
           input: {
-            postId: post.id,
             content: text,
           },
         },
