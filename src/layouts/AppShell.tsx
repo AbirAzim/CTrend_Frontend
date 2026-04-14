@@ -1,44 +1,33 @@
 import { NavLink, Outlet } from "react-router-dom";
-import {
-  IconHome,
-  IconPlusSquare,
-  IconReels,
-  IconSearch,
-  IconUser,
-} from "../components/IgIcons";
+import { IconHome, IconPlusSquare, IconUser } from "../components/IgIcons";
 
 export function AppShell() {
   return (
     <div className="ig-app">
       <header className="ig-topbar">
-        <NavLink to="/" className="ig-logo" end>
-          CTrend
-        </NavLink>
-        <div className="ig-topbar-actions">
-          <button type="button" className="ig-icon-btn" aria-label="Notifications">
-            <span className="ig-heart-dot" aria-hidden />
-          </button>
-          <button type="button" className="ig-icon-btn" aria-label="Messages">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              aria-hidden
-            >
-              <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
-            </svg>
-          </button>
+        <div className="ig-brand-block">
+          <NavLink to="/" className="ig-logo" end>
+            CTrend
+          </NavLink>
+          <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
+        <NavLink
+          to="/create"
+          className="ig-topbar-cta"
+          title="Start a new compare"
+        >
+          <span className="ig-topbar-cta-glyph" aria-hidden>
+            &#10022;
+          </span>
+          <span className="ig-topbar-cta-label">New compare</span>
+        </NavLink>
       </header>
 
       <main className="ig-main-scroll">
         <Outlet />
       </main>
 
-      <nav className="ig-bottom-nav" aria-label="Main">
+      <nav className="ig-bottom-nav ig-bottom-nav--three" aria-label="Main">
         <NavLink
           to="/"
           end
@@ -49,33 +38,16 @@ export function AppShell() {
         >
           {({ isActive }) => <IconHome active={isActive} />}
         </NavLink>
-        <button
-          type="button"
-          className="ig-nav-item ig-nav-item--muted"
-          disabled
-          title="Search — coming soon"
-          aria-label="Search"
-        >
-          <IconSearch />
-        </button>
-        <button
-          type="button"
-          className="ig-nav-item ig-nav-item--muted"
-          disabled
-          title="Create — coming soon"
-          aria-label="Create"
+        <NavLink
+          to="/create"
+          className={({ isActive }) =>
+            `ig-nav-item ig-nav-item--fab${isActive ? " ig-nav-item--active" : ""}`
+          }
+          title="Create compare"
+          aria-label="Create compare"
         >
           <IconPlusSquare />
-        </button>
-        <button
-          type="button"
-          className="ig-nav-item ig-nav-item--muted"
-          disabled
-          title="Reels — coming soon"
-          aria-label="Reels"
-        >
-          <IconReels />
-        </button>
+        </NavLink>
         <NavLink
           to="/profile"
           className={({ isActive }) =>

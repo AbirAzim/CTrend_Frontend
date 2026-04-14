@@ -4,6 +4,12 @@ export type MockPost = {
   username: string;
   displayName: string;
   imageSeed: string;
+  /** If set (2+ seeds), post is a side-by-side compare; votes are per image in the UI. */
+  compareSeeds?: string[];
+  /** Titles for each compare column (same length as `compareSeeds` when set). */
+  compareLabels?: string[];
+  /** Initial vote counts per compare column (3+ columns only). */
+  compareOptionCounts?: number[];
   likes: number;
   caption: string;
   timeAgo: string;
@@ -32,8 +38,10 @@ export const MOCK_POSTS: MockPost[] = [
     username: "city_views",
     displayName: "City Views",
     imageSeed: "1025",
+    compareSeeds: ["1025", "1026"],
+    compareLabels: ["Downtown glass", "Harbor sunset"],
     likes: 892,
-    caption: "Concrete jungle where dreams are made of.",
+    caption: "Which skyline hits harder? Tap an image to vote.",
     timeAgo: "5h",
   },
   {
@@ -41,8 +49,11 @@ export const MOCK_POSTS: MockPost[] = [
     username: "minimal_home",
     displayName: "Minimal Home",
     imageSeed: "1060",
+    compareSeeds: ["1060", "1061", "1062"],
+    compareLabels: ["Reading nook", "Kitchen island", "Bedroom light"],
+    compareOptionCounts: [420, 1180, 801],
     likes: 3401,
-    caption: "Sunday reset ✨",
+    caption: "Pick your favorite corner — tap to vote (demo: 3-way).",
     timeAgo: "1d",
   },
 ];
