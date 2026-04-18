@@ -4,7 +4,7 @@ import { IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/Ig
 import { useAuth } from "../context/AuthContext";
 
 export function AppShell() {
-  const { logout } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,25 +36,33 @@ export function AppShell() {
           <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
         <div className="ig-topbar-actions">
-          <NavLink
-            to="/create"
-            className="ig-topbar-cta"
-            title="Start a new compare"
-          >
-            <span className="ig-topbar-cta-glyph" aria-hidden>
-              &#10022;
-            </span>
-            <span className="ig-topbar-cta-label">New compare</span>
-          </NavLink>
-          <button
-            type="button"
-            className="ig-topbar-logout"
-            onClick={onLogoutClick}
-            aria-label="Logout"
-            title="Logout"
-          >
-            <IconLogout />
-          </button>
+          {isAuthenticated && (
+            <NavLink
+              to="/create"
+              className="ig-topbar-cta"
+              title="Start a new compare"
+            >
+              <span className="ig-topbar-cta-glyph" aria-hidden>
+                &#10022;
+              </span>
+              <span className="ig-topbar-cta-label">New compare</span>
+            </NavLink>
+          )}
+          {isAuthenticated ? (
+            <button
+              type="button"
+              className="ig-topbar-logout"
+              onClick={onLogoutClick}
+              aria-label="Logout"
+              title="Logout"
+            >
+              <IconLogout />
+            </button>
+          ) : (
+            <NavLink to="/login" className="ig-topbar-cta">
+              <span className="ig-topbar-cta-label">Log in</span>
+            </NavLink>
+          )}
         </div>
       </header>
 
@@ -75,7 +83,8 @@ export function AppShell() {
           {({ isActive }) => <IconHome active={isActive} />}
         </NavLink>
         <NavLink
-          to="/create"
+          to={isAuthenticated ? "/create" : "/login"}
+          state={!isAuthenticated ? { from: location.pathname } : undefined}
           className={({ isActive }) =>
             `ig-nav-item ig-nav-item--fab${isActive ? " ig-nav-item--active" : ""}`
           }
@@ -85,7 +94,8 @@ export function AppShell() {
           <IconPlusSquare />
         </NavLink>
         <NavLink
-          to="/profile"
+          to={isAuthenticated ? "/profile" : "/login"}
+          state={!isAuthenticated ? { from: "/profile" } : undefined}
           className={({ isActive }) =>
             `ig-nav-item${isActive ? " ig-nav-item--active" : ""}`
           }

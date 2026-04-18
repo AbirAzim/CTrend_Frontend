@@ -14,18 +14,26 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppShell />
-          </ProtectedRoute>
-        }
-      >
+      <Route element={<AppShell />}>
         <Route index element={<FeedPage />} />
-        <Route path="create" element={<CreatePostPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />
         <Route path="friends" element={<FriendsPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route
+          path="create"
+          element={
+            <ProtectedRoute>
+              <CreatePostPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

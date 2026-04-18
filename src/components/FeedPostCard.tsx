@@ -1,6 +1,6 @@
 import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { COMMENT_POST, COMMENTS_BY_POST } from "../graphql/comments";
 import {
@@ -195,7 +195,9 @@ export function FeedPostCard({
   voteMode,
   showPermalinkToolbar = true,
 }: Props) {
-  const { user: authUser } = useAuth();
+  const { user: authUser, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -564,6 +566,10 @@ export function FeedPostCard({
     if (isVotingClosed) {
       return;
     }
+    if (voteMode === "api" && !isAuthenticated) {
+      navigate("/login", { state: { from: location.pathname } });
+      return;
+    }
     const direction = nextDirection(viewer, clicked);
 
     if (voteMode === "local") {
@@ -632,6 +638,10 @@ export function FeedPostCard({
 
   async function handleMultiCompareTap(index: number) {
     if (isVotingClosed) {
+      return;
+    }
+    if (voteMode === "api" && !isAuthenticated) {
+      navigate("/login", { state: { from: location.pathname } });
       return;
     }
     if (!compareUrls || compareUrls.length <= 2) {
