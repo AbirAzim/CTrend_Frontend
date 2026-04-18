@@ -13,6 +13,7 @@ import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { ME } from "../graphql/profile";
+import { useAuth } from "../context/AuthContext";
 import type { FeedPostView } from "../types/feed";
 
 type FriendRow = {
@@ -33,6 +34,7 @@ function friendInitial(f: FriendRow): string {
 
 export function FeedPage() {
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
+  const { isAuthenticated } = useAuth();
   const [friendError, setFriendError] = useState<string | null>(null);
 
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
@@ -44,13 +46,13 @@ export function FeedPage() {
     loading: friendsLoading,
     refetch: refetchFriends,
   } = useQuery(MY_FRIENDS, {
-    skip: useMockFeed,
+    skip: useMockFeed || !isAuthenticated,
     fetchPolicy: "network-only",
   });
   const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery(
     FRIEND_REQUESTS,
     {
-      skip: useMockFeed,
+      skip: useMockFeed || !isAuthenticated,
       fetchPolicy: "network-only",
     },
   );
@@ -62,12 +64,12 @@ export function FeedPage() {
     FRIEND_SUGGESTIONS,
     {
       variables: { limit: 8 },
-      skip: useMockFeed,
+      skip: useMockFeed || !isAuthenticated,
       fetchPolicy: "network-only",
     },
   );
   const { data: meData, refetch: refetchMe } = useQuery(ME, {
-    skip: useMockFeed,
+    skip: useMockFeed || !isAuthenticated,
     fetchPolicy: "network-only",
   });
   const [addFriend, { loading: addingFriend }] = useMutation(ADD_FRIEND, {
