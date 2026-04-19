@@ -144,3 +144,12 @@ src/
 - **No test suite** exists yet — verify features manually in browser
 - **CSS classes**: follow the `ig-*` BEM-like naming convention already established in the codebase
 - **No Tailwind** — plain CSS with `ig-*` class names
+
+---
+
+## CI / Lint Rules (ESLint — errors block deploy)
+
+Always run `npm run lint` before committing. The CI runs lint and fails on any **error** (exit code 1).
+
+- **`prefer-const`**: use `const` for any variable that is never reassigned after declaration. Using `let` for such variables is a lint **error**. This caught `let rem = ...` in `FeedPostCard.tsx` — it was read-only and should have been `const`.
+- **`react-hooks/exhaustive-deps`** and **`react-refresh/only-export-components`**: currently warnings, not errors — safe to leave but worth cleaning up over time.

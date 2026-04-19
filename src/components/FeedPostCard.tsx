@@ -84,7 +84,7 @@ function pctParts(counts: number[]): number[] {
   }
   const raw = counts.map((c) => (100 * c) / total);
   const floors = raw.map((x) => Math.floor(x));
-  let rem = 100 - floors.reduce((a, b) => a + b, 0);
+  const rem = 100 - floors.reduce((a, b) => a + b, 0);
   const frac = raw.map((x, i) => ({ i, f: x - floors[i] }));
   frac.sort((a, b) => b.f - a.f);
   const out = [...floors];
