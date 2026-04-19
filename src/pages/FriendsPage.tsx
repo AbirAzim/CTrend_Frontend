@@ -64,7 +64,7 @@ export function FriendsPage() {
 
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (requestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
-  const friends = (friendsData?.myFriends ?? []) as FriendRow[];
+  const friends = useMemo(() => (friendsData?.myFriends ?? []) as FriendRow[], [friendsData]);
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const friendIds = useMemo(() => new Set(friends.map((f) => f.id)), [friends]);
 
