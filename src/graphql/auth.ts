@@ -25,16 +25,7 @@ export const SIGNUP = gql`
       email: $email
       password: $password
       displayName: $displayName
-    ) {
-      accessToken
-      refreshToken
-      user {
-        id
-        email
-        displayName
-        username
-      }
-    }
+    )
   }
 `;
 
