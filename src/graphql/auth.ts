@@ -25,16 +25,7 @@ export const SIGNUP = gql`
       email: $email
       password: $password
       displayName: $displayName
-    ) {
-      accessToken
-      refreshToken
-      user {
-        id
-        email
-        displayName
-        username
-      }
-    }
+    )
   }
 `;
 
@@ -50,5 +41,38 @@ export const GOOGLE_LOGIN = gql`
         username
       }
     }
+  }
+`;
+
+export const VERIFY_EMAIL = gql`
+  mutation VerifyEmail($email: String!, $code: String!) {
+    verifyEmail(email: $email, code: $code) {
+      accessToken
+      refreshToken
+      user {
+        id
+        email
+        displayName
+        username
+      }
+    }
+  }
+`;
+
+export const RESEND_VERIFICATION_EMAIL = gql`
+  mutation ResendVerificationEmail($email: String!) {
+    resendVerificationEmail(email: $email)
+  }
+`;
+
+export const REQUEST_PASSWORD_RESET = gql`
+  mutation RequestPasswordReset($email: String!) {
+    requestPasswordReset(email: $email)
+  }
+`;
+
+export const RESET_PASSWORD = gql`
+  mutation ResetPassword($token: String!, $newPassword: String!) {
+    resetPassword(token: $token, newPassword: $newPassword)
   }
 `;
