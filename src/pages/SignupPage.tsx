@@ -6,13 +6,14 @@ import { useAuth } from "../context/AuthContext";
 import { GOOGLE_LOGIN, SIGNUP } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
+
 function formatAuthError(message: string | undefined): string {
   if (!message) return "Something went wrong.";
   return message;
 }
 
 export function SignupPage() {
-  const { isAuthenticated, setSession } = useAuth();
+  const { isAuthenticated, setSession } = useAuth(); // setSession used by Google login path
   const navigate = useNavigate();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
@@ -37,20 +38,14 @@ export function SignupPage() {
       return;
     }
     try {
-      const { data } = await signup({
+      await signup({
         variables: {
           email: email.trim(),
           password,
           displayName: displayName.trim() || undefined,
         },
       });
-      const payload = data?.signup;
-      if (!payload?.accessToken || !payload.user) {
-        setFormError("Invalid response from server.");
-        return;
-      }
-      setSession(payload.accessToken, payload.user);
-      navigate("/", { replace: true });
+      navigate("/verify-email", { replace: true, state: { email: email.trim() } });
     } catch (err: unknown) {
       setFormError(formatAuthError(getApolloErrorMessage(err)));
     }

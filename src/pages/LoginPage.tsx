@@ -80,6 +80,9 @@ export function LoginPage() {
               minLength={8}
             />
           </label>
+          <p className="auth-forgot">
+            <Link to="/forgot-password">Forgot password?</Link>
+          </p>
           {loginLoading && <p className="muted small">Signing in…</p>}
           {formError != null && !loginLoading && (
             <p className="error" role="alert">
