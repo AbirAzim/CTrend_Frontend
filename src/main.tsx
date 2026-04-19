@@ -10,26 +10,24 @@ import "./index.css";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
-function Shell() {
-  return (
-    <BrowserRouter>
-      <ApolloProvider client={apolloClient}>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </ApolloProvider>
-    </BrowserRouter>
-  );
-}
+const shell = (
+  <BrowserRouter>
+    <ApolloProvider client={apolloClient}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ApolloProvider>
+  </BrowserRouter>
+);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {googleClientId ? (
       <GoogleOAuthProvider clientId={googleClientId}>
-        <Shell />
+        {shell}
       </GoogleOAuthProvider>
     ) : (
-      <Shell />
+      shell
     )}
   </StrictMode>,
 );
