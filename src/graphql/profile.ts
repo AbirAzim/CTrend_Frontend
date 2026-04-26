@@ -39,6 +39,11 @@ export const USER_POSTS = gql`
       totalVotes
       upvoteCount
       downvoteCount
+      commentCount
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
       votingEndsAt
       isVotingOpen
       options {

@@ -32,10 +32,27 @@ function friendInitial(f: FriendRow): string {
   return friendName(f).slice(0, 1).toUpperCase();
 }
 
+const SIDE_PREVIEW_LIMIT = 3;
+
+function rotateSlice<T>(items: T[], offset: number, limit: number): T[] {
+  if (items.length <= limit) {
+    return items;
+  }
+  const out: T[] = [];
+  for (let i = 0; i < limit; i += 1) {
+    out.push(items[(offset + i) % items.length]);
+  }
+  return out;
+}
+
 export function FeedPage() {
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
   const { isAuthenticated } = useAuth();
   const [friendError, setFriendError] = useState<string | null>(null);
+  const [suggestionOffset, setSuggestionOffset] = useState(0);
+  const [activePeopleModal, setActivePeopleModal] = useState<
+    "suggestions" | "friends" | "requestedMe" | "requestedByMe" | null
+  >(null);
 
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
     skip: useMockFeed,
@@ -101,6 +118,10 @@ export function FeedPage() {
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (requestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
+  const visibleSuggestions = rotateSlice(suggestions, suggestionOffset, SIDE_PREVIEW_LIMIT);
+  const visibleFriends = friends.slice(0, SIDE_PREVIEW_LIMIT);
+  const visibleRequestedMe = requestedMe.slice(0, SIDE_PREVIEW_LIMIT);
+  const visibleRequestedByMe = requestedByMe.slice(0, SIDE_PREVIEW_LIMIT);
   const me = meData?.me as FriendRow | undefined;
 
   const profileByUsername = new Map<string, string>();
@@ -158,6 +179,28 @@ export function FeedPage() {
     };
   }, [useMockFeed, refetchFeed, refetchFriends, refetchRequests, refetchSuggestions, refetchMe]);
 
+  useEffect(() => {
+    if (suggestions.length <= SIDE_PREVIEW_LIMIT) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setSuggestionOffset((prev) => (prev + 1) % suggestions.length);
+    }, 22000);
+    return () => clearInterval(timer);
+  }, [suggestions.length]);
+
+  useEffect(() => {
+    if (!activePeopleModal) {
+      document.body.style.overflow = "";
+      return;
+    }
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [activePeopleModal]);
+
   async function onAddFriend(userId: string) {
     setFriendError(null);
     try {
@@ -179,7 +222,18 @@ export function FeedPage() {
   return (
     <div className="cx-feed-layout">
       <aside className="cx-side-panel cx-side-panel--left" aria-label="Friend suggestions">
-        <h3 className="cx-side-panel-title">Suggestions</h3>
+        <div className="cx-side-head">
+          <h3 className="cx-side-panel-title">Suggestions</h3>
+          {suggestions.length > SIDE_PREVIEW_LIMIT ? (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setActivePeopleModal("suggestions")}
+            >
+              View all
+            </button>
+          ) : null}
+        </div>
         {!useMockFeed && suggestionsLoading ? (
           <p className="muted small">Loading suggestions…</p>
         ) : null}
@@ -187,7 +241,7 @@ export function FeedPage() {
           <p className="muted small">No suggestions right now.</p>
         ) : null}
         <ul className="cx-friend-list">
-          {suggestions.map((s) => (
+          {visibleSuggestions.map((s) => (
             <li key={s.id} className="cx-friend-item">
               <span className="cx-friend-avatar">
                 {s.profileImageUrl ? (
@@ -265,7 +319,18 @@ export function FeedPage() {
       </div>
 
       <aside className="cx-side-panel cx-side-panel--right" aria-label="My friends">
-        <h3 className="cx-side-panel-title">Friends</h3>
+        <div className="cx-side-head">
+          <h3 className="cx-side-panel-title">Friends</h3>
+          {friends.length > SIDE_PREVIEW_LIMIT ? (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setActivePeopleModal("friends")}
+            >
+              View all
+            </button>
+          ) : null}
+        </div>
         {!useMockFeed && friendsLoading ? (
           <p className="muted small">Loading friends…</p>
         ) : null}
@@ -273,7 +338,7 @@ export function FeedPage() {
           <p className="muted small">No friends yet.</p>
         ) : null}
         <ul className="cx-friend-list">
-          {friends.map((f) => (
+          {visibleFriends.map((f) => (
             <li key={f.id} className="cx-friend-item">
               <span className="cx-friend-avatar">
                 {f.profileImageUrl ? (
@@ -290,7 +355,18 @@ export function FeedPage() {
           ))}
         </ul>
 
-        <h4 className="cx-side-subtitle">Requested me</h4>
+        <div className="cx-side-head cx-side-head--sub">
+          <h4 className="cx-side-subtitle">Requested me</h4>
+          {requestedMe.length > SIDE_PREVIEW_LIMIT ? (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setActivePeopleModal("requestedMe")}
+            >
+              View all
+            </button>
+          ) : null}
+        </div>
         {!useMockFeed && requestsLoading ? (
           <p className="muted small">Loading requests…</p>
         ) : null}
@@ -298,7 +374,7 @@ export function FeedPage() {
           <p className="muted small">No incoming requests.</p>
         ) : null}
         <ul className="cx-friend-list">
-          {requestedMe.map((f) => (
+          {visibleRequestedMe.map((f) => (
             <li key={`in-${f.id}`} className="cx-friend-item">
               <span className="cx-friend-avatar">
                 {f.profileImageUrl ? (
@@ -335,12 +411,23 @@ export function FeedPage() {
           ))}
         </ul>
 
-        <h4 className="cx-side-subtitle">Requested by me</h4>
+        <div className="cx-side-head cx-side-head--sub">
+          <h4 className="cx-side-subtitle">Requested by me</h4>
+          {requestedByMe.length > SIDE_PREVIEW_LIMIT ? (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setActivePeopleModal("requestedByMe")}
+            >
+              View all
+            </button>
+          ) : null}
+        </div>
         {!useMockFeed && !requestsLoading && requestedByMe.length === 0 ? (
           <p className="muted small">No outgoing requests.</p>
         ) : null}
         <ul className="cx-friend-list">
-          {requestedByMe.map((f) => (
+          {visibleRequestedByMe.map((f) => (
             <li key={`out-${f.id}`} className="cx-friend-item">
               <span className="cx-friend-avatar">
                 {f.profileImageUrl ? (
@@ -358,6 +445,87 @@ export function FeedPage() {
           ))}
         </ul>
       </aside>
+      {activePeopleModal ? (
+        <div
+          className="ig-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="People list"
+          onClick={() => setActivePeopleModal(null)}
+        >
+          <section className="ig-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ig-post-comments-head">
+              <h3 className="ig-post-comments-title">
+                {activePeopleModal === "suggestions"
+                  ? "All suggestions"
+                  : activePeopleModal === "friends"
+                    ? "All friends"
+                    : activePeopleModal === "requestedMe"
+                      ? "Requested me"
+                      : "Requested by me"}
+              </h3>
+              <button type="button" className="btn-ghost" onClick={() => setActivePeopleModal(null)}>
+                Close
+              </button>
+            </div>
+            <div className="cx-modal-list-scroll">
+              <ul className="cx-friend-list">
+                {(activePeopleModal === "suggestions"
+                  ? suggestions
+                  : activePeopleModal === "friends"
+                    ? friends
+                    : activePeopleModal === "requestedMe"
+                      ? requestedMe
+                      : requestedByMe
+                  ).map((f) => (
+                    <li key={`${activePeopleModal}-${f.id}`} className="cx-friend-item">
+                      <span className="cx-friend-avatar">
+                        {f.profileImageUrl ? <img src={f.profileImageUrl} alt="" /> : friendInitial(f)}
+                      </span>
+                      <div className="cx-friend-meta">
+                        <strong>{friendName(f)}</strong>
+                        <span>@{f.username ?? "user"}</span>
+                      </div>
+                      {activePeopleModal === "suggestions" ? (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          disabled={addingFriend}
+                          onClick={() => void onAddFriend(f.id)}
+                        >
+                          Add
+                        </button>
+                      ) : null}
+                      {activePeopleModal === "requestedMe" ? (
+                        <div className="cx-friend-actions">
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            disabled={respondingRequest}
+                            onClick={() => void onRespondRequest(f.id, true)}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            disabled={respondingRequest}
+                            onClick={() => void onRespondRequest(f.id, false)}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : null}
+                      {activePeopleModal === "requestedByMe" ? (
+                        <span className="cx-pending-badge">Pending</span>
+                      ) : null}
+                    </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

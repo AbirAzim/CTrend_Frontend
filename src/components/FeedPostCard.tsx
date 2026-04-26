@@ -17,6 +17,9 @@ import {
   FEED_POSTS,
   GET_POST_BY_ID,
   POST_VOTE_UPDATED,
+  SET_POST_HYPE,
+  SET_POST_KEEP,
+  VOTERS_BY_POST,
   VOTE_POST,
 } from "../graphql/feed";
 import { apolloClient } from "../lib/apolloClient";
@@ -154,6 +157,20 @@ type CommentsByPostQueryData = {
   }>;
 };
 
+type VotersByPostData = {
+  votersByPost: Array<{
+    voteId: string;
+    selectedOptionIndex: number;
+    anonymous: boolean;
+    createdAt: string;
+    user?: {
+      id: string;
+      username?: string | null;
+      displayName?: string | null;
+    } | null;
+  }>;
+};
+
 type VoteLiveState = {
   upvoteCount: number;
   downvoteCount: number;
@@ -182,6 +199,15 @@ type PostVoteUpdatedData = {
   };
 };
 
+type VotePostMutationData = {
+  votePost?: {
+    postId: string;
+    totalVotes: number;
+    countsPerOption: number[];
+    percentages: number[];
+  } | null;
+};
+
 type Props = {
   post: FeedPostView;
   /** `local` = demo feed only; `api` = call GraphQL `votePost`. */
@@ -199,8 +225,12 @@ export function FeedPostCard({
   const navigate = useNavigate();
   const location = useLocation();
   const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [hypeCountLive, setHypeCountLive] = useState(post.hypeCount ?? 0);
+  const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
+  const [anonymousVote, setAnonymousVote] = useState(false);
+  const [showVoters, setShowVoters] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [showAllComments, setShowAllComments] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [localComments, setLocalComments] = useState<LocalCommentRow[]>([]);
   const [commentError, setCommentError] = useState<string | null>(null);
@@ -213,10 +243,14 @@ export function FeedPostCard({
 
   const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
     useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, { fetchPolicy: "network-only" });
+  const [fetchVoters, { data: votersData, loading: votersLoading, error: votersError }] =
+    useLazyQuery<VotersByPostData>(VOTERS_BY_POST, { fetchPolicy: "network-only" });
 
   const [commentMut, { loading: commentPosting }] = useMutation(COMMENT_POST, {
     refetchQueries: [{ query: COMMENTS_BY_POST, variables: { postId: post.id } }],
   });
+  const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
+  const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
 
   useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
     skip: voteMode !== "api",
@@ -256,6 +290,12 @@ export function FeedPostCard({
   }, [commentsOpen, voteMode, post.id, fetchComments]);
 
   useEffect(() => {
+    if (!commentsOpen) {
+      setShowAllComments(false);
+    }
+  }, [commentsOpen]);
+
+  useEffect(() => {
     return () => {
       if (shareHintTimer.current != null) {
         clearTimeout(shareHintTimer.current);
@@ -270,6 +310,9 @@ export function FeedPostCard({
 
   useEffect(() => {
     setOptimisticVote(null);
+    setHypeCountLive(post.hypeCount ?? 0);
+    setSaved(Boolean(post.viewerHasSaved));
+    setLiked(false);
   }, [
     post.id,
     post.upvoteCount,
@@ -279,7 +322,60 @@ export function FeedPostCard({
     post.optionStats,
     post.isVotingOpen,
     post.votingEndsAt,
+    post.hypeCount,
+    post.viewerHasSaved,
+    post.saveCount,
   ]);
+
+  async function handleToggleHype() {
+    const nextActive = !liked;
+    const delta = nextActive ? 1 : -1;
+    setLiked(nextActive);
+    setHypeCountLive((prev) => Math.max(0, prev + delta));
+
+    if (voteMode !== "api") {
+      return;
+    }
+
+    try {
+      await setPostHypeMut({
+        variables: { postId: post.id, active: nextActive },
+      });
+      await apolloClient.refetchQueries({
+        include: [FEED_POSTS, GET_POST_BY_ID],
+      });
+    } catch {
+      // Rollback optimistic UI on failure.
+      setLiked(!nextActive);
+      setHypeCountLive((prev) => Math.max(0, prev - delta));
+    }
+  }
+
+  async function handleToggleKeep() {
+    const nextKeep = !saved;
+    setSaved(nextKeep);
+    if (voteMode !== "api") {
+      return;
+    }
+    try {
+      await setPostKeepMut({
+        variables: { postId: post.id, keep: nextKeep },
+      });
+      await apolloClient.refetchQueries({
+        include: [FEED_POSTS, GET_POST_BY_ID],
+      });
+    } catch {
+      setSaved(!nextKeep);
+    }
+  }
+
+  async function openVotersList(optionIndex?: number) {
+    setShowVoters(true);
+    if (voteMode !== "api") {
+      return;
+    }
+    await fetchVoters({ variables: { postId: post.id, optionIndex } });
+  }
 
   async function handleSharePostLink() {
     const url = postPermalink(post.id);
@@ -345,12 +441,7 @@ export function FeedPostCard({
     post.viewerCompareChoice ?? null,
   );
 
-  const [voteMut, { loading: voting }] = useMutation(VOTE_POST, {
-    refetchQueries: [
-      { query: FEED_POSTS },
-      { query: GET_POST_BY_ID, variables: { id: post.id } },
-    ],
-  });
+  const [voteMut, { loading: voting }] = useMutation<VotePostMutationData>(VOTE_POST);
 
   const useApiMulti =
     voteMode === "api" &&
@@ -483,83 +574,46 @@ export function FeedPostCard({
     });
   }
 
-  function applyOptimisticBinaryVote(nextDirectionValue: VoteDirectionGql) {
-    let nextUp = up;
-    let nextDown = down;
-    let nextViewer: FeedPostView["viewerVote"] = viewer;
-    if (nextDirectionValue === "NONE") {
-      if (viewer === "UP") {
-        nextUp = Math.max(0, nextUp - 1);
-      } else if (viewer === "DOWN") {
-        nextDown = Math.max(0, nextDown - 1);
-      }
-      nextViewer = null;
-    } else if (nextDirectionValue === "UP") {
-      if (viewer === "DOWN") {
-        nextDown = Math.max(0, nextDown - 1);
-      }
-      if (viewer !== "UP") {
-        nextUp += 1;
-      }
-      nextViewer = "UP";
-    } else if (nextDirectionValue === "DOWN") {
-      if (viewer === "UP") {
-        nextUp = Math.max(0, nextUp - 1);
-      }
-      if (viewer !== "DOWN") {
-        nextDown += 1;
-      }
-      nextViewer = "DOWN";
-    }
-    setOptimisticVote({
-      upvoteCount: nextUp,
-      downvoteCount: nextDown,
-      viewerVote: nextViewer,
-      mySelectedOptionIndex: nextViewer === "UP" ? 0 : nextViewer === "DOWN" ? 1 : null,
-      optionStats: activeOptionStats ?? null,
-      isVotingOpen: activeIsVotingOpen,
-      votingEndsAt: activeVotingEndsAt,
-    });
-    setVoteFx(true);
-    setTimeout(() => setVoteFx(false), 240);
-  }
-
-  function applyOptimisticMultiVote(index: number) {
-    if (!compareUrls || compareUrls.length <= 2) {
+  function applyServerVoteSnapshot(
+    payload: VotePostMutationData["votePost"] | undefined,
+    selectedOptionIndex: number,
+  ) {
+    const counts = payload?.countsPerOption?.map((n) => Math.max(0, Math.round(n))) ?? [];
+    if (counts.length === 0) {
       return;
     }
-    const len = compareUrls.length;
-    const baseCounts = activeOptionStats?.length
-      ? Array.from({ length: len }, (_, i) => {
-          const s = activeOptionStats.find((x) => x.index === i);
-          return s ? Math.round(s.count) : 0;
-        })
-      : [...multiCounts];
-    const currentSelected = activeMySelectedOptionIndex;
-    if (currentSelected !== null && currentSelected >= 0 && currentSelected < len) {
-      baseCounts[currentSelected] = Math.max(0, baseCounts[currentSelected] - 1);
-    }
-    baseCounts[index] += 1;
-    const total = baseCounts.reduce((a, b) => a + b, 0);
-    const percentages =
-      total > 0 ? baseCounts.map((c) => (100 * c) / total) : baseCounts.map(() => 0);
+    const len = compareUrls?.length ?? counts.length;
     const labels = Array.from({ length: len }, (_, i) => compareOptionLabel(post, i));
+    const total = counts.reduce((a, b) => a + b, 0);
+    const payloadPercentages = payload?.percentages ?? [];
+    const percentages =
+      payloadPercentages.length === counts.length
+        ? payloadPercentages
+        : total > 0
+          ? counts.map((c) => (100 * c) / total)
+          : counts.map(() => 0);
+
     setOptimisticVote({
-      upvoteCount: baseCounts[0] ?? up,
-      downvoteCount: baseCounts[1] ?? down,
-      viewerVote: index === 0 ? "UP" : index === 1 ? "DOWN" : null,
-      mySelectedOptionIndex: index,
+      upvoteCount: counts[0] ?? up,
+      downvoteCount: counts[1] ?? down,
+      viewerVote:
+        selectedOptionIndex === 0
+          ? "UP"
+          : selectedOptionIndex === 1
+            ? "DOWN"
+            : null,
+      mySelectedOptionIndex: selectedOptionIndex,
       optionStats: Array.from({ length: len }, (_, i) => ({
         index: i,
         label: labels[i],
-        count: baseCounts[i],
-        percentage: percentages[i],
+        count: counts[i] ?? 0,
+        percentage: percentages[i] ?? 0,
       })),
       isVotingOpen: activeIsVotingOpen,
       votingEndsAt: activeVotingEndsAt,
     });
     setVoteFx(true);
-    setTimeout(() => setVoteFx(false), 240);
+    setTimeout(() => setVoteFx(false), 220);
   }
 
   async function handleVote(clicked: "UP" | "DOWN") {
@@ -615,14 +669,15 @@ export function FeedPostCard({
     }
 
     const selectedOptionIndex = clicked === "UP" ? 0 : 1;
-    applyOptimisticBinaryVote(direction);
     try {
-      await voteMut({
+      const { data } = await voteMut({
         variables: {
           postId: post.id,
           selectedOptionIndex,
+          anonymous: anonymousVote,
         },
       });
+      applyServerVoteSnapshot(data?.votePost, selectedOptionIndex);
     } catch (err: unknown) {
       const message = getApolloErrorMessage(err);
       await refreshPostVotingState();
@@ -652,14 +707,15 @@ export function FeedPostCard({
       if (activeMySelectedOptionIndex === index) {
         return;
       }
-      applyOptimisticMultiVote(index);
       try {
-        await voteMut({
+        const { data } = await voteMut({
           variables: {
             postId: post.id,
             selectedOptionIndex: index,
+            anonymous: anonymousVote,
           },
         });
+        applyServerVoteSnapshot(data?.votePost, index);
       } catch (err: unknown) {
         const message = getApolloErrorMessage(err);
         await refreshPostVotingState();
@@ -701,6 +757,24 @@ export function FeedPostCard({
   }
 
   const binaryTotal = up + down;
+  const hypeCount = hypeCountLive;
+  const apiComments = commentsData?.commentsByPost ?? [];
+  const displayedApiComments = showAllComments ? apiComments : apiComments.slice(0, 2);
+  const hasMoreApiComments = apiComments.length > 2;
+  const displayedLocalComments = showAllComments ? localComments : localComments.slice(0, 2);
+  const hasMoreLocalComments = localComments.length > 2;
+  const recentPreviewComments = (post.recentComments ?? []).slice(0, 2);
+  const hasMorePreviewComments = (post.commentCount ?? recentPreviewComments.length) > 2;
+  const groupedVoters = useMemo(() => {
+    const rows = votersData?.votersByPost ?? [];
+    const groups = new Map<number, typeof rows>();
+    for (const row of rows) {
+      const existing = groups.get(row.selectedOptionIndex) ?? [];
+      existing.push(row);
+      groups.set(row.selectedOptionIndex, existing);
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+  }, [votersData]);
   const leftPct =
     binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : null;
   const rightPct =
@@ -841,6 +915,17 @@ export function FeedPostCard({
       )}
 
       <div className="cx-post-footer">
+        {voteMode === "api" ? (
+          <label className="cx-anon-toggle">
+            <input
+              type="checkbox"
+              checked={anonymousVote}
+              onChange={(e) => setAnonymousVote(e.target.checked)}
+            />
+            <span className="cx-anon-toggle-text">Vote anonymously</span>
+          </label>
+        ) : null}
+
         {compareUrls ? (
           <p className="cx-vote-hint-chip">
             {isVotingClosed
@@ -897,6 +982,13 @@ export function FeedPostCard({
                       {count.toLocaleString()}
                       {pct != null ? ` · ${pct}%` : ""}
                     </span>
+                    <button
+                      type="button"
+                      className="cx-see-voters-btn"
+                      onClick={() => void openVotersList(side)}
+                    >
+                      See voters
+                    </button>
                   </div>
                   <div className="cx-pulse-track" aria-hidden>
                     <div
@@ -927,6 +1019,13 @@ export function FeedPostCard({
                   <div className="cx-pulse-row-top">
                     <span className="cx-pulse-name">{label}</span>
                     <span className="cx-pulse-count">{pctVal}%</span>
+                    <button
+                      type="button"
+                      className="cx-see-voters-btn"
+                      onClick={() => void openVotersList(idx)}
+                    >
+                      See voters
+                    </button>
                   </div>
                   <div className="cx-pulse-track" aria-hidden>
                     <div
@@ -1001,6 +1100,7 @@ export function FeedPostCard({
             onClick={() => {
               setCommentsOpen((v) => !v);
               setCommentError(null);
+              setShowAllComments(false);
             }}
           >
             <IconComment />
@@ -1032,22 +1132,54 @@ export function FeedPostCard({
             className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
             aria-label={liked ? "Unlike" : "Like"}
             aria-pressed={liked}
-            onClick={() => setLiked((v) => !v)}
+            disabled={hypeUpdating}
+            onClick={() => void handleToggleHype()}
           >
             <IconHeart filled={liked} />
-            <span className="cx-action-chip-label">Hype</span>
+            <span className="cx-action-chip-label">Hype {hypeCount}</span>
           </button>
           <button
             type="button"
             className={`cx-action-chip${saved ? " cx-action-chip--saved" : ""}`}
             aria-label={saved ? "Unsave" : "Save"}
             aria-pressed={saved}
-            onClick={() => setSaved((v) => !v)}
+            disabled={keepUpdating}
+            onClick={() => void handleToggleKeep()}
           >
             <IconBookmark filled={saved} />
             <span className="cx-action-chip-label">Keep</span>
           </button>
+          <button
+            type="button"
+            className="cx-action-chip"
+            aria-label="See who voted"
+            onClick={() => void openVotersList()}
+          >
+            <span className="cx-action-chip-label">Voters</span>
+          </button>
         </div>
+
+        {!commentsOpen && recentPreviewComments.length > 0 ? (
+          <div className="ig-post-comments-preview">
+            {recentPreviewComments.map((c) => (
+              <p key={c.id} className="muted small">
+                <strong>{c.author.displayName?.trim() || c.author.username}</strong>: {c.content}
+              </p>
+            ))}
+            {hasMorePreviewComments ? (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setCommentsOpen(true);
+                  setShowAllComments(true);
+                }}
+              >
+                Show more
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {shareHint ? (
           <p className="ig-share-hint" role="status">
@@ -1078,7 +1210,7 @@ export function FeedPostCard({
           ) : null}
           <ul className="ig-post-comments-list">
             {voteMode === "api"
-              ? (commentsData?.commentsByPost ?? []).map((c) => (
+              ? displayedApiComments.map((c) => (
                   <li key={c.id} className="ig-post-comment">
                     <span className="ig-post-comment-author">
                       {c.author.displayName?.trim() || c.author.username}
@@ -1089,7 +1221,7 @@ export function FeedPostCard({
                     </time>
                   </li>
                 ))
-              : localComments.map((c) => (
+              : displayedLocalComments.map((c) => (
                   <li key={c.id} className="ig-post-comment">
                     <span className="ig-post-comment-author">{c.authorLabel}</span>
                     <p className="ig-post-comment-body">{c.content}</p>
@@ -1099,6 +1231,15 @@ export function FeedPostCard({
                   </li>
                 ))}
           </ul>
+          {(voteMode === "api" ? hasMoreApiComments : hasMoreLocalComments) ? (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setShowAllComments((v) => !v)}
+            >
+              {showAllComments ? "Show less" : "Show more"}
+            </button>
+          ) : null}
           {(voteMode === "api"
             ? (commentsData?.commentsByPost?.length ?? 0) === 0 && !commentsLoading
             : localComments.length === 0) ? (
@@ -1135,6 +1276,53 @@ export function FeedPostCard({
             </button>
           </form>
         </section>
+      ) : null}
+      {showVoters ? (
+        <div
+          className="ig-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Voter list"
+          onClick={() => setShowVoters(false)}
+        >
+          <section className="ig-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ig-post-comments-head">
+              <h3 className="ig-post-comments-title">Voted by</h3>
+            <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
+                Close
+              </button>
+            </div>
+            {votersLoading ? <p className="muted small">Loading voters…</p> : null}
+            {votersError ? (
+              <p className="ig-post-comments-error" role="alert">
+                {votersError.message}
+              </p>
+            ) : null}
+            <div className="ig-voter-list-scroll">
+              {groupedVoters.map(([optionIndex, voters]) => (
+                <div key={`option-group-${optionIndex}`} className="ig-voter-group">
+                  <div className="ig-voter-group-head">
+                    <span>Chose {compareOptionLabel(post, optionIndex)}</span>
+                  </div>
+                  <ul className="ig-post-comments-list">
+                    {voters.map((v) => (
+                      <li key={v.voteId} className="ig-post-comment">
+                        <span className="ig-post-comment-author">
+                          {v.anonymous || !v.user
+                            ? "Anonymous voter"
+                            : v.user.displayName?.trim() || v.user.username || "Voter"}
+                        </span>
+                        <time className="ig-post-comment-time" dateTime={v.createdAt}>
+                          {formatRelativeTime(v.createdAt) || ""}
+                        </time>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       ) : null}
     </article>
   );

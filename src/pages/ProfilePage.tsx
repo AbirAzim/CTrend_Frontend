@@ -1,12 +1,14 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { MY_FRIENDS } from "../graphql/friends";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
-import { EXTEND_POST_VOTING } from "../graphql/feed";
+import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
+import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
+import type { FeedPostView } from "../types/feed";
 
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
@@ -56,6 +58,8 @@ function friendInitial(f: FriendRow): string {
 
 export function ProfilePage() {
   const { user, patchUser } = useAuth();
+  const location = useLocation();
+  const keepsOnlyView = new URLSearchParams(location.search).get("view") === "keeps";
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const [editing, setEditing] = useState(false);
@@ -70,6 +74,7 @@ export function ProfilePage() {
     {},
   );
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [showAllSaved, setShowAllSaved] = useState(false);
 
   const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
     skip: !user,
@@ -86,6 +91,10 @@ export function ProfilePage() {
   });
   const { data: friendsData, loading: friendsLoading } = useQuery(MY_FRIENDS, {
     skip: useMockFeed,
+    fetchPolicy: "network-only",
+  });
+  const { data: savedPostsData, loading: savedPostsLoading } = useQuery(MY_SAVED_POSTS, {
+    skip: useMockFeed || !user,
     fetchPolicy: "network-only",
   });
 
@@ -126,6 +135,10 @@ export function ProfilePage() {
     ? playgroundPosts
     : apiPosts;
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
+  const savedPosts: FeedPostView[] = (savedPostsData?.mySavedPosts ?? []).map(
+    mapGqlPostToFeedView,
+  );
+  const visibleSavedPosts = showAllSaved ? savedPosts : savedPosts.slice(0, 6);
 
   const totalImages = gridPosts.reduce((a, p) => a + (p.imageUrls?.length ?? 0), 0);
   const totalVotes = gridPosts.reduce(
@@ -154,6 +167,21 @@ export function ProfilePage() {
     setAvatarLoadFailed(false);
   }, [heroAvatarUrl]);
 
+  useEffect(() => {
+    if (location.hash !== "#saved-posts" && !keepsOnlyView) {
+      return;
+    }
+    // Deep-link from bottom keeps icon should open full kept list.
+    setShowAllSaved(true);
+    window.setTimeout(() => {
+      const target = document.getElementById("saved-posts");
+      if (!target) {
+        return;
+      }
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }, [location.hash, keepsOnlyView, savedPosts.length]);
+
   const [saveProfile, { loading: saving }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: ME }],
   });
@@ -166,6 +194,43 @@ export function ProfilePage() {
 
   if (!user) {
     return null;
+  }
+
+  if (keepsOnlyView) {
+    return (
+      <div className="cx-profile">
+        <section className="cx-profile-friends" aria-label="Saved posts" id="saved-posts">
+          <h2 className="cx-profile-section-title">Kept posts</h2>
+          {!useMockFeed && savedPostsLoading ? (
+            <p className="muted small">Loading kept posts…</p>
+          ) : null}
+          {!useMockFeed && !savedPostsLoading && savedPosts.length === 0 ? (
+            <p className="muted small">No kept posts yet.</p>
+          ) : null}
+          {savedPosts.length > 0 ? (
+            <ul className="cx-profile-grid cx-profile-grid--rich">
+              {savedPosts.map((post) => (
+                <li key={`saved-${post.id}`}>
+                  <article className="cx-profile-drop-card">
+                    <NavLink to={`/post/${post.id}`} className="cx-profile-drop-link">
+                      <div className="cx-profile-drop-media-grid">
+                        {(post.imageUrls ?? []).map((u, idx) => (
+                          <span
+                            key={`${post.id}-saved-img-${idx}`}
+                            className="cx-profile-grid-cell"
+                            style={{ backgroundImage: `url(${u})` }}
+                          />
+                        ))}
+                      </div>
+                    </NavLink>
+                  </article>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      </div>
+    );
   }
 
   async function onSaveProfile(e: React.FormEvent) {
@@ -505,6 +570,49 @@ export function ProfilePage() {
               </li>
             ))}
           </ul>
+        ) : null}
+      </section>
+
+      <section className="cx-profile-friends" aria-label="Saved posts" id="saved-posts">
+        <h2 className="cx-profile-section-title">Kept posts</h2>
+        {!useMockFeed && savedPostsLoading ? (
+          <p className="muted small">Loading kept posts…</p>
+        ) : null}
+        {!useMockFeed && !savedPostsLoading && savedPosts.length === 0 ? (
+          <p className="muted small">No kept posts yet.</p>
+        ) : null}
+        {savedPosts.length > 0 ? (
+          <>
+            <ul className="cx-profile-grid cx-profile-grid--rich">
+              {visibleSavedPosts.map((post) => (
+                <li key={`saved-${post.id}`}>
+                  <article className="cx-profile-drop-card">
+                    <NavLink to={`/post/${post.id}`} className="cx-profile-drop-link">
+                      <div className="cx-profile-drop-media-grid">
+                        {(post.imageUrls ?? []).map((u, idx) => (
+                          <span
+                            key={`${post.id}-saved-grid-${idx}`}
+                            className="cx-profile-grid-cell"
+                            style={{ backgroundImage: `url(${u})` }}
+                          />
+                        ))}
+                      </div>
+                    </NavLink>
+                  </article>
+                </li>
+              ))}
+            </ul>
+            {savedPosts.length > 6 ? (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowAllSaved((v) => !v)}
+                style={{ marginTop: "10px" }}
+              >
+                {showAllSaved ? "Show less" : "View all kept items"}
+              </button>
+            ) : null}
+          </>
         ) : null}
       </section>
 

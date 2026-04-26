@@ -33,6 +33,22 @@ export function mapGqlPostToFeedView(p: {
   isVotingOpen?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
+  hypeCount?: number;
+  saveCount?: number;
+  viewerHasSaved?: boolean;
+  commentCount?: number;
+  recentComments?: Array<{
+    id: string;
+    content: string;
+    createdAt: string;
+    likeCount?: number;
+    viewerHasLiked?: boolean;
+    author: {
+      id: string;
+      username: string;
+      displayName?: string | null;
+    };
+  }> | null;
   viewerVote?: string | null;
   mySelectedOptionIndex?: number | null;
   optionStats?: Array<{
@@ -71,6 +87,11 @@ export function mapGqlPostToFeedView(p: {
         : p.isVotingOpen,
     upvoteCount: p.upvoteCount,
     downvoteCount: p.downvoteCount,
+    hypeCount: p.hypeCount ?? 0,
+    saveCount: p.saveCount ?? 0,
+    viewerHasSaved: p.viewerHasSaved ?? false,
+    commentCount: p.commentCount ?? 0,
+    recentComments: p.recentComments ?? [],
     viewerVote: mapViewerVote(p.viewerVote, p.mySelectedOptionIndex),
     mySelectedOptionIndex:
       p.mySelectedOptionIndex === undefined || p.mySelectedOptionIndex === null

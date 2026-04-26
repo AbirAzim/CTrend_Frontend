@@ -6,6 +6,8 @@ export const COMMENTS_BY_POST = gql`
       id
       content
       createdAt
+      likeCount
+      viewerHasLiked
       postId
       parentId
       author {
@@ -26,6 +28,16 @@ export const COMMENT_POST = gql`
       postId
       parentId
       createdAt
+    }
+  }
+`;
+
+export const SET_COMMENT_LIKE = gql`
+  mutation SetCommentLike($commentId: ID!, $liked: Boolean!) {
+    setCommentLike(commentId: $commentId, liked: $liked) {
+      id
+      likeCount
+      viewerHasLiked
     }
   }
 `;
