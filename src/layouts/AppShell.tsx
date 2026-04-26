@@ -1,12 +1,25 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import { IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/IgIcons";
+import { useQuery } from "@apollo/client";
+import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
+import { MY_SAVED_POSTS } from "../graphql/feed";
 
 export function AppShell() {
   const { logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [navHidden, setNavHidden] = useState(false);
+  const [topbarHidden, setTopbarHidden] = useState(false);
+  const lastYRef = useRef(0);
+  const navStopTimerRef = useRef<number | null>(null);
+  const topbarStopTimerRef = useRef<number | null>(null);
+  const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-and-network",
+  });
+  const savedCount = (savedPostsData?.mySavedPosts?.length as number | undefined) ?? 0;
 
   function onHomeClick(event: MouseEvent<HTMLAnchorElement>) {
     if (location.pathname !== "/") {
@@ -26,9 +39,53 @@ export function AppShell() {
     navigate("/login", { replace: true });
   }
 
+  useEffect(() => {
+    lastYRef.current = window.scrollY;
+    function onScroll() {
+      const y = window.scrollY;
+      const delta = y - lastYRef.current;
+      // Ignore micro-jitter from touchpads.
+      if (Math.abs(delta) < 8) {
+        return;
+      }
+      if (y < 60) {
+        setNavHidden(false);
+        setTopbarHidden(false);
+      } else {
+        setNavHidden(true);
+        setTopbarHidden(true);
+        if (navStopTimerRef.current != null) {
+          window.clearTimeout(navStopTimerRef.current);
+        }
+        if (topbarStopTimerRef.current != null) {
+          window.clearTimeout(topbarStopTimerRef.current);
+        }
+        navStopTimerRef.current = window.setTimeout(() => {
+          setNavHidden(false);
+          navStopTimerRef.current = null;
+        }, 300);
+        topbarStopTimerRef.current = window.setTimeout(() => {
+          setTopbarHidden(false);
+          topbarStopTimerRef.current = null;
+        }, 1500);
+      }
+      lastYRef.current = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (navStopTimerRef.current != null) {
+        window.clearTimeout(navStopTimerRef.current);
+      }
+      if (topbarStopTimerRef.current != null) {
+        window.clearTimeout(topbarStopTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="ig-app">
-      <header className="ig-topbar">
+      <header className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
         <div className="ig-brand-block">
           <NavLink to="/" className="ig-logo" end>
             CTrend
@@ -70,7 +127,10 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <nav className="ig-bottom-nav ig-bottom-nav--three" aria-label="Main">
+      <nav
+        className={`ig-bottom-nav ig-bottom-nav--four${navHidden ? " ig-bottom-nav--hidden" : ""}`}
+        aria-label="Main"
+      >
         <NavLink
           to="/"
           end
@@ -92,6 +152,22 @@ export function AppShell() {
           aria-label="Create compare"
         >
           <IconPlusSquare />
+        </NavLink>
+        <NavLink
+          to={isAuthenticated ? "/profile?view=keeps#saved-posts" : "/login"}
+          state={!isAuthenticated ? { from: "/profile?view=keeps#saved-posts" } : undefined}
+          className={({ isActive }) =>
+            `ig-nav-item ig-nav-item--keeps${isActive ? " ig-nav-item--active" : ""}`
+          }
+          aria-label="View all keeps"
+          title="View all keeps"
+        >
+          {({ isActive }) => (
+            <span className="ig-nav-keeps-wrap">
+              <IconBookmark filled={isActive} />
+              <span className="ig-nav-keeps-badge">{savedCount}</span>
+            </span>
+          )}
         </NavLink>
         <NavLink
           to={isAuthenticated ? "/profile" : "/login"}

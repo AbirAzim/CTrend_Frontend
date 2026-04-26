@@ -16,6 +16,23 @@ export const FEED_POSTS = gql`
       viewerVote
       votingEndsAt
       isVotingOpen
+      commentCount
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        viewerHasLiked
+        author {
+          id
+          username
+          displayName
+        }
+      }
       mySelectedOptionIndex
       optionStats {
         index
@@ -46,6 +63,23 @@ export const GET_POST_BY_ID = gql`
       viewerVote
       votingEndsAt
       isVotingOpen
+      commentCount
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        viewerHasLiked
+        author {
+          id
+          username
+          displayName
+        }
+      }
       mySelectedOptionIndex
       optionStats {
         index
@@ -62,12 +96,100 @@ export const GET_POST_BY_ID = gql`
 
 /** CTrend API: `votePost(postId, selectedOptionIndex)` — not `voteOnPost` / `VoteDirection`. */
 export const VOTE_POST = gql`
-  mutation VotePost($postId: ID!, $selectedOptionIndex: Int!) {
-    votePost(postId: $postId, selectedOptionIndex: $selectedOptionIndex) {
+  mutation VotePost(
+    $postId: ID!
+    $selectedOptionIndex: Int!
+    $anonymous: Boolean
+  ) {
+    votePost(
+      postId: $postId
+      selectedOptionIndex: $selectedOptionIndex
+      anonymous: $anonymous
+    ) {
       postId
       totalVotes
       countsPerOption
       percentages
+    }
+  }
+`;
+
+export const SET_POST_KEEP = gql`
+  mutation SetPostKeep($postId: ID!, $keep: Boolean!) {
+    setPostKeep(postId: $postId, keep: $keep)
+  }
+`;
+
+export const SET_POST_LIKE = gql`
+  mutation SetPostLike($postId: ID!, $active: Boolean!) {
+    setPostLike(postId: $postId, active: $active)
+  }
+`;
+
+export const SET_POST_HYPE = gql`
+  mutation SetPostHype($postId: ID!, $active: Boolean!) {
+    setPostHype(postId: $postId, active: $active)
+  }
+`;
+
+export const MY_SAVED_POSTS = gql`
+  query MySavedPosts {
+    mySavedPosts {
+      id
+      authorUsername
+      authorDisplayName
+      authorEmail
+      imageUrls
+      caption
+      createdAt
+      upvoteCount
+      downvoteCount
+      viewerVote
+      votingEndsAt
+      isVotingOpen
+      commentCount
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        viewerHasLiked
+        author {
+          id
+          username
+          displayName
+        }
+      }
+      mySelectedOptionIndex
+      optionStats {
+        index
+        label
+        count
+        percentage
+      }
+      options {
+        label
+      }
+    }
+  }
+`;
+
+export const VOTERS_BY_POST = gql`
+  query VotersByPost($postId: ID!, $optionIndex: Int) {
+    votersByPost(postId: $postId, optionIndex: $optionIndex) {
+      voteId
+      selectedOptionIndex
+      anonymous
+      createdAt
+      user {
+        id
+        username
+        displayName
+      }
     }
   }
 `;
