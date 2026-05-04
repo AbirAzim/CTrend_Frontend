@@ -16,6 +16,7 @@ import {
 import {
   FEED_POSTS,
   GET_POST_BY_ID,
+  MY_SAVED_POSTS,
   POST_VOTE_UPDATED,
   SET_POST_HYPE,
   SET_POST_KEEP,
@@ -360,9 +361,34 @@ export function FeedPostCard({
     try {
       await setPostKeepMut({
         variables: { postId: post.id, keep: nextKeep },
+        optimisticResponse: {
+          __typename: "Mutation",
+          setPostKeep: nextKeep,
+        },
+        update(cache, _result, { variables }) {
+          const pid = variables?.postId as string | undefined;
+          const keep = variables?.keep;
+          if (!pid || typeof keep !== "boolean") {
+            return;
+          }
+          cache.updateQuery({ query: MY_SAVED_POSTS }, (existing) => {
+            const prevList = (existing?.mySavedPosts ?? []) as FeedPostView[];
+            if (keep) {
+              if (prevList.some((p: FeedPostView) => p.id === pid)) {
+                return existing ?? { mySavedPosts: prevList };
+              }
+              return {
+                mySavedPosts: [...prevList, { ...post, viewerHasSaved: true }],
+              };
+            }
+            return {
+              mySavedPosts: prevList.filter((p: FeedPostView) => p.id !== pid),
+            };
+          });
+        },
       });
       await apolloClient.refetchQueries({
-        include: [FEED_POSTS, GET_POST_BY_ID],
+        include: [FEED_POSTS, GET_POST_BY_ID, MY_SAVED_POSTS],
       });
     } catch {
       setSaved(!nextKeep);
