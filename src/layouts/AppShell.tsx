@@ -13,8 +13,6 @@ export function AppShell() {
   const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
   const lastYRef = useRef(0);
-  const navStopTimerRef = useRef<number | null>(null);
-  const topbarStopTimerRef = useRef<number | null>(null);
   const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
     skip: !isAuthenticated,
     fetchPolicy: "cache-and-network",
@@ -48,39 +46,24 @@ export function AppShell() {
       if (Math.abs(delta) < 8) {
         return;
       }
+      lastYRef.current = y;
       if (y < 60) {
         setNavHidden(false);
         setTopbarHidden(false);
-      } else {
-        setNavHidden(true);
-        setTopbarHidden(true);
-        if (navStopTimerRef.current != null) {
-          window.clearTimeout(navStopTimerRef.current);
-        }
-        if (topbarStopTimerRef.current != null) {
-          window.clearTimeout(topbarStopTimerRef.current);
-        }
-        navStopTimerRef.current = window.setTimeout(() => {
-          setNavHidden(false);
-          navStopTimerRef.current = null;
-        }, 300);
-        topbarStopTimerRef.current = window.setTimeout(() => {
-          setTopbarHidden(false);
-          topbarStopTimerRef.current = null;
-        }, 1500);
+        return;
       }
-      lastYRef.current = y;
+      if (delta > 0) {
+        // Scrolling down: hide bottom nav, show topbar
+        setNavHidden(true);
+        setTopbarHidden(false);
+      } else {
+        // Scrolling up: show bottom nav, hide topbar
+        setNavHidden(false);
+        setTopbarHidden(true);
+      }
     }
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (navStopTimerRef.current != null) {
-        window.clearTimeout(navStopTimerRef.current);
-      }
-      if (topbarStopTimerRef.current != null) {
-        window.clearTimeout(topbarStopTimerRef.current);
-      }
-    };
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
