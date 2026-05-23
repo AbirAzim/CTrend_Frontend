@@ -176,14 +176,19 @@ export const uploadResolvers = {
 
       // 4. Build the PutObject command
       const command = new PutObjectCommand({
-        Bucket:      process.env.R2_BUCKET_NAME,
-        Key:         key,
-        ContentType: contentType,
+        Bucket:           process.env.R2_BUCKET_NAME,
+        Key:              key,
+        ContentType:      contentType,
+        ChecksumAlgorithm: undefined, // AWS SDK v3 adds CRC32 by default — disable it or browsers can't PUT
       });
 
       // 5. Sign the URL — expires in 5 minutes (300 seconds)
-      //    The frontend must complete the upload within this window
-      const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
+      //    unhoistableHeaders prevents the SDK from embedding x-amz-checksum-crc32 in the signed URL
+      //    (that header breaks browser fetch() PUT requests)
+      const uploadUrl = await getSignedUrl(r2, command, {
+        expiresIn: 300,
+        unhoistableHeaders: new Set(['x-amz-checksum-crc32']),
+      });
 
       // 6. Construct the permanent public URL
       const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
