@@ -78,6 +78,10 @@ if (!process.env.R2_SECRET_ACCESS_KEY)  throw new Error('R2_SECRET_ACCESS_KEY is
 export const r2 = new S3Client({
   region: 'auto',   // R2 requires the literal string 'auto'
   endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  forcePathStyle: true,  // REQUIRED for R2 — without this, SDK v3 generates virtual-hosted URLs
+                         // (e.g. bucket.accountid.r2.cloudflarestorage.com) which R2 doesn't support
+                         // on the main endpoint. This causes "Failed to fetch" in browsers because
+                         // CORS on the bucket won't apply to the virtual-hosted hostname.
   credentials: {
     accessKeyId:     process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
