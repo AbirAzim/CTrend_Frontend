@@ -1307,6 +1307,47 @@ a:hover {
   border-top: 1px solid rgb(var(--cx-accent-rgb) / 0.1);
 }
 
+.cx-post-details-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cx-details-toggle {
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.26);
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  color: var(--cx-accent-deep);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--cx-ease-spring),
+    background 0.2s var(--cx-ease-out),
+    border-color 0.2s var(--cx-ease-out);
+}
+
+.cx-details-toggle:hover {
+  transform: translateY(-1px);
+  background: rgb(var(--cx-accent-rgb) / 0.14);
+  border-color: rgb(var(--cx-accent-rgb) / 0.4);
+}
+
+.cx-post-details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.58);
+}
+
 .cx-vote-hint-chip {
   margin: 0;
   padding: 5px 10px;
@@ -1324,14 +1365,12 @@ a:hover {
 
 .cx-voting-state-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.14);
-  background: rgb(255 255 255 / 0.7);
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .cx-voting-badge {
@@ -1356,7 +1395,7 @@ a:hover {
 
 .cx-voting-time {
   font-size: 0.8rem;
-  color: var(--ig-muted);
+  color: rgb(var(--cx-ink-rgb) / 0.72);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1715,7 +1754,7 @@ a:hover {
   }
 
   .cx-voting-time {
-    font-size: 0.74rem;
+    font-size: 0.72rem;
   }
 
   .cx-pulse-row-top {
@@ -1745,6 +1784,11 @@ a:hover {
 
   .cx-action-chip-label {
     font-size: 0.66rem;
+  }
+
+  .cx-details-toggle {
+    padding: 5px 10px;
+    font-size: 0.62rem;
   }
 }
 
@@ -2571,6 +2615,89 @@ a.cx-action-chip {
 
 :root[data-theme="dark"] .ig-post-header {
   background: linear-gradient(180deg, rgb(30 41 59 / 0.82), rgb(15 23 42 / 0.42));
+}
+
+:root[data-theme="dark"] .cx-post-footer {
+  background: linear-gradient(180deg, rgb(15 23 42 / 0.72), rgb(15 23 42 / 0.55));
+  border-top-color: rgb(148 163 184 / 0.22);
+}
+
+:root[data-theme="dark"] .cx-post-details-panel {
+  background: rgb(15 23 42 / 0.54);
+  border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .cx-vote-hint-chip {
+  color: #dbe4ff;
+  background: rgb(129 140 248 / 0.16);
+  border-color: rgb(129 140 248 / 0.35);
+}
+
+:root[data-theme="dark"] .cx-voting-time {
+  color: #c6d0e7;
+}
+
+:root[data-theme="dark"] .cx-post-copy {
+  background: rgb(15 23 42 / 0.72);
+  border-color: rgb(148 163 184 / 0.22);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+}
+
+:root[data-theme="dark"] .cx-post-caption-text {
+  color: #e8edf9;
+}
+
+:root[data-theme="dark"] .cx-pulse-card {
+  background: linear-gradient(180deg, rgb(15 23 42 / 0.88), rgb(15 23 42 / 0.76));
+  border-color: rgb(148 163 184 / 0.24);
+  box-shadow: 0 14px 30px rgb(0 0 0 / 0.35);
+}
+
+:root[data-theme="dark"] .cx-pulse-card-metric {
+  color: #d3dcf0;
+}
+
+:root[data-theme="dark"] .cx-pulse-row {
+  background: rgb(15 23 42 / 0.64);
+  border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .cx-pulse-name {
+  color: #eef3ff;
+}
+
+:root[data-theme="dark"] .cx-pulse-count {
+  color: #c9d5ff;
+}
+
+:root[data-theme="dark"] .cx-pulse-track {
+  background: rgb(148 163 184 / 0.2);
+}
+
+:root[data-theme="dark"] .cx-action-rail {
+  background: rgb(15 23 42 / 0.64);
+  border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .cx-action-chip {
+  background: rgb(15 23 42 / 0.84);
+  border-color: rgb(148 163 184 / 0.3);
+  color: #e6edff;
+}
+
+:root[data-theme="dark"] .cx-action-chip-label {
+  color: #d3def8;
+}
+
+:root[data-theme="dark"] .cx-action-chip:hover {
+  background: rgb(129 140 248 / 0.2);
+}
+
+:root[data-theme="dark"] .cx-see-voters-btn,
+:root[data-theme="dark"] .cx-details-toggle {
+  color: #dbe5ff;
+  background: rgb(129 140 248 / 0.14);
+  border-color: rgb(129 140 248 / 0.38);
 }
 
 :root[data-theme="dark"] .ig-post-comments-input {

@@ -244,6 +244,7 @@ export function FeedPostCard({
   const [commentError, setCommentError] = useState<string | null>(null);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [shareHint, setShareHint] = useState<string | null>(null);
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -868,6 +869,10 @@ export function FeedPostCard({
     setAuthorAvatarAttempt(0);
   }, [post.id, post.authorEmail]);
 
+  useEffect(() => {
+    setDetailsOpen(false);
+  }, [post.id]);
+
   return (
     <article className="ig-post">
       <header className="ig-post-header">
@@ -1003,45 +1008,62 @@ export function FeedPostCard({
       )}
 
       <div className="cx-post-footer">
-        {voteMode === "api" ? (
-          <label className="cx-anon-toggle">
-            <input
-              type="checkbox"
-              checked={anonymousVote}
-              onChange={(e) => setAnonymousVote(e.target.checked)}
-            />
-            <span className="cx-anon-toggle-text">Vote anonymously</span>
-          </label>
-        ) : null}
-
-        {compareUrls ? (
-          <p className="cx-vote-hint-chip">
-            {isVotingClosed
-              ? "Voting closed for this post."
-              : voteMode === "api"
-              ? "Tap a side to vote — switch anytime with another tap"
-              : "Tap a side to vote — tap again to clear your pick"}
-          </p>
-        ) : null}
-        <div className="cx-voting-state-row">
+        <div className="cx-post-details-head">
           <span
             className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
           >
             {votingStatusLabel}
           </span>
-          {votingHasEndDate ? (
-            <time className="cx-voting-time" dateTime={post.votingEndsAt ?? undefined}>
-              {isVotingClosed
-                ? `Ended ${votingEndsAtText || formatRelativeTime(post.votingEndsAt) || ""}`
-                : `Ends at ${votingEndsAtText || formatRelativeTime(post.votingEndsAt) || ""}`}
-            </time>
-          ) : null}
+          <button
+            type="button"
+            className="cx-details-toggle"
+            aria-expanded={detailsOpen}
+            aria-controls={`post-details-${post.id}`}
+            onClick={() => setDetailsOpen((prev) => !prev)}
+          >
+            {detailsOpen ? "Hide details" : "See details"}
+          </button>
         </div>
 
-        {post.caption ? (
-          <div className="cx-post-copy">
-            <span className="cx-post-handle">@{post.authorUsername}</span>
-            <p className="cx-post-caption-text">{post.caption}</p>
+        {detailsOpen ? (
+          <div className="cx-post-details-panel" id={`post-details-${post.id}`}>
+            {voteMode === "api" ? (
+              <label className="cx-anon-toggle">
+                <input
+                  type="checkbox"
+                  checked={anonymousVote}
+                  onChange={(e) => setAnonymousVote(e.target.checked)}
+                />
+                <span className="cx-anon-toggle-text">Vote anonymously</span>
+              </label>
+            ) : null}
+
+            {compareUrls ? (
+              <p className="cx-vote-hint-chip">
+                {isVotingClosed
+                  ? "Voting closed for this post."
+                  : voteMode === "api"
+                  ? "Tap a side to vote — switch anytime with another tap"
+                  : "Tap a side to vote — tap again to clear your pick"}
+              </p>
+            ) : null}
+
+            {votingHasEndDate ? (
+              <div className="cx-voting-state-row">
+                <time className="cx-voting-time" dateTime={post.votingEndsAt ?? undefined}>
+                  {isVotingClosed
+                    ? `Ended ${votingEndsAtText || formatRelativeTime(post.votingEndsAt) || ""}`
+                    : `Ends at ${votingEndsAtText || formatRelativeTime(post.votingEndsAt) || ""}`}
+                </time>
+              </div>
+            ) : null}
+
+            {post.caption ? (
+              <div className="cx-post-copy">
+                <span className="cx-post-handle">@{post.authorUsername}</span>
+                <p className="cx-post-caption-text">{post.caption}</p>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
