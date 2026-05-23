@@ -9,6 +9,7 @@ type DraftCompareItem = {
   id: string;
   imageUrl: string;
   title: string;
+  localPreview?: string;
 };
 
 type CategoriesQueryData = {
@@ -62,13 +63,25 @@ export function CreatePostPage() {
 
   async function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
+    // Show local preview immediately so user sees feedback before upload finishes
+    const localPreview = URL.createObjectURL(file);
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, localPreview } : it)),
+    );
     setUploadingId(id);
     setError(null);
     try {
       const publicUrl = await uploadImage(file);
-      updateItem(id, "imageUrl", publicUrl);
+      // Replace local preview with the permanent R2 URL
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === id ? { ...it, imageUrl: publicUrl, localPreview: undefined } : it,
+        ),
+      );
+      URL.revokeObjectURL(localPreview);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      // Keep local preview visible so user can see which slot failed
+      setError(err instanceof Error ? err.message : "Upload failed. Check CORS is configured on your R2 bucket.");
     } finally {
       setUploadingId(null);
     }
@@ -258,8 +271,10 @@ export function CreatePostPage() {
                 />
                 <button
                   type="button"
-                  className={`ig-compare-zone${item.imageUrl ? " ig-compare-zone--filled" : ""}`}
-                  style={item.imageUrl ? { backgroundImage: `url(${item.imageUrl})` } : undefined}
+                  className={`ig-compare-zone${item.imageUrl || item.localPreview ? " ig-compare-zone--filled" : ""}`}
+                  style={item.imageUrl || item.localPreview
+                    ? { backgroundImage: `url(${item.imageUrl || item.localPreview})` }
+                    : undefined}
                   onClick={() => fileInputRefs.current[item.id]?.click()}
                   disabled={uploadingId === item.id}
                   aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
