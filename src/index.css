@@ -709,6 +709,7 @@ a:hover {
 }
 
 .cx-side-panel {
+  display: none;
   border: 1px solid var(--ig-border);
   border-radius: var(--cx-radius-lg);
   background: rgb(255 255 255 / 0.72);
@@ -4344,25 +4345,6 @@ a.cx-profile-btn-accent {
   font-weight: 700;
 }
 
-@media (min-width: 980px) {
-  .cx-side-panel {
-    position: fixed;
-    top: 86px;
-    width: 220px;
-    max-height: calc(100dvh - 118px);
-    overflow-y: auto;
-    z-index: 20;
-  }
-
-  .cx-side-panel--left {
-    left: max(10px, calc(50% - 520px));
-  }
-
-  .cx-side-panel--right {
-    right: max(10px, calc(50% - 520px));
-  }
-}
-
 /* Desktop/web-view density tuning: slightly smaller UI with more breathing room. */
 @media (min-width: 768px) {
   :root {
@@ -4387,6 +4369,36 @@ a.cx-profile-btn-accent {
   .cx-post-footer {
     padding: 14px 14px 13px;
     gap: 12px;
+  }
+}
+
+@media (min-width: 980px) {
+  .ig-app {
+    max-width: 1280px;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-bottom: 40px;
+  }
+
+  .ig-topbar {
+    max-width: 640px;
+  }
+
+  .cx-feed-layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 260px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .cx-side-panel {
+    display: block;
+    position: sticky;
+    top: 86px;
+    width: auto;
+    max-height: calc(100dvh - 118px);
+    overflow-y: auto;
+    z-index: 1;
   }
 }
 
