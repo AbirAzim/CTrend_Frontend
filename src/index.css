@@ -4363,6 +4363,33 @@ a.cx-profile-btn-accent {
   }
 }
 
+/* Desktop/web-view density tuning: slightly smaller UI with more breathing room. */
+@media (min-width: 768px) {
+  :root {
+    font-size: 15px;
+  }
+
+  .ig-app {
+    max-width: 620px;
+    padding-top: 14px;
+  }
+
+  .ig-topbar {
+    max-width: 600px;
+    margin-bottom: 14px;
+  }
+
+  .ig-feed {
+    padding: 0 12px 18px;
+    gap: 10px;
+  }
+
+  .cx-post-footer {
+    padding: 14px 14px 13px;
+    gap: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
