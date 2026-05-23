@@ -847,6 +847,72 @@ export function FeedPostCard({
     binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : null;
   const rightPct =
     binaryTotal > 0 ? Math.round((100 * down) / binaryTotal) : null;
+  const multiCountsForSummary = useMemo(() => {
+    if (!isMultiCompare) {
+      return [];
+    }
+    if (useApiMulti && activeOptionStats && compareUrls) {
+      return compareUrls.map((_, i) => {
+        const s = activeOptionStats.find((x) => x.index === i);
+        return s ? Math.max(0, Math.round(s.count)) : 0;
+      });
+    }
+    return multiCounts;
+  }, [isMultiCompare, useApiMulti, activeOptionStats, compareUrls, multiCounts]);
+
+  const votingWinnerSummary = useMemo(() => {
+    if (!isVotingClosed) {
+      return "";
+    }
+
+    if (isMultiCompare && compareUrls && compareUrls.length > 0) {
+      if (multiTotalVotes <= 0 || multiPercents.length === 0) {
+        return "No votes were cast";
+      }
+      const topPct = Math.max(...multiPercents);
+      const leaders = multiPercents
+        .map((pct, idx) => ({ pct, idx }))
+        .filter((row) => row.pct === topPct);
+      if (leaders.length !== 1) {
+        return `Tie at ${topPct}%`;
+      }
+      const winnerIndex = leaders[0]!.idx;
+      const winnerLabel = compareOptionLabel(post, winnerIndex);
+      const winnerVotes = multiCountsForSummary[winnerIndex] ?? 0;
+      return `${winnerLabel} won · ${topPct}% (${winnerVotes.toLocaleString()} votes)`;
+    }
+
+    if (binaryTotal <= 0 || leftPct == null || rightPct == null) {
+      return "No votes were cast";
+    }
+    if (up === down) {
+      return `Tie · ${leftPct}% each`;
+    }
+    const winnerSide = up > down ? 0 : 1;
+    const winnerLabel =
+      isBinaryCompare && compareUrls
+        ? compareOptionLabel(post, winnerSide)
+        : winnerSide === 0
+          ? "Upvotes"
+          : "Downvotes";
+    const winnerVotes = winnerSide === 0 ? up : down;
+    const winnerPct = winnerSide === 0 ? leftPct : rightPct;
+    return `${winnerLabel} won · ${winnerPct}% (${winnerVotes.toLocaleString()} votes)`;
+  }, [
+    isVotingClosed,
+    isMultiCompare,
+    compareUrls,
+    multiTotalVotes,
+    multiPercents,
+    multiCountsForSummary,
+    binaryTotal,
+    leftPct,
+    rightPct,
+    up,
+    down,
+    isBinaryCompare,
+    post,
+  ]);
   const binaryLeaderPct =
     leftPct != null && rightPct != null ? Math.max(leftPct, rightPct) : null;
   const binaryHasTie =
@@ -1009,11 +1075,16 @@ export function FeedPostCard({
 
       <div className="cx-post-footer">
         <div className="cx-post-details-head">
-          <span
-            className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
-          >
-            {votingStatusLabel}
-          </span>
+          <div className="cx-post-details-status">
+            <span
+              className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
+            >
+              {isVotingClosed ? "Result" : votingStatusLabel}
+            </span>
+            {isVotingClosed && votingWinnerSummary ? (
+              <span className="cx-voting-result">{votingWinnerSummary}</span>
+            ) : null}
+          </div>
           <button
             type="button"
             className="cx-details-toggle"
@@ -1041,7 +1112,9 @@ export function FeedPostCard({
             {compareUrls ? (
               <p className="cx-vote-hint-chip">
                 {isVotingClosed
-                  ? "Voting closed for this post."
+                  ? votingWinnerSummary
+                    ? `Final: ${votingWinnerSummary}`
+                    : "Voting closed for this post."
                   : voteMode === "api"
                   ? "Tap a side to vote — switch anytime with another tap"
                   : "Tap a side to vote — tap again to clear your pick"}
