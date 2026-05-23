@@ -4345,12 +4345,26 @@ a.cx-profile-btn-accent {
 }
 
 @media (min-width: 980px) {
+  .ig-app {
+    max-width: 1440px;
+    padding-bottom: 24px;
+  }
+
+  .ig-topbar {
+    max-width: 1400px;
+    width: calc(100% - 40px);
+  }
+
+  .ig-bottom-nav {
+    display: none;
+  }
+
   .cx-feed-layout {
     display: grid;
-    grid-template-columns: 220px minmax(0, 620px) 220px;
-    gap: 14px;
+    grid-template-columns: 280px 1fr 300px;
+    gap: 20px;
     align-items: start;
-    justify-content: center;
+    padding: 0 20px;
   }
 
   .cx-side-panel {
@@ -4373,22 +4387,24 @@ a.cx-profile-btn-accent {
   .ig-feed {
     width: 100%;
     max-width: none;
+    padding: 0 0 18px;
+    min-width: 0;
   }
 }
 
-/* Desktop/web-view density tuning: slightly smaller UI with more breathing room. */
+/* Tablet and up: expand beyond mobile shell */
 @media (min-width: 768px) {
   :root {
     font-size: 15px;
   }
 
   .ig-app {
-    max-width: 620px;
+    max-width: 900px;
     padding-top: 14px;
   }
 
   .ig-topbar {
-    max-width: 600px;
+    max-width: 860px;
     margin-bottom: 14px;
   }
 
