@@ -74,6 +74,33 @@
   --ig-white: #fff;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cx-ink: #e7e9f2;
+  --cx-slate-muted: #a8b0c7;
+  --cx-canvas: #0c1220;
+  --cx-accent-deep: #818cf8;
+  --cx-accent: #a5b4fc;
+  --cx-accent-mid: #6366f1;
+  --cx-accent-bright: #7c83ff;
+  --cx-accent-2: #22d3ee;
+  --cx-accent-3: #94a3b8;
+  --cx-rose: #fb7185;
+  --cx-rose-soft: #f43f5e;
+  --cx-accent-rgb: 129 140 248;
+  --cx-ink-rgb: 7 12 24;
+  --cx-rose-rgb: 251 113 133;
+  --ig-border: rgb(148 163 184 / 0.26);
+  --ig-text: #e7e9f2;
+  --ig-muted: #a8b0c7;
+  --ig-bg: #0c1220;
+  --ig-white: #111a2e;
+  --cx-shadow-soft: 0 8px 26px rgb(0 0 0 / 0.42);
+  --cx-shadow-lift: 0 18px 52px rgb(0 0 0 / 0.48), 0 4px 18px rgb(129 140 248 / 0.2);
+  --cx-shadow-accent: 0 10px 28px rgb(129 140 248 / 0.34);
+  --cx-shadow-accent-lg: 0 14px 38px rgb(129 140 248 / 0.4);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -420,6 +447,14 @@ a:hover {
   pointer-events: none;
 }
 
+:root[data-theme="dark"] .ig-app::before {
+  background:
+    radial-gradient(ellipse 90% 55% at 8% -8%, rgb(var(--cx-accent-rgb) / 0.22), transparent 52%),
+    radial-gradient(ellipse 72% 48% at 96% 4%, rgb(34 211 238 / 0.14), transparent 48%),
+    radial-gradient(ellipse 58% 42% at 48% 108%, rgb(71 85 105 / 0.2), transparent 42%),
+    linear-gradient(165deg, #090f1d 0%, #0b1324 42%, #0b172d 100%);
+}
+
 .ig-topbar {
   position: sticky;
   top: 8px;
@@ -496,6 +531,17 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.ig-theme-toggle {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.28);
+}
+
+.ig-theme-toggle-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .ig-icon-btn {
@@ -1185,15 +1231,25 @@ a:hover {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 6px 6px 5px;
+  padding: 8px 8px 7px;
   background: linear-gradient(transparent, rgb(15 23 42 / 0.88));
   color: #fff;
   font-weight: 800;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   text-align: center;
   line-height: 1.2;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.ig-compare-pct-main {
+  font-size: 1.12rem;
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
 }
 
 .ig-compare-pct-sub {
@@ -1203,10 +1259,39 @@ a:hover {
   overflow: hidden;
   font-size: 0.62rem;
   font-weight: 600;
-  opacity: 0.92;
-  margin-top: 3px;
+  opacity: 0.96;
   line-height: 1.25;
   word-break: break-word;
+}
+
+.ig-compare-meter {
+  width: min(88%, 220px);
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.24);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+}
+
+.ig-compare-meter-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22d3ee, #60a5fa);
+  transition: width 0.35s var(--cx-ease-out);
+}
+
+.ig-compare-cell--binary-a .ig-compare-meter-fill {
+  background: linear-gradient(90deg, #34d399, #22c55e);
+}
+
+.ig-compare-cell--binary-b .ig-compare-meter-fill {
+  background: linear-gradient(90deg, #fb923c, #f59e0b);
+}
+
+.ig-compare-cell--multi .ig-compare-meter-fill {
+  background: linear-gradient(90deg, #818cf8, #6366f1);
 }
 
 .cx-post-footer {
@@ -2402,6 +2487,45 @@ a.cx-action-chip {
 .ig-topbar-logout:hover {
   transform: scale(1.03);
   box-shadow: 0 10px 20px rgb(190 24 93 / 0.15);
+}
+
+:root[data-theme="dark"] .ig-topbar {
+  background: rgb(15 23 42 / 0.62);
+  border-color: rgb(148 163 184 / 0.25);
+}
+
+:root[data-theme="dark"] .ig-bottom-nav {
+  background: rgb(15 23 42 / 0.82);
+  border-color: rgb(148 163 184 / 0.26);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.45);
+}
+
+:root[data-theme="dark"] .ig-nav-item {
+  background: rgb(15 23 42 / 0.92);
+  border-color: rgb(148 163 184 / 0.28);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.38);
+}
+
+:root[data-theme="dark"] .ig-post-header {
+  background: linear-gradient(180deg, rgb(30 41 59 / 0.82), rgb(15 23 42 / 0.42));
+}
+
+:root[data-theme="dark"] .ig-post-comments-input {
+  background: rgb(15 23 42 / 0.7);
+  color: var(--ig-text);
+}
+
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .ig-modal-card,
+:root[data-theme="dark"] .panel {
+  background: rgb(15 23 42 / 0.88);
+  border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .ig-topbar-logout {
+  background: linear-gradient(135deg, rgb(127 29 29 / 0.45), rgb(136 19 55 / 0.45));
+  border-color: rgb(251 113 133 / 0.36);
+  color: #fecdd3;
 }
 
 /* Bottom nav:3-up (home · create · you) — not a5-tab clone */

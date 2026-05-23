@@ -6,12 +6,24 @@ import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconUser } from "..
 import { useAuth } from "../context/AuthContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 
+type ThemeMode = "light" | "dark";
+
 export function AppShell() {
   const { logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+    const storedTheme = window.localStorage.getItem("ctrend_theme");
+    if (storedTheme === "light" || storedTheme === "dark") {
+      return storedTheme;
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
   const lastYRef = useRef(0);
   const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
     skip: !isAuthenticated,
@@ -35,6 +47,10 @@ export function AppShell() {
   function onLogoutClick() {
     logout();
     navigate("/login", { replace: true });
+  }
+
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
   useEffect(() => {
@@ -66,6 +82,11 @@ export function AppShell() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("ctrend_theme", theme);
+  }, [theme]);
+
   return (
     <div className="ig-app">
       <header className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
@@ -76,6 +97,17 @@ export function AppShell() {
           <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
         <div className="ig-topbar-actions">
+          <button
+            type="button"
+            className="ig-icon-btn ig-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            <span className="ig-theme-toggle-glyph" aria-hidden>
+              {theme === "dark" ? "☀" : "🌙"}
+            </span>
+          </button>
           {isAuthenticated && (
             <NavLink
               to="/create"
