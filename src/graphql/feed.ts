@@ -11,8 +11,6 @@ export const FEED_POSTS = gql`
       imageUrls
       caption
       createdAt
-      status
-      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -60,8 +58,6 @@ export const GET_POST_BY_ID = gql`
       imageUrls
       caption
       createdAt
-      status
-      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -146,8 +142,6 @@ export const MY_SAVED_POSTS = gql`
       imageUrls
       caption
       createdAt
-      status
-      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -211,8 +205,6 @@ export const CREATE_POST = gql`
       authorDisplayName
       authorEmail
       createdAt
-      status
-      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
