@@ -2813,6 +2813,244 @@ a:hover {
   text-decoration: underline;
 }
 
+/* ── Schedule toggle ── */
+.ig-schedule-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.ig-schedule-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--cx-radius-pill);
+  background: rgb(var(--cx-ink-rgb) / 0.15);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.ig-schedule-toggle--on {
+  background: var(--cx-accent);
+}
+
+.ig-schedule-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+  transition: transform 0.2s var(--cx-ease-spring);
+}
+
+.ig-schedule-toggle--on .ig-schedule-toggle-knob {
+  transform: translateX(18px);
+}
+
+.ig-schedule-toggle-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--cx-ink);
+}
+
+.ig-schedule-picker {
+  flex: 1;
+  min-width: 180px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.3);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cx-ink);
+  transition: border-color 0.2s;
+}
+
+.ig-schedule-picker:focus {
+  outline: none;
+  border-color: var(--cx-accent);
+}
+
+.ig-schedule-toast {
+  padding: 12px 16px;
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.25);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cx-accent);
+  text-align: center;
+}
+
+/* ── Scheduled Posts Page ── */
+.ig-scheduled-page {
+  padding: 0 12px 40px;
+}
+
+.ig-scheduled-header {
+  padding: 20px 8px 16px;
+}
+
+.ig-scheduled-back {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cx-accent);
+  text-decoration: none;
+}
+
+.ig-scheduled-back:hover {
+  text-decoration: underline;
+}
+
+.ig-scheduled-title {
+  margin: 8px 0 2px;
+  font-family: var(--cx-font-display);
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ig-scheduled-lead {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ig-muted);
+}
+
+.ig-scheduled-state {
+  text-align: center;
+  padding: 24px 0;
+  font-size: 0.85rem;
+}
+
+.ig-scheduled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ig-scheduled-card {
+  background: rgb(255 255 255 / 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--ig-border);
+  border-radius: var(--cx-radius-xl);
+  overflow: hidden;
+  box-shadow: var(--cx-shadow-soft);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ig-scheduled-card {
+    background: rgb(255 255 255 / 0.04);
+  }
+}
+
+.ig-scheduled-card-images {
+  display: flex;
+  height: 140px;
+}
+
+.ig-scheduled-card-img {
+  flex: 1;
+  background-size: cover;
+  background-position: center;
+}
+
+.ig-scheduled-card-img + .ig-scheduled-card-img {
+  border-left: 2px solid var(--ig-white);
+}
+
+.ig-scheduled-card-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ig-scheduled-card-caption {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--cx-ink);
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ig-scheduled-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ig-scheduled-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cx-accent);
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.2);
+  border-radius: var(--cx-radius-pill);
+  padding: 2px 8px;
+}
+
+.ig-scheduled-category {
+  font-size: 0.72rem;
+  color: var(--ig-muted);
+  font-weight: 500;
+}
+
+.ig-scheduled-countdown {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cx-ink);
+}
+
+.ig-scheduled-date {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ig-muted);
+}
+
+.ig-scheduled-cancel-btn {
+  margin-top: 6px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #e53e3e;
+  background: rgb(229 62 62 / 0.08);
+  border: 1.5px solid rgb(229 62 62 / 0.25);
+  border-radius: var(--cx-radius-pill);
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.2s;
+}
+
+.ig-scheduled-cancel-btn:hover:not(:disabled) {
+  background: rgb(229 62 62 / 0.16);
+}
+
+.ig-scheduled-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 /* Post permalink (/post/:id) */
 .ig-post-detail {
   padding: 0 12px 28px;

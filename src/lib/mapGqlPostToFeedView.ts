@@ -1,4 +1,4 @@
-import type { FeedPostView, ViewerVote, VoteOptionStatView } from "../types/feed";
+import type { FeedPostView, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
 
 function mapViewerVote(
   viewerVote: string | null | undefined,
@@ -58,6 +58,8 @@ export function mapGqlPostToFeedView(p: {
     percentage: number;
   }> | null;
   options?: Array<{ label: string }> | null;
+  status?: string | null;
+  scheduledAt?: string | null;
 }): FeedPostView {
   const imageUrls = (p.imageUrls ?? []).filter(
     (u) => typeof u === "string" && u.trim().length > 0,
@@ -92,6 +94,8 @@ export function mapGqlPostToFeedView(p: {
     viewerHasSaved: p.viewerHasSaved ?? false,
     commentCount: p.commentCount ?? 0,
     recentComments: p.recentComments ?? [],
+    status: (p.status as PostStatus | null) ?? null,
+    scheduledAt: p.scheduledAt ?? null,
     viewerVote: mapViewerVote(p.viewerVote, p.mySelectedOptionIndex),
     mySelectedOptionIndex:
       p.mySelectedOptionIndex === undefined || p.mySelectedOptionIndex === null

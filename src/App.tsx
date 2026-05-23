@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ScheduledPostsPage } from "./pages/ScheduledPostsPage";
 import { FriendsPage } from "./pages/FriendsPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { SignupPage } from "./pages/SignupPage";
@@ -37,6 +38,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile/scheduled"
+          element={
+            <ProtectedRoute>
+              <ScheduledPostsPage />
             </ProtectedRoute>
           }
         />

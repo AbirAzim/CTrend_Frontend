@@ -420,6 +420,9 @@ export function ProfilePage() {
         <NavLink to="/friends" className="ig-btn-outline cx-profile-btn-primary">
           Friends
         </NavLink>
+        <NavLink to="/profile/scheduled" className="ig-btn-outline cx-profile-btn-primary">
+          ⏰ Scheduled
+        </NavLink>
       </div>
 
       {editing ? (
