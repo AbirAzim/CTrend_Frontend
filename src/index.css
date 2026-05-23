@@ -2813,6 +2813,62 @@ a:hover {
   text-decoration: underline;
 }
 
+/* ── Custom date+time picker ── */
+.ig-dtp-wrap {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.ig-dtp-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgb(var(--cx-accent-rgb) / 0.06);
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.18);
+  border-radius: 10px;
+  padding: 9px 12px;
+  transition: border-color 0.2s;
+}
+
+.ig-dtp-field:focus-within {
+  border-color: var(--cx-accent);
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.ig-dtp-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.ig-dtp-input {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cx-ink);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ig-dtp-input:focus {
+  outline: none;
+}
+
+.ig-dtp-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.ig-dtp-input::-webkit-inner-spin-button,
+.ig-dtp-input::-webkit-clear-button {
+  display: none;
+}
+
 /* ── Schedule picker (expanded state) ── */
 .ig-schedule-picker-wrap {
   background: rgb(var(--cx-accent-rgb) / 0.05);
@@ -2830,24 +2886,6 @@ a:hover {
   color: var(--cx-ink);
 }
 
-.ig-schedule-picker {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  font: inherit;
-  font-size: 0.88rem;
-  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.3);
-  border-radius: 10px;
-  background: var(--ig-white);
-  color: var(--cx-ink);
-  transition: border-color 0.2s;
-}
-
-.ig-schedule-picker:focus {
-  outline: none;
-  border-color: var(--cx-accent);
-  box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.1);
-}
 
 .ig-schedule-cancel-link {
   background: none;
