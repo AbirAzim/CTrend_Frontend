@@ -61,17 +61,38 @@ export function useImageUpload() {
     const buffer = await file.arrayBuffer();
     const checksum = crc32ToBase64(buffer);
 
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type,
-        "x-amz-checksum-crc32": checksum,
-      },
-      body: buffer,
-    });
+    // Debug logging — open DevTools console, then try uploading to see these.
+    // Copy the curl command to test R2 directly (bypasses browser CORS).
+    console.debug("[R2 upload] presigned URL:", uploadUrl);
+    console.debug("[R2 upload] checksum:", checksum);
+    console.debug(
+      `[R2 upload] test with curl:\ncurl -X PUT '${uploadUrl}' \\\n  -H 'Content-Type: ${file.type}' \\\n  -H 'x-amz-checksum-crc32: ${checksum}' \\\n  --data-binary @/path/to/your-image.jpg`
+    );
+
+    let res: Response;
+    try {
+      res = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+          "x-amz-checksum-crc32": checksum,
+        },
+        body: buffer,
+      });
+    } catch (networkErr) {
+      // "Failed to fetch" = CORS preflight blocked OR no network.
+      // Open DevTools → Network → filter "r2.cloudflarestorage.com" to see the failed OPTIONS/PUT.
+      console.error("[R2 upload] Network/CORS error:", networkErr);
+      throw new Error(
+        "Upload blocked — likely a CORS issue on the R2 bucket. " +
+        "Check the browser DevTools Network tab for a failed request to r2.cloudflarestorage.com " +
+        "and verify the bucket CORS policy in the Cloudflare dashboard."
+      );
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      console.error("[R2 upload] Error response:", res.status, text);
       throw new Error(`Upload failed (${res.status})${text ? `: ${text}` : ""}. Please try again.`);
     }
 
