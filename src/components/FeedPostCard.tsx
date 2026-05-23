@@ -98,6 +98,13 @@ function pctParts(counts: number[]): number[] {
   return out;
 }
 
+function clampPercent(value: number | null | undefined): number {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function formatCountdown(targetIso: string): string {
   const end = new Date(targetIso).getTime();
   if (Number.isNaN(end)) {
@@ -240,6 +247,7 @@ export function FeedPostCard({
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [shareHint, setShareHint] = useState<string | null>(null);
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const votersModalCardRef = useRef<HTMLElement | null>(null);
   const [authorAvatarAttempt, setAuthorAvatarAttempt] = useState(0);
 
   const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
@@ -308,6 +316,39 @@ export function FeedPostCard({
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (!showVoters) {
+      return;
+    }
+
+    function handleOutsidePointerDown(event: MouseEvent | TouchEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (votersModalCardRef.current?.contains(target)) {
+        return;
+      }
+      setShowVoters(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVoters(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsidePointerDown);
+    document.addEventListener("touchstart", handleOutsidePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePointerDown);
+      document.removeEventListener("touchstart", handleOutsidePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showVoters]);
 
   useEffect(() => {
     setOptimisticVote(null);
@@ -885,8 +926,14 @@ export function FeedPostCard({
                   >
                     <img src={url} alt="" width={1080} height={1080} loading="lazy" />
                     <span className="ig-compare-pct">
-                      {pct !== null ? `${pct}%` : "—"}
+                      <span className="ig-compare-pct-main">{pct !== null ? `${pct}%` : "—"}</span>
                       <span className="ig-compare-pct-sub">{colTitle}</span>
+                      <span className="ig-compare-meter" aria-hidden>
+                        <span
+                          className="ig-compare-meter-fill"
+                          style={{ width: `${clampPercent(pct)}%` }}
+                        />
+                      </span>
                     </span>
                   </button>
                 );
@@ -915,8 +962,14 @@ export function FeedPostCard({
                 >
                   <img src={url} alt="" width={1080} height={1080} loading="lazy" />
                   <span className="ig-compare-pct">
-                    {`${pct}%`}
+                    <span className="ig-compare-pct-main">{`${pct}%`}</span>
                     <span className="ig-compare-pct-sub">{colTitle}</span>
+                    <span className="ig-compare-meter" aria-hidden>
+                      <span
+                        className="ig-compare-meter-fill"
+                        style={{ width: `${clampPercent(pct)}%` }}
+                      />
+                    </span>
                   </span>
                 </button>
               );
@@ -1309,9 +1362,8 @@ export function FeedPostCard({
           role="dialog"
           aria-modal="true"
           aria-label="Voter list"
-          onClick={() => setShowVoters(false)}
         >
-          <section className="ig-modal-card" onClick={(e) => e.stopPropagation()}>
+          <section ref={votersModalCardRef} className="ig-modal-card">
             <div className="ig-post-comments-head">
               <h3 className="ig-post-comments-title">Voted by</h3>
             <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
