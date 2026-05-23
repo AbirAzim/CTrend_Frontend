@@ -846,6 +846,15 @@ export function FeedPostCard({
     binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : null;
   const rightPct =
     binaryTotal > 0 ? Math.round((100 * down) / binaryTotal) : null;
+  const binaryLeaderPct =
+    leftPct != null && rightPct != null ? Math.max(leftPct, rightPct) : null;
+  const binaryHasTie =
+    leftPct != null && rightPct != null && leftPct === rightPct;
+  const multiLeaderPct = multiPercents.length > 0 ? Math.max(...multiPercents) : null;
+  const multiLeaderCount =
+    multiLeaderPct == null
+      ? 0
+      : multiPercents.filter((value) => value === multiLeaderPct).length;
 
   const showClassicVoteBar = !compareUrls;
   const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
@@ -1053,21 +1062,29 @@ export function FeedPostCard({
               const count = side === 0 ? up : down;
               const pct = side === 0 ? leftPct : rightPct;
               const label = compareOptionLabel(post, side);
+              const isLeader =
+                !binaryHasTie &&
+                binaryLeaderPct != null &&
+                pct != null &&
+                pct === binaryLeaderPct &&
+                pct > 0;
               return (
-                <div key={side} className="cx-pulse-row">
+                <div key={side} className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}`}>
                   <div className="cx-pulse-row-top">
                     <span className="cx-pulse-name">{label}</span>
-                    <span className="cx-pulse-count">
-                      {count.toLocaleString()}
-                      {pct != null ? ` · ${pct}%` : ""}
-                    </span>
-                    <button
-                      type="button"
-                      className="cx-see-voters-btn"
-                      onClick={() => void openVotersList(side)}
-                    >
-                      See voters
-                    </button>
+                    <div className="cx-pulse-row-actions">
+                      <span className="cx-pulse-count">
+                        {count.toLocaleString()}
+                        {pct != null ? ` · ${pct}%` : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="cx-see-voters-btn"
+                        onClick={() => void openVotersList(side)}
+                      >
+                        See voters
+                      </button>
+                    </div>
                   </div>
                   <div className="cx-pulse-track" aria-hidden>
                     <div
@@ -1093,18 +1110,28 @@ export function FeedPostCard({
             {compareUrls?.map((_, idx) => {
               const pctVal = multiPercents[idx] ?? 0;
               const label = compareOptionLabel(post, idx);
+              const isLeader =
+                multiLeaderPct != null &&
+                multiLeaderPct > 0 &&
+                multiLeaderCount === 1 &&
+                pctVal === multiLeaderPct;
               return (
-                <div key={`${post.id}-pulse-${idx}`} className="cx-pulse-row">
+                <div
+                  key={`${post.id}-pulse-${idx}`}
+                  className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}`}
+                >
                   <div className="cx-pulse-row-top">
                     <span className="cx-pulse-name">{label}</span>
-                    <span className="cx-pulse-count">{pctVal}%</span>
-                    <button
-                      type="button"
-                      className="cx-see-voters-btn"
-                      onClick={() => void openVotersList(idx)}
-                    >
-                      See voters
-                    </button>
+                    <div className="cx-pulse-row-actions">
+                      <span className="cx-pulse-count">{pctVal}%</span>
+                      <button
+                        type="button"
+                        className="cx-see-voters-btn"
+                        onClick={() => void openVotersList(idx)}
+                      >
+                        See voters
+                      </button>
+                    </div>
                   </div>
                   <div className="cx-pulse-track" aria-hidden>
                     <div
