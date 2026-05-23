@@ -192,139 +192,164 @@ export function CreatePostPage() {
     );
   }
 
+  const LABELS = ["A", "B", "C", "D"];
+
   return (
     <div className="ig-create-page">
-      <h1 className="ig-create-title">New post</h1>
-      <p className="ig-create-lead">
-        Create a compare post with category, multiple options, image URLs, and
-        per-option titles. You can add as many compare items as needed.
-      </p>
+      <div className="ig-create-hero">
+        <span className="ig-create-hero-chip">New Compare</span>
+        <h1 className="ig-create-title">What's your take?</h1>
+        <p className="ig-create-lead">Drop your picks. Let the crowd decide.</p>
+      </div>
 
       <form className="ig-create-form" onSubmit={(ev) => void onSubmit(ev)}>
-        <div className="ig-field">
-          <label htmlFor="create-category-id">Category</label>
-          <select
-            id="create-category-id"
-            name="categoryId"
-            className="ig-input"
-            value={categoryId}
-            onChange={(ev) => setCategoryId(ev.target.value)}
-            disabled={categoriesLoading}
-          >
-            <option value="">
-              {categoriesLoading ? "Loading categories..." : "Select a category"}
-            </option>
-            {(categoriesData?.categories ?? []).map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {(cat.name?.trim() || cat.id).toString()}
-              </option>
+
+        {/* ── Compare slots ── */}
+        <div className="ig-create-vs-wrap">
+          <div className="ig-compare-grid">
+            {items.map((item, idx) => (
+              <div className="ig-compare-slot" key={item.id}>
+                <input
+                  ref={(el) => { fileInputRefs.current[item.id] = el; }}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                  style={{ display: "none" }}
+                  onChange={(ev) =>
+                    void handleFileChange(item.id, ev.target.files?.[0])
+                  }
+                />
+                <button
+                  type="button"
+                  className={`ig-compare-zone${item.imageUrl ? " ig-compare-zone--filled" : ""}`}
+                  style={item.imageUrl ? { backgroundImage: `url(${item.imageUrl})` } : undefined}
+                  onClick={() => fileInputRefs.current[item.id]?.click()}
+                  disabled={uploadingId === item.id}
+                  aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
+                >
+                  {uploadingId === item.id ? (
+                    <span className="ig-compare-zone-uploading">
+                      <span className="ig-compare-spinner" />
+                      Uploading…
+                    </span>
+                  ) : item.imageUrl ? (
+                    <span className="ig-compare-zone-change">Change</span>
+                  ) : (
+                    <span className="ig-compare-zone-empty">
+                      <span className="ig-compare-zone-icon">↑</span>
+                      <span className="ig-compare-zone-label">Option {LABELS[idx] ?? idx + 1}</span>
+                      <span className="ig-compare-zone-hint">Tap to add</span>
+                    </span>
+                  )}
+                </button>
+
+                <input
+                  type="url"
+                  className="ig-compare-url-input"
+                  value={item.imageUrl}
+                  onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
+                  placeholder="or paste URL"
+                  autoComplete="off"
+                  disabled={uploadingId === item.id}
+                />
+
+                <input
+                  id={`create-item-title-${item.id}`}
+                  name={`itemTitle-${idx}`}
+                  type="text"
+                  className="ig-compare-title-input"
+                  value={item.title}
+                  onChange={(ev) => updateItem(item.id, "title", ev.target.value)}
+                  placeholder={`Label…`}
+                  autoComplete="off"
+                />
+
+                {items.length > 2 && (
+                  <button
+                    type="button"
+                    className="ig-compare-remove"
+                    onClick={() => removeItem(item.id)}
+                    aria-label="Remove option"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
-          </select>
-          {categoriesError ? (
-            <small className="error">Could not load categories from API.</small>
-          ) : null}
+          </div>
+          {items.length === 2 && (
+            <div className="ig-compare-vs-badge">VS</div>
+          )}
         </div>
 
-        <div className="ig-field">
-          <label htmlFor="create-caption">Caption (optional)</label>
-          <textarea
-            id="create-caption"
-            name="caption"
-            rows={3}
-            className="ig-input ig-input-textarea"
-            value={caption}
-            onChange={(ev) => setCaption(ev.target.value)}
-            placeholder="What are you comparing?"
-            autoComplete="off"
-          />
-        </div>
+        <button type="button" className="ig-create-add-btn" onClick={addItem}>
+          + Add option
+        </button>
 
-        <div className="ig-field">
-          <label htmlFor="create-deadline">Voting deadline (optional)</label>
-          <input
-            id="create-deadline"
-            name="votingEndsAt"
-            type="datetime-local"
-            className="ig-input"
-            value={votingEndsAt}
-            onChange={(ev) => setVotingEndsAt(ev.target.value)}
-            min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
-          />
-          <small className="muted">
-            Will be sent as UTC ISO datetime to backend.
-          </small>
-        </div>
-
-        {items.map((item, idx) => (
-          <div className="ig-field" key={item.id}>
-            <label htmlFor={`create-item-title-${item.id}`}>
-              Compare title {idx + 1}
+        {/* ── Settings card ── */}
+        <div className="ig-create-settings-card">
+          <div className="ig-settings-row">
+            <label htmlFor="create-category-id" className="ig-settings-label">
+              <span className="ig-settings-icon">◈</span> Category
             </label>
-            <input
-              id={`create-item-title-${item.id}`}
-              name={`itemTitle-${idx}`}
-              type="text"
-              className="ig-input"
-              value={item.title}
-              onChange={(ev) => updateItem(item.id, "title", ev.target.value)}
-              placeholder={`Option ${idx + 1} title`}
+            <select
+              id="create-category-id"
+              name="categoryId"
+              className="ig-settings-select"
+              value={categoryId}
+              onChange={(ev) => setCategoryId(ev.target.value)}
+              disabled={categoriesLoading}
+            >
+              <option value="">
+                {categoriesLoading ? "Loading…" : "Pick one"}
+              </option>
+              {(categoriesData?.categories ?? []).map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {(cat.name?.trim() || cat.id).toString()}
+                </option>
+              ))}
+            </select>
+            {categoriesError && (
+              <small className="ig-settings-error">Could not load categories.</small>
+            )}
+          </div>
+
+          <div className="ig-settings-divider" />
+
+          <div className="ig-settings-row ig-settings-row--col">
+            <label htmlFor="create-caption" className="ig-settings-label">
+              <span className="ig-settings-icon">✎</span> Caption
+              <span className="ig-settings-optional">optional</span>
+            </label>
+            <textarea
+              id="create-caption"
+              name="caption"
+              rows={2}
+              className="ig-settings-textarea"
+              value={caption}
+              onChange={(ev) => setCaption(ev.target.value)}
+              placeholder="What are you comparing?"
               autoComplete="off"
             />
-            <label>Image {idx + 1}</label>
-            <input
-              ref={(el) => { fileInputRefs.current[item.id] = el; }}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-              style={{ display: "none" }}
-              onChange={(ev) =>
-                void handleFileChange(item.id, ev.target.files?.[0])
-              }
-            />
-            <div className="ig-create-image-row">
-              <input
-                id={`create-item-image-${item.id}`}
-                name={`itemImage-${idx}`}
-                type="url"
-                className="ig-input"
-                value={item.imageUrl}
-                onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
-                placeholder="Paste image URL…"
-                autoComplete="off"
-                disabled={uploadingId === item.id}
-              />
-              <button
-                type="button"
-                className="btn-ghost ig-create-upload-btn"
-                disabled={uploadingId === item.id}
-                onClick={() => fileInputRefs.current[item.id]?.click()}
-                title="Upload from device"
-              >
-                {uploadingId === item.id ? "Uploading…" : "Upload"}
-              </button>
-            </div>
-            {item.imageUrl && uploadingId !== item.id && (
-              <img
-                src={item.imageUrl}
-                alt={`Preview option ${idx + 1}`}
-                className="ig-create-preview"
-              />
-            )}
-            <div className="ig-create-item-actions">
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => removeItem(item.id)}
-                disabled={items.length <= 2}
-              >
-                Remove option
-              </button>
-            </div>
           </div>
-        ))}
 
-        <button type="button" className="btn-ghost" onClick={addItem}>
-          + Add another compare option
-        </button>
+          <div className="ig-settings-divider" />
+
+          <div className="ig-settings-row">
+            <label htmlFor="create-deadline" className="ig-settings-label">
+              <span className="ig-settings-icon">⏱</span> Ends
+              <span className="ig-settings-optional">optional</span>
+            </label>
+            <input
+              id="create-deadline"
+              name="votingEndsAt"
+              type="datetime-local"
+              className="ig-settings-select"
+              value={votingEndsAt}
+              onChange={(ev) => setVotingEndsAt(ev.target.value)}
+              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+            />
+          </div>
+        </div>
 
         {error ? (
           <div className="ig-feed-banner ig-feed-banner--error" role="alert">
@@ -335,9 +360,9 @@ export function CreatePostPage() {
         <button
           type="submit"
           className="ig-create-submit"
-          disabled={loading}
+          disabled={loading || !!uploadingId}
         >
-          {loading ? "Posting…" : "Post"}
+          {loading ? "Posting…" : "Launch it →"}
         </button>
 
         <p className="ig-create-cancel">
