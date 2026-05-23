@@ -460,8 +460,8 @@ a:hover {
   top: 8px;
   left: auto;
   transform: none;
-  width: calc(100% - 20px);
-  max-width: 540px;
+  width: calc(100% - 36px);
+  max-width: 408px;
   margin: 0 auto 10px;
   min-height: 56px;
   display: flex;
@@ -4351,16 +4351,18 @@ a.cx-profile-btn-accent {
   }
 
   .ig-topbar {
-    max-width: 1400px;
+    max-width: 1280px;
     width: calc(100% - 40px);
   }
 
   .cx-feed-layout {
     display: grid;
-    grid-template-columns: 220px 1fr 240px;
-    gap: 20px;
+    grid-template-columns: 240px 1fr 260px;
+    gap: 28px;
     align-items: start;
     padding: 0 20px;
+    max-width: 1280px;
+    margin: 0 auto;
   }
 
   .cx-side-panel {
