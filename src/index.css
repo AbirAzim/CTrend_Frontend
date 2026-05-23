@@ -4345,21 +4345,34 @@ a.cx-profile-btn-accent {
 }
 
 @media (min-width: 980px) {
+  .cx-feed-layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 620px) 220px;
+    gap: 14px;
+    align-items: start;
+    justify-content: center;
+  }
+
   .cx-side-panel {
-    position: fixed;
+    position: sticky;
     top: 86px;
-    width: 220px;
+    width: 100%;
     max-height: calc(100dvh - 118px);
     overflow-y: auto;
-    z-index: 20;
+    z-index: 6;
   }
 
   .cx-side-panel--left {
-    left: max(10px, calc(50% - 520px));
+    left: auto;
   }
 
   .cx-side-panel--right {
-    right: max(10px, calc(50% - 520px));
+    right: auto;
+  }
+
+  .ig-feed {
+    width: 100%;
+    max-width: none;
   }
 }
 
