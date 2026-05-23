@@ -301,21 +301,6 @@ export function FeedPage() {
             {friendError}
           </div>
         ) : null}
-        <p className="ig-feed-footnote">
-          {useMockFeed ? (
-            <>
-              <strong>Demo mode:</strong> votes stay in this browser only. Set{" "}
-              <code>VITE_USE_MOCK_FEED=false</code> and implement{" "}
-              <code>feedPosts</code> / <code>votePost</code> on the backend.
-            </>
-          ) : (
-            <>
-              Live feed from <code>feedPosts</code> (uses <code>imageUrls</code>).
-              Votes use <code>votePost(postId, selectedOptionIndex)</code>. Each
-              post has a shareable link under <code>/post/:id</code>.
-            </>
-          )}
-        </p>
       </div>
 
       <aside className="cx-side-panel cx-side-panel--right" aria-label="My friends">
