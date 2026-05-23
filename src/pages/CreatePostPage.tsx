@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -29,31 +29,203 @@ function DateTimePicker({
   label?: string;
   id?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
   const [datePart, timePart] = value ? value.split("T") : ["", ""];
-  const update = (d: string, t: string) => onChange(d && t ? `${d}T${t}` : d ? `${d}T00:00` : "");
-  const today = minDate ? minDate.split("T")[0] : new Date().toISOString().split("T")[0];
+
+  const today = new Date();
+  const minDateObj = minDate
+    ? (() => { const d = new Date(minDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
+    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const [viewYear, setViewYear] = useState(
+    datePart ? Number(datePart.split("-")[0]) : today.getFullYear()
+  );
+  const [viewMonth, setViewMonth] = useState(
+    datePart ? Number(datePart.split("-")[1]) - 1 : today.getMonth()
+  );
+
+  // Parse time to 12-hour parts
+  let hour12 = 12, minute = 0, ampm: "AM" | "PM" = "AM";
+  if (timePart) {
+    const [h, m] = timePart.split(":").map(Number);
+    minute = m ?? 0;
+    if (h === 0) { hour12 = 12; ampm = "AM"; }
+    else if (h < 12) { hour12 = h; ampm = "AM"; }
+    else if (h === 12) { hour12 = 12; ampm = "PM"; }
+    else { hour12 = h - 12; ampm = "PM"; }
+  }
+
+  function toDateStr(y: number, mo: number, d: number) {
+    return `${y}-${String(mo + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  function toTimeStr(h12: number, min: number, ap: "AM" | "PM") {
+    const h24 = ap === "AM" ? (h12 === 12 ? 0 : h12) : (h12 === 12 ? 12 : h12 + 12);
+    return `${String(h24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  }
+
+  function selectDay(y: number, mo: number, d: number) {
+    onChange(`${toDateStr(y, mo, d)}T${timePart || "12:00"}`);
+  }
+
+  function updateTime(h12: number, min: number, ap: "AM" | "PM") {
+    if (datePart) onChange(`${datePart}T${toTimeStr(h12, min, ap)}`);
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  // Build calendar cells
+  const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrev = new Date(viewYear, viewMonth, 0).getDate();
+
+  type Cell = { day: number; year: number; month: number; outside: boolean };
+  const cells: Cell[] = [];
+  for (let i = 0; i < firstWeekday; i++) {
+    const mo = viewMonth === 0 ? 11 : viewMonth - 1;
+    const y = viewMonth === 0 ? viewYear - 1 : viewYear;
+    cells.push({ day: daysInPrev - firstWeekday + 1 + i, year: y, month: mo, outside: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, year: viewYear, month: viewMonth, outside: false });
+  }
+  while (cells.length < 42) {
+    const d = cells.length - firstWeekday - daysInMonth + 1;
+    const mo = viewMonth === 11 ? 0 : viewMonth + 1;
+    const y = viewMonth === 11 ? viewYear + 1 : viewYear;
+    cells.push({ day: d, year: y, month: mo, outside: true });
+  }
+
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+
+  const displayDate = datePart
+    ? new Date(datePart + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+  const displayTime = timePart
+    ? `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`
+    : null;
 
   return (
-    <div className="ig-dtp-wrap" id={id} aria-label={label}>
-      <div className="ig-dtp-field">
-        <span className="ig-dtp-icon">📅</span>
-        <input
-          type="date"
-          className="ig-dtp-input"
-          value={datePart ?? ""}
-          min={today}
-          onChange={(e) => update(e.target.value, timePart ?? "")}
-        />
-      </div>
-      <div className="ig-dtp-field">
-        <span className="ig-dtp-icon">🕐</span>
-        <input
-          type="time"
-          className="ig-dtp-input"
-          value={timePart ?? ""}
-          onChange={(e) => update(datePart ?? "", e.target.value)}
-        />
-      </div>
+    <div className="ig-dtp-wrap" ref={wrapRef} id={id} aria-label={label}>
+      <button
+        type="button"
+        className={`ig-dtp-trigger${open ? " ig-dtp-trigger--open" : ""}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="ig-dtp-trigger-date">
+          <span className="ig-dtp-icon">📅</span>
+          {displayDate ?? <span className="ig-dtp-placeholder">Pick date</span>}
+        </span>
+        <span className="ig-dtp-sep" />
+        <span className="ig-dtp-trigger-time">
+          <span className="ig-dtp-icon">🕐</span>
+          {displayTime ?? <span className="ig-dtp-placeholder">Pick time</span>}
+        </span>
+      </button>
+
+      {open && (
+        <div className="ig-dtp-popover">
+          <div className="ig-dtp-cal-header">
+            <button type="button" className="ig-dtp-cal-nav" onClick={prevMonth}>‹</button>
+            <span className="ig-dtp-cal-month-label">{MONTHS[viewMonth]} {viewYear}</span>
+            <button type="button" className="ig-dtp-cal-nav" onClick={nextMonth}>›</button>
+          </div>
+
+          <div className="ig-dtp-cal-grid">
+            {DAYS.map(d => (
+              <span key={d} className="ig-dtp-cal-dayname">{d}</span>
+            ))}
+            {cells.map((cell, i) => {
+              const cellDate = new Date(cell.year, cell.month, cell.day);
+              const isSelected = datePart === toDateStr(cell.year, cell.month, cell.day);
+              const isToday = cell.day === today.getDate() && cell.month === today.getMonth() && cell.year === today.getFullYear();
+              const isDisabled = cellDate < minDateObj;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={[
+                    "ig-dtp-cal-day",
+                    isSelected && "ig-dtp-cal-day--selected",
+                    isToday && !isSelected && "ig-dtp-cal-day--today",
+                    cell.outside && "ig-dtp-cal-day--outside",
+                    isDisabled && "ig-dtp-cal-day--disabled",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => { if (!isDisabled) selectDay(cell.year, cell.month, cell.day); }}
+                  disabled={isDisabled}
+                  tabIndex={cell.outside ? -1 : 0}
+                >
+                  {cell.day}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="ig-dtp-divider" />
+
+          <div className="ig-dtp-time-row">
+            <span className="ig-dtp-time-label">Time</span>
+            <div className="ig-dtp-time-selects">
+              <select
+                className="ig-dtp-time-select"
+                value={hour12}
+                onChange={e => updateTime(Number(e.target.value), minute, ampm)}
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                ))}
+              </select>
+              <span className="ig-dtp-time-colon">:</span>
+              <select
+                className="ig-dtp-time-select"
+                value={minute}
+                onChange={e => updateTime(hour12, Number(e.target.value), ampm)}
+              >
+                {Array.from({ length: 60 }, (_, i) => i).map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                ))}
+              </select>
+              <select
+                className="ig-dtp-time-select ig-dtp-time-select--ampm"
+                value={ampm}
+                onChange={e => updateTime(hour12, minute, e.target.value as "AM" | "PM")}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="ig-dtp-footer">
+            <button type="button" className="ig-dtp-btn-clear" onClick={() => { onChange(""); setOpen(false); }}>
+              Clear
+            </button>
+            <button type="button" className="ig-dtp-btn-done" onClick={() => setOpen(false)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
