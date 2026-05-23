@@ -742,7 +742,7 @@ a:hover {
 }
 
 .cx-side-head--sub {
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
 .cx-modal-list-scroll {
@@ -795,7 +795,7 @@ a:hover {
 }
 
 .cx-side-subtitle {
-  margin: 6px 6px 4px;
+  margin: 10px 6px 6px;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -4345,102 +4345,43 @@ a.cx-profile-btn-accent {
 }
 
 @media (min-width: 980px) {
-  .ig-app {
-    max-width: 1440px;
-    padding-bottom: 96px;
-  }
-
-  .ig-topbar {
-    max-width: 1280px;
-    width: calc(100% - 40px);
-  }
-
-  .cx-feed-layout {
-    display: grid;
-    grid-template-columns: 220px 1fr 220px;
-    gap: 20px;
-    align-items: start;
-    padding: 0 24px;
-    max-width: 1280px;
-    margin: 0 auto;
-  }
-
   .cx-side-panel {
-    position: sticky;
+    position: fixed;
     top: 86px;
-    width: 100%;
+    width: 220px;
     max-height: calc(100dvh - 118px);
     overflow-y: auto;
-    z-index: 6;
+    z-index: 20;
   }
 
   .cx-side-panel--left {
-    left: auto;
+    left: max(10px, calc(50% - 520px));
   }
 
   .cx-side-panel--right {
-    right: auto;
-  }
-
-  .ig-feed {
-    width: 100%;
-    max-width: none;
-    padding: 0 0 18px;
-    min-width: 0;
-  }
-
-  /* Cap image area so the full post (header + media + footer) fits in one viewport */
-  .ig-post-media-wrap {
-    max-height: calc(100dvh - 360px);
-  }
-
-  /* Cells inside a side-by-side compare must stretch to the capped wrap height */
-  .ig-post-media-wrap--compare {
-    align-items: stretch;
-  }
-
-  .ig-post-media-wrap--compare .ig-compare-cell {
-    align-self: stretch;
-  }
-
-  .ig-post-media-wrap--compare .ig-compare-cell img,
-  .ig-post-media-wrap--compare .ig-post-media {
-    height: 100%;
-    object-fit: cover;
+    right: max(10px, calc(50% - 520px));
   }
 }
 
-/* Tablet only (768–979px) */
-@media (min-width: 768px) and (max-width: 979px) {
+/* Desktop/web-view density tuning: slightly smaller UI with more breathing room. */
+@media (min-width: 768px) {
   :root {
     font-size: 15px;
   }
 
   .ig-app {
-    max-width: 900px;
+    max-width: 620px;
     padding-top: 14px;
   }
 
   .ig-topbar {
-    max-width: 860px;
+    max-width: 600px;
     margin-bottom: 14px;
   }
 
   .ig-feed {
     padding: 0 12px 18px;
     gap: 10px;
-  }
-
-  .cx-post-footer {
-    padding: 14px 14px 13px;
-    gap: 12px;
-  }
-}
-
-/* Desktop 980px+ — font + post-footer tuning */
-@media (min-width: 980px) {
-  :root {
-    font-size: 15px;
   }
 
   .cx-post-footer {
