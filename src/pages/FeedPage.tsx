@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from "@apollo/client";
+import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client";
 import { useEffect, useState } from "react";
 import { FeedPostCard } from "../components/FeedPostCard";
-import { FEED_POSTS } from "../graphql/feed";
+import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "../graphql/feed";
 import {
   ADD_FRIEND,
   FRIEND_REQUESTS,
@@ -48,6 +48,8 @@ function rotateSlice<T>(items: T[], offset: number, limit: number): T[] {
 export function FeedPage() {
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
   const { isAuthenticated } = useAuth();
+  const client = useApolloClient();
+  const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
   const [friendError, setFriendError] = useState<string | null>(null);
   const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [activePeopleModal, setActivePeopleModal] = useState<
@@ -111,9 +113,16 @@ export function FeedPage() {
     ? data.feedPosts.map(mapGqlPostToFeedView)
     : null;
 
-  const postsRaw: FeedPostView[] = useMockFeed
+  const basePostsRaw: FeedPostView[] = useMockFeed
     ? mockPostsAsFeed()
     : (apiPosts ?? []);
+
+  // Prepend subscription-delivered posts, excluding any already in the API results
+  const knownIds = new Set(basePostsRaw.map((p) => p.id));
+  const postsRaw: FeedPostView[] = [
+    ...liveQueue.filter((p) => !knownIds.has(p.id)),
+    ...basePostsRaw,
+  ];
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
@@ -162,11 +171,31 @@ export function FeedPage() {
   const showEmpty =
     !useMockFeed && !loading && !error && posts.length === 0;
 
+  useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
+    skip: useMockFeed,
+    onData: ({ data }) => {
+      const postId = data.data?.newPosts?.postId;
+      if (!postId) return;
+      void client
+        .query({ query: GET_POST_BY_ID, variables: { id: postId }, fetchPolicy: "network-only" })
+        .then(({ data: postData }) => {
+          const gqlPost = postData?.getPostById;
+          if (!gqlPost) return;
+          setLiveQueue((prev) => {
+            if (prev.some((p) => p.id === postId)) return prev;
+            return [mapGqlPostToFeedView(gqlPost), ...prev];
+          });
+        })
+        .catch(() => {/* post not visible to viewer — ignore */});
+    },
+  });
+
   useEffect(() => {
     if (useMockFeed) {
       return;
     }
     function handleRefreshFeed() {
+      setLiveQueue([]);
       void refetchFeed();
       void refetchFriends();
       void refetchRequests();
