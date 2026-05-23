@@ -1,6 +1,7 @@
-import { useMutation, useQuery } from "@apollo/client";
+import { useMutation, useQuery, useSubscription } from "@apollo/client";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { CANCEL_SCHEDULED_POST, MY_SCHEDULED_POSTS } from "../graphql/feed";
+import { CANCEL_SCHEDULED_POST, MY_SCHEDULED_POSTS, NEW_POSTS } from "../graphql/feed";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
 type ScheduledPost = {
@@ -38,7 +39,24 @@ export function ScheduledPostsPage() {
   );
 
   const [cancelPost, { loading: cancelling }] = useMutation(CANCEL_SCHEDULED_POST);
-  const posts = data?.myScheduledPosts ?? [];
+  const [goneLiveIds, setGoneLiveIds] = useState<ReadonlySet<string>>(new Set());
+  const [liveToast, setLiveToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const allPosts = data?.myScheduledPosts ?? [];
+  const posts = allPosts.filter((p) => !goneLiveIds.has(p.id));
+
+  useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
+    onData: ({ data: subData }) => {
+      const postId = subData.data?.newPosts?.postId;
+      if (!postId) return;
+      if (!allPosts.some((p) => p.id === postId)) return;
+      setGoneLiveIds((prev) => new Set([...prev, postId]));
+      setLiveToast("Your post is now live");
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setLiveToast(null), 4000);
+    },
+  });
 
   async function handleCancel(postId: string) {
     try {
@@ -63,6 +81,12 @@ export function ScheduledPostsPage() {
 
       {loading && <p className="ig-scheduled-state muted small">Loading…</p>}
       {error && <p className="ig-scheduled-state" style={{ color: "#e53e3e" }}>{getApolloErrorMessage(error)}</p>}
+
+      {liveToast && (
+        <div className="ig-live-toast" role="status">
+          ✓ {liveToast}
+        </div>
+      )}
 
       <ul className="ig-scheduled-list">
         {posts.map((post) => {

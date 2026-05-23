@@ -280,3 +280,11 @@ export const POST_VOTE_UPDATED = gql`
     }
   }
 `;
+
+export const NEW_POSTS = gql`
+  subscription NewPosts {
+    newPosts {
+      postId
+    }
+  }
+`;

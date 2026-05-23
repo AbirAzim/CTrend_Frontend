@@ -3109,6 +3109,30 @@ a:hover {
   text-align: center;
 }
 
+/* ── Live post toast (ScheduledPostsPage) ── */
+.ig-live-toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  padding: 10px 20px;
+  background: var(--cx-accent);
+  color: #fff;
+  border-radius: 100px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.18);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: ig-toast-in 0.2s ease;
+}
+
+@keyframes ig-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 /* ── Action buttons row ── */
 .ig-create-actions {
   display: flex;
