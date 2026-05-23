@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
+import { useImageUpload } from "../lib/useImageUpload";
 import { MY_FRIENDS } from "../graphql/friends";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
@@ -75,6 +76,10 @@ export function ProfilePage() {
   );
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [showAllSaved, setShowAllSaved] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarFileRef = useRef<HTMLInputElement | null>(null);
+  const { uploadImage } = useImageUpload();
 
   const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
     skip: !user,
@@ -233,6 +238,27 @@ export function ProfilePage() {
     );
   }
 
+  async function onAvatarFileChange(file: File | undefined) {
+    if (!file) return;
+    setAvatarUploading(true);
+    setAvatarError(null);
+    try {
+      const publicUrl = await uploadImage(file);
+      const { data } = await saveProfile({
+        variables: { input: { profileImageUrl: publicUrl } },
+      });
+      const u = data?.updateProfile;
+      if (u) {
+        patchUser({ displayName: u.displayName ?? null, username: u.username ?? null, bio: u.bio ?? null });
+      }
+      setAvatarLoadFailed(false);
+    } catch (err: unknown) {
+      setAvatarError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
   async function onSaveProfile(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -319,7 +345,7 @@ export function ProfilePage() {
     <div className="cx-profile">
       <header className="cx-profile-hero">
         <div className="cx-profile-hero-blob" aria-hidden />
-        <span className="ig-profile-avatar lg cx-profile-avatar">
+        <span className="ig-profile-avatar lg cx-profile-avatar cx-profile-avatar--editable">
           {heroAvatarUrl && !avatarLoadFailed ? (
             <img
               src={heroAvatarUrl}
@@ -329,7 +355,27 @@ export function ProfilePage() {
           ) : (
             initialFromUser(displayName, user.email)
           )}
+          <input
+            ref={avatarFileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+            style={{ display: "none" }}
+            onChange={(ev) => void onAvatarFileChange(ev.target.files?.[0])}
+          />
+          <button
+            type="button"
+            className="cx-avatar-edit-btn"
+            onClick={() => avatarFileRef.current?.click()}
+            disabled={avatarUploading}
+            title="Change profile picture"
+            aria-label="Change profile picture"
+          >
+            {avatarUploading ? "…" : "📷"}
+          </button>
         </span>
+        {avatarError && (
+          <p className="cx-avatar-error">{avatarError}</p>
+        )}
         <div className="cx-profile-hero-text">
           <p className="cx-profile-kicker">Your corner of CTrend</p>
           <h1 className="cx-profile-title">{displayName}</h1>

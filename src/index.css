@@ -2429,6 +2429,32 @@ a:hover {
   margin-top: 8px;
 }
 
+.ig-create-image-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ig-create-image-row .ig-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ig-create-upload-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ig-create-preview {
+  display: block;
+  margin-top: 8px;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--ig-border, #dbdbdb);
+}
+
 .ig-create-submit {
   margin-top: 4px;
   padding: 13px 18px;
@@ -3042,6 +3068,42 @@ a.cx-action-chip {
 .cx-profile-avatar {
   position: relative;
   z-index: 1;
+}
+
+.cx-profile-avatar--editable {
+  cursor: pointer;
+}
+
+.cx-avatar-edit-btn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.cx-profile-avatar--editable:hover .cx-avatar-edit-btn {
+  opacity: 1;
+}
+
+.cx-avatar-error {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: #e53e3e;
+  text-align: center;
 }
 
 .cx-profile-hero-text {

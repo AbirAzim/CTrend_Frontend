@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { useImageUpload } from "../lib/useImageUpload";
 
 type DraftCompareItem = {
   id: string;
@@ -43,6 +44,9 @@ function localInputToUtcIso(value: string): string | null {
 
 export function CreatePostPage() {
   const navigate = useNavigate();
+  const { uploadImage } = useImageUpload();
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState("");
@@ -50,7 +54,22 @@ export function CreatePostPage() {
     { id: "1", imageUrl: "", title: "" },
     { id: "2", imageUrl: "", title: "" },
   ]);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleFileChange(id: string, file: File | undefined) {
+    if (!file) return;
+    setUploadingId(id);
+    setError(null);
+    try {
+      const publicUrl = await uploadImage(file);
+      updateItem(id, "imageUrl", publicUrl);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploadingId(null);
+    }
+  }
 
   const [createPost, { loading }] = useMutation(CREATE_POST, {
     refetchQueries: [{ query: FEED_POSTS }],
@@ -95,7 +114,7 @@ export function CreatePostPage() {
       .filter((it) => it.imageUrl.length > 0);
 
     if (normalized.length < 2) {
-      setError("Please add at least two image URLs for compare.");
+      setError("Please upload images for at least two options.");
       return;
     }
 
@@ -251,17 +270,45 @@ export function CreatePostPage() {
               placeholder={`Option ${idx + 1} title`}
               autoComplete="off"
             />
-            <label htmlFor={`create-item-image-${item.id}`}>Image URL {idx + 1}</label>
+            <label>Image {idx + 1}</label>
             <input
-              id={`create-item-image-${item.id}`}
-              name={`itemImage-${idx}`}
-              type="url"
-              className="ig-input"
-              value={item.imageUrl}
-              onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
-              placeholder="https://…"
-              autoComplete="off"
+              ref={(el) => { fileInputRefs.current[item.id] = el; }}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+              style={{ display: "none" }}
+              onChange={(ev) =>
+                void handleFileChange(item.id, ev.target.files?.[0])
+              }
             />
+            <div className="ig-create-image-row">
+              <input
+                id={`create-item-image-${item.id}`}
+                name={`itemImage-${idx}`}
+                type="url"
+                className="ig-input"
+                value={item.imageUrl}
+                onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
+                placeholder="Paste image URL…"
+                autoComplete="off"
+                disabled={uploadingId === item.id}
+              />
+              <button
+                type="button"
+                className="btn-ghost ig-create-upload-btn"
+                disabled={uploadingId === item.id}
+                onClick={() => fileInputRefs.current[item.id]?.click()}
+                title="Upload from device"
+              >
+                {uploadingId === item.id ? "Uploading…" : "Upload"}
+              </button>
+            </div>
+            {item.imageUrl && uploadingId !== item.id && (
+              <img
+                src={item.imageUrl}
+                alt={`Preview option ${idx + 1}`}
+                className="ig-create-preview"
+              />
+            )}
             <div className="ig-create-item-actions">
               <button
                 type="button"
