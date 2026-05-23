@@ -11,35 +11,6 @@ const ALLOWED_TYPES = new Set([
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
-// CRC32/ISO-HDLC lookup table — required while backend still includes
-// x-amz-checksum-crc32 in X-Amz-SignedHeaders.
-const CRC32_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    table[i] = c;
-  }
-  return table;
-})();
-
-function crc32ToBase64(buffer: ArrayBuffer): string {
-  let crc = 0xffffffff;
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.length; i++) {
-    crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
-  }
-  crc = (crc ^ 0xffffffff) >>> 0;
-  const b = new Uint8Array(4);
-  b[0] = (crc >>> 24) & 0xff;
-  b[1] = (crc >>> 16) & 0xff;
-  b[2] = (crc >>> 8) & 0xff;
-  b[3] = crc & 0xff;
-  return btoa(String.fromCharCode(...b));
-}
-
 export function useImageUpload() {
   const [getUploadUrl] = useMutation(GET_IMAGE_UPLOAD_URL);
 
@@ -57,18 +28,12 @@ export function useImageUpload() {
 
     const { uploadUrl, publicUrl } = data.getImageUploadUrl;
 
-    const buffer = await file.arrayBuffer();
-    const checksum = crc32ToBase64(buffer);
-
     let res: Response;
     try {
       res = await fetch(uploadUrl, {
         method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-          "x-amz-checksum-crc32": checksum,
-        },
-        body: buffer,
+        headers: { "Content-Type": file.type },
+        body: await file.arrayBuffer(),
       });
     } catch (networkErr) {
       console.error("[R2 upload] network error:", networkErr);
