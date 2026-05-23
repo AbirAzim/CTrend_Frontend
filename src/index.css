@@ -2813,63 +2813,32 @@ a:hover {
   text-decoration: underline;
 }
 
-/* ── Schedule toggle ── */
-.ig-schedule-wrap {
+/* ── Schedule picker (expanded state) ── */
+.ig-schedule-picker-wrap {
+  background: rgb(var(--cx-accent-rgb) / 0.05);
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.2);
+  border-radius: var(--cx-radius-lg);
+  padding: 16px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
-  padding: 4px 0;
 }
 
-.ig-schedule-toggle {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  border-radius: var(--cx-radius-pill);
-  background: rgb(var(--cx-ink-rgb) / 0.15);
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.2s;
-  padding: 0;
-}
-
-.ig-schedule-toggle--on {
-  background: var(--cx-accent);
-}
-
-.ig-schedule-toggle-knob {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
-  transition: transform 0.2s var(--cx-ease-spring);
-}
-
-.ig-schedule-toggle--on .ig-schedule-toggle-knob {
-  transform: translateX(18px);
-}
-
-.ig-schedule-toggle-label {
-  font-size: 0.82rem;
-  font-weight: 600;
+.ig-schedule-picker-label {
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--cx-ink);
 }
 
 .ig-schedule-picker {
-  flex: 1;
-  min-width: 180px;
-  padding: 7px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.3);
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 10px;
+  background: var(--ig-white);
   color: var(--cx-ink);
   transition: border-color 0.2s;
 }
@@ -2877,6 +2846,19 @@ a:hover {
 .ig-schedule-picker:focus {
   outline: none;
   border-color: var(--cx-accent);
+  box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.ig-schedule-cancel-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--ig-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: flex-start;
 }
 
 .ig-schedule-toast {
@@ -2888,6 +2870,33 @@ a:hover {
   font-weight: 600;
   color: var(--cx-accent);
   text-align: center;
+}
+
+/* ── Action buttons row ── */
+.ig-create-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ig-create-submit--main {
+  flex: 1;
+}
+
+.ig-create-submit--schedule {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--cx-accent);
+  border: 2px solid rgb(var(--cx-accent-rgb) / 0.35);
+  box-shadow: none;
+  font-size: 0.88rem;
+  padding: 15px 16px;
+}
+
+.ig-create-submit--schedule:hover:not(:disabled) {
+  background: rgb(var(--cx-accent-rgb) / 0.07);
+  border-color: var(--cx-accent);
+  transform: none;
+  box-shadow: none;
 }
 
 /* ── Scheduled Posts Page ── */
