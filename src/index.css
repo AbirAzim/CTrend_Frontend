@@ -2878,12 +2878,18 @@ a:hover {
   gap: 10px;
 }
 
+.ig-create-actions .ig-create-submit {
+  width: auto;
+}
+
 .ig-create-submit--main {
   flex: 1;
+  width: auto;
 }
 
 .ig-create-submit--schedule {
-  flex-shrink: 0;
+  flex: 1;
+  width: auto;
   background: transparent;
   color: var(--cx-accent);
   border: 2px solid rgb(var(--cx-accent-rgb) / 0.35);
