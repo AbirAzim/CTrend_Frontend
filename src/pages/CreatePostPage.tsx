@@ -80,8 +80,14 @@ export function CreatePostPage() {
       );
       URL.revokeObjectURL(localPreview);
     } catch (err: unknown) {
-      // Keep local preview visible so user can see which slot failed
-      setError(err instanceof Error ? err.message : "Upload failed. Check CORS is configured on your R2 bucket.");
+      // Clear local preview — image didn't actually land in R2
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === id ? { ...it, localPreview: undefined } : it,
+        ),
+      );
+      URL.revokeObjectURL(localPreview);
+      setError(err instanceof Error ? err.message : "Upload failed — please try again.");
     } finally {
       setUploadingId(null);
     }
@@ -404,19 +410,12 @@ export function CreatePostPage() {
           </div>
         </div>
 
-        {/* ── Schedule toggle ── */}
-        <div className="ig-schedule-wrap">
-          <button
-            type="button"
-            className={`ig-schedule-toggle${scheduleEnabled ? " ig-schedule-toggle--on" : ""}`}
-            onClick={() => { setScheduleEnabled((v) => !v); setScheduledAt(""); }}
-          >
-            <span className="ig-schedule-toggle-knob" />
-          </button>
-          <span className="ig-schedule-toggle-label">
-            {scheduleEnabled ? "Schedule for later" : "Post now"}
-          </span>
-          {scheduleEnabled && (
+        {/* ── Schedule date picker (shown when schedule mode active) ── */}
+        {scheduleEnabled && (
+          <div className="ig-schedule-picker-wrap">
+            <label className="ig-schedule-picker-label">
+              ⏰ When should this go live?
+            </label>
             <input
               type="datetime-local"
               className="ig-schedule-picker"
@@ -425,8 +424,15 @@ export function CreatePostPage() {
               min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
               required
             />
-          )}
-        </div>
+            <button
+              type="button"
+              className="ig-schedule-cancel-link"
+              onClick={() => { setScheduleEnabled(false); setScheduledAt(""); }}
+            >
+              Cancel scheduling
+            </button>
+          </div>
+        )}
 
         {error ? (
           <div className="ig-feed-banner ig-feed-banner--error" role="alert">
@@ -440,15 +446,34 @@ export function CreatePostPage() {
           </div>
         ) : null}
 
-        <button
-          type="submit"
-          className="ig-create-submit"
-          disabled={loading || !!uploadingId}
-        >
-          {loading
-            ? scheduleEnabled ? "Scheduling…" : "Posting…"
-            : scheduleEnabled ? "Schedule →" : "Launch it →"}
-        </button>
+        {/* ── Action buttons ── */}
+        {scheduleEnabled ? (
+          <button
+            type="submit"
+            className="ig-create-submit"
+            disabled={loading || !!uploadingId || !scheduledAt}
+          >
+            {loading ? "Scheduling…" : "Confirm schedule →"}
+          </button>
+        ) : (
+          <div className="ig-create-actions">
+            <button
+              type="submit"
+              className="ig-create-submit ig-create-submit--main"
+              disabled={loading || !!uploadingId}
+            >
+              {loading ? "Posting…" : "Launch it →"}
+            </button>
+            <button
+              type="button"
+              className="ig-create-submit ig-create-submit--schedule"
+              disabled={loading || !!uploadingId}
+              onClick={() => setScheduleEnabled(true)}
+            >
+              ⏰ Schedule
+            </button>
+          </div>
+        )}
 
         <p className="ig-create-cancel">
           <Link to="/">Cancel</Link>
