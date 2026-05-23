@@ -78,10 +78,16 @@ if (!process.env.R2_SECRET_ACCESS_KEY)  throw new Error('R2_SECRET_ACCESS_KEY is
 export const r2 = new S3Client({
   region: 'auto',   // R2 requires the literal string 'auto'
   endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  forcePathStyle: true,  // REQUIRED for R2 — without this, SDK v3 generates virtual-hosted URLs
-                         // (e.g. bucket.accountid.r2.cloudflarestorage.com) which R2 doesn't support
-                         // on the main endpoint. This causes "Failed to fetch" in browsers because
-                         // CORS on the bucket won't apply to the virtual-hosted hostname.
+  forcePathStyle: true,            // REQUIRED — without this, SDK v3 generates virtual-hosted URLs
+                                   // (bucket.accountid.r2.cloudflarestorage.com) which R2 doesn't
+                                   // support on the main endpoint, causing CORS failures.
+  requestChecksumCalculation: 'WHEN_REQUIRED',  // REQUIRED for newer SDK v3 (3.310+)
+                                   // Default changed to 'WHEN_SUPPORTED' which auto-adds CRC32 to
+                                   // presigned URLs via x-amz-sdk-checksum-algorithm=CRC32.
+                                   // R2 doesn't understand this SDK-internal param and returns 403
+                                   // (signature mismatch). Setting WHEN_REQUIRED disables it.
+                                   // Note: ChecksumAlgorithm: undefined on PutObjectCommand alone
+                                   // is NOT sufficient in newer SDK versions.
   credentials: {
     accessKeyId:     process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
