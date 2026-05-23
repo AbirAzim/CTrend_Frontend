@@ -2669,7 +2669,7 @@ a:hover {
   backdrop-filter: blur(12px);
   border: 1px solid var(--ig-border);
   border-radius: var(--cx-radius-xl);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: var(--cx-shadow-soft);
 }
 
@@ -2817,6 +2817,11 @@ a:hover {
 .ig-dtp-wrap {
   position: relative;
   width: 100%;
+  z-index: 1;
+}
+
+.ig-dtp-wrap:focus-within {
+  z-index: 40;
 }
 
 .ig-dtp-trigger {

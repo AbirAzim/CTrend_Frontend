@@ -46,10 +46,19 @@ function DateTimePicker({
     datePart ? Number(datePart.split("-")[1]) - 1 : today.getMonth()
   );
 
-  // Parse time to 12-hour parts
+  // Parse time to 12-hour parts. If empty, default to current/min time.
+  const fallbackTimeSource = minDate ? new Date(minDate) : today;
+  const fallbackHour24 = Number.isNaN(fallbackTimeSource.getTime())
+    ? today.getHours()
+    : fallbackTimeSource.getHours();
+  const fallbackMinute = Number.isNaN(fallbackTimeSource.getTime())
+    ? today.getMinutes()
+    : fallbackTimeSource.getMinutes();
+  const fallbackTimeStr = `${String(fallbackHour24).padStart(2, "0")}:${String(fallbackMinute).padStart(2, "0")}`;
+
   let hour12 = 12, minute = 0, ampm: "AM" | "PM" = "AM";
-  if (timePart) {
-    const [h, m] = timePart.split(":").map(Number);
+  {
+    const [h, m] = (timePart || fallbackTimeStr).split(":").map(Number);
     minute = m ?? 0;
     if (h === 0) { hour12 = 12; ampm = "AM"; }
     else if (h < 12) { hour12 = h; ampm = "AM"; }
@@ -67,7 +76,7 @@ function DateTimePicker({
   }
 
   function selectDay(y: number, mo: number, d: number) {
-    onChange(`${toDateStr(y, mo, d)}T${timePart || "12:00"}`);
+    onChange(`${toDateStr(y, mo, d)}T${timePart || fallbackTimeStr}`);
   }
 
   function updateTime(h12: number, min: number, ap: "AM" | "PM") {
@@ -121,9 +130,7 @@ function DateTimePicker({
   const displayDate = datePart
     ? new Date(datePart + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
-  const displayTime = timePart
-    ? `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`
-    : null;
+  const displayTime = `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
 
   return (
     <div className="ig-dtp-wrap" ref={wrapRef} id={id} aria-label={label}>
@@ -139,7 +146,7 @@ function DateTimePicker({
         <span className="ig-dtp-sep" />
         <span className="ig-dtp-trigger-time">
           <span className="ig-dtp-icon">🕐</span>
-          {displayTime ?? <span className="ig-dtp-placeholder">Pick time</span>}
+          {displayTime}
         </span>
       </button>
 
