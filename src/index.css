@@ -742,7 +742,7 @@ a:hover {
 }
 
 .cx-side-head--sub {
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .cx-modal-list-scroll {
@@ -795,7 +795,7 @@ a:hover {
 }
 
 .cx-side-subtitle {
-  margin: 10px 6px 6px;
+  margin: 6px 6px 4px;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -4357,10 +4357,10 @@ a.cx-profile-btn-accent {
 
   .cx-feed-layout {
     display: grid;
-    grid-template-columns: 240px 1fr 260px;
-    gap: 28px;
+    grid-template-columns: 220px 1fr 220px;
+    gap: 20px;
     align-items: start;
-    padding: 0 20px;
+    padding: 0 24px;
     max-width: 1280px;
     margin: 0 auto;
   }
@@ -4387,6 +4387,26 @@ a.cx-profile-btn-accent {
     max-width: none;
     padding: 0 0 18px;
     min-width: 0;
+  }
+
+  /* Cap image area so the full post (header + media + footer) fits in one viewport */
+  .ig-post-media-wrap {
+    max-height: calc(100dvh - 360px);
+  }
+
+  /* Cells inside a side-by-side compare must stretch to the capped wrap height */
+  .ig-post-media-wrap--compare {
+    align-items: stretch;
+  }
+
+  .ig-post-media-wrap--compare .ig-compare-cell {
+    align-self: stretch;
+  }
+
+  .ig-post-media-wrap--compare .ig-compare-cell img,
+  .ig-post-media-wrap--compare .ig-post-media {
+    height: 100%;
+    object-fit: cover;
   }
 }
 
