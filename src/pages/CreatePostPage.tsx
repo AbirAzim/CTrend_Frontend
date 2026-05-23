@@ -16,6 +16,48 @@ type CategoriesQueryData = {
   categories: Array<{ id: string; name?: string | null }>;
 };
 
+function DateTimePicker({
+  value,
+  onChange,
+  minDate,
+  label,
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  minDate?: string;
+  label?: string;
+  id?: string;
+}) {
+  const [datePart, timePart] = value ? value.split("T") : ["", ""];
+  const update = (d: string, t: string) => onChange(d && t ? `${d}T${t}` : d ? `${d}T00:00` : "");
+  const today = minDate ? minDate.split("T")[0] : new Date().toISOString().split("T")[0];
+
+  return (
+    <div className="ig-dtp-wrap" id={id} aria-label={label}>
+      <div className="ig-dtp-field">
+        <span className="ig-dtp-icon">📅</span>
+        <input
+          type="date"
+          className="ig-dtp-input"
+          value={datePart ?? ""}
+          min={today}
+          onChange={(e) => update(e.target.value, timePart ?? "")}
+        />
+      </div>
+      <div className="ig-dtp-field">
+        <span className="ig-dtp-icon">🕐</span>
+        <input
+          type="time"
+          className="ig-dtp-input"
+          value={timePart ?? ""}
+          onChange={(e) => update(datePart ?? "", e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function localInputToUtcIso(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -393,19 +435,15 @@ export function CreatePostPage() {
 
           <div className="ig-settings-divider" />
 
-          <div className="ig-settings-row">
-            <label htmlFor="create-deadline" className="ig-settings-label">
-              <span className="ig-settings-icon">⏱</span> Ends
+          <div className="ig-settings-row ig-settings-row--col">
+            <label className="ig-settings-label">
+              <span className="ig-settings-icon">⏱</span> Voting ends
               <span className="ig-settings-optional">optional</span>
             </label>
-            <input
-              id="create-deadline"
-              name="votingEndsAt"
-              type="datetime-local"
-              className="ig-settings-select"
+            <DateTimePicker
               value={votingEndsAt}
-              onChange={(ev) => setVotingEndsAt(ev.target.value)}
-              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+              onChange={setVotingEndsAt}
+              minDate={new Date(Date.now() + 60_000).toISOString()}
             />
           </div>
         </div>
@@ -416,13 +454,11 @@ export function CreatePostPage() {
             <label className="ig-schedule-picker-label">
               ⏰ When should this go live?
             </label>
-            <input
-              type="datetime-local"
-              className="ig-schedule-picker"
+            <DateTimePicker
               value={scheduledAt}
-              onChange={(ev) => setScheduledAt(ev.target.value)}
-              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
-              required
+              onChange={setScheduledAt}
+              minDate={new Date(Date.now() + 60_000).toISOString()}
+              label="Schedule date and time"
             />
             <button
               type="button"
