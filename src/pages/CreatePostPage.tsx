@@ -56,6 +56,9 @@ export function CreatePostPage() {
   ]);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   async function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
@@ -71,9 +74,7 @@ export function CreatePostPage() {
     }
   }
 
-  const [createPost, { loading }] = useMutation(CREATE_POST, {
-    refetchQueries: [{ query: FEED_POSTS }],
-  });
+  const [createPost, { loading }] = useMutation(CREATE_POST);
   const {
     data: categoriesData,
     loading: categoriesLoading,
@@ -124,11 +125,25 @@ export function CreatePostPage() {
       imageUrl: it.imageUrl,
     }));
 
+    // Validate schedule time if enabled
+    const scheduledAtIso = scheduleEnabled ? localInputToUtcIso(scheduledAt) : null;
+    if (scheduleEnabled) {
+      if (!scheduledAtIso) {
+        setError("Please choose a valid schedule time.");
+        return;
+      }
+      if (new Date(scheduledAtIso).getTime() <= Date.now()) {
+        setError("Scheduled time must be in the future.");
+        return;
+      }
+    }
+
     const input: {
       categoryId: string;
       imageUrls: string[];
       options: Array<{ label: string; imageUrl: string }>;
       votingEndsAt?: string;
+      scheduledAt?: string;
       contentText?: string;
       caption?: string;
     } = {
@@ -144,11 +159,34 @@ export function CreatePostPage() {
     if (votingEndsAtIso) {
       input.votingEndsAt = votingEndsAtIso;
     }
+    if (scheduledAtIso) {
+      input.scheduledAt = scheduledAtIso;
+    }
 
     try {
       await createPost({
         variables: { input },
+        // Don't refetch feed for scheduled posts — they won't appear there yet
+        refetchQueries: scheduledAtIso ? [] : [{ query: FEED_POSTS }],
       });
+      if (scheduledAtIso) {
+        const formatted = new Date(scheduledAtIso).toLocaleString(undefined, {
+          month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+        });
+        setSuccessToast(`Your post is scheduled for ${formatted}.`);
+        // Reset form
+        setCaption("");
+        setCategoryId("");
+        setVotingEndsAt("");
+        setScheduledAt("");
+        setScheduleEnabled(false);
+        setItems([
+          { id: "1", imageUrl: "", title: "" },
+          { id: "2", imageUrl: "", title: "" },
+        ]);
+        setTimeout(() => setSuccessToast(null), 5000);
+        return;
+      }
       navigate("/", { replace: true });
     } catch (err: unknown) {
       // Backend may reject `votingEndsAt` by strict DTO validation; retry once without it.
@@ -351,9 +389,39 @@ export function CreatePostPage() {
           </div>
         </div>
 
+        {/* ── Schedule toggle ── */}
+        <div className="ig-schedule-wrap">
+          <button
+            type="button"
+            className={`ig-schedule-toggle${scheduleEnabled ? " ig-schedule-toggle--on" : ""}`}
+            onClick={() => { setScheduleEnabled((v) => !v); setScheduledAt(""); }}
+          >
+            <span className="ig-schedule-toggle-knob" />
+          </button>
+          <span className="ig-schedule-toggle-label">
+            {scheduleEnabled ? "Schedule for later" : "Post now"}
+          </span>
+          {scheduleEnabled && (
+            <input
+              type="datetime-local"
+              className="ig-schedule-picker"
+              value={scheduledAt}
+              onChange={(ev) => setScheduledAt(ev.target.value)}
+              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+              required
+            />
+          )}
+        </div>
+
         {error ? (
           <div className="ig-feed-banner ig-feed-banner--error" role="alert">
             {error}
+          </div>
+        ) : null}
+
+        {successToast ? (
+          <div className="ig-schedule-toast" role="status">
+            ✓ {successToast}
           </div>
         ) : null}
 
@@ -362,7 +430,9 @@ export function CreatePostPage() {
           className="ig-create-submit"
           disabled={loading || !!uploadingId}
         >
-          {loading ? "Posting…" : "Launch it →"}
+          {loading
+            ? scheduleEnabled ? "Scheduling…" : "Posting…"
+            : scheduleEnabled ? "Schedule →" : "Launch it →"}
         </button>
 
         <p className="ig-create-cancel">

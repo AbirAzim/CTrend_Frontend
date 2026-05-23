@@ -1,5 +1,7 @@
 export type ViewerVote = "UP" | "DOWN" | null;
 
+export type PostStatus = "published" | "scheduled";
+
 export type FeedPostView = {
   id: string;
   authorUsername: string;
@@ -37,6 +39,8 @@ export type FeedPostView = {
       displayName?: string | null;
     };
   }>;
+  status?: PostStatus | null;
+  scheduledAt?: string | null;
   viewerVote: ViewerVote;
   /** Server vote choice (0-based option index); use for 3+ options — `viewerVote` is only A/B legacy. */
   mySelectedOptionIndex?: number | null;

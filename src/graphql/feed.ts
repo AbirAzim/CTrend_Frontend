@@ -11,6 +11,8 @@ export const FEED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      status
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -58,6 +60,8 @@ export const GET_POST_BY_ID = gql`
       imageUrls
       caption
       createdAt
+      status
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -142,6 +146,8 @@ export const MY_SAVED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      status
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -205,12 +211,41 @@ export const CREATE_POST = gql`
       authorDisplayName
       authorEmail
       createdAt
+      status
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
       isVotingOpen
     }
+  }
+`;
+
+export const MY_SCHEDULED_POSTS = gql`
+  query MyScheduledPosts {
+    myScheduledPosts {
+      id
+      contentText
+      imageUrls
+      options {
+        label
+        imageUrl
+      }
+      category {
+        id
+        name
+      }
+      status
+      scheduledAt
+      createdAt
+    }
+  }
+`;
+
+export const CANCEL_SCHEDULED_POST = gql`
+  mutation CancelScheduledPost($postId: ID!) {
+    cancelScheduledPost(postId: $postId)
   }
 `;
 
