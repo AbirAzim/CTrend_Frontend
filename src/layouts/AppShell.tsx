@@ -10,11 +10,22 @@ import { ME } from "../graphql/profile";
 type ThemeMode = "light" | "dark";
 
 export function AppShell() {
-  const { logout, isAuthenticated, user } = useAuth();
+  const { logout, isAuthenticated, user, patchUser } = useAuth();
   const { data: meData } = useQuery(ME, {
     skip: !isAuthenticated,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "network-only",
   });
+
+  // Propagate role (and any server-side profile updates) to the stored session
+  // so every component that reads user.role gets the correct value immediately.
+  useEffect(() => {
+    const serverMe = meData?.me;
+    if (!serverMe) return;
+    const updates: Record<string, unknown> = {};
+    if (serverMe.role && serverMe.role !== user?.role) updates.role = serverMe.role;
+    if (Object.keys(updates).length > 0) patchUser(updates as Parameters<typeof patchUser>[0]);
+  }, [meData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isAdmin = (meData?.me?.role ?? user?.role) === "admin";
   const navigate = useNavigate();
   const location = useLocation();
