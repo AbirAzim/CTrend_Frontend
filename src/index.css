@@ -4426,3 +4426,269 @@ a.cx-profile-btn-accent {
     transform: none;
   }
 }
+
+/* ─── Admin ──────────────────────────────────────────────────────────── */
+
+.admin-role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.admin-role-badge--admin {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.admin-role-badge--user {
+  background: var(--ig-surface, #f0f0f0);
+  color: var(--ig-text-secondary, #666);
+}
+
+.cx-profile-role-badge {
+  margin-left: 8px;
+  font-size: 10px;
+}
+
+.ig-topbar-admin {
+  background: #7c3aed !important;
+  color: #fff !important;
+}
+
+/* Admin page */
+.admin-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 80px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.admin-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.admin-section {
+  background: var(--ig-card, var(--ig-surface, #fff));
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+.admin-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.admin-section-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-btn-admin {
+  background: #7c3aed !important;
+  border-color: #7c3aed !important;
+}
+
+.admin-search {
+  width: 100%;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--ig-border, #e5e7eb);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-table th {
+  background: var(--ig-surface, #f9fafb);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ig-text-secondary, #6b7280);
+  border-bottom: 1px solid var(--ig-border, #e5e7eb);
+}
+
+.admin-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ig-border, #e5e7eb);
+  vertical-align: middle;
+}
+
+.admin-table-row:last-child td {
+  border-bottom: none;
+}
+
+.admin-table-email {
+  font-size: 12px;
+  color: var(--ig-text-secondary, #6b7280);
+}
+
+.admin-remove-btn {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.admin-remove-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/* Admin modal */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.admin-modal {
+  background: var(--ig-bg, #fff);
+  border-radius: 16px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+}
+
+.admin-modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+
+.admin-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.admin-modal-success {
+  color: #16a34a;
+  font-size: 14px;
+}
+
+.admin-confirm-msg {
+  font-size: 15px;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.btn-danger {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Admin post type selector */
+.ig-admin-post-type {
+  margin-bottom: 0;
+}
+
+.ig-admin-post-type-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.ig-admin-post-type-option {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid var(--ig-border, #e5e7eb);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.ig-admin-post-type-option input[type="radio"] {
+  display: none;
+}
+
+.ig-admin-post-type-option--active {
+  border-color: #7c3aed;
+  background: rgba(124,58,237,0.06);
+}
+
+/* Feed empty state */
+.ig-feed-empty-state {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.ig-feed-empty-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.ig-feed-empty-desc {
+  color: var(--ig-text-secondary, #6b7280);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 320px;
+  margin: 0 auto 12px;
+}

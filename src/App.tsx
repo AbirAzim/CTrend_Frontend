@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
 import { AppShell } from "./layouts/AppShell";
+import { AcceptInvitationPage } from "./pages/AcceptInvitationPage";
+import { AdminPage } from "./pages/AdminPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
 import { FeedPage } from "./pages/FeedPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -21,6 +23,7 @@ export default function App() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
       <Route element={<AppShell />}>
         <Route index element={<FeedPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />
@@ -47,6 +50,14 @@ export default function App() {
             <ProtectedRoute>
               <ScheduledPostsPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin"
+          element={
+            <AdminRoute>
+              <AdminPage />
+            </AdminRoute>
           }
         />
       </Route>

@@ -10,6 +10,7 @@ export const ME = gql`
       bio
       interests
       profileImageUrl
+      role
     }
   }
 `;

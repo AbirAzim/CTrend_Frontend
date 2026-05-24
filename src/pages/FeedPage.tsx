@@ -310,11 +310,18 @@ export function FeedPage() {
         )}
 
         {showEmpty && (
-          <p className="ig-feed-status">
-            No posts yet. Add data from the API or set{" "}
-            <code>VITE_USE_MOCK_FEED=true</code> in <code>.env</code> for demo
-            posts.
-          </p>
+          <div className="ig-feed-empty-state">
+            <p className="ig-feed-empty-title">Nothing here yet</p>
+            <p className="ig-feed-empty-desc">
+              Follow people to see their posts here. The feed shows posts from
+              people you follow — platform-wide posts from CTrend also appear here.
+            </p>
+            {isAuthenticated && (
+              <p className="muted small">
+                Check the <strong>Suggestions</strong> panel to find people to follow.
+              </p>
+            )}
+          </div>
         )}
 
         {posts.map((post) => (
