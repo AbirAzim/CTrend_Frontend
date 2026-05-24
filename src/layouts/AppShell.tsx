@@ -1,24 +1,24 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import { useQuery } from "@apollo/client";
+import { useMutation, useQuery } from "@apollo/client";
 import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { ME } from "../graphql/profile";
+import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
 
 type ThemeMode = "light" | "dark";
 
 export function AppShell() {
-  const { logout, isAuthenticated, user, patchUser } = useAuth();
+  const { logout, isAuthenticated, user, patchUser, setSession } = useAuth();
   const { data: meData } = useQuery(ME, {
     skip: !isAuthenticated,
     fetchPolicy: "network-only",
     errorPolicy: "all",
   });
 
-  // Propagate role (and any server-side profile updates) to the stored session
-  // so every component that reads user.role gets the correct value immediately.
+  // Propagate role from server into stored session.
   useEffect(() => {
     const serverMe = meData?.me;
     if (!serverMe) return;
@@ -28,7 +28,29 @@ export function AppShell() {
     }
   }, [meData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isAdmin = (meData?.me?.role ?? user?.role)?.toLowerCase() === "admin";
+  const activeRole = (meData?.me?.role ?? user?.role)?.toLowerCase();
+  const isAdmin = activeRole === "admin";
+  // hasDualRole will be wired once backend exposes `roles` array
+  const hasDualRole = false;
+
+  const [switchRoleMut, { loading: switchingRole }] = useMutation(SWITCH_ACTIVE_ROLE);
+
+  async function onSwitchRole() {
+    const targetRole = activeRole === "admin" ? "USER" : "ADMIN";
+    try {
+      const { data } = await switchRoleMut({ variables: { role: targetRole } });
+      const payload = data?.switchActiveRole;
+      if (payload?.accessToken && payload.user && user) {
+        setSession(payload.accessToken, {
+          ...user,
+          role: (payload.user.role as string)?.toLowerCase() ?? targetRole.toLowerCase(),
+        });
+      }
+    } catch {
+      // Silent — role switch is non-critical
+    }
+  }
+
   const navigate = useNavigate();
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
@@ -77,7 +99,6 @@ export function AppShell() {
     function onScroll() {
       const y = window.scrollY;
       const delta = y - lastYRef.current;
-      // Ignore micro-jitter from touchpads.
       if (Math.abs(delta) < 8) {
         return;
       }
@@ -88,11 +109,9 @@ export function AppShell() {
         return;
       }
       if (delta > 0) {
-        // Scrolling down: hide bottom nav, show topbar
         setNavHidden(true);
         setTopbarHidden(false);
       } else {
-        // Scrolling up: show bottom nav, hide topbar
         setNavHidden(false);
         setTopbarHidden(true);
       }
@@ -127,6 +146,18 @@ export function AppShell() {
               {theme === "dark" ? "☀" : "🌙"}
             </span>
           </button>
+          {hasDualRole && (
+            <button
+              type="button"
+              className={`ig-role-switcher${isAdmin ? " ig-role-switcher--admin" : ""}`}
+              onClick={() => void onSwitchRole()}
+              disabled={switchingRole}
+              title={`Active: ${activeRole} — click to switch to ${isAdmin ? "user" : "admin"} mode`}
+            >
+              <span className="ig-role-switcher-dot" aria-hidden />
+              {switchingRole ? "…" : isAdmin ? "Admin" : "User"}
+            </button>
+          )}
           {isAdmin && (
             <NavLink
               to="/admin"

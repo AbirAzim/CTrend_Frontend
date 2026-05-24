@@ -77,6 +77,18 @@ export const ACCEPT_INVITATION = gql`
   }
 `;
 
+export const SWITCH_ACTIVE_ROLE = gql`
+  mutation SwitchActiveRole($role: UserRole!) {
+    switchActiveRole(role: $role) {
+      accessToken
+      user {
+        id
+        role
+      }
+    }
+  }
+`;
+
 export const RESEND_VERIFICATION_EMAIL = gql`
   mutation ResendVerificationEmail($email: String!) {
     resendVerificationEmail(email: $email)
