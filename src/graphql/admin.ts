@@ -12,6 +12,18 @@ export const INVITE_ADMIN = gql`
   }
 `;
 
+export const PROMOTE_TO_ADMIN = gql`
+  mutation PromoteToAdmin($email: String!) {
+    promoteToAdmin(email: $email) {
+      id
+      email
+      username
+      displayName
+      role
+    }
+  }
+`;
+
 export const LIST_USERS = gql`
   query ListUsers($skip: Int, $take: Int) {
     listUsers(skip: $skip, take: $take) {
@@ -20,6 +32,7 @@ export const LIST_USERS = gql`
       username
       displayName
       role
+      profileImageUrl
     }
   }
 `;
@@ -32,7 +45,13 @@ export const REMOVE_USER = gql`
 
 export const REMOVE_ADMIN = gql`
   mutation RemoveAdmin($email: String!) {
-    removeAdmin(email: $email)
+    removeAdmin(email: $email) {
+      id
+      email
+      username
+      displayName
+      role
+    }
   }
 `;
 

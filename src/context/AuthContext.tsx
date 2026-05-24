@@ -35,6 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [{ token, user }, setState] = useState(hydrate);
 
   const setSession = useCallback((nextToken: string, nextUser: StoredUser) => {
+    // Reset Apollo cache when a new session starts so stale cached fields
+    // (e.g. me.role missing from the previous session) don't persist.
+    void apolloClient.resetStore().catch(() => {/* ignore reset errors */});
     writeSession(nextToken, nextUser);
     setState({ token: nextToken, user: nextUser });
   }, []);
