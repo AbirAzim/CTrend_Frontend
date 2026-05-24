@@ -10,6 +10,7 @@ export const LOGIN = gql`
         email
         displayName
         username
+        role
       }
     }
   }
@@ -39,6 +40,7 @@ export const GOOGLE_LOGIN = gql`
         email
         displayName
         username
+        role
       }
     }
   }
@@ -54,6 +56,22 @@ export const VERIFY_EMAIL = gql`
         email
         displayName
         username
+        role
+      }
+    }
+  }
+`;
+
+export const ACCEPT_INVITATION = gql`
+  mutation AcceptInvitation($token: String!, $password: String!, $displayName: String) {
+    acceptInvitation(token: $token, password: $password, displayName: $displayName) {
+      accessToken
+      user {
+        id
+        email
+        username
+        displayName
+        role
       }
     }
   }

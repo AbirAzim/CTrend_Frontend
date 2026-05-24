@@ -7,6 +7,7 @@ export type StoredUser = {
   displayName?: string | null;
   username?: string | null;
   bio?: string | null;
+  role?: string | null;
 };
 
 export function readStoredToken(): string | null {

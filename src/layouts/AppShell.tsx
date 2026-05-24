@@ -9,7 +9,8 @@ import { MY_SAVED_POSTS } from "../graphql/feed";
 type ThemeMode = "light" | "dark";
 
 export function AppShell() {
-  const { logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const navigate = useNavigate();
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
@@ -108,6 +109,15 @@ export function AppShell() {
               {theme === "dark" ? "☀" : "🌙"}
             </span>
           </button>
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className="ig-topbar-cta ig-topbar-admin"
+              title="Admin dashboard"
+            >
+              <span className="ig-topbar-cta-label">Admin</span>
+            </NavLink>
+          )}
           {isAuthenticated && (
             <NavLink
               to="/create"
