@@ -8,7 +8,7 @@ import { useImageUpload } from "../lib/useImageUpload";
 import { MY_FRIENDS } from "../graphql/friends";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
-import { INVITE_USER } from "../graphql/admin";
+import { INVITE_ADMIN, INVITE_USER } from "../graphql/admin";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import type { FeedPostView } from "../types/feed";
 
@@ -63,10 +63,10 @@ export function ProfilePage() {
   const location = useLocation();
   const keepsOnlyView = new URLSearchParams(location.search).get("view") === "keeps";
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
-  const isAdmin = user?.role === "admin";
 
   const [editing, setEditing] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteType, setInviteType] = useState<"user" | "admin">("user");
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<"idle" | "success" | "error">("idle");
   const [inviteError, setInviteError] = useState("");
@@ -94,6 +94,7 @@ export function ProfilePage() {
 
   const me = meData?.me;
   const userId = me?.id ?? user?.id ?? "";
+  const isAdmin = (me?.role ?? user?.role) === "admin";
 
   const { data: postsData, loading: postsLoading } = useQuery(USER_POSTS, {
     variables: { userId },
@@ -171,8 +172,12 @@ export function ProfilePage() {
       setFormDisplayName(me.displayName ?? "");
       setFormBio(me.bio ?? "");
       setFormInterests((me.interests ?? []).join(", "));
+      // Sync role from server into stored session so AppShell and other components see it
+      if (me.role && me.role !== user?.role) {
+        patchUser({ role: me.role });
+      }
     }
-  }, [me]);
+  }, [me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -202,14 +207,20 @@ export function ProfilePage() {
       refetchQueries: [{ query: USER_POSTS, variables: { userId } }],
     },
   );
-  const [inviteUserMut, { loading: inviting }] = useMutation(INVITE_USER);
+  const [inviteUserMut, { loading: invitingUser }] = useMutation(INVITE_USER);
+  const [inviteAdminMut, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
+  const inviting = invitingUser || invitingAdmin;
 
   async function onInviteFriend(e: React.FormEvent) {
     e.preventDefault();
     setInviteStatus("idle");
     setInviteError("");
     try {
-      await inviteUserMut({ variables: { email: inviteEmail.trim() } });
+      if (inviteType === "admin") {
+        await inviteAdminMut({ variables: { email: inviteEmail.trim() } });
+      } else {
+        await inviteUserMut({ variables: { email: inviteEmail.trim() } });
+      }
       setInviteStatus("success");
       setInviteEmail("");
     } catch (err: unknown) {
@@ -221,6 +232,14 @@ export function ProfilePage() {
       );
       setInviteStatus("error");
     }
+  }
+
+  function openInviteModal(type: "user" | "admin") {
+    setInviteType(type);
+    setShowInviteModal(true);
+    setInviteStatus("idle");
+    setInviteError("");
+    setInviteEmail("");
   }
 
   if (!user) {
@@ -459,19 +478,23 @@ export function ProfilePage() {
         <button
           type="button"
           className="ig-btn-outline cx-profile-btn-primary"
-          onClick={() => {
-            setShowInviteModal(true);
-            setInviteStatus("idle");
-            setInviteError("");
-            setInviteEmail("");
-          }}
+          onClick={() => openInviteModal("user")}
         >
           Invite a Friend
         </button>
         {isAdmin && (
-          <NavLink to="/admin" className="ig-btn-outline cx-profile-btn-accent">
-            Admin Dashboard
-          </NavLink>
+          <>
+            <button
+              type="button"
+              className="ig-btn-outline cx-profile-btn-accent"
+              onClick={() => openInviteModal("admin")}
+            >
+              Invite Admin
+            </button>
+            <NavLink to="/admin" className="ig-btn-outline cx-profile-btn-accent">
+              Admin Dashboard
+            </NavLink>
+          </>
         )}
       </div>
 
@@ -725,11 +748,21 @@ export function ProfilePage() {
           aria-modal
         >
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="admin-modal-title">Invite a Friend</h2>
+            <h2 className="admin-modal-title">
+              {inviteType === "admin" ? "Invite Admin" : "Invite a Friend"}
+            </h2>
+            {inviteType === "admin" && (
+              <p className="muted small" style={{ marginBottom: 12 }}>
+                The invitee will receive admin-level access to CTrend.
+              </p>
+            )}
             {inviteStatus === "success" ? (
               <>
                 <p className="admin-modal-success">
-                  Invitation sent! Your friend will receive an email to join CTrend.
+                  Invitation sent!{" "}
+                  {inviteType === "admin"
+                    ? "The new admin will receive an email to set up their account."
+                    : "Your friend will receive an email to join CTrend."}
                 </p>
                 <button
                   type="button"
@@ -743,7 +776,7 @@ export function ProfilePage() {
             ) : (
               <form onSubmit={(ev) => void onInviteFriend(ev)} className="admin-modal-form">
                 <label className="field">
-                  <span>Friend's email address</span>
+                  <span>{inviteType === "admin" ? "Email address" : "Friend's email address"}</span>
                   <input
                     type="email"
                     required
