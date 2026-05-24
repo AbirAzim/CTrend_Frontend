@@ -8,6 +8,7 @@ import { useImageUpload } from "../lib/useImageUpload";
 import { MY_FRIENDS } from "../graphql/friends";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
+import { INVITE_USER } from "../graphql/admin";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import type { FeedPostView } from "../types/feed";
 
@@ -62,8 +63,13 @@ export function ProfilePage() {
   const location = useLocation();
   const keepsOnlyView = new URLSearchParams(location.search).get("view") === "keeps";
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
+  const isAdmin = user?.role === "admin";
 
   const [editing, setEditing] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<"idle" | "success" | "error">("idle");
+  const [inviteError, setInviteError] = useState("");
   const [formDisplayName, setFormDisplayName] = useState("");
   const [formBio, setFormBio] = useState("");
   const [formInterests, setFormInterests] = useState("");
@@ -196,6 +202,26 @@ export function ProfilePage() {
       refetchQueries: [{ query: USER_POSTS, variables: { userId } }],
     },
   );
+  const [inviteUserMut, { loading: inviting }] = useMutation(INVITE_USER);
+
+  async function onInviteFriend(e: React.FormEvent) {
+    e.preventDefault();
+    setInviteStatus("idle");
+    setInviteError("");
+    try {
+      await inviteUserMut({ variables: { email: inviteEmail.trim() } });
+      setInviteStatus("success");
+      setInviteEmail("");
+    } catch (err: unknown) {
+      const msg = getApolloErrorMessage(err);
+      setInviteError(
+        msg.includes("A user with this email already exists")
+          ? "This email is already registered on CTrend."
+          : msg,
+      );
+      setInviteStatus("error");
+    }
+  }
 
   if (!user) {
     return null;
@@ -379,7 +405,14 @@ export function ProfilePage() {
         <div className="cx-profile-hero-text">
           <p className="cx-profile-kicker">Your corner of CTrend</p>
           <h1 className="cx-profile-title">{displayName}</h1>
-          <p className="cx-profile-handle">@{username}</p>
+          <p className="cx-profile-handle">
+            @{username}
+            {isAdmin && (
+              <span className="admin-role-badge admin-role-badge--admin cx-profile-role-badge">
+                admin
+              </span>
+            )}
+          </p>
           {bio ? <p className="cx-profile-bio-preview">{bio}</p> : null}
         </div>
       </header>
@@ -423,6 +456,23 @@ export function ProfilePage() {
         <NavLink to="/profile/scheduled" className="ig-btn-outline cx-profile-btn-primary">
           ⏰ Scheduled
         </NavLink>
+        <button
+          type="button"
+          className="ig-btn-outline cx-profile-btn-primary"
+          onClick={() => {
+            setShowInviteModal(true);
+            setInviteStatus("idle");
+            setInviteError("");
+            setInviteEmail("");
+          }}
+        >
+          Invite a Friend
+        </button>
+        {isAdmin && (
+          <NavLink to="/admin" className="ig-btn-outline cx-profile-btn-accent">
+            Admin Dashboard
+          </NavLink>
+        )}
       </div>
 
       {editing ? (
@@ -666,6 +716,62 @@ export function ProfilePage() {
       </section>
 
       <p className="muted small cx-profile-email">{user.email}</p>
+
+      {showInviteModal && (
+        <div
+          className="admin-modal-overlay"
+          onClick={() => setShowInviteModal(false)}
+          role="dialog"
+          aria-modal
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="admin-modal-title">Invite a Friend</h2>
+            {inviteStatus === "success" ? (
+              <>
+                <p className="admin-modal-success">
+                  Invitation sent! Your friend will receive an email to join CTrend.
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setShowInviteModal(false)}
+                  style={{ marginTop: 12 }}
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              <form onSubmit={(ev) => void onInviteFriend(ev)} className="admin-modal-form">
+                <label className="field">
+                  <span>Friend's email address</span>
+                  <input
+                    type="email"
+                    required
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                </label>
+                {inviteStatus === "error" && (
+                  <p className="error" role="alert">{inviteError}</p>
+                )}
+                <div className="admin-modal-actions">
+                  <button type="submit" className="btn-primary" disabled={inviting}>
+                    {inviting ? "Sending…" : "Send invitation"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => setShowInviteModal(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
