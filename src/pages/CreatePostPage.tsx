@@ -270,7 +270,7 @@ export function CreatePostPage() {
   const navigate = useNavigate();
   const { uploadImage } = useImageUpload();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role?.toLowerCase() === "admin";
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [caption, setCaption] = useState("");

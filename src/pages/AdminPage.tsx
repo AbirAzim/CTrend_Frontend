@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { useState } from "react";
 import { INVITE_ADMIN, INVITE_USER, LIST_USERS, REMOVE_ADMIN, REMOVE_USER } from "../graphql/admin";
+import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
 const SYSTEM_ADMIN_EMAIL = "systemadminctrend@gmail.com";
@@ -12,7 +13,17 @@ type UserRow = {
   username?: string | null;
   displayName?: string | null;
   role?: string | null;
+  profileImageUrl?: string | null;
 };
+
+function avatarUrl(user: UserRow): string | null {
+  if (user.profileImageUrl?.trim()) return user.profileImageUrl.trim();
+  const email = user.email.trim().toLowerCase();
+  if (email.endsWith("@gmail.com")) {
+    return `https://www.google.com/s2/photos/profile/${encodeURIComponent(email)}?sz=64`;
+  }
+  return null;
+}
 
 // ─── Invite Modal ────────────────────────────────────────────────────────────
 
@@ -124,6 +135,59 @@ function ConfirmDialog({
   );
 }
 
+// ─── Avatar with image + fallback ────────────────────────────────────────────
+
+function AdminAvatar({ user, isAdmin: adminStyle }: { user: UserRow; isAdmin?: boolean }) {
+  const src = avatarUrl(user);
+  const initials = (user.displayName || user.username || user.email)[0]!.toUpperCase();
+  const [failed, setFailed] = useState(false);
+
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt={user.displayName ?? user.username ?? ""}
+        className={`admin-user-avatar admin-user-avatar--img${adminStyle ? " admin-user-avatar--admin" : ""}`}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <span className={`admin-user-avatar${adminStyle ? " admin-user-avatar--admin" : ""}`}>
+      {initials}
+    </span>
+  );
+}
+
+// ─── Per-user stats (fetched individually) ──────────────────────────────────
+
+function UserStats({ userId }: { userId: string }) {
+  const { data, loading } = useQuery(USER_POSTS, {
+    variables: { userId },
+    fetchPolicy: "cache-first",
+    errorPolicy: "all",
+  });
+
+  if (loading) return <span className="muted small">…</span>;
+  const posts: Array<{ totalVotes?: number | null; upvoteCount?: number | null; downvoteCount?: number | null; isVotingOpen?: boolean | null }> = data?.getPostsByUser ?? [];
+  const totalPosts = posts.length;
+  const totalVotes = posts.reduce(
+    (sum, p) => sum + (p.totalVotes ?? (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0)),
+    0,
+  );
+  const activePolls = posts.filter((p) => p.isVotingOpen !== false).length;
+
+  return (
+    <span className="admin-user-stats">
+      <span className="admin-stat-chip">{totalPosts} posts</span>
+      <span className="admin-stat-chip">{totalVotes.toLocaleString()} votes</span>
+      {activePolls > 0 && (
+        <span className="admin-stat-chip admin-stat-chip--active">{activePolls} live</span>
+      )}
+    </span>
+  );
+}
+
 // ─── User Table ──────────────────────────────────────────────────────────────
 
 function UserTable({
@@ -147,6 +211,7 @@ function UserTable({
             <th>Name</th>
             <th>Email</th>
             <th>Username</th>
+            <th>Engagement</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -157,14 +222,13 @@ function UserTable({
               <tr key={user.id} className="admin-table-row">
                 <td>
                   <div className="admin-user-cell">
-                    <span className="admin-user-avatar">
-                      {(user.displayName || user.username || user.email)[0]!.toUpperCase()}
-                    </span>
+                    <AdminAvatar user={user} />
                     <span>{user.displayName || <span className="muted">No name</span>}</span>
                   </div>
                 </td>
                 <td className="admin-table-email">{user.email}</td>
                 <td>{user.username ? `@${user.username}` : <span className="muted">—</span>}</td>
+                <td><UserStats userId={user.id} /></td>
                 <td>
                   <button
                     type="button"
@@ -202,7 +266,7 @@ function UsersTab() {
   const [removeUser, { loading: removingUser }] = useMutation(REMOVE_USER);
   const removing = removingUser;
 
-  const allUsers = (data?.listUsers ?? []).filter((u) => u.role !== "admin");
+  const allUsers = (data?.listUsers ?? []).filter((u) => u.role?.toLowerCase() !== "admin");
   const filtered = searchTerm.trim()
     ? allUsers.filter(
         (u) =>
@@ -304,7 +368,7 @@ function AdminsTab() {
   const [removeAdmin, { loading: removingAdmin }] = useMutation(REMOVE_ADMIN);
   const removing = removingAdmin;
 
-  const admins = (data?.listUsers ?? []).filter((u) => u.role === "admin");
+  const admins = (data?.listUsers ?? []).filter((u) => u.role?.toLowerCase() === "admin");
   const filtered = searchTerm.trim()
     ? admins.filter(
         (u) =>
@@ -382,9 +446,7 @@ function AdminsTab() {
                   <tr key={user.id} className="admin-table-row">
                     <td>
                       <div className="admin-user-cell">
-                        <span className="admin-user-avatar admin-user-avatar--admin">
-                          {(user.displayName || user.username || user.email)[0]!.toUpperCase()}
-                        </span>
+                        <AdminAvatar user={user} isAdmin />
                         <span>{user.displayName || <span className="muted">No name</span>}</span>
                       </div>
                     </td>

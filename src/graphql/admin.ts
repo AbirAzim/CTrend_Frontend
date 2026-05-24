@@ -20,6 +20,7 @@ export const LIST_USERS = gql`
       username
       displayName
       role
+      profileImageUrl
     }
   }
 `;

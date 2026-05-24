@@ -21,6 +21,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   const { data: meData, loading } = useQuery(ME, {
     skip: !isAuthenticated,
     fetchPolicy: "network-only",
+    errorPolicy: "all",
   });
 
   if (!isAuthenticated) {
@@ -28,7 +29,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   }
 
   // Wait for ME to load before deciding — fall back to stored role
-  const role = meData?.me?.role ?? user?.role;
+  const role = (meData?.me?.role ?? user?.role)?.toLowerCase();
   if (!loading && role !== "admin") {
     return <Navigate to="/" replace />;
   }
