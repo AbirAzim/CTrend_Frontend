@@ -20,7 +20,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { data: meData, loading } = useQuery(ME, {
     skip: !isAuthenticated,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "network-only",
   });
 
   if (!isAuthenticated) {
