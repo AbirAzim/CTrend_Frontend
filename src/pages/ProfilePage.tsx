@@ -90,11 +90,12 @@ export function ProfilePage() {
   const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
     skip: !user,
     fetchPolicy: "network-only",
+    errorPolicy: "all",
   });
 
   const me = meData?.me;
   const userId = me?.id ?? user?.id ?? "";
-  const isAdmin = (me?.role ?? user?.role) === "admin";
+  const isAdmin = (me?.role ?? user?.role)?.toLowerCase() === "admin";
 
   const { data: postsData, loading: postsLoading } = useQuery(USER_POSTS, {
     variables: { userId },
@@ -433,6 +434,16 @@ export function ProfilePage() {
             )}
           </p>
           {bio ? <p className="cx-profile-bio-preview">{bio}</p> : null}
+          <button
+            type="button"
+            className="cx-profile-edit-btn"
+            onClick={() => {
+              setEditing((v) => !v);
+              setFormError(null);
+            }}
+          >
+            {editing ? "Close" : "Edit profile"}
+          </button>
         </div>
       </header>
 
@@ -455,94 +466,98 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <div className="cx-profile-actions">
+      {editing && (
+        <div className="cx-profile-edit-card">
+          <form onSubmit={(ev) => void onSaveProfile(ev)}>
+            <div className="cx-edit-row">
+              <label className="cx-edit-label" htmlFor="edit-display-name">
+                Display name
+              </label>
+              <input
+                id="edit-display-name"
+                className="ig-input"
+                value={formDisplayName}
+                onChange={(e) => setFormDisplayName(e.target.value)}
+                autoComplete="nickname"
+                placeholder="Your name"
+              />
+            </div>
+            <div className="cx-edit-row">
+              <label className="cx-edit-label" htmlFor="edit-bio">
+                Bio
+              </label>
+              <textarea
+                id="edit-bio"
+                className="ig-input ig-input-textarea"
+                rows={3}
+                value={formBio}
+                onChange={(e) => setFormBio(e.target.value)}
+                placeholder="What do you love comparing?"
+              />
+            </div>
+            <div className="cx-edit-row">
+              <label className="cx-edit-label" htmlFor="edit-interests">
+                Interests
+              </label>
+              <input
+                id="edit-interests"
+                className="ig-input"
+                value={formInterests}
+                onChange={(e) => setFormInterests(e.target.value)}
+                placeholder="coffee, sneakers, sunsets"
+              />
+            </div>
+            {formError && (
+              <p className="error" role="alert">
+                {formError}
+              </p>
+            )}
+            <div className="cx-edit-footer">
+              <button type="submit" className="cx-edit-save-btn" disabled={saving}>
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+              <button
+                type="button"
+                className="cx-edit-cancel-btn"
+                onClick={() => setEditing(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="cx-profile-invite-row">
         <button
           type="button"
-          className="ig-btn-outline cx-profile-btn-primary"
-          onClick={() => {
-            setEditing((v) => !v);
-            setFormError(null);
-          }}
-        >
-          {editing ? "Close editor" : "Edit vibe"}
-        </button>
-        <NavLink to="/create" className="ig-btn-outline cx-profile-btn-accent">
-          New compare
-        </NavLink>
-        <NavLink to="/friends" className="ig-btn-outline cx-profile-btn-primary">
-          Friends
-        </NavLink>
-        <NavLink to="/profile/scheduled" className="ig-btn-outline cx-profile-btn-primary">
-          ⏰ Scheduled
-        </NavLink>
-        <button
-          type="button"
-          className="ig-btn-outline cx-profile-btn-primary"
+          className="cx-invite-btn"
           onClick={() => openInviteModal("user")}
         >
-          Invite a Friend
+          + Invite a friend
         </button>
         {isAdmin && (
-          <>
-            <button
-              type="button"
-              className="ig-btn-outline cx-profile-btn-accent"
-              onClick={() => openInviteModal("admin")}
-            >
-              Invite Admin
-            </button>
-            <NavLink to="/admin" className="ig-btn-outline cx-profile-btn-accent">
-              Admin Dashboard
-            </NavLink>
-          </>
+          <button
+            type="button"
+            className="cx-invite-btn cx-invite-btn--admin"
+            onClick={() => openInviteModal("admin")}
+          >
+            + Invite admin
+          </button>
         )}
       </div>
 
-      {editing ? (
-        <form className="cx-profile-editor" onSubmit={(ev) => void onSaveProfile(ev)}>
-          <h2 className="cx-profile-editor-title">Shape your profile</h2>
-          <label className="ig-field">
-            <span>Display name</span>
-            <input
-              className="ig-input"
-              value={formDisplayName}
-              onChange={(e) => setFormDisplayName(e.target.value)}
-              autoComplete="nickname"
-            />
-          </label>
-          <label className="ig-field">
-            <span>Bio</span>
-            <textarea
-              className="ig-input ig-input-textarea"
-              rows={3}
-              value={formBio}
-              onChange={(e) => setFormBio(e.target.value)}
-              placeholder="What do you love comparing?"
-            />
-          </label>
-          <label className="ig-field">
-            <span>Interests (comma separated)</span>
-            <input
-              className="ig-input"
-              value={formInterests}
-              onChange={(e) => setFormInterests(e.target.value)}
-              placeholder="coffee, sneakers, sunsets"
-            />
-          </label>
-          {formError ? (
-            <p className="error" role="alert">
-              {formError}
-            </p>
-          ) : null}
-          <button
-            type="submit"
-            className="ig-create-submit"
-            disabled={saving}
-          >
-            {saving ? "Saving…" : "Save profile"}
-          </button>
-        </form>
-      ) : null}
+      {isAdmin && (
+        <div className="cx-admin-card">
+          <span className="cx-admin-card-label">Admin</span>
+          <NavLink to="/admin" className="cx-admin-card-link">
+            Dashboard →
+          </NavLink>
+          <NavLink to="/profile/scheduled" className="cx-admin-card-link">
+            Scheduled →
+          </NavLink>
+        </div>
+      )}
 
       {meLoading && !me && (
         <p className="ig-feed-status">Loading your profile…</p>

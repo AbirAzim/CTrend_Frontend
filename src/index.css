@@ -4755,3 +4755,386 @@ a.cx-profile-btn-accent {
   background: rgba(124, 58, 237, 0.15);
   color: #7c3aed;
 }
+
+/* Admin status bar */
+.admin-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.admin-status-bar--loading {
+  background: var(--ig-surface, #f3f4f6);
+  color: var(--ig-text-secondary, #6b7280);
+}
+
+.admin-status-bar--warn {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.admin-status-bar--ok {
+  background: rgba(124, 58, 237, 0.08);
+  color: #6d28d9;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  font-weight: 600;
+}
+
+.admin-status-bar--warn a {
+  color: #92400e;
+  text-decoration: underline;
+}
+
+/* User engagement stats in admin table */
+.admin-user-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.admin-stat-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: var(--ig-surface, #f3f4f6);
+  color: var(--ig-text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.admin-stat-chip--active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+/* Temporary debug panel */
+.admin-debug-panel {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #1e1e2e;
+  border-radius: 10px;
+  color: #cdd6f4;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-debug-panel summary {
+  font-weight: 600;
+  margin-bottom: 6px;
+  user-select: none;
+}
+
+.admin-debug-pre {
+  margin: 0;
+  font-family: monospace;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Admin avatar with image support */
+.admin-user-avatar--img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+
+/* ── Role switcher (topbar) ── */
+.ig-role-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 20px;
+  border: 1.5px solid rgb(0 0 0 / 0.12);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ig-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ig-role-switcher:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ig-role-switcher:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.05);
+}
+.ig-role-switcher--admin {
+  border-color: rgb(124 58 237 / 0.4);
+  color: #6d28d9;
+  background: rgb(124 58 237 / 0.06);
+}
+.ig-role-switcher--admin:hover:not(:disabled) {
+  background: rgb(124 58 237 / 0.12);
+}
+.ig-role-switcher-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ig-muted);
+  flex-shrink: 0;
+}
+.ig-role-switcher--admin .ig-role-switcher-dot {
+  background: #7c3aed;
+}
+
+:root[data-theme="dark"] .ig-role-switcher {
+  border-color: rgb(255 255 255 / 0.15);
+  color: #eef3ff;
+}
+:root[data-theme="dark"] .ig-role-switcher:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.07);
+}
+:root[data-theme="dark"] .ig-role-switcher--admin {
+  border-color: rgb(165 180 252 / 0.45);
+  color: #c4b5fd;
+  background: rgb(124 58 237 / 0.1);
+}
+:root[data-theme="dark"] .ig-role-switcher--admin:hover:not(:disabled) {
+  background: rgb(124 58 237 / 0.18);
+}
+
+/* ── Admin: roles wrap ── */
+.admin-roles-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.admin-role-badge--user {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ig-text-secondary, #6b7280);
+}
+
+/* ── Admin: action button group ── */
+.admin-action-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-remove-btn--danger {
+  color: #dc2626 !important;
+  border-color: rgb(220 38 38 / 0.3) !important;
+}
+.admin-remove-btn--danger:hover:not(:disabled) {
+  background: rgb(220 38 38 / 0.06) !important;
+}
+
+/* ── Profile: inline edit button (hero) ── */
+.cx-profile-edit-btn {
+  margin-top: 10px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.35);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ig-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  align-self: flex-start;
+}
+.cx-profile-edit-btn:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+}
+
+/* ── Profile: edit card (replaces old dashed-border form) ── */
+.cx-profile-edit-card {
+  margin: 0 0 20px;
+  padding: 20px 18px 18px;
+  border-radius: 16px;
+  background: var(--ig-card, #fff);
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.15);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.06);
+  animation: cx-post-in 0.22s ease both;
+}
+
+.cx-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+.cx-edit-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ig-muted);
+}
+
+.cx-edit-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.cx-edit-save-btn {
+  flex: 1;
+  padding: 11px 0;
+  border-radius: 10px;
+  border: none;
+  background: rgb(var(--cx-accent-rgb));
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.cx-edit-save-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.cx-edit-save-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.cx-edit-cancel-btn {
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: 1.5px solid rgb(0 0 0 / 0.1);
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ig-text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cx-edit-cancel-btn:hover {
+  background: rgb(0 0 0 / 0.04);
+}
+
+/* ── Profile: invite actions row ── */
+.cx-profile-invite-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cx-invite-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.28);
+  background: rgb(var(--cx-accent-rgb) / 0.05);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ig-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cx-invite-btn:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  border-color: rgb(var(--cx-accent-rgb) / 0.45);
+}
+.cx-invite-btn--admin {
+  border-color: rgb(124 58 237 / 0.32);
+  background: rgb(124 58 237 / 0.06);
+  color: #6d28d9;
+}
+.cx-invite-btn--admin:hover {
+  background: rgb(124 58 237 / 0.12);
+  border-color: rgb(124 58 237 / 0.5);
+}
+
+/* ── Profile: admin tools card ── */
+.cx-admin-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: rgb(124 58 237 / 0.05);
+  border: 1.5px solid rgb(124 58 237 / 0.18);
+  flex-wrap: wrap;
+}
+
+.cx-admin-card-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7c3aed;
+  margin-right: auto;
+}
+
+.cx-admin-card-link {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #7c3aed;
+  text-decoration: none;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgb(124 58 237 / 0.22);
+  background: rgb(124 58 237 / 0.07);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.cx-admin-card-link:hover {
+  background: rgb(124 58 237 / 0.14);
+}
+
+/* Dark mode overrides for new profile UI */
+:root[data-theme="dark"] .cx-profile-edit-card {
+  background: rgb(15 23 42 / 0.86);
+  border-color: rgb(148 163 184 / 0.2);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.28);
+}
+
+:root[data-theme="dark"] .cx-profile-edit-btn {
+  border-color: rgb(165 180 252 / 0.38);
+  color: #eef3ff;
+}
+:root[data-theme="dark"] .cx-profile-edit-btn:hover {
+  background: rgb(129 140 248 / 0.12);
+  border-color: rgb(165 180 252 / 0.6);
+}
+
+:root[data-theme="dark"] .cx-invite-btn {
+  border-color: rgb(165 180 252 / 0.3);
+  background: rgb(129 140 248 / 0.07);
+  color: #eef3ff;
+}
+:root[data-theme="dark"] .cx-invite-btn:hover {
+  background: rgb(129 140 248 / 0.14);
+}
+
+:root[data-theme="dark"] .cx-edit-cancel-btn {
+  border-color: rgb(148 163 184 / 0.28);
+  color: #eef3ff;
+}
+:root[data-theme="dark"] .cx-edit-cancel-btn:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+:root[data-theme="dark"] .cx-admin-card {
+  background: rgb(124 58 237 / 0.1);
+  border-color: rgb(124 58 237 / 0.28);
+}
+:root[data-theme="dark"] .cx-admin-card-link {
+  background: rgb(124 58 237 / 0.12);
+  border-color: rgb(124 58 237 / 0.3);
+  color: #c4b5fd;
+}
+:root[data-theme="dark"] .cx-admin-card-link:hover {
+  background: rgb(124 58 237 / 0.2);
+}
