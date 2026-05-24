@@ -14,6 +14,7 @@ export function AppShell() {
   const { data: meData } = useQuery(ME, {
     skip: !isAuthenticated,
     fetchPolicy: "network-only",
+    errorPolicy: "all",
   });
 
   // Propagate role (and any server-side profile updates) to the stored session
@@ -21,12 +22,13 @@ export function AppShell() {
   useEffect(() => {
     const serverMe = meData?.me;
     if (!serverMe) return;
-    const updates: Record<string, unknown> = {};
-    if (serverMe.role && serverMe.role !== user?.role) updates.role = serverMe.role;
-    if (Object.keys(updates).length > 0) patchUser(updates as Parameters<typeof patchUser>[0]);
+    const serverRole = serverMe.role?.toLowerCase() ?? null;
+    if (serverRole && serverRole !== user?.role?.toLowerCase()) {
+      patchUser({ role: serverRole });
+    }
   }, [meData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isAdmin = (meData?.me?.role ?? user?.role) === "admin";
+  const isAdmin = (meData?.me?.role ?? user?.role)?.toLowerCase() === "admin";
   const navigate = useNavigate();
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
