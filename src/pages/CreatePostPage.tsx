@@ -2,8 +2,10 @@ import { useMutation, useQuery } from "@apollo/client";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
+import { CREATE_SYSTEM_POST } from "../graphql/admin";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
+import { useAuth } from "../context/AuthContext";
 
 type DraftCompareItem = {
   id: string;
@@ -267,11 +269,14 @@ function localInputToUtcIso(value: string): string | null {
 export function CreatePostPage() {
   const navigate = useNavigate();
   const { uploadImage } = useImageUpload();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState("");
+  const [postType, setPostType] = useState<"regular" | "system">("regular");
   const [items, setItems] = useState<DraftCompareItem[]>([
     { id: "1", imageUrl: "", title: "" },
     { id: "2", imageUrl: "", title: "" },
@@ -314,7 +319,9 @@ export function CreatePostPage() {
     }
   }
 
-  const [createPost, { loading }] = useMutation(CREATE_POST);
+  const [createPost, { loading: creatingPost }] = useMutation(CREATE_POST);
+  const [createSystemPost, { loading: creatingSystemPost }] = useMutation(CREATE_SYSTEM_POST);
+  const loading = creatingPost || creatingSystemPost;
   const {
     data: categoriesData,
     loading: categoriesLoading,
@@ -404,7 +411,8 @@ export function CreatePostPage() {
     }
 
     try {
-      await createPost({
+      const mutate = isAdmin && postType === "system" ? createSystemPost : createPost;
+      await mutate({
         variables: { input },
         // Don't refetch feed for scheduled posts — they won't appear there yet
         refetchQueries: scheduledAtIso ? [] : [{ query: FEED_POSTS }],
@@ -434,7 +442,8 @@ export function CreatePostPage() {
         const retryInput = { ...input };
         delete retryInput.votingEndsAt;
         try {
-          await createPost({
+          const mutate = isAdmin && postType === "system" ? createSystemPost : createPost;
+          await mutate({
             variables: { input: retryInput },
           });
           navigate("/", { replace: true });
@@ -481,6 +490,39 @@ export function CreatePostPage() {
       </div>
 
       <form className="ig-create-form" onSubmit={(ev) => void onSubmit(ev)}>
+
+        {/* ── Admin post type toggle ── */}
+        {isAdmin && (
+          <div className="ig-create-settings-card ig-admin-post-type">
+            <p className="ig-settings-label">
+              <span className="ig-settings-icon">🛡</span> Post visibility
+            </p>
+            <div className="ig-admin-post-type-options">
+              <label className={`ig-admin-post-type-option${postType === "regular" ? " ig-admin-post-type-option--active" : ""}`}>
+                <input
+                  type="radio"
+                  name="postType"
+                  value="regular"
+                  checked={postType === "regular"}
+                  onChange={() => setPostType("regular")}
+                />
+                <strong>Regular Post</strong>
+                <span className="muted small">Visible to your followers only</span>
+              </label>
+              <label className={`ig-admin-post-type-option${postType === "system" ? " ig-admin-post-type-option--active" : ""}`}>
+                <input
+                  type="radio"
+                  name="postType"
+                  value="system"
+                  checked={postType === "system"}
+                  onChange={() => setPostType("system")}
+                />
+                <strong>Platform-wide Post</strong>
+                <span className="muted small">Visible to ALL users · highest priority</span>
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* ── Compare slots ── */}
         <div className="ig-create-vs-wrap">
