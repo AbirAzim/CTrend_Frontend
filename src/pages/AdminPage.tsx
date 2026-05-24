@@ -14,13 +14,9 @@ type UserRow = {
   role?: string | null;
 };
 
-function InviteModal({
-  type,
-  onClose,
-}: {
-  type: "user" | "admin";
-  onClose: () => void;
-}) {
+// ─── Invite Modal ────────────────────────────────────────────────────────────
+
+function InviteModal({ type, onClose }: { type: "user" | "admin"; onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -56,12 +52,22 @@ function InviteModal({
     <div className="admin-modal-overlay" onClick={onClose} role="dialog" aria-modal>
       <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="admin-modal-title">
-          Invite {type === "admin" ? "Admin" : "Friend"}
+          Invite {type === "admin" ? "New Admin" : "New User"}
         </h2>
-        {status === "success" ? (
-          <p className="admin-modal-success">
-            Invitation sent! The user will receive an email to set up their account.
+        {type === "admin" && (
+          <p className="muted small" style={{ marginBottom: 12 }}>
+            This person will receive admin-level access to CTrend.
           </p>
+        )}
+        {status === "success" ? (
+          <>
+            <p className="admin-modal-success">
+              Invitation sent! They'll receive an email to set up their account.
+            </p>
+            <button type="button" className="btn-ghost" onClick={onClose} style={{ marginTop: 12 }}>
+              Close
+            </button>
+          </>
         ) : (
           <form onSubmit={(ev) => void onSubmit(ev)} className="admin-modal-form">
             <label className="field">
@@ -74,28 +80,21 @@ function InviteModal({
                 autoComplete="email"
               />
             </label>
-            {status === "error" && (
-              <p className="error" role="alert">{errorMsg}</p>
-            )}
+            {status === "error" && <p className="error" role="alert">{errorMsg}</p>}
             <div className="admin-modal-actions">
               <button type="submit" className="btn-primary" disabled={loading}>
                 {loading ? "Sending…" : "Send invitation"}
               </button>
-              <button type="button" className="btn-ghost" onClick={onClose}>
-                Cancel
-              </button>
+              <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
             </div>
           </form>
-        )}
-        {status === "success" && (
-          <button type="button" className="btn-ghost" onClick={onClose} style={{ marginTop: 12 }}>
-            Close
-          </button>
         )}
       </div>
     </div>
   );
 }
+
+// ─── Confirm Dialog ──────────────────────────────────────────────────────────
 
 function ConfirmDialog({
   message,
@@ -113,12 +112,7 @@ function ConfirmDialog({
       <div className="admin-modal">
         <p className="admin-confirm-msg">{message}</p>
         <div className="admin-modal-actions">
-          <button
-            type="button"
-            className="btn-danger"
-            onClick={onConfirm}
-            disabled={loading}
-          >
+          <button type="button" className="btn-danger" onClick={onConfirm} disabled={loading}>
             {loading ? "Removing…" : "Confirm"}
           </button>
           <button type="button" className="btn-ghost" onClick={onCancel} disabled={loading}>
@@ -130,42 +124,200 @@ function ConfirmDialog({
   );
 }
 
-export function AdminPage() {
+// ─── User Table ──────────────────────────────────────────────────────────────
+
+function UserTable({
+  users,
+  onRemove,
+  removing,
+}: {
+  users: UserRow[];
+  onRemove: (user: UserRow) => void;
+  removing: boolean;
+}) {
+  if (users.length === 0) {
+    return <p className="muted small">No users found.</p>;
+  }
+
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Username</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => {
+            const isSystemAdmin = user.email === SYSTEM_ADMIN_EMAIL;
+            return (
+              <tr key={user.id} className="admin-table-row">
+                <td>
+                  <div className="admin-user-cell">
+                    <span className="admin-user-avatar">
+                      {(user.displayName || user.username || user.email)[0]!.toUpperCase()}
+                    </span>
+                    <span>{user.displayName || <span className="muted">No name</span>}</span>
+                  </div>
+                </td>
+                <td className="admin-table-email">{user.email}</td>
+                <td>{user.username ? `@${user.username}` : <span className="muted">—</span>}</td>
+                <td>
+                  <button
+                    type="button"
+                    className="btn-ghost admin-remove-btn"
+                    disabled={isSystemAdmin || removing}
+                    title={isSystemAdmin ? "System admin cannot be removed" : "Remove"}
+                    onClick={() => onRemove(user)}
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Users Tab ───────────────────────────────────────────────────────────────
+
+function UsersTab() {
   const [skip, setSkip] = useState(0);
-  const [inviteModal, setInviteModal] = useState<"user" | "admin" | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<UserRow | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [inviteModal, setInviteModal] = useState(false);
 
-  const { data, loading: listLoading, error: listError, refetch } = useQuery<{
-    listUsers: UserRow[];
-  }>(LIST_USERS, {
+  const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
     variables: { skip, take: PAGE_SIZE },
     fetchPolicy: "network-only",
   });
 
   const [removeUser, { loading: removingUser }] = useMutation(REMOVE_USER);
-  const [removeAdmin, { loading: removingAdmin }] = useMutation(REMOVE_ADMIN);
-  const removing = removingUser || removingAdmin;
+  const removing = removingUser;
 
-  const users = data?.listUsers ?? [];
+  const allUsers = (data?.listUsers ?? []).filter((u) => u.role !== "admin");
   const filtered = searchTerm.trim()
-    ? users.filter(
+    ? allUsers.filter(
         (u) =>
           u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (u.displayName ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
           (u.username ?? "").toLowerCase().includes(searchTerm.toLowerCase()),
       )
-    : users;
+    : allUsers;
 
   async function handleRemove(user: UserRow) {
     setRemoveError(null);
     try {
-      if (user.role === "admin") {
-        await removeAdmin({ variables: { email: user.email } });
-      } else {
-        await removeUser({ variables: { email: user.email } });
-      }
+      await removeUser({ variables: { email: user.email } });
+      setConfirmTarget(null);
+      void refetch();
+    } catch (err: unknown) {
+      setRemoveError(getApolloErrorMessage(err));
+      setConfirmTarget(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="admin-section-title">All Users</h2>
+          <p className="muted small">Regular users on the platform</p>
+        </div>
+        <button type="button" className="btn-primary" onClick={() => setInviteModal(true)}>
+          + Invite User
+        </button>
+      </div>
+
+      <input
+        type="search"
+        className="ig-input admin-search"
+        placeholder="Search by name, email, or username…"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+
+      {removeError && <p className="error" role="alert">{removeError}</p>}
+      {loading && <p className="muted small">Loading users…</p>}
+      {error && <p className="error">Failed to load users: {error.message}</p>}
+
+      <UserTable
+        users={filtered}
+        onRemove={(u) => { setRemoveError(null); setConfirmTarget(u); }}
+        removing={removing}
+      />
+
+      <div className="admin-pagination">
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={skip === 0 || loading}
+          onClick={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
+        >
+          ← Previous
+        </button>
+        <span className="muted small">Showing {skip + 1}–{skip + allUsers.length}</span>
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={allUsers.length < PAGE_SIZE || loading}
+          onClick={() => setSkip((s) => s + PAGE_SIZE)}
+        >
+          Next →
+        </button>
+      </div>
+
+      {inviteModal && <InviteModal type="user" onClose={() => setInviteModal(false)} />}
+      {confirmTarget && (
+        <ConfirmDialog
+          message={`Remove ${confirmTarget.displayName || confirmTarget.email}? This cannot be undone.`}
+          onConfirm={() => void handleRemove(confirmTarget)}
+          onCancel={() => setConfirmTarget(null)}
+          loading={removing}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Admins Tab ──────────────────────────────────────────────────────────────
+
+function AdminsTab() {
+  const [skip, setSkip] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [confirmTarget, setConfirmTarget] = useState<UserRow | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [inviteModal, setInviteModal] = useState(false);
+
+  const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
+    variables: { skip, take: PAGE_SIZE },
+    fetchPolicy: "network-only",
+  });
+
+  const [removeAdmin, { loading: removingAdmin }] = useMutation(REMOVE_ADMIN);
+  const removing = removingAdmin;
+
+  const admins = (data?.listUsers ?? []).filter((u) => u.role === "admin");
+  const filtered = searchTerm.trim()
+    ? admins.filter(
+        (u) =>
+          u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (u.displayName ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (u.username ?? "").toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    : admins;
+
+  async function handleRemove(user: UserRow) {
+    setRemoveError(null);
+    try {
+      await removeAdmin({ variables: { email: user.email } });
       setConfirmTarget(null);
       void refetch();
     } catch (err: unknown) {
@@ -180,146 +332,158 @@ export function AdminPage() {
   }
 
   return (
-    <div className="admin-page">
-      <div className="admin-header">
-        <h1 className="admin-title">Admin Dashboard</h1>
-        <span className="admin-role-badge admin-role-badge--admin">admin</span>
+    <div>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="admin-section-title">Admin Management</h2>
+          <p className="muted small">Manage who has admin access to CTrend</p>
+        </div>
+        <button
+          type="button"
+          className="btn-primary admin-btn-admin"
+          onClick={() => setInviteModal(true)}
+        >
+          + Invite Admin
+        </button>
       </div>
 
-      <section className="admin-section">
-        <div className="admin-section-head">
-          <h2 className="admin-section-title">User Management</h2>
-          <div className="admin-section-actions">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setInviteModal("user")}
-            >
-              Invite User
-            </button>
-            <button
-              type="button"
-              className="btn-primary admin-btn-admin"
-              onClick={() => setInviteModal("admin")}
-            >
-              Invite Admin
-            </button>
-          </div>
-        </div>
+      <input
+        type="search"
+        className="ig-input admin-search"
+        placeholder="Search admins…"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
 
-        <input
-          type="search"
-          className="ig-input admin-search"
-          placeholder="Search by name, email, or username…"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {removeError && <p className="error" role="alert">{removeError}</p>}
+      {loading && <p className="muted small">Loading admins…</p>}
+      {error && <p className="error">Failed to load admins: {error.message}</p>}
 
-        {removeError && (
-          <p className="error" role="alert">{removeError}</p>
-        )}
-
-        {listLoading && <p className="muted small">Loading users…</p>}
-        {listError && (
-          <p className="error" role="alert">Failed to load users: {listError.message}</p>
-        )}
-
-        {!listLoading && filtered.length === 0 && (
-          <p className="muted small">No users found.</p>
-        )}
-
-        {filtered.length > 0 && (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Username</th>
-                  <th>Role</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((user) => {
-                  const isSystemAdmin = user.email === SYSTEM_ADMIN_EMAIL;
-                  return (
-                    <tr key={user.id} className="admin-table-row">
-                      <td>{user.displayName || <span className="muted">—</span>}</td>
-                      <td className="admin-table-email">{user.email}</td>
-                      <td>{user.username ? `@${user.username}` : <span className="muted">—</span>}</td>
-                      <td>
-                        <span
-                          className={`admin-role-badge ${
-                            user.role === "admin"
-                              ? "admin-role-badge--admin"
-                              : "admin-role-badge--user"
-                          }`}
-                        >
-                          {user.role ?? "user"}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-ghost admin-remove-btn"
-                          disabled={isSystemAdmin || removing}
-                          title={
-                            isSystemAdmin
-                              ? "System admin cannot be removed"
-                              : `Remove ${user.role === "admin" ? "admin" : "user"}`
-                          }
-                          onClick={() => {
-                            setRemoveError(null);
-                            setConfirmTarget(user);
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="admin-pagination">
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={skip === 0 || listLoading}
-            onClick={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
-          >
-            ← Previous
-          </button>
-          <span className="muted small">
-            Showing {skip + 1}–{skip + users.length}
-          </span>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={users.length < PAGE_SIZE || listLoading}
-            onClick={() => setSkip((s) => s + PAGE_SIZE)}
-          >
-            Next →
-          </button>
-        </div>
-      </section>
-
-      {inviteModal && (
-        <InviteModal type={inviteModal} onClose={() => setInviteModal(null)} />
+      {!loading && filtered.length === 0 && (
+        <p className="muted small">No admins found.</p>
       )}
 
+      {filtered.length > 0 && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Username</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((user) => {
+                const isSystemAdmin = user.email === SYSTEM_ADMIN_EMAIL;
+                return (
+                  <tr key={user.id} className="admin-table-row">
+                    <td>
+                      <div className="admin-user-cell">
+                        <span className="admin-user-avatar admin-user-avatar--admin">
+                          {(user.displayName || user.username || user.email)[0]!.toUpperCase()}
+                        </span>
+                        <span>{user.displayName || <span className="muted">No name</span>}</span>
+                      </div>
+                    </td>
+                    <td className="admin-table-email">{user.email}</td>
+                    <td>{user.username ? `@${user.username}` : <span className="muted">—</span>}</td>
+                    <td>
+                      {isSystemAdmin ? (
+                        <span className="admin-role-badge admin-role-badge--system">system</span>
+                      ) : (
+                        <span className="admin-role-badge admin-role-badge--admin">admin</span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-ghost admin-remove-btn"
+                        disabled={isSystemAdmin || removing}
+                        title={isSystemAdmin ? "System admin cannot be removed" : "Remove admin"}
+                        onClick={() => { setRemoveError(null); setConfirmTarget(user); }}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="admin-pagination">
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={skip === 0 || loading}
+          onClick={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
+        >
+          ← Previous
+        </button>
+        <span className="muted small">Showing {skip + 1}–{skip + admins.length}</span>
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={admins.length < PAGE_SIZE || loading}
+          onClick={() => setSkip((s) => s + PAGE_SIZE)}
+        >
+          Next →
+        </button>
+      </div>
+
+      {inviteModal && <InviteModal type="admin" onClose={() => setInviteModal(false)} />}
       {confirmTarget && (
         <ConfirmDialog
-          message={`Are you sure you want to remove ${confirmTarget.displayName || confirmTarget.email}? This action cannot be undone.`}
+          message={`Remove admin access for ${confirmTarget.displayName || confirmTarget.email}? They will lose all admin privileges.`}
           onConfirm={() => void handleRemove(confirmTarget)}
           onCancel={() => setConfirmTarget(null)}
           loading={removing}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Admin Page (root) ────────────────────────────────────────────────────────
+
+export function AdminPage() {
+  const [activeTab, setActiveTab] = useState<"users" | "admins">("users");
+
+  return (
+    <div className="admin-page">
+      <div className="admin-header">
+        <div>
+          <h1 className="admin-title">Admin Dashboard</h1>
+          <p className="muted small">Manage users and admin access</p>
+        </div>
+        <span className="admin-role-badge admin-role-badge--admin">admin</span>
+      </div>
+
+      <div className="admin-tabs">
+        <button
+          type="button"
+          className={`admin-tab${activeTab === "users" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("users")}
+        >
+          Users
+        </button>
+        <button
+          type="button"
+          className={`admin-tab${activeTab === "admins" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("admins")}
+        >
+          Admin Management
+        </button>
+      </div>
+
+      <div className="admin-section">
+        {activeTab === "users" ? <UsersTab /> : <AdminsTab />}
+      </div>
     </div>
   );
 }

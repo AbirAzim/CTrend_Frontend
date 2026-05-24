@@ -5,12 +5,17 @@ import { useQuery } from "@apollo/client";
 import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
+import { ME } from "../graphql/profile";
 
 type ThemeMode = "light" | "dark";
 
 export function AppShell() {
   const { logout, isAuthenticated, user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { data: meData } = useQuery(ME, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-first",
+  });
+  const isAdmin = (meData?.me?.role ?? user?.role) === "admin";
   const navigate = useNavigate();
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
