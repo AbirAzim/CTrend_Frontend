@@ -11,6 +11,9 @@ import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ScheduledPostsPage } from "./pages/ScheduledPostsPage";
 import { FriendsPage } from "./pages/FriendsPage";
+import { WorldCupPage } from "./pages/WorldCupPage";
+import { CampaignDetailPage } from "./pages/CampaignDetailPage";
+import { UserProfilePage } from "./pages/UserProfilePage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { SignupPage } from "./pages/SignupPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
@@ -28,6 +31,9 @@ export default function App() {
         <Route index element={<FeedPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />
         <Route path="friends" element={<FriendsPage />} />
+        <Route path="profile/:userId" element={<UserProfilePage />} />
+        <Route path="world-cup" element={<WorldCupPage />} />
+        <Route path="campaign/:slug" element={<CampaignDetailPage />} />
         <Route
           path="create"
           element={
