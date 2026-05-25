@@ -15,6 +15,7 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { ME } from "../graphql/profile";
 import { useAuth } from "../context/AuthContext";
 import type { FeedPostView } from "../types/feed";
+import { CampaignBanners } from "../components/CampaignBanners";
 
 type FriendRow = {
   id: string;
@@ -297,6 +298,8 @@ export function FeedPage() {
       </aside>
 
       <div className="ig-feed">
+        <CampaignBanners />
+
         {loading && !useMockFeed && (
           <p className="ig-feed-status">Loading feed…</p>
         )}
