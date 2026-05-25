@@ -1,5 +1,6 @@
 import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "../graphql/feed";
 import {
@@ -273,16 +274,18 @@ export function FeedPage() {
         <ul className="cx-friend-list">
           {visibleSuggestions.map((s) => (
             <li key={s.id} className="cx-friend-item">
-              <span className="cx-friend-avatar">
+              <Link to={`/profile/${s.id}`} className="cx-friend-avatar">
                 {s.profileImageUrl ? (
                   <img src={s.profileImageUrl} alt="" />
                 ) : (
                   friendInitial(s)
                 )}
-              </span>
+              </Link>
               <div className="cx-friend-meta">
-                <strong>{friendName(s)}</strong>
-                <span>@{s.username ?? "user"}</span>
+                <Link to={`/profile/${s.id}`} className="cx-friend-profile-link">
+                  <strong>{friendName(s)}</strong>
+                  <span>@{s.username ?? "user"}</span>
+                </Link>
               </div>
               <button
                 type="button"
@@ -364,16 +367,18 @@ export function FeedPage() {
         <ul className="cx-friend-list">
           {visibleFriends.map((f) => (
             <li key={f.id} className="cx-friend-item">
-              <span className="cx-friend-avatar">
+              <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
                 {f.profileImageUrl ? (
                   <img src={f.profileImageUrl} alt="" />
                 ) : (
                   friendInitial(f)
                 )}
-              </span>
+              </Link>
               <div className="cx-friend-meta">
-                <strong>{friendName(f)}</strong>
-                <span>@{f.username ?? "user"}</span>
+                <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
+                  <strong>{friendName(f)}</strong>
+                  <span>@{f.username ?? "user"}</span>
+                </Link>
               </div>
             </li>
           ))}
@@ -400,17 +405,19 @@ export function FeedPage() {
         <ul className="cx-friend-list">
           {visibleRequestedMe.map((f) => (
             <li key={`in-${f.id}`} className="cx-friend-item">
-              <span className="cx-friend-avatar">
+              <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
                 {f.profileImageUrl ? (
                   <img src={f.profileImageUrl} alt="" />
                 ) : (
                   friendInitial(f)
                 )}
-              </span>
+              </Link>
               <div className="cx-friend-request-content">
                 <div className="cx-friend-meta">
-                  <strong>{friendName(f)}</strong>
-                  <span>@{f.username ?? "user"}</span>
+                  <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
+                    <strong>{friendName(f)}</strong>
+                    <span>@{f.username ?? "user"}</span>
+                  </Link>
                 </div>
                 <div className="cx-friend-actions">
                   <button
@@ -453,16 +460,18 @@ export function FeedPage() {
         <ul className="cx-friend-list">
           {visibleRequestedByMe.map((f) => (
             <li key={`out-${f.id}`} className="cx-friend-item">
-              <span className="cx-friend-avatar">
+              <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
                 {f.profileImageUrl ? (
                   <img src={f.profileImageUrl} alt="" />
                 ) : (
                   friendInitial(f)
                 )}
-              </span>
+              </Link>
               <div className="cx-friend-meta">
-                <strong>{friendName(f)}</strong>
-                <span>@{f.username ?? "user"}</span>
+                <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
+                  <strong>{friendName(f)}</strong>
+                  <span>@{f.username ?? "user"}</span>
+                </Link>
               </div>
               <span className="cx-pending-badge">Pending</span>
             </li>
@@ -503,12 +512,14 @@ export function FeedPage() {
                       : requestedByMe
                   ).map((f) => (
                     <li key={`${activePeopleModal}-${f.id}`} className="cx-friend-item">
-                      <span className="cx-friend-avatar">
+                      <Link to={`/profile/${f.id}`} className="cx-friend-avatar" onClick={() => setActivePeopleModal(null)}>
                         {f.profileImageUrl ? <img src={f.profileImageUrl} alt="" /> : friendInitial(f)}
-                      </span>
+                      </Link>
                       <div className="cx-friend-meta">
-                        <strong>{friendName(f)}</strong>
-                        <span>@{f.username ?? "user"}</span>
+                        <Link to={`/profile/${f.id}`} className="cx-friend-profile-link" onClick={() => setActivePeopleModal(null)}>
+                          <strong>{friendName(f)}</strong>
+                          <span>@{f.username ?? "user"}</span>
+                        </Link>
                       </div>
                       {activePeopleModal === "suggestions" ? (
                         <button

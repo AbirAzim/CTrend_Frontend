@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
@@ -693,16 +693,18 @@ export function ProfilePage() {
           <ul className="cx-friend-list">
             {friends.map((f) => (
               <li key={f.id} className="cx-friend-item">
-                <span className="cx-friend-avatar">
+                <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
                   {f.profileImageUrl ? (
                     <img src={f.profileImageUrl} alt="" />
                   ) : (
                     friendInitial(f)
                   )}
-                </span>
+                </Link>
                 <div className="cx-friend-meta">
-                  <strong>{friendName(f)}</strong>
-                  <span>@{f.username ?? "user"}</span>
+                  <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
+                    <strong>{friendName(f)}</strong>
+                    <span>@{f.username ?? "user"}</span>
+                  </Link>
                 </div>
               </li>
             ))}

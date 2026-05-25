@@ -52,3 +52,28 @@ export const RESPOND_FRIEND_REQUEST = gql`
     respondFriendRequest(requesterId: $requesterId, accept: $accept)
   }
 `;
+
+export const UNFRIEND = gql`
+  mutation Unfriend($userId: ID!) {
+    unfriend(userId: $userId)
+  }
+`;
+
+export const FRIENDSHIP_STATUS = gql`
+  query FriendshipStatus($userId: ID!) {
+    friendshipStatus(userId: $userId)
+  }
+`;
+
+export const GET_USER_PROFILE = gql`
+  query GetUserProfile($userId: ID!) {
+    getUserProfile(userId: $userId) {
+      id
+      username
+      displayName
+      bio
+      profileImageUrl
+      interests
+    }
+  }
+`;
