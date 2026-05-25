@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { useMemo, useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   ADD_FRIEND,
   FRIEND_REQUESTS,
@@ -146,16 +147,18 @@ export function FriendsPage() {
               const accepted = friendIds.has(u.id);
               return (
                 <li key={u.id} className="cx-friend-item">
-                  <span className="cx-friend-avatar">
+                  <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
                     {u.profileImageUrl ? (
                       <img src={u.profileImageUrl} alt="" />
                     ) : (
                       friendInitial(u)
                     )}
-                  </span>
+                  </NavLink>
                   <div className="cx-friend-meta">
-                    <strong>{friendName(u)}</strong>
-                    <span>@{u.username ?? "user"}</span>
+                    <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
+                      <strong>{friendName(u)}</strong>
+                      <span>@{u.username ?? "user"}</span>
+                    </NavLink>
                   </div>
                   <button
                     type="button"
@@ -188,16 +191,18 @@ export function FriendsPage() {
               <ul className="cx-friend-list">
                 {requestedMe.map((u) => (
                   <li key={u.id} className="cx-friend-item">
-                    <span className="cx-friend-avatar">
+                    <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
                       {u.profileImageUrl ? (
                         <img src={u.profileImageUrl} alt="" />
                       ) : (
                         friendInitial(u)
                       )}
-                    </span>
+                    </NavLink>
                     <div className="cx-friend-meta">
-                      <strong>{friendName(u)}</strong>
-                      <span>@{u.username ?? "user"}</span>
+                      <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
+                        <strong>{friendName(u)}</strong>
+                        <span>@{u.username ?? "user"}</span>
+                      </NavLink>
                     </div>
                     <button
                       type="button"
@@ -227,16 +232,18 @@ export function FriendsPage() {
               <ul className="cx-friend-list">
                 {requestedByMe.map((u) => (
                   <li key={u.id} className="cx-friend-item">
-                    <span className="cx-friend-avatar">
+                    <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
                       {u.profileImageUrl ? (
                         <img src={u.profileImageUrl} alt="" />
                       ) : (
                         friendInitial(u)
                       )}
-                    </span>
+                    </NavLink>
                     <div className="cx-friend-meta">
-                      <strong>{friendName(u)}</strong>
-                      <span>@{u.username ?? "user"}</span>
+                      <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
+                        <strong>{friendName(u)}</strong>
+                        <span>@{u.username ?? "user"}</span>
+                      </NavLink>
                     </div>
                     <span className="cx-pending-badge">Pending</span>
                   </li>
@@ -257,12 +264,14 @@ export function FriendsPage() {
           <ul className="cx-friend-list">
             {friends.map((u) => (
               <li key={u.id} className="cx-friend-item">
-                <span className="cx-friend-avatar">
+                <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
                   {u.profileImageUrl ? <img src={u.profileImageUrl} alt="" /> : friendInitial(u)}
-                </span>
+                </NavLink>
                 <div className="cx-friend-meta">
-                  <strong>{friendName(u)}</strong>
-                  <span>@{u.username ?? "user"}</span>
+                  <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
+                    <strong>{friendName(u)}</strong>
+                    <span>@{u.username ?? "user"}</span>
+                  </NavLink>
                 </div>
               </li>
             ))}
