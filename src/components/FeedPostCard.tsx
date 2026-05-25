@@ -958,14 +958,14 @@ export function FeedPostCard({
                 }}
               />
             ) : (
-              storyInitial(post.authorUsername)
+              storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
             )}
           </span>
           <div>
-            <span className="ig-post-username">{post.authorUsername}</span>
-            {post.authorDisplayName ? (
-              <span className="ig-post-meta">{post.authorDisplayName}</span>
-            ) : null}
+            <span className="ig-post-username">
+              {post.authorDisplayName?.trim() || post.authorUsername}
+            </span>
+            <span className="ig-post-meta">@{post.authorUsername}</span>
           </div>
         </div>
         <button type="button" className="ig-more-btn" aria-label="More">

@@ -393,6 +393,7 @@ export function ProfilePage() {
         <div className="cx-profile-hero-text">
           <p className="cx-profile-kicker">Your corner of CTrend</p>
           <h1 className="cx-profile-title">{displayName}</h1>
+          <p className="cx-profile-email-inline">{user.email}</p>
           <p className="cx-profile-handle">
             @{username}
             {isAdmin && (

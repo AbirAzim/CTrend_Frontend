@@ -1,13 +1,17 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useState } from "react";
+import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { BulkInviteModal } from "../components/BulkInviteModal";
 import {
+  CANCEL_INVITATION,
   INVITE_ADMIN,
   INVITE_USER,
+  LIST_INVITATIONS,
   LIST_USERS,
   PROMOTE_TO_ADMIN,
   REMOVE_ADMIN,
   REMOVE_USER,
+  RESEND_INVITATION,
 } from "../graphql/admin";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -450,10 +454,9 @@ function UsersTab() {
       </div>
 
       {inviteModal && (
-        <InviteModal
-          type="user"
-          onClose={() => setInviteModal(false)}
-          onDone={() => void refetch()}
+        <BulkInviteModal
+          inviteType="user"
+          onClose={() => { setInviteModal(false); void refetch(); }}
         />
       )}
       {confirmTarget && (
@@ -482,7 +485,7 @@ function AdminsTab() {
   const [inviteModal, setInviteModal] = useState(false);
 
   const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
-    variables: { skip, take: PAGE_SIZE },
+    variables: { skip, take: PAGE_SIZE, role: "admin" },
     fetchPolicy: "network-only",
   });
 
@@ -490,7 +493,7 @@ function AdminsTab() {
   const [removeUser, { loading: deletingUser }] = useMutation(REMOVE_USER);
   const acting = revokingAdmin || deletingUser;
 
-  const admins = (data?.listUsers ?? []).filter(hasAdminRole);
+  const admins = data?.listUsers ?? [];
   const filtered = searchTerm.trim()
     ? admins.filter(
         (u) =>
@@ -653,10 +656,9 @@ function AdminsTab() {
       </div>
 
       {inviteModal && (
-        <InviteModal
-          type="admin"
-          onClose={() => setInviteModal(false)}
-          onDone={() => void refetch()}
+        <BulkInviteModal
+          inviteType="admin"
+          onClose={() => { setInviteModal(false); void refetch(); }}
         />
       )}
       {confirmTarget && (
@@ -1181,10 +1183,333 @@ function WorldCupTab() {
   );
 }
 
+// ─── Invitations Tab ──────────────────────────────────────────────────────────
+
+type InvitationRow = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  invitedBy?: { id: string; displayName?: string | null; username?: string | null; email: string; role?: string | null; profileImageUrl?: string | null } | null;
+};
+
+type InviterUser = NonNullable<InvitationRow["invitedBy"]>;
+
+function InviterPopover({ user }: { user: InviterUser }) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const email = user.email.toLowerCase();
+  const name = user.displayName?.trim() || user.username?.trim() || email;
+  const isGmail = email.endsWith("@gmail.com");
+  const avatarSrc = user.profileImageUrl?.trim() || (isGmail && !imgFailed
+    ? `https://www.google.com/s2/photos/profile/${encodeURIComponent(email)}?sz=80`
+    : null);
+  const initial = name[0]?.toUpperCase() ?? "?";
+  const role = user.role?.toLowerCase() ?? "user";
+  const isAdmin = role === "admin";
+
+  function openPopover() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  }
+  function scheduleClose() {
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  }
+
+  return (
+    <span className="inviter-anchor" onMouseEnter={openPopover} onMouseLeave={scheduleClose}>
+      <span className="inviter-name">{name}</span>
+      {open && (
+        <span className="inviter-popover" onMouseEnter={openPopover} onMouseLeave={scheduleClose}>
+          {/* Header strip with avatar */}
+          <span className="inviter-pop-header">
+            <span className="inviter-pop-avatar">
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="" onError={() => setImgFailed(true)} />
+              ) : (
+                initial
+              )}
+            </span>
+            <span className="inviter-pop-title">
+              <strong className="inviter-pop-name">{name}</strong>
+              {user.username && (
+                <span className="inviter-pop-handle">@{user.username}</span>
+              )}
+            </span>
+            <span className={`admin-role-badge ${isAdmin ? "admin-role-badge--admin" : "admin-role-badge--user"}`} style={{ marginLeft: "auto", flexShrink: 0 }}>
+              {role}
+            </span>
+          </span>
+          {/* Details */}
+          <span className="inviter-pop-details">
+            <span className="inviter-pop-row">
+              <span className="inviter-pop-icon">✉</span>
+              <span className="inviter-pop-val">{user.email}</span>
+            </span>
+            <span className="inviter-pop-row">
+              <span className="inviter-pop-icon">👤</span>
+              <span className="inviter-pop-val">{isAdmin ? "Admin user" : "Regular user"}</span>
+            </span>
+          </span>
+          {/* Footer */}
+          <span className="inviter-pop-footer">
+            <NavLink to={`/profile/${user.id}`} className="inviter-pop-link">
+              View full profile →
+            </NavLink>
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function MultiChip({
+  label,
+  active,
+  onClick,
+  variant,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  variant?: "admin" | "danger" | "warn";
+}) {
+  const base = "inv-filter-chip";
+  const mod = active
+    ? variant === "admin"
+      ? " inv-filter-chip--admin inv-filter-chip--on"
+      : variant === "danger"
+        ? " inv-filter-chip--danger inv-filter-chip--on"
+        : variant === "warn"
+          ? " inv-filter-chip--warn inv-filter-chip--on"
+          : " inv-filter-chip--on"
+    : "";
+  return (
+    <button type="button" className={base + mod} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+function InvitationsTab() {
+  const [emailSearch, setEmailSearch] = useState("");
+  const [inviterSearch, setInviterSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const { data, loading, error, refetch } = useQuery(LIST_INVITATIONS, {
+    variables: {},
+    fetchPolicy: "network-only",
+  });
+
+  const [cancelInv, { loading: cancelling }] = useMutation(CANCEL_INVITATION, {
+    onCompleted: () => { setActionError(null); void refetch(); },
+    onError: (e) => setActionError(e.message),
+  });
+
+  const [resendInv, { loading: resending }] = useMutation(RESEND_INVITATION, {
+    onCompleted: () => { setActionError(null); void refetch(); },
+    onError: (e) => setActionError(e.message),
+  });
+
+  const acting = cancelling || resending;
+  const allInvitations = (data?.listInvitations ?? []) as InvitationRow[];
+
+  function inviterLabel(row: InvitationRow): string {
+    const u = row.invitedBy;
+    if (!u) return "—";
+    return u.displayName?.trim() || u.username?.trim() || u.email;
+  }
+
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, {
+      day: "2-digit", month: "short", year: "numeric",
+    });
+  }
+
+  function isExpired(iso: string): boolean {
+    return new Date(iso).getTime() < Date.now();
+  }
+
+  function resolvedStatus(inv: InvitationRow): "accepted" | "expired" | "pending" {
+    const s = inv.status.toLowerCase();
+    if (s === "accepted") return "accepted";
+    if (s === "pending" && isExpired(inv.expiresAt)) return "expired";
+    return "pending";
+  }
+
+  function toggleSet(set: Set<string>, value: string): Set<string> {
+    const next = new Set(set);
+    next.has(value) ? next.delete(value) : next.add(value);
+    return next;
+  }
+
+  const invitations = allInvitations.filter((inv) => {
+    if (emailSearch.trim() && !inv.email.toLowerCase().includes(emailSearch.trim().toLowerCase())) return false;
+    if (inviterSearch.trim()) {
+      const label = inviterLabel(inv).toLowerCase();
+      const inviterEmail = inv.invitedBy?.email.toLowerCase() ?? "";
+      if (!label.includes(inviterSearch.trim().toLowerCase()) && !inviterEmail.includes(inviterSearch.trim().toLowerCase())) return false;
+    }
+    if (roleFilter.size > 0 && !roleFilter.has(inv.role.toLowerCase())) return false;
+    if (statusFilter.size > 0 && !statusFilter.has(resolvedStatus(inv))) return false;
+    return true;
+  });
+
+  const hasFilters =
+    emailSearch.trim() ||
+    inviterSearch.trim() ||
+    roleFilter.size > 0 ||
+    statusFilter.size > 0;
+
+  function clearFilters() {
+    setEmailSearch("");
+    setInviterSearch("");
+    setRoleFilter(new Set());
+    setStatusFilter(new Set());
+  }
+
+  return (
+    <div>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="admin-section-title">Invitations</h2>
+          <p className="muted small">All sent invitations and their status</p>
+        </div>
+        {hasFilters && (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Filter bar */}
+      <div className="inv-filter-bar">
+        <div className="inv-filter-row">
+          <input
+            type="search"
+            className="ig-input inv-filter-input"
+            placeholder="Search email…"
+            value={emailSearch}
+            onChange={(e) => setEmailSearch(e.target.value)}
+          />
+          <input
+            type="search"
+            className="ig-input inv-filter-input"
+            placeholder="Search invited by…"
+            value={inviterSearch}
+            onChange={(e) => setInviterSearch(e.target.value)}
+          />
+        </div>
+        <div className="inv-filter-row inv-filter-row--chips">
+          <span className="inv-filter-label">Role:</span>
+          <MultiChip label="User" active={roleFilter.has("user")} onClick={() => setRoleFilter((s) => toggleSet(s, "user"))} />
+          <MultiChip label="Admin" active={roleFilter.has("admin")} onClick={() => setRoleFilter((s) => toggleSet(s, "admin"))} variant="admin" />
+          <span className="inv-filter-sep" />
+          <span className="inv-filter-label">Status:</span>
+          <MultiChip label="Pending" active={statusFilter.has("pending")} onClick={() => setStatusFilter((s) => toggleSet(s, "pending"))} />
+          <MultiChip label="Accepted" active={statusFilter.has("accepted")} onClick={() => setStatusFilter((s) => toggleSet(s, "accepted"))} variant="admin" />
+          <MultiChip label="Expired" active={statusFilter.has("expired")} onClick={() => setStatusFilter((s) => toggleSet(s, "expired"))} variant="warn" />
+        </div>
+      </div>
+
+      {actionError && <p className="error" role="alert">{actionError}</p>}
+      {loading && <p className="muted small">Loading invitations…</p>}
+      {error && <p className="error">Failed to load: {error.message}</p>}
+      {!loading && invitations.length === 0 && (
+        <p className="muted small">{hasFilters ? "No invitations match your filters." : "No invitations found."}</p>
+      )}
+
+      {invitations.length > 0 && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Invited by</th>
+                <th>Sent</th>
+                <th>Expires</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invitations.map((inv) => {
+                const status = resolvedStatus(inv);
+                const isPending = status === "pending";
+                const isAccepted = status === "accepted";
+                const expired = status === "expired";
+                return (
+                  <tr key={inv.id} className="admin-table-row">
+                    <td className="admin-table-email">{inv.email}</td>
+                    <td>
+                      <span className={`admin-role-badge ${inv.role === "ADMIN" || inv.role === "admin" ? "admin-role-badge--admin" : "admin-role-badge--user"}`}>
+                        {inv.role.toLowerCase()}
+                      </span>
+                    </td>
+                    <td>
+                      {inv.invitedBy
+                        ? <InviterPopover user={inv.invitedBy} />
+                        : <span className="muted small">—</span>}
+                    </td>
+                    <td>{formatDate(inv.createdAt)}</td>
+                    <td style={{ color: expired ? "#dc2626" : undefined }}>
+                      {formatDate(inv.expiresAt)}
+                      {expired && <span style={{ marginLeft: 4, fontSize: "0.75rem" }}>(expired)</span>}
+                    </td>
+                    <td>
+                      <span className={`wc-admin-chip wc-admin-chip--${isAccepted ? "done" : expired ? "live" : "sched"}`}>
+                        {isAccepted ? "Accepted" : expired ? "Expired" : "Pending"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="admin-action-btns">
+                        {isPending && (
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            disabled={acting}
+                            onClick={() => void resendInv({ variables: { id: inv.id } })}
+                          >
+                            Resend
+                          </button>
+                        )}
+                        {isPending && (
+                          <button
+                            type="button"
+                            className="btn-ghost admin-remove-btn"
+                            disabled={acting}
+                            onClick={() => void cancelInv({ variables: { id: inv.id } })}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        {(isAccepted || expired) && (
+                          <span className="muted small">—</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "admins" | "campaigns" | "worldcup">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "admins" | "invitations" | "campaigns" | "worldcup">("users");
 
   return (
     <div className="admin-page">
@@ -1213,6 +1538,13 @@ export function AdminPage() {
         </button>
         <button
           type="button"
+          className={`admin-tab${activeTab === "invitations" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("invitations")}
+        >
+          Invitations
+        </button>
+        <button
+          type="button"
           className={`admin-tab${activeTab === "campaigns" ? " admin-tab--active" : ""}`}
           onClick={() => setActiveTab("campaigns")}
         >
@@ -1230,6 +1562,7 @@ export function AdminPage() {
       <div className="admin-section">
         {activeTab === "users" && <UsersTab />}
         {activeTab === "admins" && <AdminsTab />}
+        {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "campaigns" && <CampaignsTab />}
         {activeTab === "worldcup" && <WorldCupTab />}
       </div>

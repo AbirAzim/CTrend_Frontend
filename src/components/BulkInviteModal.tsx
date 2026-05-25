@@ -1,14 +1,22 @@
-import { useLazyQuery, useMutation } from "@apollo/client";
+import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { useEffect, useRef, useState } from "react";
 import { ADD_FRIEND } from "../graphql/friends";
-import { INVITE_USERS_BULK, INVITE_ADMIN, PREVIEW_INVITES } from "../graphql/admin";
+import {
+  INVITE_USERS_BULK,
+  INVITE_ADMIN,
+  LIST_USERS,
+  PREVIEW_INVITES,
+  PROMOTE_TO_ADMIN,
+} from "../graphql/admin";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
 type PreviewUser = {
   id: string;
+  email: string;
   username?: string | null;
   displayName?: string | null;
   profileImageUrl?: string | null;
+  role?: string | null;
 };
 
 type PreviewRow = {
@@ -17,7 +25,6 @@ type PreviewRow = {
   existingUser?: PreviewUser | null;
 };
 
-/** Derive a human-readable name from the email local part. */
 function nameFromEmail(email: string): string {
   const local = email.split("@")[0] ?? email;
   return local
@@ -30,7 +37,6 @@ function nameFromEmail(email: string): string {
     .join(" ") || local;
 }
 
-/** Google S2 profile photo URL — works for many Gmail accounts. */
 function gmailPicUrl(email: string): string | null {
   if (!email.toLowerCase().endsWith("@gmail.com")) return null;
   return `https://www.google.com/s2/photos/profile/${encodeURIComponent(email)}?sz=64`;
@@ -40,16 +46,18 @@ function Avatar({
   email,
   profileImageUrl,
   name,
+  size = 36,
 }: {
   email: string;
   profileImageUrl?: string | null;
   name: string;
+  size?: number;
 }) {
   const [failed, setFailed] = useState(false);
   const src = profileImageUrl || (!failed ? gmailPicUrl(email) : null);
   const initial = (name[0] ?? email[0] ?? "?").toUpperCase();
   return (
-    <span className="bim-avatar">
+    <span className="bim-avatar" style={{ width: size, height: size, fontSize: size * 0.3 }}>
       {src && !failed ? (
         <img src={src} alt="" onError={() => setFailed(true)} />
       ) : (
@@ -81,6 +89,10 @@ function splitEmails(raw: string): string[] {
     .filter(isValidEmail);
 }
 
+function userName(u: PreviewUser): string {
+  return u.displayName?.trim() || u.username?.trim() || nameFromEmail(u.email);
+}
+
 type Props = {
   inviteType: "user" | "admin";
   onClose: () => void;
@@ -90,8 +102,8 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
   const [inputVal, setInputVal] = useState("");
   const [emails, setEmails] = useState<string[]>([]);
   const [previews, setPreviews] = useState<PreviewRow[]>([]);
-  const [sentIds] = useState<Set<string>>(new Set());
   const [friendedIds, setFriendedIds] = useState<Set<string>>(new Set());
+  const [promotedIds, setPromotedIds] = useState<Set<string>>(new Set());
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<"idle" | "sending" | "done">("idle");
   const [sendResults, setSendResults] = useState<{ email: string; status: string }[]>([]);
@@ -101,10 +113,41 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
     fetchPolicy: "network-only",
   });
   const [inviteUsers, { loading: inviting }] = useMutation(INVITE_USERS_BULK);
-  const [inviteAdmin, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
+  const [inviteAdminMut, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
+  const [promoteToAdminMut, { loading: promoting }] = useMutation(PROMOTE_TO_ADMIN);
   const [addFriend, { loading: addingFriend }] = useMutation(ADD_FRIEND);
 
-  const busy = inviting || invitingAdmin || addingFriend;
+  const busy = inviting || invitingAdmin || promoting || addingFriend;
+
+  // Suggestions for admin invite: fetch existing non-admin users
+  const { data: usersData } = useQuery(LIST_USERS, {
+    variables: { skip: 0, take: 50 },
+    skip: inviteType !== "admin",
+    fetchPolicy: "cache-and-network",
+  });
+  const allUsers = (usersData?.listUsers ?? []) as PreviewUser[];
+  const allUsersMap = new Map(allUsers.map((u) => [u.email.toLowerCase(), u]));
+  const query = inputVal.trim().toLowerCase();
+
+  function matchScore(u: PreviewUser): number {
+    if (!query) return 0;
+    const name = (u.displayName ?? u.username ?? "").toLowerCase();
+    const email = u.email.toLowerCase();
+    if (name.startsWith(query) || email.startsWith(query)) return 0;
+    return 1;
+  }
+
+  const adminSuggestions = allUsers
+    .filter((u) => {
+      if (u.role === "admin" || emails.includes(u.email.toLowerCase())) return false;
+      if (!query) return true;
+      return (
+        u.email.toLowerCase().includes(query) ||
+        (u.displayName ?? "").toLowerCase().includes(query) ||
+        (u.username ?? "").toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => matchScore(a) - matchScore(b));
 
   useEffect(() => {
     if (!emails.length) {
@@ -160,16 +203,27 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
   async function onSend() {
     setSendError(null);
     setSendStatus("sending");
+    const results: { email: string; status: string }[] = [];
 
-    // For admin invites, call one by one (existing mutation)
     if (inviteType === "admin") {
-      const results: { email: string; status: string }[] = [];
       for (const email of emails) {
-        try {
-          await inviteAdmin({ variables: { email } });
-          results.push({ email, status: "invited" });
-        } catch {
-          results.push({ email, status: "error" });
+        const row = previews.find((p) => p.email === email);
+        if (row?.existingUser) {
+          // Existing user → promote
+          try {
+            await promoteToAdminMut({ variables: { email } });
+            results.push({ email, status: "promoted" });
+          } catch {
+            results.push({ email, status: "error" });
+          }
+        } else {
+          // New email → send invite
+          try {
+            await inviteAdminMut({ variables: { email } });
+            results.push({ email, status: "invited" });
+          } catch {
+            results.push({ email, status: "error" });
+          }
         }
       }
       setSendResults(results);
@@ -177,7 +231,7 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
       return;
     }
 
-    // For user invites, only send to emails that aren't already in the system / pending
+    // User invites: skip existing / pending
     const toInvite = emails.filter((email) => {
       const p = previews.find((r) => r.email === email);
       return !p?.existingUser && !p?.hasPendingInvite;
@@ -204,15 +258,36 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
       await addFriend({ variables: { userId } });
       setFriendedIds((prev) => new Set([...prev, userId]));
     } catch {
-      // ignore — user can retry
+      // silent — user can retry
     }
   }
 
-  // Emails that can actually be invited (no existing user, no pending invite)
-  const invitableCount = emails.filter((email) => {
-    const p = previews.find((r) => r.email === email);
-    return !p?.existingUser && !p?.hasPendingInvite;
-  }).length;
+  async function onPromoteNow(email: string, userId: string) {
+    try {
+      await promoteToAdminMut({ variables: { email } });
+      setPromotedIds((prev) => new Set([...prev, userId]));
+    } catch {
+      // silent
+    }
+  }
+
+  const invitableCount =
+    inviteType === "admin"
+      ? emails.length
+      : emails.filter((email) => {
+          const p = previews.find((r) => r.email === email);
+          return !p?.existingUser && !p?.hasPendingInvite;
+        }).length;
+
+  const sendLabel = (() => {
+    if (busy) return "Sending…";
+    if (inviteType === "admin") {
+      if (!emails.length) return "No emails added";
+      return `Send to ${emails.length} ${emails.length === 1 ? "person" : "people"}`;
+    }
+    if (invitableCount === 0) return "No new emails to invite";
+    return `Send ${invitableCount} invitation${invitableCount !== 1 ? "s" : ""}`;
+  })();
 
   return (
     <div className="admin-modal-overlay" onClick={onClose} role="dialog" aria-modal>
@@ -222,25 +297,29 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
         </h2>
         <p className="muted small" style={{ marginBottom: 14 }}>
           {inviteType === "admin"
-            ? "Admins will receive full dashboard access."
-            : "Add one or more email addresses. Existing CTrend users won't be re-invited — you can send them a friend request instead."}
+            ? "Existing CTrend users will be promoted to admin. New emails will receive an invitation."
+            : "Add emails below. Existing CTrend users won't be re-invited — send a friend request instead."}
         </p>
 
         {sendStatus === "done" ? (
           <div className="bim-done">
             {sendResults.length === 0 ? (
-              <p className="bim-done-msg">
-                All selected emails are already on CTrend or have pending invitations.
-              </p>
+              <p className="bim-done-msg">All done — nothing new to send.</p>
             ) : (
               <>
-                <p className="bim-done-msg">Invitations sent!</p>
+                <p className="bim-done-msg">Done!</p>
                 <ul className="bim-result-list">
                   {sendResults.map((r) => (
                     <li key={r.email} className={`bim-result-item bim-result--${r.status}`}>
                       <span>{r.email}</span>
                       <span className="bim-result-badge">
-                        {r.status === "invited" ? "✓ Sent" : r.status === "already_exists" ? "Already on CTrend" : "Failed"}
+                        {r.status === "invited"
+                          ? "✓ Invite sent"
+                          : r.status === "promoted"
+                            ? "✓ Promoted"
+                            : r.status === "already_exists"
+                              ? "Already on CTrend"
+                              : "Failed"}
                       </span>
                     </li>
                   ))}
@@ -254,10 +333,7 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
         ) : (
           <>
             {/* Tag input */}
-            <div
-              className="bim-tag-input"
-              onClick={() => inputRef.current?.focus()}
-            >
+            <div className="bim-tag-input" onClick={() => inputRef.current?.focus()}>
               {emails.map((email) => (
                 <EmailTag key={email} email={email} onRemove={() => removeEmail(email)} />
               ))}
@@ -276,50 +352,54 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
               />
             </div>
             <p className="muted small" style={{ marginTop: 4 }}>
-              Press Enter or comma to add an email. Paste multiple at once.
+              Press Enter or comma to add. Paste multiple at once.
             </p>
 
-            {/* Preview list */}
+            {/* Preview of added emails */}
             {emails.length > 0 && (
               <ul className="bim-preview-list">
                 {emails.map((email) => {
                   const row = previews.find((p) => p.email === email);
                   const existing = row?.existingUser;
                   const pending = row?.hasPendingInvite;
-                  const name = existing
-                    ? (existing.displayName?.trim() || existing.username?.trim() || nameFromEmail(email))
-                    : nameFromEmail(email);
+                  const knownUser = allUsersMap.get(email.toLowerCase());
+                  const profileImageUrl = existing?.profileImageUrl ?? knownUser?.profileImageUrl ?? null;
+                  const name = existing ? userName(existing) : knownUser ? userName(knownUser) : nameFromEmail(email);
+                  const isPromoted = existing && promotedIds.has(existing.id);
                   const isFriended = existing && friendedIds.has(existing.id);
 
                   return (
                     <li key={email} className="bim-preview-row">
-                      <Avatar
-                        email={email}
-                        profileImageUrl={existing?.profileImageUrl}
-                        name={name}
-                      />
+                      <Avatar email={email} profileImageUrl={profileImageUrl} name={name} />
                       <div className="bim-preview-meta">
                         <strong className="bim-preview-name">{name}</strong>
                         <span className="bim-preview-email muted small">{email}</span>
-                        {existing && (
-                          <span className="bim-badge bim-badge--exists">On CTrend</span>
-                        )}
-                        {!existing && pending && (
-                          <span className="bim-badge bim-badge--pending">Invite pending</span>
-                        )}
-                        {!existing && !pending && !previewing && (
-                          <span className="bim-badge bim-badge--new">Will be invited</span>
-                        )}
+                        {existing && <span className="bim-badge bim-badge--exists">On CTrend</span>}
+                        {!existing && pending && <span className="bim-badge bim-badge--pending">Invite pending</span>}
+                        {!existing && !pending && !previewing && <span className="bim-badge bim-badge--new">Will be invited</span>}
                       </div>
                       <div className="bim-preview-action">
                         {existing ? (
-                          isFriended ? (
+                          inviteType === "admin" ? (
+                            isPromoted ? (
+                              <span className="bim-badge bim-badge--sent">Promoted</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-ghost bim-friend-btn"
+                                disabled={promoting}
+                                onClick={() => void onPromoteNow(email, existing.id)}
+                              >
+                                Promote now
+                              </button>
+                            )
+                          ) : isFriended ? (
                             <span className="bim-badge bim-badge--sent">Request sent</span>
                           ) : (
                             <button
                               type="button"
                               className="btn-ghost bim-friend-btn"
-                              disabled={addingFriend || sentIds.has(existing.id)}
+                              disabled={addingFriend}
                               onClick={() => void onAddFriend(existing.id)}
                             >
                               + Friend
@@ -342,30 +422,61 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
               </ul>
             )}
 
-            {sendError && (
-              <p className="error" role="alert">{sendError}</p>
+            {/* Existing user suggestions for admin invite */}
+            {inviteType === "admin" && adminSuggestions.length > 0 && (
+              <div className="bim-suggestions">
+                <p className="bim-suggestions-label">
+                  {query ? `Matching users` : "Existing users"}
+                </p>
+                <ul className="bim-suggestions-list">
+                  {adminSuggestions.slice(0, 8).map((u) => {
+                    const name = userName(u);
+                    const highlighted = (text: string) => {
+                      if (!query) return <>{text}</>;
+                      const idx = text.toLowerCase().indexOf(query);
+                      if (idx === -1) return <>{text}</>;
+                      return (
+                        <>
+                          {text.slice(0, idx)}
+                          <mark style={{ background: "#fde68a", color: "#92400e", borderRadius: 2, padding: "0 1px" }}>
+                            {text.slice(idx, idx + query.length)}
+                          </mark>
+                          {text.slice(idx + query.length)}
+                        </>
+                      );
+                    };
+                    return (
+                      <li key={u.id} className="bim-suggestion-row">
+                        <Avatar email={u.email} profileImageUrl={u.profileImageUrl} name={name} size={30} />
+                        <div className="bim-suggestion-meta">
+                          <strong>{highlighted(name)}</strong>
+                          <span className="muted small">{highlighted(u.email)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-ghost bim-friend-btn"
+                          onClick={() => addEmail(u.email)}
+                        >
+                          + Add
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
 
+            {sendError && <p className="error" role="alert">{sendError}</p>}
+
             <div className="admin-modal-actions" style={{ marginTop: 16 }}>
-              {inviteType === "user" ? (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={invitableCount === 0 || busy || previewing}
-                  onClick={() => void onSend()}
-                >
-                  {busy ? "Sending…" : invitableCount === 0 ? "No new emails to invite" : `Send ${invitableCount} invitation${invitableCount !== 1 ? "s" : ""}`}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={emails.length === 0 || busy}
-                  onClick={() => void onSend()}
-                >
-                  {busy ? "Sending…" : `Send ${emails.length} admin invitation${emails.length !== 1 ? "s" : ""}`}
-                </button>
-              )}
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={emails.length === 0 || invitableCount === 0 || busy || previewing}
+                onClick={() => void onSend()}
+              >
+                {sendLabel}
+              </button>
               <button type="button" className="btn-ghost" onClick={onClose}>
                 Cancel
               </button>
