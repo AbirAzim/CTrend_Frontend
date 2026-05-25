@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   INVITE_ADMIN,
   INVITE_USER,
@@ -402,14 +403,22 @@ function UsersTab() {
                   <td><RoleBadges user={user} /></td>
                   <td><UserStats userId={user.id} /></td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn-ghost admin-remove-btn"
-                      disabled={removing}
-                      onClick={() => { setRemoveError(null); setConfirmTarget(user); }}
-                    >
-                      Remove
-                    </button>
+                    <div className="admin-action-btns">
+                      <NavLink
+                        to={`/profile/${user.id}`}
+                        className="btn-ghost"
+                      >
+                        View Profile
+                      </NavLink>
+                      <button
+                        type="button"
+                        className="btn-ghost admin-remove-btn"
+                        disabled={removing}
+                        onClick={() => { setRemoveError(null); setConfirmTarget(user); }}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -581,6 +590,12 @@ function AdminsTab() {
                     <td><UserStats userId={user.id} /></td>
                     <td>
                       <div className="admin-action-btns">
+                        <NavLink
+                          to={`/profile/${user.id}`}
+                          className="btn-ghost"
+                        >
+                          View Profile
+                        </NavLink>
                         <button
                           type="button"
                           className="btn-ghost admin-remove-btn"
