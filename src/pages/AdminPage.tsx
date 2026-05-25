@@ -1202,7 +1202,7 @@ function InvitationsTab() {
 
   function toggleSet(set: Set<string>, value: string): Set<string> {
     const next = new Set(set);
-    next.has(value) ? next.delete(value) : next.add(value);
+    if (next.has(value)) { next.delete(value); } else { next.add(value); }
     return next;
   }
 
