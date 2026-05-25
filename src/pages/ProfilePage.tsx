@@ -8,7 +8,7 @@ import { useImageUpload } from "../lib/useImageUpload";
 import { MY_FRIENDS } from "../graphql/friends";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
-import { INVITE_ADMIN, INVITE_USER } from "../graphql/admin";
+import { BulkInviteModal } from "../components/BulkInviteModal";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import type { FeedPostView } from "../types/feed";
 
@@ -65,11 +65,8 @@ export function ProfilePage() {
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const [editing, setEditing] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteType, setInviteType] = useState<"user" | "admin">("user");
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteStatus, setInviteStatus] = useState<"idle" | "success" | "error">("idle");
-  const [inviteError, setInviteError] = useState("");
+  const [inviteType, setInviteType] = useState<"user" | "admin">("user");
   const [formDisplayName, setFormDisplayName] = useState("");
   const [formBio, setFormBio] = useState("");
   const [formInterests, setFormInterests] = useState("");
@@ -208,39 +205,10 @@ export function ProfilePage() {
       refetchQueries: [{ query: USER_POSTS, variables: { userId } }],
     },
   );
-  const [inviteUserMut, { loading: invitingUser }] = useMutation(INVITE_USER);
-  const [inviteAdminMut, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
-  const inviting = invitingUser || invitingAdmin;
-
-  async function onInviteFriend(e: React.FormEvent) {
-    e.preventDefault();
-    setInviteStatus("idle");
-    setInviteError("");
-    try {
-      if (inviteType === "admin") {
-        await inviteAdminMut({ variables: { email: inviteEmail.trim() } });
-      } else {
-        await inviteUserMut({ variables: { email: inviteEmail.trim() } });
-      }
-      setInviteStatus("success");
-      setInviteEmail("");
-    } catch (err: unknown) {
-      const msg = getApolloErrorMessage(err);
-      setInviteError(
-        msg.includes("A user with this email already exists")
-          ? "This email is already registered on CTrend."
-          : msg,
-      );
-      setInviteStatus("error");
-    }
-  }
 
   function openInviteModal(type: "user" | "admin") {
     setInviteType(type);
     setShowInviteModal(true);
-    setInviteStatus("idle");
-    setInviteError("");
-    setInviteEmail("");
   }
 
   if (!user) {
@@ -758,69 +726,10 @@ export function ProfilePage() {
       <p className="muted small cx-profile-email">{user.email}</p>
 
       {showInviteModal && (
-        <div
-          className="admin-modal-overlay"
-          onClick={() => setShowInviteModal(false)}
-          role="dialog"
-          aria-modal
-        >
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="admin-modal-title">
-              {inviteType === "admin" ? "Invite Admin" : "Invite a Friend"}
-            </h2>
-            {inviteType === "admin" && (
-              <p className="muted small" style={{ marginBottom: 12 }}>
-                The invitee will receive admin-level access to CTrend.
-              </p>
-            )}
-            {inviteStatus === "success" ? (
-              <>
-                <p className="admin-modal-success">
-                  Invitation sent!{" "}
-                  {inviteType === "admin"
-                    ? "The new admin will receive an email to set up their account."
-                    : "Your friend will receive an email to join CTrend."}
-                </p>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setShowInviteModal(false)}
-                  style={{ marginTop: 12 }}
-                >
-                  Close
-                </button>
-              </>
-            ) : (
-              <form onSubmit={(ev) => void onInviteFriend(ev)} className="admin-modal-form">
-                <label className="field">
-                  <span>{inviteType === "admin" ? "Email address" : "Friend's email address"}</span>
-                  <input
-                    type="email"
-                    required
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    autoComplete="email"
-                  />
-                </label>
-                {inviteStatus === "error" && (
-                  <p className="error" role="alert">{inviteError}</p>
-                )}
-                <div className="admin-modal-actions">
-                  <button type="submit" className="btn-primary" disabled={inviting}>
-                    {inviting ? "Sending…" : "Send invitation"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => setShowInviteModal(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+        <BulkInviteModal
+          inviteType={inviteType}
+          onClose={() => setShowInviteModal(false)}
+        />
       )}
     </div>
   );
