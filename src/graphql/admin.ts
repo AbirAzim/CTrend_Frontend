@@ -55,6 +55,31 @@ export const REMOVE_ADMIN = gql`
   }
 `;
 
+export const PREVIEW_INVITES = gql`
+  query PreviewInvites($emails: [String!]!) {
+    previewInvites(emails: $emails) {
+      email
+      hasPendingInvite
+      existingUser {
+        id
+        username
+        displayName
+        profileImageUrl
+      }
+    }
+  }
+`;
+
+export const INVITE_USERS_BULK = gql`
+  mutation InviteUsers($emails: [String!]!) {
+    inviteUsers(emails: $emails) {
+      email
+      status
+      message
+    }
+  }
+`;
+
 export const CREATE_SYSTEM_POST = gql`
   mutation CreateSystemPost($input: CreatePostInput!) {
     createSystemPost(input: $input) {

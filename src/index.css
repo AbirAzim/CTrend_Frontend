@@ -4733,6 +4733,204 @@ a.cx-profile-btn-accent {
   box-shadow: 0 8px 40px rgba(0,0,0,0.18);
 }
 
+/* ── Bulk Invite Modal ─────────────────────────────── */
+.bim-modal {
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.bim-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1.5px solid #d0d0e0;
+  border-radius: 10px;
+  cursor: text;
+  min-height: 44px;
+  background: #fafafa;
+  transition: border-color 0.15s;
+}
+
+.bim-tag-input:focus-within {
+  border-color: var(--cx-accent-deep, #6c63ff);
+  background: #fff;
+}
+
+.bim-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ede9fe;
+  color: #4c1d95;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bim-tag-x {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #7c3aed;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 1px;
+  opacity: 0.7;
+}
+
+.bim-tag-x:hover { opacity: 1; }
+
+.bim-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.88rem;
+  flex: 1;
+  min-width: 140px;
+  padding: 2px 0;
+}
+
+.bim-preview-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.bim-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8f8fb;
+  border: 1px solid #ebebf0;
+}
+
+.bim-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6c63ff, #a78bfa);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.bim-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bim-preview-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bim-preview-name {
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bim-preview-email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bim-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+
+.bim-badge--exists { background: #dcfce7; color: #166534; }
+.bim-badge--pending { background: #fef9c3; color: #854d0e; }
+.bim-badge--new { background: #ede9fe; color: #4c1d95; }
+.bim-badge--sent { background: #dbeafe; color: #1e40af; font-size: 0.72rem; }
+
+.bim-preview-action { flex-shrink: 0; }
+
+.bim-friend-btn {
+  font-size: 0.8rem;
+  padding: 5px 10px;
+}
+
+.bim-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.bim-remove-btn:hover { color: #ef4444; }
+
+.bim-done { text-align: center; }
+.bim-done-msg { font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+
+.bim-result-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.bim-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: #f8f8fb;
+}
+
+.bim-result--invited .bim-result-badge { color: #16a34a; font-weight: 600; }
+.bim-result--already_exists .bim-result-badge { color: #d97706; }
+.bim-result--error .bim-result-badge { color: #dc2626; }
+
+:root[data-theme="dark"] .bim-tag-input {
+  background: #1e1e2e;
+  border-color: #444;
+}
+:root[data-theme="dark"] .bim-tag-input:focus-within {
+  border-color: #a78bfa;
+  background: #1a1a2a;
+}
+:root[data-theme="dark"] .bim-preview-row {
+  background: #1e1e2e;
+  border-color: #333;
+}
+:root[data-theme="dark"] .bim-result-item { background: #1e1e2e; }
+
 .admin-modal-title {
   font-size: 1.2rem;
   font-weight: 700;
