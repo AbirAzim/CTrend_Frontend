@@ -10,6 +10,19 @@ import {
 } from "../graphql/admin";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import {
+  CAMPAIGN_WINNERS,
+  CREATE_WORLD_CUP_CAMPAIGN_POST,
+  MARK_CAMPAIGN_PRIZE_PAID,
+  PROCESS_MATCH_RESULT,
+  SYNC_WORLD_CUP_FIXTURES,
+  WORLD_CUP_FIXTURES,
+} from "../graphql/worldcup";
+import {
+  CAMPAIGNS_ADMIN,
+  CREATE_CAMPAIGN,
+  TOGGLE_CAMPAIGN,
+} from "../graphql/campaigns";
 
 const SYSTEM_ADMIN_EMAIL = "systemadminctrend@gmail.com";
 const PAGE_SIZE = 20;
@@ -644,10 +657,519 @@ function AdminsTab() {
   );
 }
 
+// ─── Campaigns Tab ───────────────────────────────────────────────────────────
+
+type CampaignRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  bannerText: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  isActive: boolean;
+  prizePerWinner: number;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+};
+
+function CampaignsTab() {
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    bannerText: "",
+    ctaLabel: "",
+    ctaUrl: "",
+    prizePerWinner: 100,
+  });
+  const [createError, setCreateError] = useState("");
+
+  const { data, loading, refetch } = useQuery<{ campaigns: CampaignRow[] }>(
+    CAMPAIGNS_ADMIN,
+    { fetchPolicy: "network-only" },
+  );
+
+  const [createCampaign, { loading: creating }] = useMutation(CREATE_CAMPAIGN);
+  const [toggleCampaign] = useMutation(TOGGLE_CAMPAIGN);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError("");
+    try {
+      await createCampaign({
+        variables: {
+          input: {
+            ...form,
+            prizePerWinner: Number(form.prizePerWinner),
+          },
+        },
+      });
+      setShowCreate(false);
+      setForm({ name: "", slug: "", bannerText: "", ctaLabel: "", ctaUrl: "", prizePerWinner: 100 });
+      void refetch();
+    } catch (err: unknown) {
+      setCreateError(getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleToggle(id: string, current: boolean) {
+    try {
+      await toggleCampaign({ variables: { id, isActive: !current } });
+      void refetch();
+    } catch {
+      // silent
+    }
+  }
+
+  const campaigns = data?.campaigns ?? [];
+
+  return (
+    <div>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="admin-section-title">Campaigns</h2>
+          <p className="muted small">Promotional campaigns shown as feed banners to all users</p>
+        </div>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setShowCreate((v) => !v)}
+        >
+          {showCreate ? "Cancel" : "+ New Campaign"}
+        </button>
+      </div>
+
+      {showCreate && (
+        <form
+          onSubmit={(e) => void handleCreate(e)}
+          style={{ background: "var(--ig-border)", borderRadius: 12, padding: 16, marginBottom: 20 }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label className="field">
+              <span>Campaign name</span>
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="World Cup Fever 2026"
+              />
+            </label>
+            <label className="field">
+              <span>Slug (URL key)</span>
+              <input
+                required
+                value={form.slug}
+                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                placeholder="world-cup-2026"
+              />
+            </label>
+            <label className="field" style={{ gridColumn: "1/-1" }}>
+              <span>Banner text</span>
+              <input
+                required
+                value={form.bannerText}
+                onChange={(e) => setForm((f) => ({ ...f, bannerText: e.target.value }))}
+                placeholder="Predict match winners and win 100 BDT!"
+              />
+            </label>
+            <label className="field">
+              <span>CTA button label</span>
+              <input
+                required
+                value={form.ctaLabel}
+                onChange={(e) => setForm((f) => ({ ...f, ctaLabel: e.target.value }))}
+                placeholder="World Cup 2026"
+              />
+            </label>
+            <label className="field">
+              <span>CTA URL (frontend route)</span>
+              <input
+                required
+                value={form.ctaUrl}
+                onChange={(e) => setForm((f) => ({ ...f, ctaUrl: e.target.value }))}
+                placeholder="/world-cup"
+              />
+            </label>
+            <label className="field">
+              <span>Prize per winner (BDT)</span>
+              <input
+                type="number"
+                min={1}
+                value={form.prizePerWinner}
+                onChange={(e) => setForm((f) => ({ ...f, prizePerWinner: Number(e.target.value) }))}
+              />
+            </label>
+          </div>
+          {createError && <p className="error" role="alert" style={{ marginTop: 8 }}>{createError}</p>}
+          <div style={{ marginTop: 12 }}>
+            <button type="submit" className="btn-primary" disabled={creating}>
+              {creating ? "Creating…" : "Create Campaign"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {loading && campaigns.length === 0 && <p className="muted small">Loading…</p>}
+      {!loading && campaigns.length === 0 && <p className="muted small">No campaigns yet.</p>}
+
+      {campaigns.length > 0 && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th>CTA</th>
+                <th>Prize</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaigns.map((c) => (
+                <tr key={c.id} className="admin-table-row">
+                  <td><strong>{c.name}</strong></td>
+                  <td className="muted small">{c.slug}</td>
+                  <td className="muted small">{c.ctaLabel} → {c.ctaUrl}</td>
+                  <td><span className="admin-stat-chip">{c.prizePerWinner} BDT</span></td>
+                  <td>
+                    <span className={`admin-stat-chip${c.isActive ? " admin-stat-chip--active" : ""}`}>
+                      {c.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={c.isActive ? "btn-danger" : "btn-primary"}
+                      style={{ fontSize: 13 }}
+                      onClick={() => void handleToggle(c.id, c.isActive)}
+                    >
+                      {c.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── World Cup Tab ────────────────────────────────────────────────────────────
+
+type WcFixture = {
+  id: string;
+  homeTeam: { name: string | null; shortName: string | null; crest: string | null };
+  awayTeam: { name: string | null; shortName: string | null; crest: string | null };
+  kickoff: string;
+  status: string;
+  stage: string;
+  group: string | null;
+  campaignPostId: string | null;
+};
+
+type WcWinner = {
+  id: string;
+  fixtureId: string;
+  postId: string;
+  prize: number;
+  winningOption: number | null;
+  paid: boolean;
+  note: string | null;
+  createdAt: string;
+  user: { id: string; username: string; displayName: string | null; email: string } | null;
+};
+
+function WorldCupTab() {
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<Record<string, string>>({});
+
+  const { data: fixturesData, loading: fixturesLoading, refetch: refetchFixtures } = useQuery<{
+    worldCupFixtures: WcFixture[];
+  }>(WORLD_CUP_FIXTURES, { fetchPolicy: "network-only" });
+
+  const { data: winnersData, refetch: refetchWinners } = useQuery<{
+    campaignWinners: WcWinner[];
+  }>(CAMPAIGN_WINNERS, { fetchPolicy: "network-only" });
+
+  const [syncFixtures, { loading: syncing }] = useMutation(SYNC_WORLD_CUP_FIXTURES);
+  const [createPost, { loading: creatingPost }] = useMutation(CREATE_WORLD_CUP_CAMPAIGN_POST);
+  const [processResult, { loading: processingResult }] = useMutation(PROCESS_MATCH_RESULT);
+  const [markPaid] = useMutation(MARK_CAMPAIGN_PRIZE_PAID);
+
+  async function handleSync() {
+    setSyncMsg(null);
+    try {
+      await syncFixtures();
+      setSyncMsg("Fixtures synced successfully.");
+      void refetchFixtures();
+    } catch (err: unknown) {
+      setSyncMsg("Sync failed: " + getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleCreatePost(fixtureId: string) {
+    setActionMsg((prev) => ({ ...prev, [fixtureId]: "Creating…" }));
+    try {
+      await createPost({ variables: { fixtureId } });
+      setActionMsg((prev) => ({ ...prev, [fixtureId]: "Post created!" }));
+      void refetchFixtures();
+    } catch (err: unknown) {
+      setActionMsg((prev) => ({ ...prev, [fixtureId]: getApolloErrorMessage(err) }));
+    }
+  }
+
+  async function handleProcessResult(fixtureId: string) {
+    setActionMsg((prev) => ({ ...prev, [`result-${fixtureId}`]: "Processing…" }));
+    try {
+      await processResult({ variables: { fixtureId } });
+      setActionMsg((prev) => ({ ...prev, [`result-${fixtureId}`]: "Done! Winner drawn." }));
+      void refetchWinners();
+    } catch (err: unknown) {
+      setActionMsg((prev) => ({
+        ...prev,
+        [`result-${fixtureId}`]: getApolloErrorMessage(err),
+      }));
+    }
+  }
+
+  async function handleMarkPaid(winnerId: string) {
+    try {
+      await markPaid({ variables: { winnerId } });
+      void refetchWinners();
+    } catch {
+      // silent — admin can retry
+    }
+  }
+
+  const fixtures = fixturesData?.worldCupFixtures ?? [];
+  const winners = winnersData?.campaignWinners ?? [];
+  const winnersByFixture = new Map(winners.map((w) => [w.fixtureId, w]));
+  const now = new Date();
+
+  return (
+    <div>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="admin-section-title">World Cup 2026 Fixtures</h2>
+          <p className="muted small">Sync fixtures, create campaign posts, and process results</p>
+        </div>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => void handleSync()}
+          disabled={syncing}
+        >
+          {syncing ? "Syncing…" : "Sync Fixtures"}
+        </button>
+      </div>
+
+      {syncMsg && (
+        <p className={`muted small${syncMsg.startsWith("Sync failed") ? " error" : ""}`} style={{ marginBottom: 12 }}>
+          {syncMsg}
+        </p>
+      )}
+
+      {fixturesLoading && fixtures.length === 0 && (
+        <p className="muted small">Loading fixtures…</p>
+      )}
+      {fixtures.length === 0 && !fixturesLoading && (
+        <p className="muted small">No fixtures synced yet. Click "Sync Fixtures" above.</p>
+      )}
+
+      {fixtures.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th style={{ minWidth: 200 }}>Match</th>
+                  <th style={{ minWidth: 120 }}>Kickoff</th>
+                  <th style={{ minWidth: 100 }}>Status</th>
+                  <th style={{ minWidth: 130 }}>Campaign Post</th>
+                  <th style={{ minWidth: 160 }}>Result / Draw</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fixtures.map((f) => {
+                  const kickoff = new Date(f.kickoff);
+                  const isPast = kickoff <= now;
+                  const winner = winnersByFixture.get(f.id);
+                  const isLive = f.status === "IN_PLAY" || f.status === "PAUSED";
+                  const isFinished = f.status === "FINISHED";
+                  const groupLabel = f.group
+                    ? f.group.replace("GROUP_", "Group ")
+                    : f.stage.replace(/_/g, " ");
+
+                  const statusChipClass = isFinished
+                    ? "wc-admin-chip wc-admin-chip--done"
+                    : isLive
+                      ? "wc-admin-chip wc-admin-chip--live"
+                      : "wc-admin-chip";
+
+                  const statusLabel = isLive
+                    ? "● Live"
+                    : isFinished
+                      ? "✓ Finished"
+                      : f.status === "POSTPONED"
+                        ? "Postponed"
+                        : "Scheduled";
+
+                  return (
+                    <tr key={f.id} className="admin-table-row">
+                      <td>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span>
+                            {f.homeTeam.crest && (
+                              <img src={f.homeTeam.crest} alt="" style={{ width: 18, height: 13, objectFit: "contain", marginRight: 5, verticalAlign: "middle" }} />
+                            )}
+                            <strong>{f.homeTeam.shortName ?? f.homeTeam.name ?? "TBD"}</strong>
+                            {" vs "}
+                            <strong>{f.awayTeam.shortName ?? f.awayTeam.name ?? "TBD"}</strong>
+                            {f.awayTeam.crest && (
+                              <img src={f.awayTeam.crest} alt="" style={{ width: 18, height: 13, objectFit: "contain", marginLeft: 5, verticalAlign: "middle" }} />
+                            )}
+                          </span>
+                          <span className="muted" style={{ fontSize: 11 }}>{groupLabel}</span>
+                        </div>
+                      </td>
+                      <td className="muted small">
+                        {kickoff.toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td>
+                        <span className={statusChipClass}>{statusLabel}</span>
+                      </td>
+                      <td>
+                        {f.campaignPostId ? (
+                          <span className="wc-admin-chip wc-admin-chip--done">✓ Created</span>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ fontSize: 12, padding: "3px 10px" }}
+                              onClick={() => void handleCreatePost(f.id)}
+                              disabled={creatingPost}
+                            >
+                              + Create Post
+                            </button>
+                            {actionMsg[f.id] && (
+                              <span className="muted small">{actionMsg[f.id]}</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {winner ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span className="wc-admin-chip wc-admin-chip--done">
+                              {winner.user ? `🏆 @${winner.user.username}` : winner.note ?? "No winner"}
+                            </span>
+                          </div>
+                        ) : isPast && f.campaignPostId ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ fontSize: 12, padding: "3px 10px" }}
+                              onClick={() => void handleProcessResult(f.id)}
+                              disabled={processingResult}
+                            >
+                              Draw Winner
+                            </button>
+                            {actionMsg[`result-${f.id}`] && (
+                              <span className="muted small">{actionMsg[`result-${f.id}`]}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="muted small">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {winners.length > 0 && (
+        <>
+          <h2 className="admin-section-title" style={{ marginTop: 24 }}>
+            Campaign Winners
+          </h2>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Winner</th>
+                  <th>Prize</th>
+                  <th>Note</th>
+                  <th>Date</th>
+                  <th>Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {winners.map((w) => (
+                  <tr key={w.id} className="admin-table-row">
+                    <td>
+                      {w.user ? (
+                        <span>
+                          <strong>@{w.user.username}</strong>
+                          <span className="muted small" style={{ marginLeft: 6 }}>
+                            {w.user.email}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="muted small">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="admin-stat-chip">{w.prize} BDT</span>
+                    </td>
+                    <td className="muted small">{w.note ?? "—"}</td>
+                    <td className="muted small">
+                      {new Date(w.createdAt).toLocaleDateString()}
+                    </td>
+                    <td>
+                      {w.paid ? (
+                        <span className="admin-stat-chip admin-stat-chip--active">Paid</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ fontSize: 13 }}
+                          onClick={() => void handleMarkPaid(w.id)}
+                        >
+                          Mark Paid
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "admins">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "admins" | "campaigns" | "worldcup">("users");
 
   return (
     <div className="admin-page">
@@ -674,10 +1196,27 @@ export function AdminPage() {
         >
           Admin Management
         </button>
+        <button
+          type="button"
+          className={`admin-tab${activeTab === "campaigns" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("campaigns")}
+        >
+          Campaigns
+        </button>
+        <button
+          type="button"
+          className={`admin-tab${activeTab === "worldcup" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("worldcup")}
+        >
+          🏆 World Cup
+        </button>
       </div>
 
       <div className="admin-section">
-        {activeTab === "users" ? <UsersTab /> : <AdminsTab />}
+        {activeTab === "users" && <UsersTab />}
+        {activeTab === "admins" && <AdminsTab />}
+        {activeTab === "campaigns" && <CampaignsTab />}
+        {activeTab === "worldcup" && <WorldCupTab />}
       </div>
     </div>
   );
