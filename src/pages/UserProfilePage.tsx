@@ -163,27 +163,29 @@ export function UserProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  if (user && userId === user.id) {
-    navigate("/profile", { replace: true });
-    return null;
-  }
+  const isOwnProfile = Boolean(user && userId === user.id);
 
   const { data: profileData, loading: profileLoading, error: profileError } = useQuery(
     GET_USER_PROFILE,
-    { variables: { userId }, skip: !userId },
+    { variables: { userId }, skip: !userId || isOwnProfile },
   );
 
   const { data: statusData, refetch: refetchStatus } = useQuery(FRIENDSHIP_STATUS, {
     variables: { userId },
-    skip: !userId || !user,
+    skip: !userId || !user || isOwnProfile,
     fetchPolicy: "network-only",
   });
 
   const { data: postsData, loading: postsLoading } = useQuery(USER_POSTS, {
     variables: { userId },
-    skip: !userId,
+    skip: !userId || isOwnProfile,
     fetchPolicy: "network-only",
   });
+
+  if (isOwnProfile) {
+    navigate("/profile", { replace: true });
+    return null;
+  }
 
   const profile = profileData?.getUserProfile as UserProfile | undefined;
   const friendshipStatus = (statusData?.friendshipStatus ?? "NONE") as FriendshipStatus;
