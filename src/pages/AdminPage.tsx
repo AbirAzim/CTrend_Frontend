@@ -4,11 +4,8 @@ import { NavLink } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import {
   CANCEL_INVITATION,
-  INVITE_ADMIN,
-  INVITE_USER,
   LIST_INVITATIONS,
   LIST_USERS,
-  PROMOTE_TO_ADMIN,
   REMOVE_ADMIN,
   REMOVE_USER,
   RESEND_INVITATION,
@@ -82,146 +79,6 @@ function RoleBadges({ user }: { user: UserRow }) {
     </span>
   );
 }
-
-// ─── Invite / Promote Modal ──────────────────────────────────────────────────
-
-type InviteStep = "form" | "confirm-promote" | "success";
-
-function InviteModal({
-  type,
-  onClose,
-  onDone,
-}: {
-  type: "user" | "admin";
-  onClose: () => void;
-  onDone?: () => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [step, setStep] = useState<InviteStep>("form");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [pendingEmail, setPendingEmail] = useState("");
-  const [promoteError, setPromoteError] = useState("");
-
-  const [inviteUser, { loading: invitingUser }] = useMutation(INVITE_USER);
-  const [inviteAdmin, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
-  const [promoteToAdmin, { loading: promoting }] = useMutation(PROMOTE_TO_ADMIN);
-  const loading = invitingUser || invitingAdmin;
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setErrorMsg("");
-    const trimmed = email.trim();
-    try {
-      if (type === "admin") {
-        await inviteAdmin({ variables: { email: trimmed } });
-      } else {
-        await inviteUser({ variables: { email: trimmed } });
-      }
-      setStep("success");
-      onDone?.();
-    } catch (err: unknown) {
-      const msg = getApolloErrorMessage(err);
-      if (type === "admin" && (msg.includes("already has an account") || msg.includes("promoteToAdmin"))) {
-        setPendingEmail(trimmed);
-        setStep("confirm-promote");
-      } else {
-        setErrorMsg(msg.includes("A user with this email already exists")
-          ? "This email is already registered on CTrend."
-          : msg);
-      }
-    }
-  }
-
-  async function onConfirmPromote() {
-    setPromoteError("");
-    try {
-      await promoteToAdmin({ variables: { email: pendingEmail } });
-      setStep("success");
-      onDone?.();
-    } catch (err: unknown) {
-      setPromoteError(getApolloErrorMessage(err));
-    }
-  }
-
-  return (
-    <div className="admin-modal-overlay" onClick={onClose} role="dialog" aria-modal>
-      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-        {step === "confirm-promote" ? (
-          <>
-            <h2 className="admin-modal-title">Grant Admin Access</h2>
-            <p className="muted small" style={{ marginBottom: 14 }}>
-              <strong>{pendingEmail}</strong> already has a CTrend account.
-              Grant them admin access instead?
-            </p>
-            {promoteError && <p className="error" role="alert">{promoteError}</p>}
-            <div className="admin-modal-actions">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void onConfirmPromote()}
-                disabled={promoting}
-              >
-                {promoting ? "Granting…" : "Grant admin access"}
-              </button>
-              <button type="button" className="btn-ghost" onClick={onClose} disabled={promoting}>
-                Cancel
-              </button>
-            </div>
-          </>
-        ) : step === "success" ? (
-          <>
-            <p className="admin-modal-success">
-              {type === "admin"
-                ? "Admin access granted! They'll receive an email to finish setting up their account."
-                : "Invitation sent! They'll receive an email to join CTrend."}
-            </p>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={onClose}
-              style={{ marginTop: 12 }}
-            >
-              Close
-            </button>
-          </>
-        ) : (
-          <>
-            <h2 className="admin-modal-title">
-              Invite {type === "admin" ? "New Admin" : "New User"}
-            </h2>
-            {type === "admin" && (
-              <p className="muted small" style={{ marginBottom: 12 }}>
-                If they already have an account, you'll be prompted to grant admin access instead.
-              </p>
-            )}
-            <form onSubmit={(ev) => void onSubmit(ev)} className="admin-modal-form">
-              <label className="field">
-                <span>Email address</span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-              </label>
-              {errorMsg && <p className="error" role="alert">{errorMsg}</p>}
-              <div className="admin-modal-actions">
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? "Sending…" : "Send invitation"}
-                </button>
-                <button type="button" className="btn-ghost" onClick={onClose}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Confirm Dialog ──────────────────────────────────────────────────────────
 
 function ConfirmDialog({
