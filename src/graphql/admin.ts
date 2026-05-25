@@ -12,6 +12,12 @@ export const INVITE_ADMIN = gql`
   }
 `;
 
+export const REJECT_ADMIN_PROMOTION = gql`
+  mutation RejectAdminPromotion($token: String!) {
+    rejectAdminPromotion(token: $token)
+  }
+`;
+
 export const PROMOTE_TO_ADMIN = gql`
   mutation PromoteToAdmin($email: String!) {
     promoteToAdmin(email: $email) {
@@ -25,8 +31,8 @@ export const PROMOTE_TO_ADMIN = gql`
 `;
 
 export const LIST_USERS = gql`
-  query ListUsers($skip: Int, $take: Int) {
-    listUsers(skip: $skip, take: $take) {
+  query ListUsers($skip: Int, $take: Int, $role: String) {
+    listUsers(skip: $skip, take: $take, role: $role) {
       id
       email
       username
@@ -51,6 +57,64 @@ export const REMOVE_ADMIN = gql`
       username
       displayName
       role
+    }
+  }
+`;
+
+export const LIST_INVITATIONS = gql`
+  query ListInvitations($status: InvitationStatus) {
+    listInvitations(status: $status) {
+      id
+      email
+      role
+      status
+      expiresAt
+      createdAt
+      invitedBy {
+        id
+        displayName
+        username
+        email
+        role
+        profileImageUrl
+      }
+    }
+  }
+`;
+
+export const CANCEL_INVITATION = gql`
+  mutation CancelInvitation($id: ID!) {
+    cancelInvitation(id: $id)
+  }
+`;
+
+export const RESEND_INVITATION = gql`
+  mutation ResendInvitation($id: ID!) {
+    resendInvitation(id: $id)
+  }
+`;
+
+export const PREVIEW_INVITES = gql`
+  query PreviewInvites($emails: [String!]!) {
+    previewInvites(emails: $emails) {
+      email
+      hasPendingInvite
+      existingUser {
+        id
+        username
+        displayName
+        profileImageUrl
+      }
+    }
+  }
+`;
+
+export const INVITE_USERS_BULK = gql`
+  mutation InviteUsers($emails: [String!]!) {
+    inviteUsers(emails: $emails) {
+      email
+      status
+      message
     }
   }
 `;
