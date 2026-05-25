@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
 import { AppShell } from "./layouts/AppShell";
 import { AcceptInvitationPage } from "./pages/AcceptInvitationPage";
+import { RejectPromotionPage } from "./pages/RejectPromotionPage";
 import { AdminPage } from "./pages/AdminPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
 import { FeedPage } from "./pages/FeedPage";
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+      <Route path="/reject-promotion" element={<RejectPromotionPage />} />
       <Route element={<AppShell />}>
         <Route index element={<FeedPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />
