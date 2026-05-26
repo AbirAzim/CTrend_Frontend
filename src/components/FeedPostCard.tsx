@@ -451,7 +451,7 @@ export function FeedPostCard({
 
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ url, title: "CTrend post" });
+        await navigator.share({ url, title: "Ke Jitbe post" });
         message = "Shared";
       } catch (e: unknown) {
         if (

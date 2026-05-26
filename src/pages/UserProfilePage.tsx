@@ -223,7 +223,7 @@ export function UserProfilePage() {
         </span>
 
         <div className="cx-profile-hero-text">
-          <p className="cx-profile-kicker">CTrend member</p>
+          <p className="cx-profile-kicker">Ke Jitbe member</p>
           <h1 className="cx-profile-title">{name}</h1>
           <p className="cx-profile-handle">@{profile.username ?? "user"}</p>
 

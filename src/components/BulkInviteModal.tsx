@@ -297,8 +297,8 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
         </h2>
         <p className="muted small" style={{ marginBottom: 14 }}>
           {inviteType === "admin"
-            ? "Existing CTrend users will be promoted to admin. New emails will receive an invitation."
-            : "Add emails below. Existing CTrend users won't be re-invited — send a friend request instead."}
+            ? "Existing Ke Jitbe users will be promoted to admin. New emails will receive an invitation."
+            : "Add emails below. Existing Ke Jitbe users won't be re-invited — send a friend request instead."}
         </p>
 
         {sendStatus === "done" ? (
@@ -318,7 +318,7 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
                           : r.status === "promoted"
                             ? "✓ Promoted"
                             : r.status === "already_exists"
-                              ? "Already on CTrend"
+                              ? "Already on Ke Jitbe"
                               : "Failed"}
                       </span>
                     </li>
@@ -374,7 +374,7 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
                       <div className="bim-preview-meta">
                         <strong className="bim-preview-name">{name}</strong>
                         <span className="bim-preview-email muted small">{email}</span>
-                        {existing && <span className="bim-badge bim-badge--exists">On CTrend</span>}
+                        {existing && <span className="bim-badge bim-badge--exists">On Ke Jitbe</span>}
                         {!existing && pending && <span className="bim-badge bim-badge--pending">Invite pending</span>}
                         {!existing && !pending && !previewing && <span className="bim-badge bim-badge--new">Will be invited</span>}
                       </div>

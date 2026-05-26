@@ -77,7 +77,7 @@ export function AcceptInvitationPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Set up your account</h1>
-        <p className="muted">You've been invited to join CTrend. Create a password to get started.</p>
+        <p className="muted">You've been invited to join Ke Jitbe. Create a password to get started.</p>
 
         <form onSubmit={(ev) => void onSubmit(ev)} className="auth-form">
           <label className="field">

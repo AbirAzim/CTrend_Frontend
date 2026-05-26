@@ -396,7 +396,7 @@ function AdminsTab() {
       <div className="admin-section-head">
         <div>
           <h2 className="admin-section-title">Admin Management</h2>
-          <p className="muted small">Manage who has admin access to CTrend</p>
+          <p className="muted small">Manage who has admin access to Ke Jitbe</p>
         </div>
         <button
           type="button"

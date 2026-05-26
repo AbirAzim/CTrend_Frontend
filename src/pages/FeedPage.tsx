@@ -320,7 +320,7 @@ export function FeedPage() {
             <p className="ig-feed-empty-title">Nothing here yet</p>
             <p className="ig-feed-empty-desc">
               Follow people to see their posts here. The feed shows posts from
-              people you follow — platform-wide posts from CTrend also appear here.
+              people you follow — platform-wide posts from Ke Jitbe also appear here.
             </p>
             {isAuthenticated && (
               <p className="muted small">

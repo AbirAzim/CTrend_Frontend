@@ -130,7 +130,7 @@ export function AppShell() {
       <header className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
         <div className="ig-brand-block">
           <NavLink to="/" className="ig-logo" end>
-            CTrend
+            Ke Jitbe
           </NavLink>
           <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
