@@ -13,6 +13,7 @@
   "dependencies": {
     "@apollo/client": "^3.13.8",
     "@react-oauth/google": "^0.13.5",
+    "apollo3-cache-persist": "^0.15.0",
     "graphql": "^16.11.0",
     "graphql-ws": "^6.0.8",
     "react": "^19.1.0",

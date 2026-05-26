@@ -60,7 +60,7 @@ export function FeedPage() {
 
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
     skip: useMockFeed,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
   });
   const {
     data: friendsData,
@@ -68,13 +68,13 @@ export function FeedPage() {
     refetch: refetchFriends,
   } = useQuery(MY_FRIENDS, {
     skip: useMockFeed || !isAuthenticated,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
   });
   const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery(
     FRIEND_REQUESTS,
     {
       skip: useMockFeed || !isAuthenticated,
-      fetchPolicy: "network-only",
+      fetchPolicy: "cache-and-network",
     },
   );
   const {
@@ -86,12 +86,12 @@ export function FeedPage() {
     {
       variables: { limit: 8 },
       skip: useMockFeed || !isAuthenticated,
-      fetchPolicy: "network-only",
+      fetchPolicy: "cache-and-network",
     },
   );
   const { data: meData, refetch: refetchMe } = useQuery(ME, {
     skip: useMockFeed || !isAuthenticated,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
   });
   const [addFriend, { loading: addingFriend }] = useMutation(ADD_FRIEND, {
     refetchQueries: [
@@ -303,7 +303,7 @@ export function FeedPage() {
       <div className="ig-feed">
         <CampaignBanners />
 
-        {loading && !useMockFeed && (
+        {loading && !data && !useMockFeed && (
           <p className="ig-feed-status">Loading feed…</p>
         )}
 

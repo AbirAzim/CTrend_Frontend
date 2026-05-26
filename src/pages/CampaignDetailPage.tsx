@@ -448,7 +448,7 @@ export function CampaignDetailPage() {
     <div className="cd-page">
       {/* Hero */}
       <div
-        className="cd-hero"
+        className={`cd-hero${c.slug?.includes("world-cup") || c.slug?.includes("worldcup") ? " cd-hero--wc" : ""}`}
         style={c.bannerImageUrl ? { backgroundImage: `url(${c.bannerImageUrl})` } : undefined}
       >
         <div className="cd-hero-overlay" />
@@ -467,6 +467,14 @@ export function CampaignDetailPage() {
             </span>
           </div>
         </div>
+        {(c.slug?.includes("world-cup") || c.slug?.includes("worldcup")) && (
+          <img
+            src="/worldcup-players.png"
+            className="cd-hero-players"
+            alt=""
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       {/* Prize callout */}

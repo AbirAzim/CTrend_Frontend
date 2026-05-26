@@ -2,6 +2,7 @@ import { ApolloClient, HttpLink, InMemoryCache, split } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
+import { persistCache, LocalStorageWrapper } from "apollo3-cache-persist";
 import { createClient } from "graphql-ws";
 import { readStoredToken } from "./authStorage";
 
@@ -52,7 +53,17 @@ const link = wsLink
     )
   : authLink.concat(httpLink);
 
+export const cache = new InMemoryCache();
+
 export const apolloClient = new ApolloClient({
   link,
-  cache: new InMemoryCache(),
+  cache,
 });
+
+export async function initApolloCache(): Promise<void> {
+  await persistCache({
+    cache,
+    storage: new LocalStorageWrapper(window.localStorage),
+    maxSize: 1_048_576, // 1 MB cap
+  });
+}
