@@ -46,6 +46,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const historyFetched = useRef(false);
 
   const [fetchMessages] = useLazyQuery(GET_MESSAGES, {
     fetchPolicy: "network-only",
@@ -68,9 +69,13 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     },
   });
 
-  // Load initial messages and mark read on open
+  // Load initial messages and mark read on open.
+  // Always fetch history on first open — even if subscription messages are already
+  // cached (messages.length > 0), those are only the most recent real-time events,
+  // not the full history.
   useEffect(() => {
-    if (messages.length === 0) {
+    if (!historyFetched.current) {
+      historyFetched.current = true;
       setLoadingHistory(true);
       fetchMessages({ variables: { conversationId: conversation.id, skip: 0, take: 30 } })
         .then(({ data }) => {
