@@ -40,7 +40,7 @@ export function RejectPromotionPage() {
             <div className="rp-icon rp-icon--warn">⚠</div>
             <h1 className="rp-title">Decline Admin Access?</h1>
             <p className="rp-body">
-              You're about to decline the admin promotion on CTrend.<br />
+              You're about to decline the admin promotion on Ke Jitbe.<br />
               Your account will remain active as a regular user.
             </p>
             <div className="rp-actions">
@@ -72,10 +72,10 @@ export function RejectPromotionPage() {
             <h1 className="rp-title">Admin access declined</h1>
             <p className="rp-body">
               Your account has been restored to a regular user.<br />
-              You can still use CTrend normally.
+              You can still use Ke Jitbe normally.
             </p>
             <Link to="/" className="btn-primary rp-btn" style={{ marginTop: 8 }}>
-              Go to CTrend
+              Go to Ke Jitbe
             </Link>
           </>
         )}
@@ -88,7 +88,7 @@ export function RejectPromotionPage() {
               {errorMsg || "This link is invalid or has already been used."}
             </p>
             <Link to="/" className="btn-ghost rp-btn">
-              Go to CTrend
+              Go to Ke Jitbe
             </Link>
           </>
         )}
