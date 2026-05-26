@@ -15,6 +15,7 @@ type Campaign = {
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const navigate = useNavigate();
+  const isWorldCup = campaign.slug?.includes("world-cup") || campaign.slug?.includes("worldcup");
 
   function go() {
     navigate(`/campaign/${campaign.slug}`);
@@ -22,18 +23,22 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
 
   return (
     <div
-      className="cb-card"
-      style={
-        campaign.bannerImageUrl
-          ? { backgroundImage: `url(${campaign.bannerImageUrl})` }
-          : undefined
-      }
+      className={`cb-card${isWorldCup ? " cb-card--wc" : ""}`}
       onClick={go}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && go()}
     >
-      <div className="cb-card-overlay" />
+      <div
+        className="cb-card-inner"
+        style={
+          campaign.bannerImageUrl
+            ? { backgroundImage: `url(${campaign.bannerImageUrl})` }
+            : undefined
+        }
+      >
+        <div className="cb-card-overlay" />
+      </div>
       <div className="cb-card-body">
         <div className="cb-card-top">
           <span className="cb-badge">Campaign</span>
@@ -49,6 +54,14 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
           {campaign.ctaLabel}
         </button>
       </div>
+      {isWorldCup && (
+        <img
+          src="/worldcup-players.png"
+          className="cb-players-img"
+          alt=""
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }

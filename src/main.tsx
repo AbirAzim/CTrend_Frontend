@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ApolloProvider } from "@apollo/client";
 import { BrowserRouter } from "react-router-dom";
-import { apolloClient } from "./lib/apolloClient";
+import { apolloClient, initApolloCache } from "./lib/apolloClient";
 import { AuthProvider } from "./context/AuthContext";
 import App from "./App";
 import "./index.css";
@@ -20,14 +20,19 @@ const shell = (
   </BrowserRouter>
 );
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    {googleClientId ? (
-      <GoogleOAuthProvider clientId={googleClientId}>
-        {shell}
-      </GoogleOAuthProvider>
-    ) : (
-      shell
-    )}
-  </StrictMode>,
-);
+async function bootstrap() {
+  await initApolloCache();
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      {googleClientId ? (
+        <GoogleOAuthProvider clientId={googleClientId}>
+          {shell}
+        </GoogleOAuthProvider>
+      ) : (
+        shell
+      )}
+    </StrictMode>,
+  );
+}
+
+void bootstrap();
