@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@apollo/client";
 import { useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useMessenger } from "../context/MessengerContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import {
   ADD_FRIEND,
@@ -10,6 +11,7 @@ import {
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
 } from "../graphql/friends";
+import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { USER_POSTS } from "../graphql/profile";
 
 type UserProfile = {
@@ -158,6 +160,44 @@ function FriendButton({
   );
 }
 
+function MessageIconButton({ userId }: { userId: string }) {
+  const { openChat, ensureConversation } = useMessenger();
+  const [startDirect, { loading }] = useMutation(START_DIRECT_CONVERSATION);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handle() {
+    setError(null);
+    try {
+      const { data } = await startDirect({ variables: { userId } });
+      const convo = data?.startDirectConversation;
+      if (convo) {
+        ensureConversation(convo);
+        openChat(convo.id);
+      }
+    } catch (err: unknown) {
+      setError(getApolloErrorMessage(err));
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <button
+        type="button"
+        className="up-msg-btn"
+        disabled={loading}
+        onClick={() => void handle()}
+        aria-label="Send message"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        {loading ? "Opening…" : "Message"}
+      </button>
+      {error ? <small className="cx-extend-error" role="alert">{error}</small> : null}
+    </div>
+  );
+}
+
 export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const { user } = useAuth();
@@ -242,11 +282,16 @@ export function UserProfilePage() {
           ) : null}
 
           {isLoggedIn && (
-            <FriendButton
-              userId={profile.id}
-              status={friendshipStatus}
-              onStatusChange={() => void refetchStatus()}
-            />
+            <div className="up-action-row">
+              <FriendButton
+                userId={profile.id}
+                status={friendshipStatus}
+                onStatusChange={() => void refetchStatus()}
+              />
+              {friendshipStatus === "FRIEND" && (
+                <MessageIconButton userId={profile.id} />
+              )}
+            </div>
           )}
 
           {!isLoggedIn && (
