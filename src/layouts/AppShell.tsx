@@ -7,6 +7,8 @@ import { useAuth } from "../context/AuthContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { ME } from "../graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
+import { NotificationBell } from "../components/NotificationBell";
+import { MessengerPanel } from "../components/MessengerPanel";
 
 type ThemeMode = "light" | "dark";
 
@@ -179,6 +181,7 @@ export function AppShell() {
               <span className="ig-topbar-cta-label">New compare</span>
             </NavLink>
           )}
+          {isAuthenticated && <NotificationBell />}
           {isAuthenticated ? (
             <button
               type="button"
@@ -200,6 +203,8 @@ export function AppShell() {
       <main className="ig-main-scroll">
         <Outlet />
       </main>
+
+      <MessengerPanel />
 
       <nav
         className={`ig-bottom-nav ig-bottom-nav--four${navHidden ? " ig-bottom-nav--hidden" : ""}`}

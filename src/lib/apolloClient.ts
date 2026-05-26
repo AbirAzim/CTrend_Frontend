@@ -26,18 +26,44 @@ const authLink = setContext((_, { headers }) => {
 const httpLink = new HttpLink({ uri, credentials: "include" });
 const wsUri = import.meta.env.VITE_GRAPHQL_WS;
 
+let _wsClient: ReturnType<typeof createClient> | null = null;
+
 const wsLink =
   typeof window !== "undefined" && wsUri
     ? new GraphQLWsLink(
-        createClient({
-          url: wsUri,
-          connectionParams: () => {
-            const token = readStoredToken();
-            return token ? { Authorization: `Bearer ${token}` } : {};
-          },
-        }),
+        (() => {
+          _wsClient = createClient({
+            url: wsUri,
+            retryAttempts: Infinity,
+            shouldRetry: () => true,
+            keepAlive: 10_000, // ping every 10 s — prevents Safari from killing idle WS connections
+            connectionParams: () => {
+              const token = readStoredToken();
+              return token ? { Authorization: `Bearer ${token}` } : {};
+            },
+          });
+          return _wsClient;
+        })(),
       )
     : null;
+
+/**
+ * Terminates the current WebSocket connection so it reconnects fresh on the
+ * next subscription — picking up any new auth token from connectionParams.
+ * Call this after login and logout.
+ */
+export function reconnectWs(): void {
+  _wsClient?.terminate();
+}
+
+/**
+ * Registers a callback that fires every time the WebSocket connection is
+ * (re)established. Returns an unsubscribe function.
+ */
+export function onWsConnected(cb: () => void): () => void {
+  if (!_wsClient) return () => {};
+  return _wsClient.on("connected", cb);
+}
 
 const link = wsLink
   ? split(

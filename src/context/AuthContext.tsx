@@ -13,7 +13,7 @@ import {
   writeSession,
   type StoredUser,
 } from "../lib/authStorage";
-import { apolloClient } from "../lib/apolloClient";
+import { apolloClient, reconnectWs } from "../lib/apolloClient";
 
 type AuthContextValue = {
   user: StoredUser | null;
@@ -35,15 +35,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [{ token, user }, setState] = useState(hydrate);
 
   const setSession = useCallback((nextToken: string, nextUser: StoredUser) => {
-    // Reset Apollo cache when a new session starts so stale cached fields
-    // (e.g. me.role missing from the previous session) don't persist.
-    void apolloClient.resetStore().catch(() => {/* ignore reset errors */});
     writeSession(nextToken, nextUser);
+    // Reconnect WS first so the new connection picks up the token in
+    // connectionParams, then reset the Apollo store.
+    reconnectWs();
+    void apolloClient.resetStore().catch(() => {/* ignore reset errors */});
     setState({ token: nextToken, user: nextUser });
   }, []);
 
   const logout = useCallback(() => {
     clearSession();
+    reconnectWs();
     void apolloClient.clearStore();
     setState({ token: null, user: null });
   }, []);
