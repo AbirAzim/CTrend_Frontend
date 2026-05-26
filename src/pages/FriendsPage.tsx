@@ -8,6 +8,8 @@ import {
   MY_FRIENDS,
   RESPOND_FRIEND_REQUEST,
 } from "../graphql/friends";
+import { START_DIRECT_CONVERSATION } from "../graphql/messages";
+import { useMessenger } from "../context/MessengerContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
 type FriendRow = {
@@ -16,6 +18,48 @@ type FriendRow = {
   displayName?: string | null;
   profileImageUrl?: string | null;
 };
+
+function MessageButton({ userId }: { userId: string }) {
+  const { openChat, ensureConversation } = useMessenger();
+  const [startDirect, { loading }] = useMutation(START_DIRECT_CONVERSATION);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleMessage() {
+    setError(null);
+    try {
+      const { data } = await startDirect({ variables: { userId } });
+      const convo = data?.startDirectConversation;
+      if (convo) {
+        ensureConversation(convo);
+        openChat(convo.id);
+      }
+    } catch (err: unknown) {
+      setError(getApolloErrorMessage(err));
+    }
+  }
+
+  return (
+    <div className="cx-friend-msg-wrap">
+      <button
+        type="button"
+        className="cx-friend-msg-btn"
+        title={error ?? "Send message"}
+        disabled={loading}
+        onClick={() => void handleMessage()}
+        aria-label="Send message"
+      >
+        {loading ? (
+          <span style={{ fontSize: "0.7rem" }}>…</span>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        )}
+      </button>
+      {error ? <span className="cx-friend-msg-error" role="alert" title={error}>!</span> : null}
+    </div>
+  );
+}
 
 function friendName(f: FriendRow): string {
   return f.displayName?.trim() || f.username?.trim() || "User";
@@ -26,6 +70,7 @@ function friendInitial(f: FriendRow): string {
 }
 
 export function FriendsPage() {
+  const { onlineUserIds } = useMessenger();
   const [tab, setTab] = useState<"suggestions" | "requests" | "friends">(
     "suggestions",
   );
@@ -264,15 +309,19 @@ export function FriendsPage() {
           <ul className="cx-friend-list">
             {friends.map((u) => (
               <li key={u.id} className="cx-friend-item">
-                <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
-                  {u.profileImageUrl ? <img src={u.profileImageUrl} alt="" /> : friendInitial(u)}
-                </NavLink>
+                <div className="cx-friend-avatar-wrap">
+                  <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
+                    {u.profileImageUrl ? <img src={u.profileImageUrl} alt="" /> : friendInitial(u)}
+                  </NavLink>
+                  {onlineUserIds.has(u.id) && <span className="cx-friend-online-dot" aria-hidden />}
+                </div>
                 <div className="cx-friend-meta">
                   <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
                     <strong>{friendName(u)}</strong>
                     <span>@{u.username ?? "user"}</span>
                   </NavLink>
                 </div>
+                <MessageButton userId={u.id} />
               </li>
             ))}
           </ul>
