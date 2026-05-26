@@ -6,7 +6,9 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { useImageUpload } from "../lib/useImageUpload";
 import { MY_FRIENDS } from "../graphql/friends";
+import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
+import { useMessenger } from "../context/MessengerContext";
 import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
@@ -58,8 +60,46 @@ function friendInitial(f: FriendRow): string {
   return friendName(f).slice(0, 1).toUpperCase();
 }
 
+function MessageButton({ userId }: { userId: string }) {
+  const { openChat, ensureConversation } = useMessenger();
+  const [startDirect, { loading }] = useMutation(START_DIRECT_CONVERSATION);
+  const [msgError, setMsgError] = useState<string | null>(null);
+
+  async function handleMessage() {
+    setMsgError(null);
+    try {
+      const { data } = await startDirect({ variables: { userId } });
+      const convo = data?.startDirectConversation;
+      if (convo) { ensureConversation(convo); openChat(convo.id); }
+    } catch (err: unknown) {
+      setMsgError(getApolloErrorMessage(err));
+    }
+  }
+
+  return (
+    <div className="cx-friend-msg-wrap">
+      <button
+        type="button"
+        className="cx-friend-msg-btn"
+        title={msgError ?? "Send message"}
+        disabled={loading}
+        onClick={() => void handleMessage()}
+        aria-label="Send message"
+      >
+        {loading ? <span style={{ fontSize: "0.7rem" }}>…</span> : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        )}
+      </button>
+      {msgError && <span className="cx-friend-msg-error" role="alert" title={msgError}>!</span>}
+    </div>
+  );
+}
+
 export function ProfilePage() {
   const { user, patchUser } = useAuth();
+  const { onlineUserIds } = useMessenger();
   const location = useLocation();
   const keepsOnlyView = new URLSearchParams(location.search).get("view") === "keeps";
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
@@ -699,19 +739,23 @@ export function ProfilePage() {
           <ul className="cx-friend-list">
             {friends.map((f) => (
               <li key={f.id} className="cx-friend-item">
-                <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                  {f.profileImageUrl ? (
-                    <img src={f.profileImageUrl} alt="" />
-                  ) : (
-                    friendInitial(f)
-                  )}
-                </Link>
+                <div className="cx-friend-avatar-wrap">
+                  <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
+                    {f.profileImageUrl ? (
+                      <img src={f.profileImageUrl} alt="" />
+                    ) : (
+                      friendInitial(f)
+                    )}
+                  </Link>
+                  {onlineUserIds.has(f.id) && <span className="cx-friend-online-dot" aria-hidden />}
+                </div>
                 <div className="cx-friend-meta">
                   <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
                     <strong>{friendName(f)}</strong>
                     <span>@{f.username ?? "user"}</span>
                   </Link>
                 </div>
+                <MessageButton userId={f.id} />
               </li>
             ))}
           </ul>

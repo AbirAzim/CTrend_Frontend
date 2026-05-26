@@ -14,7 +14,9 @@ import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { ME } from "../graphql/profile";
+import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { useAuth } from "../context/AuthContext";
+import { useMessenger } from "../context/MessengerContext";
 import type { FeedPostView } from "../types/feed";
 import { CampaignBanners } from "../components/CampaignBanners";
 
@@ -36,6 +38,36 @@ function friendInitial(f: FriendRow): string {
 
 const SIDE_PREVIEW_LIMIT = 3;
 
+function FriendMessageButton({ userId }: { userId: string }) {
+  const { openChat, ensureConversation } = useMessenger();
+  const [startDirect, { loading }] = useMutation(START_DIRECT_CONVERSATION);
+
+  async function handleMessage() {
+    try {
+      const { data } = await startDirect({ variables: { userId } });
+      const convo = data?.startDirectConversation;
+      if (convo) { ensureConversation(convo); openChat(convo.id); }
+    } catch { /* ignore — user can retry */ }
+  }
+
+  return (
+    <button
+      type="button"
+      className="cx-friend-msg-btn"
+      title="Send message"
+      disabled={loading}
+      onClick={() => void handleMessage()}
+      aria-label="Send message"
+    >
+      {loading ? <span style={{ fontSize: "0.7rem" }}>…</span> : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function rotateSlice<T>(items: T[], offset: number, limit: number): T[] {
   if (items.length <= limit) {
     return items;
@@ -50,6 +82,7 @@ function rotateSlice<T>(items: T[], offset: number, limit: number): T[] {
 export function FeedPage() {
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
   const { isAuthenticated } = useAuth();
+  const { onlineUserIds } = useMessenger();
   const client = useApolloClient();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
   const [friendError, setFriendError] = useState<string | null>(null);
@@ -367,19 +400,23 @@ export function FeedPage() {
         <ul className="cx-friend-list">
           {visibleFriends.map((f) => (
             <li key={f.id} className="cx-friend-item">
-              <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                {f.profileImageUrl ? (
-                  <img src={f.profileImageUrl} alt="" />
-                ) : (
-                  friendInitial(f)
-                )}
-              </Link>
+              <div className="cx-friend-avatar-wrap">
+                <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
+                  {f.profileImageUrl ? (
+                    <img src={f.profileImageUrl} alt="" />
+                  ) : (
+                    friendInitial(f)
+                  )}
+                </Link>
+                {onlineUserIds.has(f.id) && <span className="cx-friend-online-dot" aria-hidden />}
+              </div>
               <div className="cx-friend-meta">
                 <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
                   <strong>{friendName(f)}</strong>
                   <span>@{f.username ?? "user"}</span>
                 </Link>
               </div>
+              <FriendMessageButton userId={f.id} />
             </li>
           ))}
         </ul>
@@ -512,15 +549,21 @@ export function FeedPage() {
                       : requestedByMe
                   ).map((f) => (
                     <li key={`${activePeopleModal}-${f.id}`} className="cx-friend-item">
-                      <Link to={`/profile/${f.id}`} className="cx-friend-avatar" onClick={() => setActivePeopleModal(null)}>
-                        {f.profileImageUrl ? <img src={f.profileImageUrl} alt="" /> : friendInitial(f)}
-                      </Link>
+                      <div className="cx-friend-avatar-wrap">
+                        <Link to={`/profile/${f.id}`} className="cx-friend-avatar" onClick={() => setActivePeopleModal(null)}>
+                          {f.profileImageUrl ? <img src={f.profileImageUrl} alt="" /> : friendInitial(f)}
+                        </Link>
+                        {activePeopleModal === "friends" && onlineUserIds.has(f.id) && <span className="cx-friend-online-dot" aria-hidden />}
+                      </div>
                       <div className="cx-friend-meta">
                         <Link to={`/profile/${f.id}`} className="cx-friend-profile-link" onClick={() => setActivePeopleModal(null)}>
                           <strong>{friendName(f)}</strong>
                           <span>@{f.username ?? "user"}</span>
                         </Link>
                       </div>
+                      {activePeopleModal === "friends" ? (
+                        <FriendMessageButton userId={f.id} />
+                      ) : null}
                       {activePeopleModal === "suggestions" ? (
                         <button
                           type="button"
