@@ -23,6 +23,7 @@ function mapViewerVote(
 /** Maps a `PostGql`-shaped object from `feedPosts` or `getPostById` into `FeedPostView`. */
 export function mapGqlPostToFeedView(p: {
   id: string;
+  authorId?: string | null;
   authorUsername: string;
   authorDisplayName?: string | null;
   authorEmail?: string | null;
@@ -76,6 +77,7 @@ export function mapGqlPostToFeedView(p: {
     p.options?.map((o) => ({ label: o.label })) ?? null;
   return {
     id: p.id,
+    authorId: p.authorId ?? null,
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,
     authorEmail: p.authorEmail ?? null,

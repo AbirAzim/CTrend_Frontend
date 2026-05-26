@@ -74,6 +74,7 @@ export function ProfilePage() {
   const [extendDraftByPost, setExtendDraftByPost] = useState<Record<string, string>>(
     {},
   );
+  const [extendPresetByPost, setExtendPresetByPost] = useState<Record<string, string>>({});
   const [extendErrorByPost, setExtendErrorByPost] = useState<Record<string, string>>(
     {},
   );
@@ -614,31 +615,67 @@ export function ProfilePage() {
                           >
                             Edit post
                           </NavLink>
-                          <input
-                            type="datetime-local"
-                            className="ig-input cx-profile-drop-extend-input"
-                            value={extendDraftByPost[post.id] ?? ""}
-                            onChange={(e) =>
-                              setExtendDraftByPost((prev) => ({
-                                ...prev,
-                                [post.id]: e.target.value,
-                              }))
-                            }
-                            min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
-                          />
-                          <button
-                            type="button"
-                            className="btn-ghost"
-                            disabled={extendingVoting}
-                            onClick={() => void onExtendVoting(post.id, post.votingEndsAt)}
-                          >
-                            {extendingVoting ? "Updating..." : "Extend voting"}
-                          </button>
-                          {extendErrorByPost[post.id] ? (
-                            <small className="error" role="alert">
-                              {extendErrorByPost[post.id]}
-                            </small>
-                          ) : null}
+                          <div className="cx-extend-section">
+                            <p className="cx-extend-label">Extend voting deadline</p>
+                            <div className="cx-extend-presets">
+                              {(
+                                [
+                                  { label: "+12h", ms: 12 * 3_600_000 },
+                                  { label: "+1d",  ms: 24 * 3_600_000 },
+                                  { label: "+3d",  ms: 3 * 24 * 3_600_000 },
+                                  { label: "+1w",  ms: 7 * 24 * 3_600_000 },
+                                  { label: "Custom", ms: null },
+                                ] as { label: string; ms: number | null }[]
+                              ).map(({ label, ms }) => (
+                                <button
+                                  key={label}
+                                  type="button"
+                                  className={`cx-extend-chip${extendPresetByPost[post.id] === label ? " cx-extend-chip--active" : ""}`}
+                                  onClick={() => {
+                                    setExtendPresetByPost((prev) => ({ ...prev, [post.id]: label }));
+                                    if (ms !== null) {
+                                      setExtendDraftByPost((prev) => ({
+                                        ...prev,
+                                        [post.id]: toLocalDateTimeInputValue(new Date(Date.now() + ms)),
+                                      }));
+                                    } else {
+                                      setExtendDraftByPost((prev) => ({ ...prev, [post.id]: "" }));
+                                    }
+                                    setExtendErrorByPost((prev) => ({ ...prev, [post.id]: "" }));
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            {extendPresetByPost[post.id] === "Custom" && (
+                              <input
+                                type="datetime-local"
+                                className="cx-extend-date-input"
+                                value={extendDraftByPost[post.id] ?? ""}
+                                onChange={(e) =>
+                                  setExtendDraftByPost((prev) => ({
+                                    ...prev,
+                                    [post.id]: e.target.value,
+                                  }))
+                                }
+                                min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+                              />
+                            )}
+                            <button
+                              type="button"
+                              className="cx-extend-submit"
+                              disabled={extendingVoting || !extendDraftByPost[post.id]}
+                              onClick={() => void onExtendVoting(post.id, post.votingEndsAt)}
+                            >
+                              {extendingVoting ? "Updating…" : "Apply"}
+                            </button>
+                            {extendErrorByPost[post.id] ? (
+                              <small className="cx-extend-error" role="alert">
+                                {extendErrorByPost[post.id]}
+                              </small>
+                            ) : null}
+                          </div>
                         </div>
                       ) : null}
                     </div>
