@@ -14,6 +14,7 @@ import {
   IconShare,
 } from "./IgIcons";
 import {
+  DELETE_POST,
   FEED_POSTS,
   GET_POST_BY_ID,
   MY_SAVED_POSTS,
@@ -250,6 +251,26 @@ export function FeedPostCard({
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const votersModalCardRef = useRef<HTMLElement | null>(null);
   const [authorAvatarAttempt, setAuthorAvatarAttempt] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+
+  const isOwner = !!authUser && !!post.authorId && authUser.id === post.authorId;
+  const isAdmin = authUser?.role === "admin";
+  const canDelete = isOwner || isAdmin;
+
+  const [deletePostMut, { loading: deleting }] = useMutation(DELETE_POST, {
+    refetchQueries: [{ query: FEED_POSTS }],
+  });
+
+  async function handleDelete() {
+    try {
+      await deletePostMut({ variables: { postId: post.id } });
+      setDeleteConfirm(false);
+    } catch {
+      // error surfaced via Apollo
+    }
+  }
 
   const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
     useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, { fetchPolicy: "network-only" });
@@ -968,9 +989,57 @@ export function FeedPostCard({
             <span className="ig-post-meta">@{post.authorUsername}</span>
           </div>
         </div>
-        <button type="button" className="ig-more-btn" aria-label="More">
-          <IconMore />
-        </button>
+        <div className="ig-more-wrap" ref={moreRef}>
+          <button
+            type="button"
+            className="ig-more-btn"
+            aria-label="More"
+            onClick={() => setMoreOpen((v) => !v)}
+          >
+            <IconMore />
+          </button>
+          {moreOpen && (
+            <div className="ig-more-menu" role="menu">
+              {canDelete && !deleteConfirm && (
+                <button
+                  type="button"
+                  className="ig-more-item ig-more-item--danger"
+                  role="menuitem"
+                  onClick={() => { setMoreOpen(false); setDeleteConfirm(true); }}
+                >
+                  Delete post
+                </button>
+              )}
+              {!canDelete && (
+                <button type="button" className="ig-more-item" role="menuitem" onClick={() => setMoreOpen(false)}>
+                  Report
+                </button>
+              )}
+            </div>
+          )}
+          {deleteConfirm && (
+            <div className="ig-delete-confirm">
+              <p>Delete this post? This cannot be undone.</p>
+              <div className="ig-delete-confirm-actions">
+                <button
+                  type="button"
+                  className="btn-danger"
+                  disabled={deleting}
+                  onClick={() => void handleDelete()}
+                >
+                  {deleting ? "Deleting…" : "Yes, delete"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setDeleteConfirm(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </header>
 
       {compareUrls ? (

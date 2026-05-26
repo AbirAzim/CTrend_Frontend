@@ -4,6 +4,7 @@ export type PostStatus = "published" | "scheduled";
 
 export type FeedPostView = {
   id: string;
+  authorId?: string | null;
   authorUsername: string;
   authorDisplayName: string | null;
   authorEmail?: string | null;

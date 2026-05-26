@@ -5,6 +5,7 @@ export const FEED_POSTS = gql`
   query FeedPosts {
     feedPosts {
       id
+      authorId
       authorUsername
       authorDisplayName
       authorEmail
@@ -52,6 +53,7 @@ export const GET_POST_BY_ID = gql`
   query GetPostById($id: ID!) {
     getPostById(id: $id) {
       id
+      authorId
       authorUsername
       authorDisplayName
       authorEmail
@@ -136,6 +138,7 @@ export const MY_SAVED_POSTS = gql`
   query MySavedPosts {
     mySavedPosts {
       id
+      authorId
       authorUsername
       authorDisplayName
       authorEmail
@@ -278,6 +281,12 @@ export const POST_VOTE_UPDATED = gql`
         percentage
       }
     }
+  }
+`;
+
+export const DELETE_POST = gql`
+  mutation DeletePost($postId: ID!) {
+    deletePost(postId: $postId)
   }
 `;
 
