@@ -14,6 +14,7 @@ import {
   NEW_NOTIFICATION_SUB,
 } from "../graphql/notifications";
 import { useAuth } from "./AuthContext";
+import { playNotificationChime } from "../lib/notificationSound";
 
 export type NotificationItem = {
   id: string;
@@ -59,6 +60,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const n = data.data?.newNotification as NotificationItem | undefined;
       if (!n) return;
       setNotifications((prev) => [n, ...prev]);
+      // Play a chime for every new real-time notification
+      playNotificationChime();
     },
   });
 
