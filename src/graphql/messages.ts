@@ -30,6 +30,7 @@ export const GET_MESSAGES = gql`
       senderName
       senderAvatar
       text
+      imageUrl
       readBy {
         userId
         readAt
@@ -88,14 +89,15 @@ export const CREATE_GROUP_CONVERSATION = gql`
 `;
 
 export const SEND_MESSAGE = gql`
-  mutation SendMessage($conversationId: ID!, $text: String!) {
-    sendMessage(conversationId: $conversationId, text: $text) {
+  mutation SendMessage($conversationId: ID!, $text: String!, $imageUrl: String) {
+    sendMessage(conversationId: $conversationId, text: $text, imageUrl: $imageUrl) {
       id
       conversationId
       senderId
       senderName
       senderAvatar
       text
+      imageUrl
       readBy {
         userId
         readAt
@@ -126,6 +128,7 @@ export const MESSAGE_RECEIVED = gql`
       senderName
       senderAvatar
       text
+      imageUrl
       readBy {
         userId
         readAt
@@ -141,6 +144,16 @@ export const TYPING_INDICATOR_SUB = gql`
       conversationId
       userId
       isTyping
+    }
+  }
+`;
+
+export const MESSAGE_READ_SUB = gql`
+  subscription MessageRead {
+    messageRead {
+      conversationId
+      userId
+      readAt
     }
   }
 `;

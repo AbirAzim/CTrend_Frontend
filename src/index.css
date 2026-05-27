@@ -1471,7 +1471,7 @@ a.cx-friend-avatar:hover {
 }
 
 .ig-compare-cell:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.92;
 }
 
@@ -1686,15 +1686,16 @@ a.cx-friend-avatar:hover {
 }
 
 .cx-voting-badge--closed {
-  color: #4338ca;
-  background: linear-gradient(135deg, rgb(238 242 255 / 0.95), rgb(224 231 255 / 0.92));
-  border-color: rgb(129 140 248 / 0.42);
+  color: #92400e;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border-color: rgb(245 158 11 / 0.55);
+  box-shadow: 0 2px 8px rgb(245 158 11 / 0.2);
 }
 
 .cx-voting-result {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: rgb(var(--cx-ink-rgb) / 0.84);
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #92400e;
   line-height: 1.3;
   max-width: 100%;
   overflow: hidden;
@@ -1884,6 +1885,353 @@ a.cx-friend-avatar:hover {
 .cx-pulse-row--leader {
   border-color: rgb(var(--cx-accent-rgb) / 0.28);
   box-shadow: 0 8px 20px rgb(var(--cx-accent-rgb) / 0.14);
+}
+
+/* ── Voting ended / Final results ───────────────────────────────────── */
+
+/* Overlay strip that sits at the top of the compare media when closed */
+.ig-post-media-wrap--voting-closed {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Amber/gold announcement banner */
+@keyframes strip-slide-in {
+  from { transform: translateY(-110%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+@keyframes strip-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.cx-voting-ended-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(
+    105deg,
+    rgb(120 53 15 / 0.96) 0%,
+    rgb(180 83 9 / 0.96) 50%,
+    rgb(120 53 15 / 0.96) 100%
+  );
+  background-size: 200% auto;
+  animation: strip-slide-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+             strip-shimmer 3.5s linear 0.8s infinite;
+  border-bottom: 1px solid rgb(251 191 36 / 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.cx-voting-ended-strip-trophy {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgb(251 191 36 / 0.8));
+}
+
+.cx-voting-ended-strip-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fde68a;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.5);
+}
+
+.cx-voting-ended-strip-label {
+  background: rgb(251 191 36 / 0.25);
+  border: 1px solid rgb(251 191 36 / 0.5);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+}
+
+.cx-voting-ended-strip-sep {
+  opacity: 0.6;
+}
+
+.cx-voting-ended-strip-lock {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+/* ── Winner cell ────────────────────────────────────────────────────── */
+
+/* Winner cell shines forward */
+@keyframes winner-shine {
+  0%   { left: -120%; }
+  100% { left: 220%; }
+}
+
+@keyframes crown-pop {
+  0%   { transform: translateX(-50%) translateY(-12px) scale(0.6); opacity: 0; }
+  60%  { transform: translateX(-50%) translateY(2px) scale(1.12); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes crown-glow {
+  0%, 100% { text-shadow: 0 0 8px rgb(251 191 36 / 0.6); }
+  50%       { text-shadow: 0 0 18px rgb(251 191 36 / 1); }
+}
+
+/* Closed compare cell — cursor + slight dim for non-winners */
+.ig-compare-cell--closed {
+  cursor: not-allowed;
+}
+
+/* Loser: heavy grayscale + scrim */
+.ig-compare-cell--closed:not(.ig-compare-cell--winner) {
+  opacity: 0.48;
+  filter: grayscale(0.85) saturate(0.25);
+  transform: scale(0.99);
+}
+
+/* Dark scrim overlay on loser */
+.cx-loser-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+/* Winner cell — scales forward, golden glow */
+.ig-compare-cell--winner {
+  transform: scale(1.025) translateZ(0);
+  z-index: 2;
+  box-shadow:
+    inset 0 0 0 3px #f59e0b,
+    0 0 32px rgb(245 158 11 / 0.65),
+    0 8px 24px rgb(245 158 11 / 0.3);
+}
+
+/* Shimmer sweep across winner image */
+.ig-compare-cell--winner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgb(255 255 255 / 0.14) 50%,
+    transparent 75%
+  );
+  animation: winner-shine 2.8s ease-in-out 0.6s infinite;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Floating crown badge on winner image */
+.cx-winner-crown-badge {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px 4px 7px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+  box-shadow:
+    0 2px 14px rgb(245 158 11 / 0.6),
+    0 1px 3px rgb(0 0 0 / 0.4);
+  pointer-events: none;
+  animation: crown-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.cx-winner-crown-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+  animation: crown-glow 2s ease-in-out infinite;
+}
+
+/* ── Winner pct overlay ─────────────────────────────────────────────── */
+
+.ig-compare-pct--winner {
+  background: linear-gradient(
+    transparent,
+    rgb(120 53 15 / 0.92)
+  );
+}
+
+.ig-compare-pct--winner .ig-compare-pct-main {
+  font-size: 2.2rem;
+  color: #fde68a;
+  text-shadow: 0 2px 16px rgb(245 158 11 / 0.8);
+}
+
+.ig-compare-pct--winner .ig-compare-pct-sub {
+  color: #fef3c7;
+  font-weight: 800;
+}
+
+.ig-compare-pct--loser .ig-compare-pct-main {
+  opacity: 0.7;
+}
+
+/* ── Final Results pulse card ───────────────────────────────────────── */
+
+/* Pulse card final-state variant */
+.cx-pulse-card--final {
+  border-color: rgb(245 158 11 / 0.4);
+  box-shadow:
+    0 14px 32px rgb(var(--cx-accent-rgb) / 0.1),
+    inset 0 0 0 1px rgb(245 158 11 / 0.22);
+}
+
+.cx-pulse-card-title--final {
+  color: #d97706;
+  font-weight: 800;
+}
+
+/* Winner row in final results */
+.cx-pulse-row--final-winner {
+  background: linear-gradient(
+    135deg,
+    rgb(245 158 11 / 0.12),
+    rgb(251 191 36 / 0.06)
+  );
+  border-color: rgb(245 158 11 / 0.4);
+  border-left: 3px solid #f59e0b;
+}
+
+.cx-pulse-row--final-winner .cx-pulse-name {
+  color: #d97706;
+  font-weight: 800;
+}
+
+.cx-pulse-row--final-winner .cx-pulse-count {
+  color: #d97706;
+  font-weight: 800;
+}
+
+.cx-pulse-medal {
+  font-size: 0.9rem;
+}
+
+/* Loser row in final results */
+.cx-pulse-row--final-loser {
+  opacity: 0.72;
+  border-left: 3px solid rgb(148 163 184 / 0.4);
+}
+
+/* Winner fill bar is amber/gold */
+.cx-pulse-fill--winner {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24) !important;
+  box-shadow: 0 0 8px rgb(245 158 11 / 0.45);
+}
+
+/* ── Dark mode overrides ─────────────────────────────────────────────── */
+
+:root[data-theme="dark"] .cx-pulse-card-title--final {
+  color: #fbbf24;
+}
+
+:root[data-theme="dark"] .cx-pulse-card--final {
+  border-color: rgb(245 158 11 / 0.3);
+  box-shadow:
+    0 14px 30px rgb(0 0 0 / 0.35),
+    inset 0 0 0 1px rgb(245 158 11 / 0.18);
+}
+
+:root[data-theme="dark"] .cx-pulse-row--final-winner {
+  background: linear-gradient(
+    135deg,
+    rgb(245 158 11 / 0.18),
+    rgb(251 191 36 / 0.09)
+  );
+  border-color: rgb(245 158 11 / 0.45);
+}
+
+:root[data-theme="dark"] .cx-pulse-row--final-winner .cx-pulse-name,
+:root[data-theme="dark"] .cx-pulse-row--final-winner .cx-pulse-count {
+  color: #fbbf24;
+}
+
+/* ── Voting badge (closed) upgrade ──────────────────────────────────── */
+
+/* ── Tap-to-vote hint ───────────────────────────────────────────────── */
+
+@keyframes hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+
+.cx-tap-to-vote-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 16px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgb(var(--cx-accent-rgb));
+  background: rgb(var(--cx-accent-rgb) / 0.07);
+  border-bottom: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
+}
+
+.cx-tap-to-vote-hint--voted {
+  color: #059669;
+  background: rgb(5 150 105 / 0.07);
+  border-bottom-color: rgb(5 150 105 / 0.18);
+}
+
+.cx-tap-to-vote-icon {
+  font-size: 1rem;
+  line-height: 1;
+  animation: hint-bob 1.6s ease-in-out infinite;
+}
+
+.cx-tap-to-vote-hint--voted .cx-tap-to-vote-icon {
+  animation: none;
+}
+
+/* Pulsing glow on compare cells before a vote is cast */
+@keyframes vote-invite {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1.5px rgb(var(--cx-accent-rgb) / 0.25);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px rgb(var(--cx-accent-rgb) / 0.55),
+      0 0 18px rgb(var(--cx-accent-rgb) / 0.2);
+  }
+}
+
+.ig-compare-cell--unvoted {
+  animation: vote-invite 2.4s ease-in-out infinite;
+}
+
+/* Pause animation on hover so the scale effect is clean */
+.ig-compare-cell--unvoted:hover:not(:disabled) {
+  animation: none;
 }
 
 .cx-pulse-inline {
@@ -2325,6 +2673,34 @@ a.cx-friend-avatar:hover {
   background: #fff;
   padding-bottom: 8px;
   border-bottom: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Search input inside people modals */
+.cx-modal-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.22);
+  background: rgb(var(--cx-accent-rgb) / 0.06);
+  color: var(--cx-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.18s var(--cx-ease-out), box-shadow 0.18s var(--cx-ease-out);
+}
+
+.cx-modal-search-input:focus {
+  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+  box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.12);
+}
+
+.cx-modal-search-input::placeholder {
+  color: var(--ig-muted);
+  opacity: 1;
 }
 
 .cx-modal-close {
@@ -3958,13 +4334,15 @@ a.cx-action-chip {
 }
 
 :root[data-theme="dark"] .cx-voting-badge--closed {
-  color: #e7ecff;
-  background: linear-gradient(135deg, rgb(99 102 241 / 0.4), rgb(79 70 229 / 0.3));
-  border-color: rgb(165 180 252 / 0.62);
+  color: #fde68a;
+  background: linear-gradient(135deg, rgb(120 53 15 / 0.55), rgb(92 40 0 / 0.45));
+  border-color: rgb(245 158 11 / 0.5);
+  box-shadow: 0 2px 8px rgb(245 158 11 / 0.15);
 }
 
 :root[data-theme="dark"] .cx-voting-result {
-  color: #d8e2fb;
+  color: #fbbf24;
+  font-weight: 800;
 }
 
 :root[data-theme="dark"] .cx-post-copy {
@@ -4040,6 +4418,26 @@ a.cx-action-chip {
 :root[data-theme="dark"] .panel {
   background: rgb(15 23 42 / 0.88);
   border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .ig-modal-card .ig-post-comments-head {
+  background: rgb(15 23 42 / 0.88);
+  border-bottom-color: rgb(148 163 184 / 0.18);
+}
+
+:root[data-theme="dark"] .cx-modal-search-input {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(148 163 184 / 0.28);
+  color: #e6edff;
+}
+
+:root[data-theme="dark"] .cx-modal-search-input:focus {
+  border-color: rgb(165 180 252 / 0.55);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.18);
+}
+
+:root[data-theme="dark"] .cx-modal-search-input::placeholder {
+  color: #94a3b8;
 }
 
 :root[data-theme="dark"] .ig-topbar-logout {
@@ -7667,135 +8065,245 @@ a.cx-profile-btn-accent {
 /* ═══════════════════════════════════════════════════
    MESSENGER PANEL  (redesigned)
 ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   MESSENGER  — complete redesign
+   Panel, chat windows, bubbles, composer
+═══════════════════════════════════════════════════ */
+
+/* ── Shared animations ────────────────────────────────────────────── */
 @keyframes mp-slidein {
-  from { opacity: 0; transform: translateY(12px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
+@keyframes cw-bounce {
+  0%, 60%, 100% { transform: translateY(0);  }
+  30%           { transform: translateY(-5px); }
+}
+
+/* ── Root container ───────────────────────────────────────────────── */
 .mp-root {
   position: fixed;
   bottom: 72px;
-  right: 18px;
+  right: 16px;
   z-index: 900;
   display: flex;
-  flex-direction: row; /* windows LEFT → toggle button FAR RIGHT (Facebook style) */
+  flex-direction: row;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
   pointer-events: none;
 }
 .mp-root > * { pointer-events: auto; }
 
 .mp-windows {
   display: flex;
-  flex-direction: row-reverse; /* newest window appears closest to the toggle */
+  flex-direction: row-reverse;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 
-/* ── Toggle button ── */
+/* ── FAB toggle button ───────────────────────────────────────────── */
 .mp-panel-wrap { position: relative; }
 
 .mp-toggle-btn {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
+  background: linear-gradient(145deg, #6366f1 0%, #7c3aed 100%);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 24px rgb(var(--cx-accent-rgb) / 0.45), 0 2px 8px rgba(0,0,0,.12);
+  box-shadow:
+    0 8px 28px rgb(99 102 241 / 0.5),
+    0 2px 8px rgba(0,0,0,.15);
   position: relative;
-  transition: transform 0.18s cubic-bezier(.34,1.56,.64,1), box-shadow 0.18s ease;
+  transition:
+    transform 0.2s cubic-bezier(.34,1.56,.64,1),
+    box-shadow 0.2s ease;
   color: #fff;
 }
 .mp-toggle-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 8px 28px rgb(var(--cx-accent-rgb) / 0.55), 0 2px 8px rgba(0,0,0,.16);
+  box-shadow: 0 10px 32px rgb(99 102 241 / 0.6), 0 2px 8px rgba(0,0,0,.18);
 }
-.mp-toggle-btn:active { transform: scale(0.96); }
+.mp-toggle-btn:active { transform: scale(0.95); }
+.mp-toggle-btn--open {
+  background: linear-gradient(145deg, #7c3aed 0%, #4f46e5 100%);
+}
 
 .mp-badge {
   position: absolute;
-  top: -1px; right: -1px;
+  top: -2px; right: -2px;
   background: #f43f5e;
   color: #fff;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   padding: 2px 5px;
   border-radius: 999px;
   min-width: 18px;
   text-align: center;
   line-height: 1.5;
-  border: 2px solid var(--ig-bg, #fff);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
 }
 
-/* ── Conversation list panel ── */
+/* ── Conversation list panel ──────────────────────────────────────── */
 .mp-panel {
-  position: absolute;
-  bottom: 62px;
-  right: 0;
-  width: 300px;
+  position: fixed;
+  bottom: 136px; /* mp-root(72px) + FAB clearance(64px) */
+  right: 16px;   /* matches mp-root right offset */
+  width: 320px;
+  max-height: calc(100vh - 160px); /* never taller than the visible viewport */
+  display: flex;
+  flex-direction: column;
   background: var(--ig-surface, #fff);
-  border: 1px solid var(--ig-border, rgba(0,0,0,.08));
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow:
-    0 24px 60px rgba(0,0,0,.14),
-    0 6px 20px rgba(0,0,0,.08),
-    0 0 0 1px rgba(255,255,255,.6) inset;
+    0 28px 64px rgba(0,0,0,.18),
+    0 8px 24px rgba(0,0,0,.1),
+    0 0 0 1px rgba(0,0,0,.06);
   overflow: hidden;
-  animation: mp-slidein 0.22s cubic-bezier(.22,1,.36,1);
+  animation: mp-slidein 0.24s cubic-bezier(.22,1,.36,1);
 }
 [data-theme="dark"] .mp-panel {
-  background: #16213e;
-  border-color: rgba(255,255,255,.07);
-  box-shadow: 0 24px 60px rgba(0,0,0,.45), 0 6px 20px rgba(0,0,0,.3);
+  background: #0f172a;
+  box-shadow:
+    0 28px 64px rgba(0,0,0,.55),
+    0 8px 24px rgba(0,0,0,.35),
+    0 0 0 1px rgba(255,255,255,.06);
 }
 
+/* Panel header */
 .mp-panel-header {
-  padding: 14px 18px 12px;
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
+  padding: 16px 16px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border-bottom: 1px solid rgba(0,0,0,.06);
 }
+[data-theme="dark"] .mp-panel-header {
+  border-bottom-color: rgba(255,255,255,.07);
+}
+
 .mp-panel-title {
-  font-weight: 700;
-  font-size: 1rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--ig-text, #0f172a);
+  letter-spacing: -0.02em;
+}
+[data-theme="dark"] .mp-panel-title { color: #f1f5f9; }
+
+.mp-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-panel-unread-chip {
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
   color: #fff;
-  letter-spacing: -0.01em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
 }
 
-.mp-empty {
-  padding: 28px 18px;
-  text-align: center;
+.mp-panel-close-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,.06);
   color: var(--ig-muted);
-  font-size: 0.82rem;
-  line-height: 1.6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.mp-panel-close-btn:hover { background: rgba(0,0,0,.1); }
+[data-theme="dark"] .mp-panel-close-btn { background: rgba(255,255,255,.08); }
+[data-theme="dark"] .mp-panel-close-btn:hover { background: rgba(255,255,255,.14); }
+
+/* Search */
+.mp-search-wrap {
+  position: relative;
+  margin: 0 14px 10px;
 }
 
-.mp-list { list-style: none; margin: 0; padding: 6px 0; max-height: 340px; overflow-y: auto; }
+.mp-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ig-muted);
+  pointer-events: none;
+}
+
+.mp-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px 8px 34px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(0,0,0,.08);
+  background: rgba(0,0,0,.04);
+  color: var(--ig-text);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mp-search-input:focus {
+  border-color: rgba(99,102,241,.45);
+  background: rgba(99,102,241,.04);
+}
+.mp-search-input::placeholder { color: var(--ig-muted); }
+[data-theme="dark"] .mp-search-input {
+  border-color: rgba(255,255,255,.09);
+  background: rgba(255,255,255,.05);
+  color: #e2e8f0;
+}
+[data-theme="dark"] .mp-search-input:focus {
+  border-color: rgba(165,180,252,.45);
+  background: rgba(99,102,241,.1);
+}
+
+/* Conversation list */
+.mp-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 10px;
+  flex: 1;          /* fill remaining panel height */
+  overflow-y: auto; /* scroll if conversations overflow */
+  min-height: 0;    /* allow flex child to shrink below content size */
+}
 
 .mp-item {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   padding: 10px 16px;
   cursor: pointer;
-  transition: background 0.13s;
-  border-radius: 0;
+  transition: background 0.12s;
+  position: relative;
 }
-.mp-item:hover { background: rgb(var(--cx-accent-rgb) / 0.06); }
-.mp-item--unread .mp-item-name { font-weight: 700; }
+.mp-item:hover { background: rgba(99,102,241,.05); }
+.mp-item:active { background: rgba(99,102,241,.1); }
+.mp-item--active { background: rgba(99,102,241,.07); }
+[data-theme="dark"] .mp-item:hover { background: rgba(255,255,255,.04); }
+[data-theme="dark"] .mp-item--active { background: rgba(255,255,255,.07); }
+
+/* Avatar */
+.mp-item-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
 
 .mp-item-avatar {
-  position: relative;
-  width: 44px;
-  height: 44px;
+  width: 48px; height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
-  flex-shrink: 0;
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -7803,28 +8311,52 @@ a.cx-profile-btn-accent {
   font-weight: 700;
   font-size: 1.1rem;
   color: #fff;
+  flex-shrink: 0;
 }
 .mp-item-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .mp-online-dot {
   position: absolute;
-  bottom: 2px; right: 2px;
-  width: 11px; height: 11px;
+  bottom: 1px; right: 1px;
+  width: 13px; height: 13px;
   border-radius: 50%;
   background: #22c55e;
   border: 2.5px solid var(--ig-surface, #fff);
 }
+[data-theme="dark"] .mp-online-dot { border-color: #0f172a; }
 
+/* Meta */
 .mp-item-meta { flex: 1; min-width: 0; }
+
+.mp-item-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .mp-item-name {
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
-  color: var(--ig-text);
+  color: var(--ig-text, #0f172a);
+  flex: 1;
+  min-width: 0;
 }
+[data-theme="dark"] .mp-item-name { color: #f1f5f9; }
+
+.mp-item--unread .mp-item-name { font-weight: 800; }
+
+.mp-item-time {
+  font-size: 0.7rem;
+  color: var(--ig-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.mp-item--unread .mp-item-time { color: #6366f1; font-weight: 700; }
+
 .mp-item-last {
   font-size: 0.76rem;
   color: var(--ig-muted);
@@ -7834,79 +8366,95 @@ a.cx-profile-btn-accent {
   display: block;
   margin-top: 2px;
 }
+.mp-item--unread .mp-item-last {
+  color: var(--ig-text, #0f172a);
+  font-weight: 600;
+}
+[data-theme="dark"] .mp-item--unread .mp-item-last { color: #cbd5e1; }
 
 .mp-item-badge {
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   color: #fff;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   border-radius: 999px;
   padding: 2px 7px;
   min-width: 20px;
   text-align: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgb(99 102 241 / 0.4);
 }
 
-/* ═══════════════════════════════════════════════════
-   CHAT WINDOW  (redesigned)
-═══════════════════════════════════════════════════ */
+.mp-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--ig-muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+/* ── Chat Window ──────────────────────────────────────────────────── */
 .cw-window {
-  width: 328px;
-  height: 440px;
+  width: 340px;
+  height: 490px;
   background: var(--ig-surface, #fff);
-  border-radius: 12px 12px 0 0;
+  border-radius: 18px 18px 0 0;
   box-shadow:
-    0 24px 60px rgba(0,0,0,.16),
+    0 28px 64px rgba(0,0,0,.18),
     0 6px 20px rgba(0,0,0,.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: mp-slidein 0.22s cubic-bezier(.22,1,.36,1);
+  animation: mp-slidein 0.24s cubic-bezier(.22,1,.36,1);
 }
 [data-theme="dark"] .cw-window {
-  background: #16213e;
-  box-shadow: 0 24px 60px rgba(0,0,0,.5), 0 6px 20px rgba(0,0,0,.3);
+  background: #0f172a;
+  box-shadow: 0 28px 64px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.35);
+}
+.cw-window--min {
+  height: auto;
+  border-radius: 18px;
 }
 
-.cw-window--min { height: auto; max-height: 52px; }
-
-/* ── Chat header ── */
+/* Header */
 .cw-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
+  padding: 11px 12px 11px 14px;
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
-  transition: filter 0.15s;
 }
-.cw-header:hover { filter: brightness(1.06); }
+
+.cw-header-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
 
 .cw-header-avatar {
-  position: relative;
-  width: 36px; height: 36px;
+  width: 38px; height: 38px;
   border-radius: 50%;
-  background: rgba(255,255,255,.25);
+  background: rgba(255,255,255,.2);
   overflow: hidden;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 1rem;
   color: #fff;
-  border: 2px solid rgba(255,255,255,.35);
+  border: 2px solid rgba(255,255,255,.3);
 }
 .cw-header-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .cw-online-dot {
   position: absolute;
-  bottom: 0; right: 0;
-  width: 10px; height: 10px;
+  bottom: 1px; right: 1px;
+  width: 11px; height: 11px;
   border-radius: 50%;
-  background: #22c55e;
-  border: 2.5px solid rgb(var(--cx-accent-rgb));
+  background: #4ade80;
+  border: 2px solid #6366f1;
 }
 
 .cw-header-meta { flex: 1; min-width: 0; }
@@ -7920,63 +8468,105 @@ a.cx-profile-btn-accent {
   color: #fff;
 }
 .cw-header-status {
-  font-size: 0.7rem;
-  color: rgba(255,255,255,.75);
+  font-size: 0.68rem;
+  color: rgba(255,255,255,.65);
+  display: block;
+  margin-top: 1px;
+}
+.cw-header-status--online {
+  color: #a7f3d0;
 }
 
-.cw-close-btn {
-  background: rgba(255,255,255,.15);
-  border: none;
-  cursor: pointer;
-  width: 26px; height: 26px;
+.cw-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cw-header-btn {
+  width: 28px; height: 28px;
   border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.15);
+  color: rgba(255,255,255,.9);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255,255,255,.9);
-  font-size: 0.75rem;
-  flex-shrink: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.12s;
 }
-.cw-close-btn:hover { background: rgba(255,255,255,.28); }
+.cw-header-btn:hover { background: rgba(255,255,255,.28); transform: scale(1.08); }
+.cw-header-btn--close:hover { background: rgba(244,63,94,.55); }
 
-/* ── Message body ── */
+/* Body */
 .cw-body {
   flex: 1;
-  min-height: 0; /* required: prevents flex child from overflowing fixed-height parent */
+  min-height: 0;
   overflow-y: auto;
-  padding: 12px 12px 8px;
+  padding: 14px 14px 6px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   scroll-behavior: smooth;
   background: var(--ig-surface, #fff);
 }
-[data-theme="dark"] .cw-body { background: #16213e; }
+[data-theme="dark"] .cw-body { background: #0f172a; }
 
-.cw-loading { text-align: center; font-size: 0.73rem; color: var(--ig-muted); margin: 4px 0; }
+/* Scrollbar */
+.cw-body::-webkit-scrollbar { width: 4px; }
+.cw-body::-webkit-scrollbar-track { background: transparent; }
+.cw-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.1); border-radius: 2px; }
+[data-theme="dark"] .cw-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); }
+
+.cw-loading {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+.cw-loading-dots {
+  display: flex;
+  gap: 4px;
+}
+.cw-loading-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(99,102,241,.4);
+  animation: cw-bounce 1.2s infinite;
+}
+.cw-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.cw-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
 .cw-no-more {
   text-align: center;
   font-size: 0.7rem;
   color: var(--ig-muted);
-  margin: 4px 0;
-  padding: 4px 10px;
-  background: rgb(var(--cx-accent-rgb) / 0.06);
+  margin: 4px auto 8px;
+  padding: 3px 12px;
+  background: rgba(0,0,0,.05);
   border-radius: 999px;
   align-self: center;
 }
+[data-theme="dark"] .cw-no-more { background: rgba(255,255,255,.06); }
 
+/* Messages */
 .cw-msg {
   display: flex;
   align-items: flex-end;
-  gap: 7px;
+  gap: 6px;
+  margin-bottom: 1px;
 }
 .cw-msg--mine { flex-direction: row-reverse; }
 
+/* Tighten grouped messages */
+.cw-msg--grouped { margin-bottom: 0; }
+.cw-msg--group-end { margin-bottom: 6px; }
+
+/* Avatar */
 .cw-msg-avatar {
-  width: 26px; height: 26px;
+  width: 28px; height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
@@ -7988,65 +8578,125 @@ a.cx-profile-btn-accent {
 }
 .cw-msg-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-.cw-msg-content { display: flex; flex-direction: column; max-width: 76%; }
+/* Hidden placeholder to keep layout consistent in grouped messages */
+.cw-msg-avatar--hidden {
+  visibility: hidden;
+}
+
+/* Content wrapper */
+.cw-msg-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 72%;
+}
 .cw-msg--mine .cw-msg-content { align-items: flex-end; }
 
+/* Bubble */
 .cw-bubble {
-  padding: 8px 13px;
-  border-radius: 20px;
+  padding: 9px 14px;
+  border-radius: 18px;
   font-size: 0.84rem;
-  line-height: 1.48;
+  line-height: 1.5;
   word-break: break-word;
-  background: rgb(var(--cx-accent-rgb) / 0.09);
-  color: var(--ig-text);
-  border-bottom-left-radius: 5px;
+  position: relative;
+  cursor: default;
 }
-.cw-msg--mine .cw-bubble {
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
+
+/* Theirs */
+.cw-bubble--theirs {
+  background: rgba(0,0,0,.06);
+  color: var(--ig-text, #0f172a);
+  border-bottom-left-radius: 4px;
+}
+[data-theme="dark"] .cw-bubble--theirs {
+  background: rgba(255,255,255,.09);
+  color: #e2e8f0;
+}
+
+/* Mine */
+.cw-bubble--mine {
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   color: #fff;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 5px;
-  box-shadow: 0 2px 8px rgb(var(--cx-accent-rgb) / 0.3);
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 10px rgb(99 102 241 / 0.35);
 }
 
-.cw-seen { font-size: 0.65rem; color: var(--ig-muted); margin-top: 3px; }
+/* Grouped: remove the sharp corner on non-first messages */
+.cw-msg--grouped .cw-bubble--theirs { border-bottom-left-radius: 18px; }
+.cw-msg--grouped .cw-bubble--mine   { border-bottom-right-radius: 18px; }
 
-.cw-typing-indicator {
+/* Timestamp inside bubble — appears on hover */
+.cw-bubble-time {
+  display: none;
+  font-size: 0.6rem;
+  opacity: 0.65;
+  margin-left: 8px;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.cw-bubble:hover .cw-bubble-time { display: inline; }
+
+/* Seen */
+.cw-seen {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 2px;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--ig-muted);
+  margin-top: 3px;
 }
-.cw-typing-dots {
-  display: flex;
-  gap: 3px;
-  background: rgb(var(--cx-accent-rgb) / 0.09);
-  padding: 9px 13px;
-  border-radius: 20px;
-  border-bottom-left-radius: 5px;
-}
-.cw-typing-dots span {
-  width: 6px; height: 6px;
+.cw-seen-avatar {
+  width: 14px; height: 14px;
   border-radius: 50%;
-  background: rgb(var(--cx-accent-rgb) / 0.6);
-  animation: cw-bounce 1.2s infinite;
+  object-fit: cover;
 }
-.cw-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.cw-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes cw-bounce {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-5px); }
+.cw-seen-initial {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* ── Emoji picker ── */
+/* Typing bubble */
+.cw-typing-bubble {
+  display: flex;
+  gap: 4px;
+  background: rgba(0,0,0,.06);
+  padding: 10px 14px;
+  border-radius: 18px;
+  border-bottom-left-radius: 4px;
+  align-items: center;
+}
+[data-theme="dark"] .cw-typing-bubble { background: rgba(255,255,255,.09); }
+
+.cw-typing-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: rgba(99,102,241,.55);
+  animation: cw-bounce 1.2s infinite;
+}
+.cw-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.cw-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── Emoji picker ─────────────────────────────────────────────────── */
 .msg-emoji-picker {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--ig-border);
+  padding: 8px 12px;
+  border-top: 1px solid var(--ig-border, rgba(0,0,0,.07));
   background: var(--ig-surface, #fff);
 }
+[data-theme="dark"] .msg-emoji-picker {
+  background: #0f172a;
+  border-top-color: rgba(255,255,255,.07);
+}
+
 .msg-emoji-btn {
   background: none;
   border: none;
@@ -8057,905 +8707,308 @@ a.cx-profile-btn-accent {
   line-height: 1;
   transition: background 0.1s, transform 0.1s;
 }
-.msg-emoji-btn:hover { background: rgb(var(--cx-accent-rgb) / 0.08); transform: scale(1.15); }
+.msg-emoji-btn:hover { background: rgba(99,102,241,.1); transform: scale(1.18); }
 
-/* ── Footer / composer ── */
+/* ── Composer / footer ────────────────────────────────────────────── */
 .cw-footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px 10px;
+  padding: 10px 12px 12px;
   background: var(--ig-surface, #fff);
-  border-top: 1px solid var(--ig-border);
+  border-top: 1px solid rgba(0,0,0,.06);
   flex-shrink: 0;
 }
-[data-theme="dark"] .cw-footer { background: #16213e; }
+[data-theme="dark"] .cw-footer {
+  background: #0f172a;
+  border-top-color: rgba(255,255,255,.07);
+}
 
 .cw-emoji-toggle {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.2rem;
-  padding: 4px;
+  font-size: 1.22rem;
+  width: 34px; height: 34px;
   border-radius: 50%;
   flex-shrink: 0;
-  line-height: 1;
-  transition: background 0.1s, transform 0.12s;
-  color: var(--ig-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, transform 0.12s;
 }
-.cw-emoji-toggle:hover { background: rgb(var(--cx-accent-rgb) / 0.08); transform: scale(1.1); }
+.cw-emoji-toggle:hover { background: rgba(99,102,241,.1); transform: scale(1.1); }
+.cw-emoji-toggle--active { background: rgba(99,102,241,.12); }
+
+.cw-input-wrap {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0,0,0,.05);
+  border: 1.5px solid rgba(0,0,0,.08);
+  border-radius: 22px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cw-input-wrap:focus-within {
+  border-color: rgba(99,102,241,.45);
+  background: rgba(99,102,241,.04);
+}
+[data-theme="dark"] .cw-input-wrap {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.09);
+}
+[data-theme="dark"] .cw-input-wrap:focus-within {
+  border-color: rgba(165,180,252,.45);
+  background: rgba(99,102,241,.1);
+}
 
 .cw-input {
-  flex: 1;
-  border: 1.5px solid var(--ig-border);
+  width: 100%;
+  border: none;
+  background: transparent;
   border-radius: 22px;
-  padding: 7px 14px;
-  font-size: 0.83rem;
+  padding: 8px 14px;
+  font-size: 0.84rem;
   resize: none;
   outline: none;
   line-height: 1.45;
-  background: rgb(var(--cx-accent-rgb) / 0.04);
   color: var(--ig-text);
-  max-height: 80px;
+  max-height: 88px;
   overflow-y: auto;
   font-family: inherit;
-  transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box;
+  display: block;
 }
-.cw-input:focus {
-  border-color: rgb(var(--cx-accent-rgb) / 0.55);
-  background: rgb(var(--cx-accent-rgb) / 0.02);
-}
-[data-theme="dark"] .cw-input { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); }
-[data-theme="dark"] .cw-input:focus { border-color: rgb(var(--cx-accent-rgb) / 0.6); }
+[data-theme="dark"] .cw-input { color: #e2e8f0; }
+.cw-input::placeholder { color: var(--ig-muted); }
 
 .cw-send-btn {
-  background: linear-gradient(135deg, rgb(var(--cx-accent-rgb)) 0%, #7c3aed 100%);
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  width: 34px; height: 34px;
+  width: 36px; height: 36px;
   border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,.07);
+  color: var(--ig-muted);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 10px rgb(var(--cx-accent-rgb) / 0.4);
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s cubic-bezier(.34,1.56,.64,1),
+    box-shadow 0.18s ease;
 }
-.cw-send-btn:not(:disabled):hover { transform: scale(1.1); }
-.cw-send-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
-.cw-send-btn:not(:disabled):hover { opacity: 0.85; }
-
-
-/* ═══════════════════════════════════════════════════════════════════
-   MOBILE — iPhone Safari & Android Chrome
-   Covers everything from the topbar to the messenger, all pages.
-═══════════════════════════════════════════════════════════════════ */
-
-/* ─── 0. No horizontal page scroll, ever ─────────────────────────── */
-/* NOTE: overflow-x: hidden on <body> breaks position:sticky + iOS scroll.
-   Instead we fix individual overflowing containers below. */
-
-/* ─── 1. Global touch hygiene ────────────────────────────────────── */
-/* Eliminate 300 ms tap delay on every interactive element */
-a, button, label, [role="button"], [role="tab"], [role="menuitem"],
-[role="option"], summary,
-.ig-nav-item, .cx-action-chip, .ig-compare-cell,
-.ig-vote-btn, .ig-more-btn, .btn-primary, .btn-ghost, .btn-danger,
-.cx-profile-btn-primary, .cx-profile-btn-accent,
-.inv-filter-chip, .admin-tab, .wc-admin-chip,
-.cx-details-toggle, .cx-see-voters-btn,
-.mp-toggle-btn, .mp-item, .cw-header,
-.ig-topbar-cta, .ig-topbar-logout, .ig-icon-btn {
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
+.cw-send-btn--active {
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgb(99 102 241 / 0.5);
+  transform: scale(1.05);
 }
+.cw-send-btn--active:hover { transform: scale(1.12); }
+.cw-send-btn--active:active { transform: scale(0.95); }
+[data-theme="dark"] .cw-send-btn { background: rgba(255,255,255,.08); color: #94a3b8; }
 
-/* Smooth momentum scroll on every scrollable container */
-.ig-post-comments-list,
-.ig-voter-list-scroll,
-.cx-modal-list-scroll,
-.cx-feed-keeps-bar,
-.ig-stories-track,
-.cx-action-rail,
-.mp-list,
-.cw-body,
-.cw-body .cw-scroll,
-.admin-table-wrap,
-.nb-list,
-.inv-filter-bar,
-.cx-side-panel {
-  -webkit-overflow-scrolling: touch;
+/* ── Image attach button ──────────────────────────────────────────── */
+.cw-img-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
 }
+.cw-img-btn:hover { background: rgba(99,102,241,.1); color: #6366f1; }
+.cw-img-btn:active { transform: scale(0.9); }
+.cw-img-btn--active { color: #6366f1; }
+.cw-img-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+[data-theme="dark"] .cw-img-btn { color: #64748b; }
+[data-theme="dark"] .cw-img-btn:hover { background: rgba(99,102,241,.18); color: #818cf8; }
 
-/* ─── 2. Prevent iOS keyboard zoom on inputs ─────────────────────── */
-/* iOS auto-zooms the viewport when a focused input has font-size < 16px.
-   We override only on narrow viewports so desktop type sizes are unchanged. */
-@media (max-width: 767px) {
-  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-  textarea,
-  select {
-    font-size: max(16px, 1em) !important;
-  }
-  /* OTP digit boxes keep their visual size via width/height, not font */
-  .otp-digit {
-    font-size: 1.4rem !important;
-  }
+/* ── Pending image preview bar ──────────────────────────────────── */
+.cw-img-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(99,102,241,.05);
+  border-top: 1px solid rgba(99,102,241,.12);
+  animation: mp-slidein 0.18s ease;
 }
-
-/* ─── 3. iPhone safe-area insets (notch / Dynamic Island / home bar) ─ */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  /* Page-level app wrapper: add bottom room for home indicator */
-  .ig-app {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom));
-  }
-
-  /* Bottom nav clears the home indicator */
-  .ig-bottom-nav {
-    bottom: max(14px, calc(env(safe-area-inset-bottom) + 8px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    height: calc(62px + env(safe-area-inset-bottom, 0px));
-  }
-
-  /* Topbar stays below the status bar / camera cutout */
-  .ig-topbar {
-    top: max(8px, calc(env(safe-area-inset-top) + 4px));
-  }
-
-  /* Auth pages: top padding so they aren't hidden under the notch */
-  .auth-page {
-    padding-top: max(1.5rem, env(safe-area-inset-top));
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
-  }
-
-  /* Floating messenger button above home bar */
-  .mp-root {
-    bottom: calc(72px + env(safe-area-inset-bottom));
-  }
-
-  /* Modals: bottom padding so actions aren't hidden by home bar */
-  .ig-modal-card,
-  .admin-modal {
-    padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
-  }
+[data-theme="dark"] .cw-img-preview-bar {
+  background: rgba(99,102,241,.1);
+  border-top-color: rgba(99,102,241,.2);
 }
+.cw-img-preview-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.cw-img-preview-thumb {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid rgba(99,102,241,.3);
+  display: block;
+}
+.cw-img-preview-spinner {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cw-img-preview-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cw-img-preview-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ig-text, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cw-img-preview-size {
+  font-size: 0.72rem;
+  color: var(--ig-muted, #64748b);
+}
+.cw-img-preview-error {
+  font-size: 0.72rem;
+  color: #ef4444;
+  font-weight: 500;
+}
+[data-theme="dark"] .cw-img-preview-name { color: #e2e8f0; }
+.cw-img-preview-remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239,68,68,.12);
+  color: #ef4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s;
+}
+.cw-img-preview-remove:hover { background: rgba(239,68,68,.22); transform: scale(1.1); }
+.cw-img-preview-remove:active { transform: scale(0.9); }
 
-/* ─── 4. Topbar — compact on phones ─────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-topbar {
-    width: calc(100% - 24px);
-    max-width: none;
-    padding: 8px 10px;
-    min-height: 50px;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-
-  .ig-logo {
-    font-size: 1.15rem;
-    gap: 5px;
-  }
-
-  .ig-logo-img {
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-  }
-
-  /* Hide the decorative tagline ("Compare · vote · vibe") on phones */
-  .ig-brand-tag {
-    display: none;
-  }
-
-  .ig-topbar-actions {
-    gap: 4px;
-    flex-wrap: nowrap;
-  }
-
-  .ig-theme-toggle,
-  .ig-topbar-logout {
-    width: 34px;
-    height: 34px;
-    flex-shrink: 0;
-  }
-
-  /* Admin badge: shrink to icon-only on very small phones */
-  .ig-topbar-admin .ig-topbar-cta-label {
-    max-width: 54px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* "New compare" button: remove glyph spacing so it's compact */
-  .ig-topbar-cta {
-    padding: 6px 10px;
-    font-size: 0.72rem;
-    gap: 4px;
-  }
+/* ── Upload spinner ───────────────────────────────────────────────── */
+@keyframes cw-spin {
+  to { transform: rotate(360deg); }
+}
+.cw-upload-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cw-spin 0.7s linear infinite;
+}
+.cw-upload-spinner--sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
 }
 
-/* Below 400px: hide "New compare" label, show only the ✦ glyph */
-@media (max-width: 399px) {
-  .ig-topbar-cta-label {
-    display: none;
-  }
+/* ── Image bubble ─────────────────────────────────────────────────── */
+.cw-bubble--img {
+  padding: 5px 5px 6px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
-
-/* ─── 5. Bottom nav ──────────────────────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-bottom-nav {
-    width: calc(100% - 24px);
-    max-width: none;
-    padding: 0 8px;
-  }
-
-  /* Minimum 44 × 44 px touch targets (Apple HIG) */
-  .ig-nav-item {
-    width: 46px;
-    height: 46px;
-  }
-
-  .ig-nav-item--fab {
-    width: 50px;
-    height: 50px;
-  }
+.cw-bubble-img-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-
-/* ─── 6. Feed & post cards ───────────────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-app {
-    max-width: 100%;
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  /* Clip any content wider than the viewport.
-     Applied on ig-main-scroll (not body/html) so position:sticky on the
-     topbar still works, and iOS vertical scroll is unaffected. */
-  .ig-main-scroll {
-    overflow-x: hidden;
-  }
-
-  .ig-feed {
-    padding: 0 0 12px;
-    gap: 8px;
-  }
-
-  /* Post card: remove side margin so it bleeds edge-to-edge */
-  .ig-post {
-    border-radius: 14px;
-    margin: 0 8px 10px;
-  }
-
-  /* Hover zoom disabled on touch devices */
-  .ig-post:hover .ig-post-media {
-    transform: none;
-  }
-
-  /* Compare cells: larger tap area overlay */
-  .ig-compare-cell {
-    -webkit-user-select: none;
-    user-select: none;
-  }
-
-  /* Percentage overlay: larger text on mobile */
-  .ig-compare-pct-main {
-    font-size: 1.4rem;
-  }
-
-  /* Action rail: always scrolls horizontally, fits on 360px screens */
-  .cx-action-rail {
-    gap: 4px;
-    padding: 8px 10px;
-  }
-
-  .cx-action-chip {
-    padding: 8px 10px;
-    min-height: 40px;
-    flex-shrink: 0;
-  }
-
-  .cx-action-chip-label {
-    font-size: 0.67rem;
-    white-space: nowrap;
-  }
-
-  /* Pulse / live split card */
-  .cx-pulse-card {
-    padding: 10px 12px;
-  }
-
-  /* Post footer */
-  .cx-post-footer {
-    padding: 10px 10px 10px;
-    gap: 8px;
-  }
-
-  /* Comment section */
-  .ig-post-comments {
-    margin: 0 8px 8px;
-    padding: 10px 10px 10px;
-  }
-
-  /* Comment input: full-width, taller for thumbs */
-  .ig-post-comments-input {
-    min-height: 48px;
-  }
-
-  /* Submit button: wide for easy tapping */
-  .ig-post-comments-submit {
-    min-height: 40px;
-    padding: 8px 16px;
-  }
+.cw-bubble-img {
+  max-width: 220px;
+  max-height: 280px;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  display: block;
+  cursor: pointer;
+  object-fit: cover;
+  transition: filter 0.15s, transform 0.15s;
+  box-shadow: 0 3px 12px rgba(0,0,0,.18);
 }
-
-/* ─── 7. Modals — bottom sheet on mobile ────────────────────────── */
-@media (max-width: 767px) {
-  .ig-modal-overlay,
-  .admin-modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .ig-modal-card {
-    width: 100%;
-    max-width: 100%;
-    max-height: 88dvh;
-    border-radius: 20px 20px 0 0;
-    padding: 20px 16px 24px;
-    /* drag handle visual cue */
-    position: relative;
-  }
-
-  /* Drag-handle nub */
-  .ig-modal-card::before {
-    content: "";
-    display: block;
-    width: 40px;
-    height: 4px;
-    background: rgb(var(--cx-ink-rgb) / 0.15);
-    border-radius: 2px;
-    margin: -8px auto 12px;
-  }
-
-  .admin-modal {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 20px 20px 0 0;
-    padding: 20px 16px 24px;
-  }
-
-  /* Voter list modal: taller scroll area */
-  .ig-voter-list-scroll {
-    max-height: 55dvh;
-  }
-
-  /* People list modal */
-  .cx-modal-list-scroll {
-    max-height: 65dvh;
-  }
+.cw-bubble-img:hover {
+  filter: brightness(0.92);
+  transform: scale(1.02);
 }
-
-/* ─── 8. Auth pages (Login / Signup / Forgot-password / etc.) ────── */
-@media (max-width: 767px) {
-  .auth-page {
-    align-items: flex-start;
-    padding: 1.5rem 1rem 2rem;
-  }
-
-  .auth-card {
-    max-width: 100%;
-    padding: 1.5rem 1.25rem;
-    border-radius: 1rem;
-    /* Remove backdrop blur on low-end mobile GPUs */
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgb(255 255 255 / 0.97);
-  }
-
-  .auth-card h1 {
-    font-size: 1.3rem;
-  }
-
-  /* OTP input row — ensure digits don't overflow 360px screens */
-  .otp-field {
-    gap: 6px;
-  }
-
-  .otp-digit {
-    width: clamp(36px, 11vw, 52px);
-    height: clamp(44px, 12vw, 60px);
-  }
+.cw-bubble-caption {
+  margin: 0;
+  padding: 4px 8px 2px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ig-text, #1e293b);
+  word-break: break-word;
 }
+[data-theme="dark"] .cw-bubble-caption { color: #e2e8f0; }
 
-/* Dark-mode auth card on mobile */
-:root[data-theme="dark"] .auth-card {
-  background: var(--ig-card, #111a2e);
+/* Align image bubbles the same as text bubbles */
+.cw-msg--mine .cw-bubble--img .cw-bubble-img { margin-left: auto; }
+.cw-msg--mine .cw-bubble--img .cw-bubble-caption { text-align: right; }
+
+/* ── Lightbox ─────────────────────────────────────────────────────── */
+@keyframes cw-lb-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-
-/* ─── 9. Create-post page ────────────────────────────────────────── */
-@media (max-width: 767px) {
-  /* The create-post DateTimePicker calendar popup */
-  .dtp-popup {
-    position: fixed !important;
-    left: 50% !important;
-    top: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    bottom: auto !important;
-    right: auto !important;
-    width: calc(100vw - 32px);
-    max-width: 360px;
-    z-index: 1100;
-  }
-
-  /* Image compare slots: keep them a good size */
-  .create-post-compare-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
+.cw-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: cw-lb-in 0.18s ease;
+  cursor: zoom-out;
 }
-
-/* ─── 10. Profile page ────────────────────────────────────────────── */
-@media (max-width: 767px) {
-  /* Your drops grid: single column on mobile so each card has enough room.
-     !important beats the min-width:400px breakpoint that sets 2 columns. */
-  .cx-profile-grid--rich {
-    grid-template-columns: 1fr !important;
-    gap: 12px;
-  }
-
-  /* Thumbnail strip inside each drop card */
-  .cx-profile-drop-link {
-    width: 110px;
-  }
-
-  .cx-profile-drop-media-grid {
-    padding: 8px 6px 8px 8px;
-  }
-
-  /* Title can go to 3 lines on a single-column card */
-  .cx-profile-drop-title {
-    -webkit-line-clamp: 3;
-  }
-
-  /* Extend chips: wrap onto multiple lines — no horizontal scroll */
-  .cx-extend-presets {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  .cx-extend-chip {
-    flex-shrink: 0;
-  }
-
-  .cx-profile-hero {
-    padding: 18px 12px 14px;
-    border-radius: 14px;
-  }
-
-  /* Avatar: slightly smaller on phones */
-  .cx-profile-avatar {
-    width: 70px;
-    height: 70px;
-  }
-
-  .cx-profile-title {
-    font-size: 1.2rem;
-  }
-
-  /* Stats row: wrap on small screens */
-  .cx-profile-stats-row {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .cx-profile-stat {
-    min-width: 56px;
-  }
-
-  /* Action buttons: full-width stack */
-  .cx-profile-actions {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .cx-profile-btn-primary,
-  .cx-profile-btn-accent {
-    width: 100%;
-    text-align: center;
-    justify-content: center;
-  }
-
-  /* Profile grid: 3-col on 380+, 2-col on smaller */
-  .cx-profile-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  /* Post grid hover effect: remove on touch */
-  .cx-profile-grid-cell:hover {
-    transform: none;
-  }
-
-  /* Keeps bar: ensure horizontal scroll works */
-  .cx-feed-keeps-bar {
-    -webkit-overflow-scrolling: touch;
-  }
+.cw-lightbox-img {
+  max-width: min(90vw, 900px);
+  max-height: 90vh;
+  border-radius: 12px;
+  object-fit: contain;
+  cursor: default;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6);
 }
-
-@media (min-width: 380px) and (max-width: 767px) {
-  .cx-profile-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.cw-lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
 }
+.cw-lightbox-close:hover { background: rgba(255,255,255,.28); }
 
-/* ─── 11. Friends page ────────────────────────────────────────────── */
-@media (max-width: 767px) {
-  .cx-friends-page {
-    padding: 12px 12px 80px;
-  }
-
-  /* Friend-request accept/reject buttons: larger tap area */
-  .cx-friend-actions .btn-ghost {
-    min-height: 36px;
-    padding: 6px 12px;
-  }
-}
-
-/* ─── 12. User-profile page (profile/:userId) ─────────────────────── */
-@media (max-width: 767px) {
-  .up-root {
-    padding-bottom: 80px;
-  }
-
-  .up-friend-actions {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .up-friend-actions button {
-    min-height: 40px;
-  }
-}
-
-/* ─── 13. Admin page ─────────────────────────────────────────────── */
-@media (max-width: 767px) {
-  .admin-page {
-    padding: 16px 10px 88px;
-    max-width: 100%;
-  }
-
-  /* Tabs: wrap onto multiple rows — no horizontal scroll */
-  .admin-tabs {
-    gap: 4px;
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  .admin-tab {
-    white-space: nowrap;
-    flex-shrink: 0;
-    padding: 8px 12px;
-    font-size: 0.78rem;
-  }
-
-  /* Table wrapper already has overflow-x: auto; ensure smooth scroll */
-  .admin-table-wrap {
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Tighter cells on phones */
-  .admin-table th,
-  .admin-table td {
-    padding: 8px 10px;
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  /* Action buttons in admin table: stack vertically */
-  .admin-action-btns {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .admin-action-btns .btn-ghost,
-  .admin-action-btns a.btn-ghost {
-    min-height: 34px;
-    font-size: 0.72rem;
-    padding: 4px 10px;
-    white-space: nowrap;
-  }
-
-  /* Section head: wrap title + button on narrow screens */
-  .admin-section-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  /* Search bar: full width */
-  .admin-search {
-    font-size: 16px !important; /* prevent iOS zoom */
-  }
-
-  /* Invitation filter bar: scrollable chips */
-  .inv-filter-bar {
-    gap: 8px;
-  }
-
-  .inv-filter-row--chips {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  .inv-filter-chip {
-    flex-shrink: 0;
-  }
-}
-
-/* ─── 14. World Cup / Campaign pages ─────────────────────────────── */
-@media (max-width: 767px) {
-  /* Fixture cards: make score numbers a bit smaller to fit 360px */
-  .cd-fc-body {
-    grid-template-columns: 1fr 80px 1fr;
-    gap: 6px;
-    padding: 12px 10px;
-  }
-
-  .cd-fc-sn {
-    font-size: 1.3rem;
-  }
-
-  .cd-fc-name {
-    font-size: 0.78rem;
-  }
-
-  /* World-cup stage scrollable on mobile */
-  .wc-fixture-list,
-  .wc-group {
-    overflow-x: visible;
-  }
-
-  /* Bracket group cards: full-width stack */
-  .cd-groups-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* WC page hero title */
-  .cd-hero-title {
-    font-size: 1.4rem;
-  }
-}
-
-/* ─── 15. Messenger — full-screen chat window on phones ──────────── */
-@media (max-width: 767px) {
-  /* Keep the FAB (toggle button) at bottom-right above nav */
-  .mp-root {
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-    right: 14px;
-    gap: 0;
-  }
-
-  /* Conversation list panel: full-width pop-up */
-  .mp-panel {
-    width: calc(100vw - 28px);
-    max-width: 380px;
-    right: 0;
-    bottom: 60px;
-    border-radius: 16px;
-  }
-
-  /* Chat window: full-screen overlay above bottom nav */
-  .cw-window {
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 0;
-    width: 100%;
-    height: calc(100dvh - 70px - env(safe-area-inset-bottom, 0px));
-    border-radius: 0;
-    z-index: 950;
-    box-shadow: none;
-  }
-
-  /* When minimized, show as a compact strip at the bottom */
-  .cw-window--min {
-    height: 52px;
-    top: auto;
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-    border-radius: 12px 12px 0 0;
-  }
-
-  /* Multiple open windows: only show the first (most-recent) on mobile */
-  .mp-windows > .mp-panel-wrap:not(:first-child) .cw-window:not(.cw-window--min) {
-    display: none;
-  }
-
-  /* Chat input: prevent iOS keyboard from shrinking the window weirdly */
-  .cw-input {
-    font-size: 16px !important; /* prevent iOS zoom */
-    max-height: 100px;
-  }
-
-  /* Make the message list fill available height with smooth scroll */
-  .cw-body {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-}
-
-/* ─── 16. Notification bell dropdown ─────────────────────────────── */
-@media (max-width: 767px) {
-  /* The bell dropdown is positioned absolute; on small screens
-     it can clip off the right edge. Pin it to the right viewport edge. */
-  .nb-dropdown {
-    right: -4px;
-    left: auto;
-    width: min(340px, calc(100vw - 20px));
-    max-height: 70dvh;
-    overflow-y: auto;
-  }
-}
-
-/* ─── 17. Post-detail page ───────────────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-post-detail-bar {
-    padding: 8px 10px;
-  }
-
-  .ig-post-detail-back {
-    min-height: 40px;
-    padding: 6px 12px;
-  }
-}
-
-/* ─── 18. Scheduled posts page ───────────────────────────────────── */
-@media (max-width: 767px) {
-  .sp-root {
-    padding: 12px 10px 88px;
-  }
-
-  .sp-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-}
-
-/* ─── 19. Campaign detail & banner cards ─────────────────────────── */
-@media (max-width: 767px) {
-  .cb-card {
-    min-height: 90px;
-  }
-
-  .cb-card--wc {
-    min-height: 130px;
-  }
-
-  /* Campaign detail hero */
-  .cd-hero {
-    padding: 20px 14px 16px;
-  }
-}
-
-/* ─── 20. General buttons — minimum 44px touch target ────────────── */
-@media (max-width: 767px) {
-  /* Ensure all primary / ghost buttons are at least 40px tall */
-  .btn-primary,
-  .btn-ghost {
-    min-height: 40px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Danger button */
-  .btn-danger {
-    min-height: 40px;
-  }
-
-  /* Role switcher */
-  .ig-role-switcher {
-    min-height: 34px;
-  }
-}
-
-/* ─── 21. DateTimePicker (CreatePostPage calendar) ───────────────── */
-@media (max-width: 767px) {
-  /* Override any absolute positioning so it appears centered */
-  .dtp-popup {
-    position: fixed !important;
-    left: 50% !important;
-    top: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    width: calc(100vw - 32px);
-    max-width: 360px;
-    max-height: 90dvh;
-    overflow-y: auto;
-    z-index: 1200;
-  }
-}
-
-/* ─── 22. ig-input (global text inputs) ─────────────────────────── */
-@media (max-width: 767px) {
-  .ig-input {
-    font-size: 16px !important; /* prevent iOS zoom */
-    min-height: 44px;
-  }
-
-  /* Comment input textarea */
-  .ig-post-comments-input {
-    font-size: 16px !important;
-  }
-
-  /* Field inputs (auth pages) */
-  .field input {
-    font-size: 16px !important;
-    min-height: 44px;
-    padding: 10px 12px;
-  }
-}
-
-/* ─── 23. Stories / horizontal scroll strips ─────────────────────── */
-@media (max-width: 767px) {
-  .ig-stories-track {
-    padding: 0 8px;
-    gap: 8px;
-  }
-}
-
-/* ─── 24. Delete-confirm inline card (post card) ─────────────────── */
-@media (max-width: 767px) {
-  .ig-delete-confirm {
-    margin: 8px 10px;
-    padding: 12px;
-  }
-
-  .ig-delete-confirm-actions {
-    flex-direction: row;
-    gap: 8px;
-  }
-}
-
-/* ─── 25. Share hint toast ───────────────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-share-hint {
-    font-size: 0.78rem;
-  }
-}
-
-/* ─── 26. More-menu dropdown ─────────────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-more-menu {
-    right: 0;
-    left: auto;
-    min-width: 140px;
-  }
-
-  .ig-more-item {
-    padding: 12px 16px;
-    font-size: 0.88rem;
-  }
-}
-
-/* ─── 27. Feed empty state ───────────────────────────────────────── */
-@media (max-width: 767px) {
-  .ig-feed-empty-state {
-    padding: 24px 16px;
-    border-radius: 14px;
-    margin: 0 8px;
-  }
-}
-
-/* ─── 28. Smooth scroll – global ─────────────────────────────────── */
-@media (max-width: 767px) {
-  html {
-    scroll-behavior: smooth;
-    /* Ensures iOS scroll doesn't bounce the bg */
-    overscroll-behavior-y: none;
-  }
-
-  body {
-    overscroll-behavior-y: none;
-  }
-}

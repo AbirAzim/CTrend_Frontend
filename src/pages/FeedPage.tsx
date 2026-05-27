@@ -1,5 +1,5 @@
-import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client";
-import { useEffect, useState } from "react";
+import { useApolloClient, useLazyQuery, useMutation, useQuery, useSubscription } from "@apollo/client";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "../graphql/feed";
@@ -90,6 +90,7 @@ export function FeedPage() {
   const [activePeopleModal, setActivePeopleModal] = useState<
     "suggestions" | "friends" | "requestedMe" | "requestedByMe" | null
   >(null);
+  const [modalSearch, setModalSearch] = useState("");
 
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
     skip: useMockFeed,
@@ -144,6 +145,12 @@ export function FeedPage() {
     },
   );
 
+  // Lazy query for all suggestions used in the "View all" modal (limit 100)
+  const [fetchAllSuggestions, { data: allSuggestionsData, loading: allSuggestionsLoading }] =
+    useLazyQuery<{ friendSuggestions: FriendRow[] }>(FRIEND_SUGGESTIONS, {
+      fetchPolicy: "network-only",
+    });
+
   const apiPosts: FeedPostView[] | null = data?.feedPosts
     ? data.feedPosts.map(mapGqlPostToFeedView)
     : null;
@@ -162,6 +169,25 @@ export function FeedPage() {
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (requestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
+
+  // For the "View all" modal: full suggestions list (fetched lazily) filtered by search
+  const allModalSuggestions = (allSuggestionsData?.friendSuggestions ?? suggestions) as FriendRow[];
+  const filteredModalList = useMemo(() => {
+    const base =
+      activePeopleModal === "suggestions" ? allModalSuggestions
+        : activePeopleModal === "friends" ? friends
+          : activePeopleModal === "requestedMe" ? requestedMe
+            : requestedByMe;
+    if (!modalSearch.trim()) return base;
+    const q = modalSearch.trim().toLowerCase();
+    return base.filter(
+      (f) =>
+        friendName(f).toLowerCase().includes(q) ||
+        (f.username?.toLowerCase().includes(q) ?? false) ||
+        (f.email?.toLowerCase().includes(q) ?? false),
+    );
+  }, [activePeopleModal, allModalSuggestions, friends, requestedMe, requestedByMe, modalSearch]);
+
   const visibleSuggestions = rotateSlice(suggestions, suggestionOffset, SIDE_PREVIEW_LIMIT);
   const visibleFriends = friends.slice(0, SIDE_PREVIEW_LIMIT);
   const visibleRequestedMe = requestedMe.slice(0, SIDE_PREVIEW_LIMIT);
@@ -260,10 +286,15 @@ export function FeedPage() {
     }
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Reset search and pre-fetch all suggestions when the modal opens
+    setModalSearch("");
+    if (activePeopleModal === "suggestions") {
+      void fetchAllSuggestions({ variables: { limit: 100 } });
+    }
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [activePeopleModal]);
+  }, [activePeopleModal, fetchAllSuggestions]);
 
   async function onAddFriend(userId: string) {
     setFriendError(null);
@@ -525,29 +556,36 @@ export function FeedPage() {
         >
           <section className="ig-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ig-post-comments-head">
-              <h3 className="ig-post-comments-title">
-                {activePeopleModal === "suggestions"
-                  ? "All suggestions"
-                  : activePeopleModal === "friends"
-                    ? "All friends"
-                    : activePeopleModal === "requestedMe"
-                      ? "Requested me"
-                      : "Requested by me"}
-              </h3>
+              <input
+                type="search"
+                className="cx-modal-search-input"
+                placeholder={
+                  activePeopleModal === "suggestions"
+                    ? "Search suggestions by name or email…"
+                    : activePeopleModal === "friends"
+                      ? "Search friends by name or email…"
+                      : activePeopleModal === "requestedMe"
+                        ? "Search requests…"
+                        : "Search…"
+                }
+                value={modalSearch}
+                onChange={(e) => setModalSearch(e.target.value)}
+                autoFocus
+              />
               <button type="button" className="btn-ghost" onClick={() => setActivePeopleModal(null)}>
                 Close
               </button>
             </div>
             <div className="cx-modal-list-scroll">
+              {allSuggestionsLoading && activePeopleModal === "suggestions" ? (
+                <p className="muted small" style={{ padding: "16px 12px" }}>Loading all users…</p>
+              ) : filteredModalList.length === 0 ? (
+                <p className="muted small" style={{ padding: "16px 12px" }}>
+                  {modalSearch.trim() ? "No matches found." : "Nothing here yet."}
+                </p>
+              ) : null}
               <ul className="cx-friend-list">
-                {(activePeopleModal === "suggestions"
-                  ? suggestions
-                  : activePeopleModal === "friends"
-                    ? friends
-                    : activePeopleModal === "requestedMe"
-                      ? requestedMe
-                      : requestedByMe
-                  ).map((f) => (
+                {filteredModalList.map((f) => (
                     <li key={`${activePeopleModal}-${f.id}`} className="cx-friend-item">
                       <div className="cx-friend-avatar-wrap">
                         <Link to={`/profile/${f.id}`} className="cx-friend-avatar" onClick={() => setActivePeopleModal(null)}>

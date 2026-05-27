@@ -12,6 +12,7 @@ export const MY_FRIENDS = gql`
       id
       username
       displayName
+      email
       profileImageUrl
     }
   }
@@ -23,6 +24,7 @@ export const FRIEND_SUGGESTIONS = gql`
       id
       username
       displayName
+      email
       profileImageUrl
     }
   }

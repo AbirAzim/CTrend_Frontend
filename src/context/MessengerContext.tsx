@@ -16,9 +16,11 @@ import {
   MARK_CONVERSATION_READ,
   SET_TYPING,
   MESSAGE_RECEIVED,
+  MESSAGE_READ_SUB,
   PRESENCE_CHANGED,
 } from "../graphql/messages";
 import { useAuth } from "./AuthContext";
+import { playMessageSound } from "../lib/notificationSound";
 
 export type Participant = {
   id: string;
@@ -46,6 +48,7 @@ export type Message = {
   senderName: string;
   senderAvatar?: string | null;
   text: string;
+  imageUrl?: string | null;
   readBy: { userId: string; readAt: string }[];
   createdAt: string;
 };
@@ -60,7 +63,7 @@ type MessengerContextValue = {
   setPanelOpen: (open: boolean) => void;
   openChat: (conversationId: string) => void;
   closeChat: (conversationId: string) => void;
-  sendMessage: (conversationId: string, text: string) => Promise<void>;
+  sendMessage: (conversationId: string, text: string, imageUrl?: string) => Promise<void>;
   markRead: (conversationId: string) => void;
   setTyping: (conversationId: string, isTyping: boolean) => void;
   prependMessages: (conversationId: string, msgs: Message[]) => void;
@@ -73,7 +76,7 @@ const MessengerContext = createContext<MessengerContextValue | null>(null);
 const MAX_OPEN_WINDOWS = 3;
 
 export function MessengerProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user: authUser } = useAuth();
   const [panelOpen, setPanelOpen] = useState(false);
   const [openWindowIds, setOpenWindowIds] = useState<string[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -151,13 +154,49 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
           c.id === msg.conversationId
             ? {
                 ...c,
-                lastMessageText: msg.text,
+                lastMessageText: msg.text || "📷 Image",
                 lastMessageAt: msg.createdAt,
                 unreadCount: openWindowIds.includes(c.id) ? 0 : c.unreadCount + 1,
               }
             : c,
         ),
       );
+      // Play a soft ping for messages from other users
+      if (msg.senderId !== authUser?.id) {
+        playMessageSound();
+      }
+    },
+  });
+
+  // Real-time "Seen" — fires when any participant marks a conversation read.
+  // We patch readBy on all messages in that convo so the sender's Seen badge
+  // appears instantly without waiting for a full refetch.
+  useSubscription(MESSAGE_READ_SUB, {
+    skip: !isAuthenticated,
+    onData({ data }) {
+      const ev = data.data?.messageRead as
+        | { conversationId: string; userId: string; readAt: string }
+        | undefined;
+      if (!ev) return;
+      setMessagesByConvo((prev) => {
+        const msgs = prev[ev.conversationId];
+        if (!msgs) return prev;
+        const updated = msgs.map((m) => {
+          // Only add a readBy entry on messages NOT sent by the reader,
+          // and only if that reader isn't already in the readBy list.
+          if (
+            m.senderId === ev.userId ||
+            m.readBy.some((r) => r.userId === ev.userId)
+          ) {
+            return m;
+          }
+          return {
+            ...m,
+            readBy: [...m.readBy, { userId: ev.userId, readAt: ev.readAt }],
+          };
+        });
+        return { ...prev, [ev.conversationId]: updated };
+      });
     },
   });
 
@@ -186,10 +225,17 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   const openChat = useCallback((conversationId: string) => {
     setOpenWindowIds((prev) => {
       if (prev.includes(conversationId)) return prev;
-      const next = [conversationId, ...prev].slice(0, MAX_OPEN_WINDOWS);
-      return next;
+      return [conversationId, ...prev].slice(0, MAX_OPEN_WINDOWS);
     });
     setPanelOpen(true);
+    // Optimistically zero the unread count the instant the user opens the
+    // chat — the FAB badge drops immediately without waiting for ChatWindow's
+    // useEffect → markRead mutation → setState round-trip.
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId ? { ...c, unreadCount: 0 } : c,
+      ),
+    );
   }, []);
 
   const closeChat = useCallback((conversationId: string) => {
@@ -197,8 +243,10 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendMessage = useCallback(
-    async (conversationId: string, text: string) => {
-      const { data } = await sendMessageMut({ variables: { conversationId, text } });
+    async (conversationId: string, text: string, imageUrl?: string) => {
+      const { data } = await sendMessageMut({
+        variables: { conversationId, text, imageUrl },
+      });
       const msg = data?.sendMessage as Message | undefined;
       if (!msg) return;
       setMessagesByConvo((prev) => {
@@ -209,7 +257,11 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       setConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
-            ? { ...c, lastMessageText: msg.text, lastMessageAt: msg.createdAt }
+            ? {
+                ...c,
+                lastMessageText: msg.text || "📷 Image",
+                lastMessageAt: msg.createdAt,
+              }
             : c,
         ),
       );

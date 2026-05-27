@@ -47,7 +47,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     variables: { skip: 0, take: 30 },
     fetchPolicy: "cache-and-network",
     onCompleted(data) {
-      setNotifications(data?.myNotifications?.items ?? []);
+      // Exclude MESSAGE-type entries — those are surfaced by the messenger
+      // FAB badge, not the bell icon.
+      const items: NotificationItem[] = data?.myNotifications?.items ?? [];
+      setNotifications(items.filter((n) => n.type !== 'MESSAGE'));
     },
   });
 
@@ -58,9 +61,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     skip: !isAuthenticated,
     onData({ data }) {
       const n = data.data?.newNotification as NotificationItem | undefined;
-      if (!n) return;
+      // MESSAGE notifications belong to the messenger FAB, not the bell
+      if (!n || n.type === 'MESSAGE') return;
       setNotifications((prev) => [n, ...prev]);
-      // Play a chime for every new real-time notification
       playNotificationChime();
     },
   });
