@@ -9012,3 +9012,117 @@ a.cx-profile-btn-accent {
 }
 .cw-lightbox-close:hover { background: rgba(255,255,255,.28); }
 
+/* ═══════════════════════════════════════════════════════════════════
+   MESSENGER — MOBILE LAYOUT  (≤ 640 px)
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* ── Root: nudge up to clear the pill-shaped bottom nav ─────────── */
+  .mp-root {
+    bottom: 90px;   /* nav bottom(14) + nav height(62) + gap(14) */
+    right: 12px;
+    gap: 0;
+  }
+
+  /* ── Chat windows: escape the flex row, become a fixed bottom sheet */
+  .mp-windows {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    /* override desktop row-reverse */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    z-index: 960; /* above nav (50) and mp-root (900) */
+    pointer-events: auto;
+  }
+
+  /* Only show the most-recently opened window on mobile */
+  .mp-windows .cw-window ~ .cw-window { display: none; }
+
+  /* ── Chat window: full-width bottom sheet ───────────────────────── */
+  .cw-window {
+    width: 100%;
+    /* dvh adjusts when the keyboard slides up (iOS 15.4+, Chrome 108+);
+       vh is a safe fallback for older browsers */
+    height: 78vh;
+    height: 78dvh;
+    max-height: 78vh;
+    max-height: 78dvh;
+    border-radius: 20px 20px 0 0;
+    /* shadow only upward — matches bottom-sheet convention */
+    box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  }
+  [data-theme="dark"] .cw-window {
+    box-shadow: 0 -8px 40px rgba(0,0,0,.55);
+  }
+
+  /* Drag-handle indicator at top of bottom sheet */
+  .cw-header::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,.35);
+    pointer-events: none;
+  }
+  .cw-header { position: relative; }
+
+  /* Minimised: show just the header bar above the nav */
+  .cw-window--min {
+    height: auto;
+    max-height: none;
+    border-radius: 20px 20px 0 0;
+  }
+
+  /* Smooth touch-scroll in the message list */
+  .cw-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Footer: add space for iOS home indicator */
+  .cw-footer {
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  }
+
+  /* Image preview bar: same safe-area padding */
+  .cw-img-preview-bar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  }
+
+  /* ── Conversation list panel: fill most of the screen width ─────── */
+  .mp-panel {
+    width: min(320px, calc(100vw - 24px));
+    right: 12px;
+    bottom: 130px;
+    max-height: min(65vh, calc(100vh - 145px));
+  }
+
+  /* ── Emoji picker: scrollable grid on small screens ─────────────── */
+  .msg-emoji-picker {
+    max-height: 130px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Bubble images: cap width tighter on small screens ──────────── */
+  .cw-bubble-img {
+    max-width: min(220px, calc(100vw - 100px));
+  }
+
+  /* ── Lightbox: full-screen tap-to-close on mobile ───────────────── */
+  .cw-lightbox-img {
+    max-width: 96vw;
+    max-height: 88dvh;
+    max-height: 88vh;
+    border-radius: 8px;
+  }
+}
+
