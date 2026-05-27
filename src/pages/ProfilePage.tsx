@@ -122,8 +122,21 @@ export function ProfilePage() {
   const [showAllSaved, setShowAllSaved] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [browserOnline, setBrowserOnline] = useState(() => navigator.onLine);
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const { uploadImage } = useImageUpload();
+
+  // Track browser connectivity in real time
+  useEffect(() => {
+    const onOnline = () => setBrowserOnline(true);
+    const onOffline = () => setBrowserOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
     skip: !user,
@@ -134,6 +147,8 @@ export function ProfilePage() {
   const me = meData?.me;
   const userId = me?.id ?? user?.id ?? "";
   const isAdmin = (me?.role ?? user?.role)?.toLowerCase() === "admin";
+  // Online if the server has reported this user online OR if the browser connection is up
+  const isOnline = (userId ? onlineUserIds.has(userId) : false) || browserOnline;
 
   const { data: postsData, loading: postsLoading } = useQuery(USER_POSTS, {
     variables: { userId },
@@ -433,7 +448,16 @@ export function ProfilePage() {
         )}
         <div className="cx-profile-hero-text">
           <p className="cx-profile-kicker">Your corner of Ke Jitbe</p>
-          <h1 className="cx-profile-title">{displayName}</h1>
+          <div className="cx-profile-name-row">
+            <h1 className="cx-profile-title">{displayName}</h1>
+            <span
+              className={`cx-profile-presence${isOnline ? " cx-profile-presence--online" : " cx-profile-presence--offline"}`}
+              title={isOnline ? "Online" : "Offline"}
+            >
+              <span className="cx-profile-presence-dot" aria-hidden />
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </div>
           <p className="cx-profile-email-inline">{user.email}</p>
           <p className="cx-profile-handle">
             @{username}

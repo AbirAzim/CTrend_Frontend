@@ -201,6 +201,7 @@ function MessageIconButton({ userId }: { userId: string }) {
 export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const { user } = useAuth();
+  const { onlineUserIds } = useMessenger();
   const navigate = useNavigate();
 
   const isOwnProfile = Boolean(user && userId === user.id);
@@ -232,6 +233,8 @@ export function UserProfilePage() {
   const posts = (postsData?.getPostsByUser ?? []) as PostRow[];
   const isFriend = friendshipStatus === "FRIEND";
   const isLoggedIn = Boolean(user);
+  // Show online status only for friends (mutual trust)
+  const isUserOnline = isFriend && Boolean(userId) && onlineUserIds.has(userId!);
 
   if (profileLoading) {
     return <div className="cx-profile"><p className="muted small">Loading profile…</p></div>;
@@ -264,7 +267,18 @@ export function UserProfilePage() {
 
         <div className="cx-profile-hero-text">
           <p className="cx-profile-kicker">Ke Jitbe member</p>
-          <h1 className="cx-profile-title">{name}</h1>
+          <div className="cx-profile-name-row">
+            <h1 className="cx-profile-title">{name}</h1>
+            {isFriend && (
+              <span
+                className={`cx-profile-presence${isUserOnline ? " cx-profile-presence--online" : " cx-profile-presence--offline"}`}
+                title={isUserOnline ? "Online" : "Offline"}
+              >
+                <span className="cx-profile-presence-dot" aria-hidden />
+                {isUserOnline ? "Online" : "Offline"}
+              </span>
+            )}
+          </div>
           <p className="cx-profile-handle">@{profile.username ?? "user"}</p>
 
           {canSeeDetails && profile.bio ? (

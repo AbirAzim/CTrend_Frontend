@@ -307,23 +307,33 @@ export function FriendsPage() {
             <p className="muted small">No friends yet.</p>
           ) : null}
           <ul className="cx-friend-list">
-            {friends.map((u) => (
-              <li key={u.id} className="cx-friend-item">
-                <div className="cx-friend-avatar-wrap">
-                  <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
-                    {u.profileImageUrl ? <img src={u.profileImageUrl} alt="" /> : friendInitial(u)}
-                  </NavLink>
-                  {onlineUserIds.has(u.id) && <span className="cx-friend-online-dot" aria-hidden />}
-                </div>
-                <div className="cx-friend-meta">
-                  <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
-                    <strong>{friendName(u)}</strong>
-                    <span>@{u.username ?? "user"}</span>
-                  </NavLink>
-                </div>
-                <MessageButton userId={u.id} />
-              </li>
-            ))}
+            {friends.map((u) => {
+              const friendOnline = onlineUserIds.has(u.id);
+              return (
+                <li key={u.id} className="cx-friend-item">
+                  <div className="cx-friend-avatar-wrap">
+                    <NavLink to={`/profile/${u.id}`} className="cx-friend-avatar">
+                      {u.profileImageUrl ? <img src={u.profileImageUrl} alt="" /> : friendInitial(u)}
+                    </NavLink>
+                    {friendOnline && <span className="cx-friend-online-dot" aria-hidden />}
+                  </div>
+                  <div className="cx-friend-meta">
+                    <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
+                      <strong>{friendName(u)}</strong>
+                      <span>@{u.username ?? "user"}</span>
+                    </NavLink>
+                    <span
+                      className={`cx-friend-status${friendOnline ? " cx-friend-status--online" : " cx-friend-status--offline"}`}
+                      aria-label={friendOnline ? "Online" : "Offline"}
+                    >
+                      <span className="cx-friend-status-dot" aria-hidden />
+                      {friendOnline ? "Online" : "Offline"}
+                    </span>
+                  </div>
+                  <MessageButton userId={u.id} />
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}

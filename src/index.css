@@ -463,6 +463,49 @@ a:hover {
     linear-gradient(165deg, #090f1d 0%, #0b1324 42%, #0b172d 100%);
 }
 
+/* ── Global offline banner ─────────────────────────────────────────── */
+.ig-offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, #92400e 0%, #b45309 100%);
+  color: #fef3c7;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.01em;
+  /* Slide in from top */
+  animation: ig-offline-slidein 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ig-offline-banner-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+@keyframes ig-offline-slidein {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+:root[data-theme="dark"] .ig-offline-banner {
+  background: linear-gradient(90deg, #78350f 0%, #92400e 100%);
+  color: #fde68a;
+}
+
+/* On very narrow phones: smaller font so it fits on one line */
+@media (max-width: 380px) {
+  .ig-offline-banner {
+    font-size: 0.74rem;
+    padding: 8px 12px;
+  }
+}
+
 .ig-topbar {
   position: sticky;
   top: 8px;
@@ -539,20 +582,27 @@ a:hover {
 }
 
 .ig-logo-img {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   object-fit: contain;
   flex-shrink: 0;
-  /* pull it slightly off the text baseline for optical balance */
   margin-bottom: 1px;
-  /* subtle shadow so it pops on both light/dark */
-  box-shadow: 0 2px 8px rgb(var(--cx-accent-rgb) / 0.22);
-  transition: transform 0.35s var(--cx-ease-spring);
+  /* Light mode: subtle drop-shadow */
+  filter: drop-shadow(0 1px 4px rgb(var(--cx-accent-rgb) / 0.3));
+  transition: transform 0.35s var(--cx-ease-spring), filter 0.25s ease;
+}
+
+/* Dark mode: brighten + glow so it's clearly visible on dark topbar */
+:root[data-theme="dark"] .ig-logo-img {
+  filter:
+    brightness(1.35)
+    drop-shadow(0 0 8px rgb(var(--cx-accent-rgb) / 0.7))
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
 }
 
 .ig-logo:hover .ig-logo-img {
-  transform: rotate(-8deg) scale(1.1);
+  transform: rotate(-8deg) scale(1.12);
 }
 
 .ig-topbar-actions {
@@ -931,6 +981,50 @@ a.cx-friend-avatar:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Friend status line (Online / Offline text under @handle) ──────── */
+.cx-friend-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.cx-friend-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cx-friend-status--online {
+  color: #16a34a;
+}
+
+.cx-friend-status--online .cx-friend-status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 1.5px rgba(34, 197, 94, 0.35);
+  animation: cx-presence-pulse 2s ease-in-out infinite;
+}
+
+.cx-friend-status--offline {
+  color: var(--ig-muted);
+}
+
+.cx-friend-status--offline .cx-friend-status-dot {
+  background: #94a3b8;
+}
+
+:root[data-theme="dark"] .cx-friend-status--online {
+  color: #4ade80;
+}
+
+:root[data-theme="dark"] .cx-friend-status--offline {
+  color: #64748b;
 }
 
 .cx-friend-actions {
@@ -4141,6 +4235,14 @@ a.cx-action-chip {
   color: var(--cx-accent);
 }
 
+/* Name + presence badge on one row */
+.cx-profile-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .cx-profile-title {
   margin: 0;
   font-family: var(--cx-font-display);
@@ -4148,6 +4250,65 @@ a.cx-action-chip {
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.03em;
+}
+
+/* Online / Offline presence pill */
+.cx-profile-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px 3px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.cx-profile-presence--online {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.cx-profile-presence--offline {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--ig-muted);
+  border: 1px solid rgba(100, 116, 139, 0.18);
+}
+
+.cx-profile-presence-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cx-profile-presence--online .cx-profile-presence-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+  animation: cx-presence-pulse 2s ease-in-out infinite;
+}
+
+.cx-profile-presence--offline .cx-profile-presence-dot {
+  background: #94a3b8;
+}
+
+@keyframes cx-presence-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3); }
+  50%       { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12); }
+}
+
+/* Dark mode overrides for presence */
+:root[data-theme="dark"] .cx-profile-presence--online {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+:root[data-theme="dark"] .cx-profile-presence--offline {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border-color: rgba(100, 116, 139, 0.22);
 }
 
 .cx-profile-handle {
@@ -8076,9 +8237,9 @@ a, button, label, [role="button"], [role="tab"], [role="menuitem"],
   }
 
   .ig-logo-img {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
   }
 
   /* Hide the decorative tagline ("Compare · vote · vibe") on phones */

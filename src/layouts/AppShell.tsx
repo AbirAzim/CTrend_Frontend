@@ -57,6 +57,7 @@ export function AppShell() {
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [theme, setTheme] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") {
       return "light";
@@ -127,13 +128,30 @@ export function AppShell() {
     window.localStorage.setItem("ctrend_theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
   return (
     <div className="ig-app">
+      {!isOnline && (
+        <div className="ig-offline-banner" role="alert" aria-live="assertive">
+          <span className="ig-offline-banner-icon" aria-hidden>📡</span>
+          <span>You're offline — check your connection</span>
+        </div>
+      )}
       <header className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
         <div className="ig-brand-block">
           <NavLink to="/" className="ig-logo" end>
-            <img src="/logo.png" className="ig-logo-img" alt="" aria-hidden="true" />
             Ke Jitbe
+            <img src="/logo.png" className="ig-logo-img" alt="" aria-hidden="true" />
           </NavLink>
           <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
