@@ -132,6 +132,7 @@ export function AppShell() {
       <header className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
         <div className="ig-brand-block">
           <NavLink to="/" className="ig-logo" end>
+            <img src="/logo.png" className="ig-logo-img" alt="" aria-hidden="true" />
             Ke Jitbe
           </NavLink>
           <span className="ig-brand-tag">Compare · vote · vibe</span>

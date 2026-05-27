@@ -72,6 +72,10 @@
   --ig-muted: var(--cx-slate-muted);
   --ig-bg: var(--cx-canvas);
   --ig-white: #fff;
+  /* Surface tokens used by admin, cards, tables */
+  --ig-card: #ffffff;
+  --ig-surface: #f9fafb;
+  --ig-text-secondary: #6b7280;
 }
 
 :root[data-theme="dark"] {
@@ -95,6 +99,10 @@
   --ig-muted: #a8b0c7;
   --ig-bg: #0c1220;
   --ig-white: #111a2e;
+  /* Surface tokens — dark equivalents */
+  --ig-card: #111a2e;
+  --ig-surface: #151f32;
+  --ig-text-secondary: #a8b0c7;
   --cx-shadow-soft: 0 8px 26px rgb(0 0 0 / 0.42);
   --cx-shadow-lift: 0 18px 52px rgb(0 0 0 / 0.48), 0 4px 18px rgb(129 140 248 / 0.2);
   --cx-shadow-accent: 0 10px 28px rgb(129 140 248 / 0.34);
@@ -521,10 +529,30 @@ a:hover {
   -webkit-text-fill-color: transparent;
   animation: cx-logo-shimmer 7s linear infinite;
   transition: transform 0.35s var(--cx-ease-spring);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .ig-logo:hover {
   transform: scale(1.06) rotate(-1.5deg);
+}
+
+.ig-logo-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: contain;
+  flex-shrink: 0;
+  /* pull it slightly off the text baseline for optical balance */
+  margin-bottom: 1px;
+  /* subtle shadow so it pops on both light/dark */
+  box-shadow: 0 2px 8px rgb(var(--cx-accent-rgb) / 0.22);
+  transition: transform 0.35s var(--cx-ease-spring);
+}
+
+.ig-logo:hover .ig-logo-img {
+  transform: rotate(-8deg) scale(1.1);
 }
 
 .ig-topbar-actions {
@@ -3773,6 +3801,10 @@ a.cx-action-chip {
   border-color: rgb(148 163 184 / 0.26);
 }
 
+:root[data-theme="dark"] .cx-profile-drop-actions {
+  border-top-color: rgb(148 163 184 / 0.18);
+}
+
 :root[data-theme="dark"] .cx-profile-drop-title {
   color: #eef3ff;
 }
@@ -4302,69 +4334,118 @@ a.cx-profile-btn-accent {
   gap: 12px;
 }
 
+/* ── Drop card (Your drops grid) ─────────────────────────────────── */
 .cx-profile-drop-card {
   border: 1px solid var(--ig-border);
   border-radius: var(--cx-radius-lg);
   background: rgb(255 255 255 / 0.78);
   box-shadow: var(--cx-shadow-soft);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
+/* ── Horizontal layout: thumbnail left, info right ── */
+.cx-profile-drop-inner {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Thumbnail strip — left column */
 .cx-profile-drop-link {
   text-decoration: none;
   color: inherit;
+  display: block;
+  flex-shrink: 0;
+  width: 104px;
 }
 
 .cx-profile-drop-media-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 8px;
+  gap: 3px;
+  padding: 8px 6px 8px 8px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
+/* Each image cell */
+.cx-profile-drop-media-grid .cx-profile-grid-cell {
+  border-radius: 8px;
+  aspect-ratio: 1;
+  min-height: 36px;
+  border: 1.5px solid rgb(255 255 255 / 0.9);
+  box-shadow: none;
+}
+
+.cx-profile-drop-media-grid .cx-profile-grid-cell:hover {
+  transform: none;
+}
+
+/* Info column — right side */
 .cx-profile-drop-meta {
-  padding: 10px 12px 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .cx-profile-drop-title {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.3;
+  /* 2-line clamp */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .cx-profile-drop-sub {
-  margin: 6px 0 0;
-  font-size: 0.76rem;
+  margin: 0;
+  font-size: 0.72rem;
   color: var(--ig-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cx-profile-drop-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 2px;
 }
 
 .cx-profile-chip {
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
   background: rgb(var(--cx-accent-rgb) / 0.09);
   color: var(--cx-accent-deep);
+  white-space: nowrap;
 }
 
+/* ── Actions + Extend section — bottom strip ── */
 .cx-profile-drop-actions {
-  margin-top: 10px;
+  border-top: 1px solid var(--ig-border);
+  padding: 10px 12px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .cx-profile-drop-edit {
   text-decoration: none;
+  align-self: flex-start;
 }
 
 .cx-profile-drop-extend-input {
@@ -4377,31 +4458,30 @@ a.cx-profile-btn-accent {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
 }
 
 .cx-extend-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: rgb(var(--cx-text-rgb) / 0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+  text-transform: none;
+  letter-spacing: 0;
   margin: 0;
 }
 
 .cx-extend-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .cx-extend-chip {
-  padding: 5px 12px;
+  padding: 5px 11px;
   border-radius: 999px;
   border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.35);
   background: transparent;
   color: rgb(var(--cx-accent-rgb));
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -4435,6 +4515,7 @@ a.cx-profile-btn-accent {
   font-size: 0.85rem;
   outline: none;
   transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .cx-extend-date-input:focus {
@@ -4442,17 +4523,24 @@ a.cx-profile-btn-accent {
   background: rgb(var(--cx-accent-rgb) / 0.07);
 }
 
+.cx-extend-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .cx-extend-submit {
-  align-self: flex-start;
-  padding: 7px 20px;
+  padding: 7px 18px;
   border-radius: 999px;
   border: none;
   background: rgb(var(--cx-accent-rgb));
   color: #fff;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.15s ease;
+  white-space: nowrap;
 }
 
 .cx-extend-submit:disabled {
@@ -4466,9 +4554,10 @@ a.cx-profile-btn-accent {
 
 .cx-extend-error {
   color: #e53e3e;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
+/* ── Grid container ── */
 @media (min-width: 400px) {
   .cx-profile-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -5257,6 +5346,46 @@ a.cx-profile-btn-accent {
   border-color: #333;
 }
 :root[data-theme="dark"] .bim-result-item { background: #1e1e2e; }
+
+/* ─── Admin – dark theme overrides ──────────────────────────────── */
+/* Fix inviter popover (base uses hardcoded #fff; media query alone isn't
+   enough when the app sets data-theme="dark" independently of OS setting) */
+:root[data-theme="dark"] .inviter-popover {
+  background: #1e2433;
+  border-color: #2d3748;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
+}
+:root[data-theme="dark"] .inviter-popover::before {
+  border-top-color: #1e2433;
+}
+:root[data-theme="dark"] .inviter-popover::after {
+  border-top-color: #2d3748;
+}
+:root[data-theme="dark"] .inviter-pop-header {
+  background: #252d3d !important;
+  border-bottom-color: #2d3748 !important;
+}
+:root[data-theme="dark"] .inviter-pop-details {
+  background: #1e2433 !important;
+}
+:root[data-theme="dark"] .inviter-pop-footer {
+  background: #252d3d !important;
+  border-top-color: #2d3748 !important;
+}
+:root[data-theme="dark"] .inviter-pop-name { color: #f1f5f9 !important; }
+:root[data-theme="dark"] .inviter-pop-handle { color: #94a3b8 !important; }
+:root[data-theme="dark"] .inviter-pop-icon { color: #64748b !important; }
+:root[data-theme="dark"] .inviter-pop-val { color: #cbd5e1 !important; }
+
+/* Fix green "active/done" chip text — #15803d is too dark against dark bg */
+:root[data-theme="dark"] .admin-stat-chip--active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+:root[data-theme="dark"] .wc-admin-chip--done {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
 
 .admin-modal-title {
   font-size: 1.2rem;
@@ -7835,3 +7964,837 @@ a.cx-profile-btn-accent {
 .cw-send-btn:not(:disabled):hover { transform: scale(1.1); }
 .cw-send-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
 .cw-send-btn:not(:disabled):hover { opacity: 0.85; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE — iPhone Safari & Android Chrome
+   Covers everything from the topbar to the messenger, all pages.
+═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 0. No horizontal page scroll, ever ─────────────────────────── */
+/* NOTE: overflow-x: hidden on <body> breaks position:sticky + iOS scroll.
+   Instead we fix individual overflowing containers below. */
+
+/* ─── 1. Global touch hygiene ────────────────────────────────────── */
+/* Eliminate 300 ms tap delay on every interactive element */
+a, button, label, [role="button"], [role="tab"], [role="menuitem"],
+[role="option"], summary,
+.ig-nav-item, .cx-action-chip, .ig-compare-cell,
+.ig-vote-btn, .ig-more-btn, .btn-primary, .btn-ghost, .btn-danger,
+.cx-profile-btn-primary, .cx-profile-btn-accent,
+.inv-filter-chip, .admin-tab, .wc-admin-chip,
+.cx-details-toggle, .cx-see-voters-btn,
+.mp-toggle-btn, .mp-item, .cw-header,
+.ig-topbar-cta, .ig-topbar-logout, .ig-icon-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth momentum scroll on every scrollable container */
+.ig-post-comments-list,
+.ig-voter-list-scroll,
+.cx-modal-list-scroll,
+.cx-feed-keeps-bar,
+.ig-stories-track,
+.cx-action-rail,
+.mp-list,
+.cw-body,
+.cw-body .cw-scroll,
+.admin-table-wrap,
+.nb-list,
+.inv-filter-bar,
+.cx-side-panel {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── 2. Prevent iOS keyboard zoom on inputs ─────────────────────── */
+/* iOS auto-zooms the viewport when a focused input has font-size < 16px.
+   We override only on narrow viewports so desktop type sizes are unchanged. */
+@media (max-width: 767px) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
+  /* OTP digit boxes keep their visual size via width/height, not font */
+  .otp-digit {
+    font-size: 1.4rem !important;
+  }
+}
+
+/* ─── 3. iPhone safe-area insets (notch / Dynamic Island / home bar) ─ */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  /* Page-level app wrapper: add bottom room for home indicator */
+  .ig-app {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
+  /* Bottom nav clears the home indicator */
+  .ig-bottom-nav {
+    bottom: max(14px, calc(env(safe-area-inset-bottom) + 8px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(62px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Topbar stays below the status bar / camera cutout */
+  .ig-topbar {
+    top: max(8px, calc(env(safe-area-inset-top) + 4px));
+  }
+
+  /* Auth pages: top padding so they aren't hidden under the notch */
+  .auth-page {
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* Floating messenger button above home bar */
+  .mp-root {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  /* Modals: bottom padding so actions aren't hidden by home bar */
+  .ig-modal-card,
+  .admin-modal {
+    padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
+  }
+}
+
+/* ─── 4. Topbar — compact on phones ─────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-topbar {
+    width: calc(100% - 24px);
+    max-width: none;
+    padding: 8px 10px;
+    min-height: 50px;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .ig-logo {
+    font-size: 1.15rem;
+    gap: 5px;
+  }
+
+  .ig-logo-img {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+
+  /* Hide the decorative tagline ("Compare · vote · vibe") on phones */
+  .ig-brand-tag {
+    display: none;
+  }
+
+  .ig-topbar-actions {
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .ig-theme-toggle,
+  .ig-topbar-logout {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+
+  /* Admin badge: shrink to icon-only on very small phones */
+  .ig-topbar-admin .ig-topbar-cta-label {
+    max-width: 54px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* "New compare" button: remove glyph spacing so it's compact */
+  .ig-topbar-cta {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+}
+
+/* Below 400px: hide "New compare" label, show only the ✦ glyph */
+@media (max-width: 399px) {
+  .ig-topbar-cta-label {
+    display: none;
+  }
+}
+
+/* ─── 5. Bottom nav ──────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-bottom-nav {
+    width: calc(100% - 24px);
+    max-width: none;
+    padding: 0 8px;
+  }
+
+  /* Minimum 44 × 44 px touch targets (Apple HIG) */
+  .ig-nav-item {
+    width: 46px;
+    height: 46px;
+  }
+
+  .ig-nav-item--fab {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+/* ─── 6. Feed & post cards ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-app {
+    max-width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Clip any content wider than the viewport.
+     Applied on ig-main-scroll (not body/html) so position:sticky on the
+     topbar still works, and iOS vertical scroll is unaffected. */
+  .ig-main-scroll {
+    overflow-x: hidden;
+  }
+
+  .ig-feed {
+    padding: 0 0 12px;
+    gap: 8px;
+  }
+
+  /* Post card: remove side margin so it bleeds edge-to-edge */
+  .ig-post {
+    border-radius: 14px;
+    margin: 0 8px 10px;
+  }
+
+  /* Hover zoom disabled on touch devices */
+  .ig-post:hover .ig-post-media {
+    transform: none;
+  }
+
+  /* Compare cells: larger tap area overlay */
+  .ig-compare-cell {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Percentage overlay: larger text on mobile */
+  .ig-compare-pct-main {
+    font-size: 1.4rem;
+  }
+
+  /* Action rail: always scrolls horizontally, fits on 360px screens */
+  .cx-action-rail {
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .cx-action-chip {
+    padding: 8px 10px;
+    min-height: 40px;
+    flex-shrink: 0;
+  }
+
+  .cx-action-chip-label {
+    font-size: 0.67rem;
+    white-space: nowrap;
+  }
+
+  /* Pulse / live split card */
+  .cx-pulse-card {
+    padding: 10px 12px;
+  }
+
+  /* Post footer */
+  .cx-post-footer {
+    padding: 10px 10px 10px;
+    gap: 8px;
+  }
+
+  /* Comment section */
+  .ig-post-comments {
+    margin: 0 8px 8px;
+    padding: 10px 10px 10px;
+  }
+
+  /* Comment input: full-width, taller for thumbs */
+  .ig-post-comments-input {
+    min-height: 48px;
+  }
+
+  /* Submit button: wide for easy tapping */
+  .ig-post-comments-submit {
+    min-height: 40px;
+    padding: 8px 16px;
+  }
+}
+
+/* ─── 7. Modals — bottom sheet on mobile ────────────────────────── */
+@media (max-width: 767px) {
+  .ig-modal-overlay,
+  .admin-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .ig-modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 24px;
+    /* drag handle visual cue */
+    position: relative;
+  }
+
+  /* Drag-handle nub */
+  .ig-modal-card::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: rgb(var(--cx-ink-rgb) / 0.15);
+    border-radius: 2px;
+    margin: -8px auto 12px;
+  }
+
+  .admin-modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 24px;
+  }
+
+  /* Voter list modal: taller scroll area */
+  .ig-voter-list-scroll {
+    max-height: 55dvh;
+  }
+
+  /* People list modal */
+  .cx-modal-list-scroll {
+    max-height: 65dvh;
+  }
+}
+
+/* ─── 8. Auth pages (Login / Signup / Forgot-password / etc.) ────── */
+@media (max-width: 767px) {
+  .auth-page {
+    align-items: flex-start;
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .auth-card {
+    max-width: 100%;
+    padding: 1.5rem 1.25rem;
+    border-radius: 1rem;
+    /* Remove backdrop blur on low-end mobile GPUs */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgb(255 255 255 / 0.97);
+  }
+
+  .auth-card h1 {
+    font-size: 1.3rem;
+  }
+
+  /* OTP input row — ensure digits don't overflow 360px screens */
+  .otp-field {
+    gap: 6px;
+  }
+
+  .otp-digit {
+    width: clamp(36px, 11vw, 52px);
+    height: clamp(44px, 12vw, 60px);
+  }
+}
+
+/* Dark-mode auth card on mobile */
+:root[data-theme="dark"] .auth-card {
+  background: var(--ig-card, #111a2e);
+}
+
+/* ─── 9. Create-post page ────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* The create-post DateTimePicker calendar popup */
+  .dtp-popup {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    bottom: auto !important;
+    right: auto !important;
+    width: calc(100vw - 32px);
+    max-width: 360px;
+    z-index: 1100;
+  }
+
+  /* Image compare slots: keep them a good size */
+  .create-post-compare-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
+/* ─── 10. Profile page ────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Your drops grid: single column on mobile so each card has enough room.
+     !important beats the min-width:400px breakpoint that sets 2 columns. */
+  .cx-profile-grid--rich {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  /* Thumbnail strip inside each drop card */
+  .cx-profile-drop-link {
+    width: 110px;
+  }
+
+  .cx-profile-drop-media-grid {
+    padding: 8px 6px 8px 8px;
+  }
+
+  /* Title can go to 3 lines on a single-column card */
+  .cx-profile-drop-title {
+    -webkit-line-clamp: 3;
+  }
+
+  /* Extend chips: wrap onto multiple lines — no horizontal scroll */
+  .cx-extend-presets {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .cx-extend-chip {
+    flex-shrink: 0;
+  }
+
+  .cx-profile-hero {
+    padding: 18px 12px 14px;
+    border-radius: 14px;
+  }
+
+  /* Avatar: slightly smaller on phones */
+  .cx-profile-avatar {
+    width: 70px;
+    height: 70px;
+  }
+
+  .cx-profile-title {
+    font-size: 1.2rem;
+  }
+
+  /* Stats row: wrap on small screens */
+  .cx-profile-stats-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cx-profile-stat {
+    min-width: 56px;
+  }
+
+  /* Action buttons: full-width stack */
+  .cx-profile-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cx-profile-btn-primary,
+  .cx-profile-btn-accent {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Profile grid: 3-col on 380+, 2-col on smaller */
+  .cx-profile-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Post grid hover effect: remove on touch */
+  .cx-profile-grid-cell:hover {
+    transform: none;
+  }
+
+  /* Keeps bar: ensure horizontal scroll works */
+  .cx-feed-keeps-bar {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (min-width: 380px) and (max-width: 767px) {
+  .cx-profile-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ─── 11. Friends page ────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .cx-friends-page {
+    padding: 12px 12px 80px;
+  }
+
+  /* Friend-request accept/reject buttons: larger tap area */
+  .cx-friend-actions .btn-ghost {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+}
+
+/* ─── 12. User-profile page (profile/:userId) ─────────────────────── */
+@media (max-width: 767px) {
+  .up-root {
+    padding-bottom: 80px;
+  }
+
+  .up-friend-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .up-friend-actions button {
+    min-height: 40px;
+  }
+}
+
+/* ─── 13. Admin page ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .admin-page {
+    padding: 16px 10px 88px;
+    max-width: 100%;
+  }
+
+  /* Tabs: wrap onto multiple rows — no horizontal scroll */
+  .admin-tabs {
+    gap: 4px;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .admin-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+
+  /* Table wrapper already has overflow-x: auto; ensure smooth scroll */
+  .admin-table-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tighter cells on phones */
+  .admin-table th,
+  .admin-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Action buttons in admin table: stack vertically */
+  .admin-action-btns {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .admin-action-btns .btn-ghost,
+  .admin-action-btns a.btn-ghost {
+    min-height: 34px;
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+
+  /* Section head: wrap title + button on narrow screens */
+  .admin-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Search bar: full width */
+  .admin-search {
+    font-size: 16px !important; /* prevent iOS zoom */
+  }
+
+  /* Invitation filter bar: scrollable chips */
+  .inv-filter-bar {
+    gap: 8px;
+  }
+
+  .inv-filter-row--chips {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .inv-filter-chip {
+    flex-shrink: 0;
+  }
+}
+
+/* ─── 14. World Cup / Campaign pages ─────────────────────────────── */
+@media (max-width: 767px) {
+  /* Fixture cards: make score numbers a bit smaller to fit 360px */
+  .cd-fc-body {
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 6px;
+    padding: 12px 10px;
+  }
+
+  .cd-fc-sn {
+    font-size: 1.3rem;
+  }
+
+  .cd-fc-name {
+    font-size: 0.78rem;
+  }
+
+  /* World-cup stage scrollable on mobile */
+  .wc-fixture-list,
+  .wc-group {
+    overflow-x: visible;
+  }
+
+  /* Bracket group cards: full-width stack */
+  .cd-groups-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* WC page hero title */
+  .cd-hero-title {
+    font-size: 1.4rem;
+  }
+}
+
+/* ─── 15. Messenger — full-screen chat window on phones ──────────── */
+@media (max-width: 767px) {
+  /* Keep the FAB (toggle button) at bottom-right above nav */
+  .mp-root {
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    right: 14px;
+    gap: 0;
+  }
+
+  /* Conversation list panel: full-width pop-up */
+  .mp-panel {
+    width: calc(100vw - 28px);
+    max-width: 380px;
+    right: 0;
+    bottom: 60px;
+    border-radius: 16px;
+  }
+
+  /* Chat window: full-screen overlay above bottom nav */
+  .cw-window {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    width: 100%;
+    height: calc(100dvh - 70px - env(safe-area-inset-bottom, 0px));
+    border-radius: 0;
+    z-index: 950;
+    box-shadow: none;
+  }
+
+  /* When minimized, show as a compact strip at the bottom */
+  .cw-window--min {
+    height: 52px;
+    top: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    border-radius: 12px 12px 0 0;
+  }
+
+  /* Multiple open windows: only show the first (most-recent) on mobile */
+  .mp-windows > .mp-panel-wrap:not(:first-child) .cw-window:not(.cw-window--min) {
+    display: none;
+  }
+
+  /* Chat input: prevent iOS keyboard from shrinking the window weirdly */
+  .cw-input {
+    font-size: 16px !important; /* prevent iOS zoom */
+    max-height: 100px;
+  }
+
+  /* Make the message list fill available height with smooth scroll */
+  .cw-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ─── 16. Notification bell dropdown ─────────────────────────────── */
+@media (max-width: 767px) {
+  /* The bell dropdown is positioned absolute; on small screens
+     it can clip off the right edge. Pin it to the right viewport edge. */
+  .nb-dropdown {
+    right: -4px;
+    left: auto;
+    width: min(340px, calc(100vw - 20px));
+    max-height: 70dvh;
+    overflow-y: auto;
+  }
+}
+
+/* ─── 17. Post-detail page ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-post-detail-bar {
+    padding: 8px 10px;
+  }
+
+  .ig-post-detail-back {
+    min-height: 40px;
+    padding: 6px 12px;
+  }
+}
+
+/* ─── 18. Scheduled posts page ───────────────────────────────────── */
+@media (max-width: 767px) {
+  .sp-root {
+    padding: 12px 10px 88px;
+  }
+
+  .sp-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* ─── 19. Campaign detail & banner cards ─────────────────────────── */
+@media (max-width: 767px) {
+  .cb-card {
+    min-height: 90px;
+  }
+
+  .cb-card--wc {
+    min-height: 130px;
+  }
+
+  /* Campaign detail hero */
+  .cd-hero {
+    padding: 20px 14px 16px;
+  }
+}
+
+/* ─── 20. General buttons — minimum 44px touch target ────────────── */
+@media (max-width: 767px) {
+  /* Ensure all primary / ghost buttons are at least 40px tall */
+  .btn-primary,
+  .btn-ghost {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    min-height: 40px;
+  }
+
+  /* Role switcher */
+  .ig-role-switcher {
+    min-height: 34px;
+  }
+}
+
+/* ─── 21. DateTimePicker (CreatePostPage calendar) ───────────────── */
+@media (max-width: 767px) {
+  /* Override any absolute positioning so it appears centered */
+  .dtp-popup {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: calc(100vw - 32px);
+    max-width: 360px;
+    max-height: 90dvh;
+    overflow-y: auto;
+    z-index: 1200;
+  }
+}
+
+/* ─── 22. ig-input (global text inputs) ─────────────────────────── */
+@media (max-width: 767px) {
+  .ig-input {
+    font-size: 16px !important; /* prevent iOS zoom */
+    min-height: 44px;
+  }
+
+  /* Comment input textarea */
+  .ig-post-comments-input {
+    font-size: 16px !important;
+  }
+
+  /* Field inputs (auth pages) */
+  .field input {
+    font-size: 16px !important;
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+}
+
+/* ─── 23. Stories / horizontal scroll strips ─────────────────────── */
+@media (max-width: 767px) {
+  .ig-stories-track {
+    padding: 0 8px;
+    gap: 8px;
+  }
+}
+
+/* ─── 24. Delete-confirm inline card (post card) ─────────────────── */
+@media (max-width: 767px) {
+  .ig-delete-confirm {
+    margin: 8px 10px;
+    padding: 12px;
+  }
+
+  .ig-delete-confirm-actions {
+    flex-direction: row;
+    gap: 8px;
+  }
+}
+
+/* ─── 25. Share hint toast ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-share-hint {
+    font-size: 0.78rem;
+  }
+}
+
+/* ─── 26. More-menu dropdown ─────────────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-more-menu {
+    right: 0;
+    left: auto;
+    min-width: 140px;
+  }
+
+  .ig-more-item {
+    padding: 12px 16px;
+    font-size: 0.88rem;
+  }
+}
+
+/* ─── 27. Feed empty state ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .ig-feed-empty-state {
+    padding: 24px 16px;
+    border-radius: 14px;
+    margin: 0 8px;
+  }
+}
+
+/* ─── 28. Smooth scroll – global ─────────────────────────────────── */
+@media (max-width: 767px) {
+  html {
+    scroll-behavior: smooth;
+    /* Ensures iOS scroll doesn't bounce the bg */
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    overscroll-behavior-y: none;
+  }
+}
