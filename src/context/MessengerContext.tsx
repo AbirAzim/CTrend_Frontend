@@ -19,6 +19,7 @@ import {
   PRESENCE_CHANGED,
 } from "../graphql/messages";
 import { useAuth } from "./AuthContext";
+import { playMessageSound } from "../lib/notificationSound";
 
 export type Participant = {
   id: string;
@@ -73,7 +74,7 @@ const MessengerContext = createContext<MessengerContextValue | null>(null);
 const MAX_OPEN_WINDOWS = 3;
 
 export function MessengerProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user: authUser } = useAuth();
   const [panelOpen, setPanelOpen] = useState(false);
   const [openWindowIds, setOpenWindowIds] = useState<string[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -158,6 +159,10 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
             : c,
         ),
       );
+      // Play a soft ping for messages from other users
+      if (msg.senderId !== authUser?.id) {
+        playMessageSound();
+      }
     },
   });
 

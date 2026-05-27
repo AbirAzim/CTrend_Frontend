@@ -1471,7 +1471,7 @@ a.cx-friend-avatar:hover {
 }
 
 .ig-compare-cell:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.92;
 }
 
@@ -1884,6 +1884,100 @@ a.cx-friend-avatar:hover {
 .cx-pulse-row--leader {
   border-color: rgb(var(--cx-accent-rgb) / 0.28);
   box-shadow: 0 8px 20px rgb(var(--cx-accent-rgb) / 0.14);
+}
+
+/* ── Voting ended / Final results ───────────────────────────────────── */
+
+/* Overlay strip that sits at the top of the compare media when closed */
+.ig-post-media-wrap--voting-closed {
+  position: relative;
+}
+
+.cx-voting-ended-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  background: rgb(0 0 0 / 0.68);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cx-voting-ended-strip-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+/* Closed compare cell — cursor + slight dim for non-winners */
+.ig-compare-cell--closed {
+  cursor: not-allowed;
+}
+
+.ig-compare-cell--closed:not(.ig-compare-cell--winner) {
+  opacity: 0.55;
+  filter: saturate(0.55);
+}
+
+/* Winner cell — golden trophy glow */
+.ig-compare-cell--winner {
+  box-shadow:
+    inset 0 0 0 3px #fbbf24,
+    0 0 28px rgb(251 191 36 / 0.55);
+}
+
+.ig-compare-cell--winner .ig-compare-pct-main {
+  color: #fde68a;
+  text-shadow: 0 0 12px rgb(251 191 36 / 0.7);
+}
+
+.ig-compare-cell--winner .ig-compare-pct-sub {
+  color: #fef3c7;
+}
+
+/* Winner tick on the percentage badge */
+.ig-compare-cell--winner .ig-compare-pct::before {
+  content: "🏆 ";
+  font-size: 1rem;
+  line-height: 1;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Pulse card final-state variant */
+.cx-pulse-card--final {
+  border-color: rgb(251 191 36 / 0.35);
+  box-shadow:
+    0 14px 32px rgb(var(--cx-accent-rgb) / 0.1),
+    inset 0 0 0 1px rgb(251 191 36 / 0.18);
+}
+
+.cx-pulse-card-title--final {
+  color: #d97706;
+  font-weight: 800;
+}
+
+:root[data-theme="dark"] .cx-pulse-card-title--final {
+  color: #fbbf24;
+}
+
+:root[data-theme="dark"] .cx-pulse-card--final {
+  border-color: rgb(251 191 36 / 0.28);
+  box-shadow:
+    0 14px 30px rgb(0 0 0 / 0.35),
+    inset 0 0 0 1px rgb(251 191 36 / 0.15);
 }
 
 .cx-pulse-inline {
