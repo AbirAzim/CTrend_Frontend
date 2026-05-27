@@ -49,7 +49,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const historyFetched = useRef(false);
 
   const [fetchMessages] = useLazyQuery(GET_MESSAGES, {
-    fetchPolicy: "network-only",
+    fetchPolicy: "no-cache",
   });
 
   // Typing indicator subscription per window
@@ -84,6 +84,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
             if ((data.messages as Message[]).length < 30) setHasMore(false);
           }
         })
+        .catch(() => { /* network error — show whatever subscription messages we have */ })
         .finally(() => setLoadingHistory(false));
     }
     markRead(conversation.id);
