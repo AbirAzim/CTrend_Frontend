@@ -1686,15 +1686,16 @@ a.cx-friend-avatar:hover {
 }
 
 .cx-voting-badge--closed {
-  color: #4338ca;
-  background: linear-gradient(135deg, rgb(238 242 255 / 0.95), rgb(224 231 255 / 0.92));
-  border-color: rgb(129 140 248 / 0.42);
+  color: #92400e;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border-color: rgb(245 158 11 / 0.55);
+  box-shadow: 0 2px 8px rgb(245 158 11 / 0.2);
 }
 
 .cx-voting-result {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: rgb(var(--cx-ink-rgb) / 0.84);
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #92400e;
   line-height: 1.3;
   max-width: 100%;
   overflow: hidden;
@@ -1891,6 +1892,18 @@ a.cx-friend-avatar:hover {
 /* Overlay strip that sits at the top of the compare media when closed */
 .ig-post-media-wrap--voting-closed {
   position: relative;
+  overflow: hidden;
+}
+
+/* Amber/gold announcement banner */
+@keyframes strip-slide-in {
+  from { transform: translateY(-110%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+@keyframes strip-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
 }
 
 .cx-voting-ended-strip {
@@ -1902,24 +1915,266 @@ a.cx-friend-avatar:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 14px;
-  background: rgb(0 0 0 / 0.68);
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(
+    105deg,
+    rgb(120 53 15 / 0.96) 0%,
+    rgb(180 83 9 / 0.96) 50%,
+    rgb(120 53 15 / 0.96) 100%
+  );
+  background-size: 200% auto;
+  animation: strip-slide-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+             strip-shimmer 3.5s linear 0.8s infinite;
+  border-bottom: 1px solid rgb(251 191 36 / 0.5);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: #e2e8f0;
   pointer-events: none;
   user-select: none;
 }
 
-.cx-voting-ended-strip-icon {
+.cx-voting-ended-strip-trophy {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgb(251 191 36 / 0.8));
+}
+
+.cx-voting-ended-strip-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fde68a;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.5);
+}
+
+.cx-voting-ended-strip-label {
+  background: rgb(251 191 36 / 0.25);
+  border: 1px solid rgb(251 191 36 / 0.5);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+}
+
+.cx-voting-ended-strip-sep {
+  opacity: 0.6;
+}
+
+.cx-voting-ended-strip-lock {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+/* ── Winner cell ────────────────────────────────────────────────────── */
+
+/* Winner cell shines forward */
+@keyframes winner-shine {
+  0%   { left: -120%; }
+  100% { left: 220%; }
+}
+
+@keyframes crown-pop {
+  0%   { transform: translateX(-50%) translateY(-12px) scale(0.6); opacity: 0; }
+  60%  { transform: translateX(-50%) translateY(2px) scale(1.12); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes crown-glow {
+  0%, 100% { text-shadow: 0 0 8px rgb(251 191 36 / 0.6); }
+  50%       { text-shadow: 0 0 18px rgb(251 191 36 / 1); }
+}
+
+/* Closed compare cell — cursor + slight dim for non-winners */
+.ig-compare-cell--closed {
+  cursor: not-allowed;
+}
+
+/* Loser: heavy grayscale + scrim */
+.ig-compare-cell--closed:not(.ig-compare-cell--winner) {
+  opacity: 0.48;
+  filter: grayscale(0.85) saturate(0.25);
+  transform: scale(0.99);
+}
+
+/* Dark scrim overlay on loser */
+.cx-loser-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+/* Winner cell — scales forward, golden glow */
+.ig-compare-cell--winner {
+  transform: scale(1.025) translateZ(0);
+  z-index: 2;
+  box-shadow:
+    inset 0 0 0 3px #f59e0b,
+    0 0 32px rgb(245 158 11 / 0.65),
+    0 8px 24px rgb(245 158 11 / 0.3);
+}
+
+/* Shimmer sweep across winner image */
+.ig-compare-cell--winner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgb(255 255 255 / 0.14) 50%,
+    transparent 75%
+  );
+  animation: winner-shine 2.8s ease-in-out 0.6s infinite;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Floating crown badge on winner image */
+.cx-winner-crown-badge {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px 4px 7px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+  box-shadow:
+    0 2px 14px rgb(245 158 11 / 0.6),
+    0 1px 3px rgb(0 0 0 / 0.4);
+  pointer-events: none;
+  animation: crown-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.cx-winner-crown-icon {
   font-size: 0.88rem;
   line-height: 1;
+  animation: crown-glow 2s ease-in-out infinite;
 }
+
+/* ── Winner pct overlay ─────────────────────────────────────────────── */
+
+.ig-compare-pct--winner {
+  background: linear-gradient(
+    transparent,
+    rgb(120 53 15 / 0.92)
+  );
+}
+
+.ig-compare-pct--winner .ig-compare-pct-main {
+  font-size: 2.2rem;
+  color: #fde68a;
+  text-shadow: 0 2px 16px rgb(245 158 11 / 0.8);
+}
+
+.ig-compare-pct--winner .ig-compare-pct-sub {
+  color: #fef3c7;
+  font-weight: 800;
+}
+
+.ig-compare-pct--loser .ig-compare-pct-main {
+  opacity: 0.7;
+}
+
+/* ── Final Results pulse card ───────────────────────────────────────── */
+
+/* Pulse card final-state variant */
+.cx-pulse-card--final {
+  border-color: rgb(245 158 11 / 0.4);
+  box-shadow:
+    0 14px 32px rgb(var(--cx-accent-rgb) / 0.1),
+    inset 0 0 0 1px rgb(245 158 11 / 0.22);
+}
+
+.cx-pulse-card-title--final {
+  color: #d97706;
+  font-weight: 800;
+}
+
+/* Winner row in final results */
+.cx-pulse-row--final-winner {
+  background: linear-gradient(
+    135deg,
+    rgb(245 158 11 / 0.12),
+    rgb(251 191 36 / 0.06)
+  );
+  border-color: rgb(245 158 11 / 0.4);
+  border-left: 3px solid #f59e0b;
+}
+
+.cx-pulse-row--final-winner .cx-pulse-name {
+  color: #d97706;
+  font-weight: 800;
+}
+
+.cx-pulse-row--final-winner .cx-pulse-count {
+  color: #d97706;
+  font-weight: 800;
+}
+
+.cx-pulse-medal {
+  font-size: 0.9rem;
+}
+
+/* Loser row in final results */
+.cx-pulse-row--final-loser {
+  opacity: 0.72;
+  border-left: 3px solid rgb(148 163 184 / 0.4);
+}
+
+/* Winner fill bar is amber/gold */
+.cx-pulse-fill--winner {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24) !important;
+  box-shadow: 0 0 8px rgb(245 158 11 / 0.45);
+}
+
+/* ── Dark mode overrides ─────────────────────────────────────────────── */
+
+:root[data-theme="dark"] .cx-pulse-card-title--final {
+  color: #fbbf24;
+}
+
+:root[data-theme="dark"] .cx-pulse-card--final {
+  border-color: rgb(245 158 11 / 0.3);
+  box-shadow:
+    0 14px 30px rgb(0 0 0 / 0.35),
+    inset 0 0 0 1px rgb(245 158 11 / 0.18);
+}
+
+:root[data-theme="dark"] .cx-pulse-row--final-winner {
+  background: linear-gradient(
+    135deg,
+    rgb(245 158 11 / 0.18),
+    rgb(251 191 36 / 0.09)
+  );
+  border-color: rgb(245 158 11 / 0.45);
+}
+
+:root[data-theme="dark"] .cx-pulse-row--final-winner .cx-pulse-name,
+:root[data-theme="dark"] .cx-pulse-row--final-winner .cx-pulse-count {
+  color: #fbbf24;
+}
+
+/* ── Voting badge (closed) upgrade ──────────────────────────────────── */
 
 /* ── Tap-to-vote hint ───────────────────────────────────────────────── */
 
@@ -1977,65 +2232,6 @@ a.cx-friend-avatar:hover {
 /* Pause animation on hover so the scale effect is clean */
 .ig-compare-cell--unvoted:hover:not(:disabled) {
   animation: none;
-}
-
-/* Closed compare cell — cursor + slight dim for non-winners */
-.ig-compare-cell--closed {
-  cursor: not-allowed;
-}
-
-.ig-compare-cell--closed:not(.ig-compare-cell--winner) {
-  opacity: 0.55;
-  filter: saturate(0.55);
-}
-
-/* Winner cell — golden trophy glow */
-.ig-compare-cell--winner {
-  box-shadow:
-    inset 0 0 0 3px #fbbf24,
-    0 0 28px rgb(251 191 36 / 0.55);
-}
-
-.ig-compare-cell--winner .ig-compare-pct-main {
-  color: #fde68a;
-  text-shadow: 0 0 12px rgb(251 191 36 / 0.7);
-}
-
-.ig-compare-cell--winner .ig-compare-pct-sub {
-  color: #fef3c7;
-}
-
-/* Winner tick on the percentage badge */
-.ig-compare-cell--winner .ig-compare-pct::before {
-  content: "🏆 ";
-  font-size: 1rem;
-  line-height: 1;
-  display: block;
-  margin-bottom: 2px;
-}
-
-/* Pulse card final-state variant */
-.cx-pulse-card--final {
-  border-color: rgb(251 191 36 / 0.35);
-  box-shadow:
-    0 14px 32px rgb(var(--cx-accent-rgb) / 0.1),
-    inset 0 0 0 1px rgb(251 191 36 / 0.18);
-}
-
-.cx-pulse-card-title--final {
-  color: #d97706;
-  font-weight: 800;
-}
-
-:root[data-theme="dark"] .cx-pulse-card-title--final {
-  color: #fbbf24;
-}
-
-:root[data-theme="dark"] .cx-pulse-card--final {
-  border-color: rgb(251 191 36 / 0.28);
-  box-shadow:
-    0 14px 30px rgb(0 0 0 / 0.35),
-    inset 0 0 0 1px rgb(251 191 36 / 0.15);
 }
 
 .cx-pulse-inline {
@@ -4138,13 +4334,15 @@ a.cx-action-chip {
 }
 
 :root[data-theme="dark"] .cx-voting-badge--closed {
-  color: #e7ecff;
-  background: linear-gradient(135deg, rgb(99 102 241 / 0.4), rgb(79 70 229 / 0.3));
-  border-color: rgb(165 180 252 / 0.62);
+  color: #fde68a;
+  background: linear-gradient(135deg, rgb(120 53 15 / 0.55), rgb(92 40 0 / 0.45));
+  border-color: rgb(245 158 11 / 0.5);
+  box-shadow: 0 2px 8px rgb(245 158 11 / 0.15);
 }
 
 :root[data-theme="dark"] .cx-voting-result {
-  color: #d8e2fb;
+  color: #fbbf24;
+  font-weight: 800;
 }
 
 :root[data-theme="dark"] .cx-post-copy {
