@@ -613,95 +613,101 @@ export function ProfilePage() {
               return (
                 <li key={post.id}>
                   <article className="cx-profile-drop-card">
-                    <NavLink to={`/post/${post.id}`} className="cx-profile-drop-link">
-                      <div className="cx-profile-drop-media-grid">
-                        {(post.imageUrls ?? []).map((u, idx) => (
-                          <span
-                            key={`${post.id}-img-${idx}`}
-                            className="cx-profile-grid-cell"
-                            style={{ backgroundImage: `url(${u})` }}
-                          />
-                        ))}
-                        {!thumb ? <span className="cx-profile-grid-fallback">?</span> : null}
-                      </div>
-                    </NavLink>
-                    <div className="cx-profile-drop-meta">
-                      <p className="cx-profile-drop-title">
-                        {post.caption?.trim() || "Untitled compare"}
-                      </p>
-                      <p className="cx-profile-drop-sub">
-                        {(post.category?.name ?? "General").toString()} ·{" "}
-                        {(post.totalVotes ?? 0).toLocaleString()} votes
-                      </p>
-                      <div className="cx-profile-drop-chips">
-                        {(post.options ?? [])
-                          .map((o) => o.label?.trim())
-                          .filter(Boolean)
-                          .slice(0, 4)
-                          .map((label) => (
-                            <span key={`${post.id}-${label}`} className="cx-profile-chip">
-                              {label}
-                            </span>
+                    {/* Top row: thumbnail strip + info */}
+                    <div className="cx-profile-drop-inner">
+                      <NavLink to={`/post/${post.id}`} className="cx-profile-drop-link">
+                        <div className="cx-profile-drop-media-grid">
+                          {(post.imageUrls ?? []).map((u, idx) => (
+                            <span
+                              key={`${post.id}-img-${idx}`}
+                              className="cx-profile-grid-cell"
+                              style={{ backgroundImage: `url(${u})` }}
+                            />
                           ))}
+                          {!thumb ? <span className="cx-profile-grid-fallback">?</span> : null}
+                        </div>
+                      </NavLink>
+                      <div className="cx-profile-drop-meta">
+                        <p className="cx-profile-drop-title">
+                          {post.caption?.trim() || "Untitled compare"}
+                        </p>
+                        <p className="cx-profile-drop-sub">
+                          {(post.category?.name ?? "General").toString()} ·{" "}
+                          {(post.totalVotes ?? 0).toLocaleString()} votes
+                        </p>
+                        <div className="cx-profile-drop-chips">
+                          {(post.options ?? [])
+                            .map((o) => o.label?.trim())
+                            .filter(Boolean)
+                            .slice(0, 3)
+                            .map((label) => (
+                              <span key={`${post.id}-${label}`} className="cx-profile-chip">
+                                {label}
+                              </span>
+                            ))}
+                        </div>
+                        <p className="cx-profile-drop-sub">
+                          {ended ? "Voting closed" : rel(post.votingEndsAt) || "Voting open"}
+                        </p>
                       </div>
-                      <p className="cx-profile-drop-sub">
-                        {ended ? "Voting closed" : rel(post.votingEndsAt) || "Voting open"}
-                      </p>
-                      {!useMockFeed ? (
-                        <div className="cx-profile-drop-actions">
-                          <NavLink
-                            to={`/post/${post.id}`}
-                            className="btn-ghost cx-profile-drop-edit"
-                          >
-                            Edit post
-                          </NavLink>
-                          <div className="cx-extend-section">
-                            <p className="cx-extend-label">Extend voting deadline</p>
-                            <div className="cx-extend-presets">
-                              {(
-                                [
-                                  { label: "+12h", ms: 12 * 3_600_000 },
-                                  { label: "+1d",  ms: 24 * 3_600_000 },
-                                  { label: "+3d",  ms: 3 * 24 * 3_600_000 },
-                                  { label: "+1w",  ms: 7 * 24 * 3_600_000 },
-                                  { label: "Custom", ms: null },
-                                ] as { label: string; ms: number | null }[]
-                              ).map(({ label, ms }) => (
-                                <button
-                                  key={label}
-                                  type="button"
-                                  className={`cx-extend-chip${extendPresetByPost[post.id] === label ? " cx-extend-chip--active" : ""}`}
-                                  onClick={() => {
-                                    setExtendPresetByPost((prev) => ({ ...prev, [post.id]: label }));
-                                    if (ms !== null) {
-                                      setExtendDraftByPost((prev) => ({
-                                        ...prev,
-                                        [post.id]: toLocalDateTimeInputValue(new Date(Date.now() + ms)),
-                                      }));
-                                    } else {
-                                      setExtendDraftByPost((prev) => ({ ...prev, [post.id]: "" }));
-                                    }
-                                    setExtendErrorByPost((prev) => ({ ...prev, [post.id]: "" }));
-                                  }}
-                                >
-                                  {label}
-                                </button>
-                              ))}
-                            </div>
-                            {extendPresetByPost[post.id] === "Custom" && (
-                              <input
-                                type="datetime-local"
-                                className="cx-extend-date-input"
-                                value={extendDraftByPost[post.id] ?? ""}
-                                onChange={(e) =>
-                                  setExtendDraftByPost((prev) => ({
-                                    ...prev,
-                                    [post.id]: e.target.value,
-                                  }))
-                                }
-                                min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
-                              />
-                            )}
+                    </div>
+                    {/* Bottom: actions + extend deadline */}
+                    {!useMockFeed ? (
+                      <div className="cx-profile-drop-actions">
+                        <NavLink
+                          to={`/post/${post.id}`}
+                          className="btn-ghost cx-profile-drop-edit"
+                        >
+                          Edit post
+                        </NavLink>
+                        <div className="cx-extend-section">
+                          <p className="cx-extend-label">Extend voting deadline</p>
+                          <div className="cx-extend-presets">
+                            {(
+                              [
+                                { label: "+12h", ms: 12 * 3_600_000 },
+                                { label: "+1d",  ms: 24 * 3_600_000 },
+                                { label: "+3d",  ms: 3 * 24 * 3_600_000 },
+                                { label: "+1w",  ms: 7 * 24 * 3_600_000 },
+                                { label: "Custom", ms: null },
+                              ] as { label: string; ms: number | null }[]
+                            ).map(({ label, ms }) => (
+                              <button
+                                key={label}
+                                type="button"
+                                className={`cx-extend-chip${extendPresetByPost[post.id] === label ? " cx-extend-chip--active" : ""}`}
+                                onClick={() => {
+                                  setExtendPresetByPost((prev) => ({ ...prev, [post.id]: label }));
+                                  if (ms !== null) {
+                                    setExtendDraftByPost((prev) => ({
+                                      ...prev,
+                                      [post.id]: toLocalDateTimeInputValue(new Date(Date.now() + ms)),
+                                    }));
+                                  } else {
+                                    setExtendDraftByPost((prev) => ({ ...prev, [post.id]: "" }));
+                                  }
+                                  setExtendErrorByPost((prev) => ({ ...prev, [post.id]: "" }));
+                                }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          {extendPresetByPost[post.id] === "Custom" && (
+                            <input
+                              type="datetime-local"
+                              className="cx-extend-date-input"
+                              value={extendDraftByPost[post.id] ?? ""}
+                              onChange={(e) =>
+                                setExtendDraftByPost((prev) => ({
+                                  ...prev,
+                                  [post.id]: e.target.value,
+                                }))
+                              }
+                              min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+                            />
+                          )}
+                          <div className="cx-extend-footer">
                             <button
                               type="button"
                               className="cx-extend-submit"
@@ -717,8 +723,8 @@ export function ProfilePage() {
                             ) : null}
                           </div>
                         </div>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
                   </article>
                 </li>
               );
