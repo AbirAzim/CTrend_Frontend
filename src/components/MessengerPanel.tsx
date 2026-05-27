@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useLazyQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
+import { formatRelativeTime } from "../lib/formatRelativeTime";
 import {
   GET_MESSAGES,
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
 
-// ── Emoji picker (simple inline set) ────────────────────────────
+// ── Emoji picker ────────────────────────────────────────────────────
 const EMOJI_SET = ["😀","😂","❤️","👍","👎","😭","😍","🔥","🎉","😊","🙏","😎","🤔","😅","🥳","💯","👏","😢","😡","✨"];
 
 function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
@@ -22,7 +23,7 @@ function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
   );
 }
 
-// ── Chat Window ──────────────────────────────────────────────────
+// ── Chat Window ──────────────────────────────────────────────────────
 function ChatWindow({ conversation }: { conversation: Conversation }) {
   const { user } = useAuth();
   const {
@@ -48,11 +49,8 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const historyFetched = useRef(false);
 
-  const [fetchMessages] = useLazyQuery(GET_MESSAGES, {
-    fetchPolicy: "no-cache",
-  });
+  const [fetchMessages] = useLazyQuery(GET_MESSAGES, { fetchPolicy: "no-cache" });
 
-  // Typing indicator subscription per window
   useSubscription(TYPING_INDICATOR_SUB, {
     variables: { conversationId: conversation.id },
     onData({ data }) {
@@ -69,10 +67,6 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     },
   });
 
-  // Load initial messages and mark read on open.
-  // Always fetch history on first open — even if subscription messages are already
-  // cached (messages.length > 0), those are only the most recent real-time events,
-  // not the full history.
   useEffect(() => {
     if (!historyFetched.current) {
       historyFetched.current = true;
@@ -84,18 +78,15 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
             if ((data.messages as Message[]).length < 30) setHasMore(false);
           }
         })
-        .catch(() => { /* network error — show whatever subscription messages we have */ })
+        .catch(() => {})
         .finally(() => setLoadingHistory(false));
     }
     markRead(conversation.id);
     void refetchConversations();
   }, [conversation.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll to bottom on new messages
   useEffect(() => {
-    if (!minimized) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    if (!minimized) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, minimized]);
 
   async function loadOlder() {
@@ -148,26 +139,44 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     <div className={`cw-window${minimized ? " cw-window--min" : ""}`}>
       {/* Header */}
       <div className="cw-header" onClick={() => setMinimized((v) => !v)}>
-        <div className="cw-header-avatar">
-          {otherParticipants[0]?.avatarUrl ? (
-            <img src={otherParticipants[0].avatarUrl} alt="" />
-          ) : (
-            <span>{(otherParticipants[0]?.displayName ?? "?")[0].toUpperCase()}</span>
-          )}
-          {isOnline && <span className="cw-online-dot" aria-hidden />}
+        <div className="cw-header-avatar-wrap">
+          <div className="cw-header-avatar">
+            {otherParticipants[0]?.avatarUrl ? (
+              <img src={otherParticipants[0].avatarUrl} alt="" />
+            ) : (
+              <span>{(otherParticipants[0]?.displayName ?? "?")[0].toUpperCase()}</span>
+            )}
+          </div>
+          {isOnline && <span className="cw-online-dot" aria-label="Online" />}
         </div>
         <div className="cw-header-meta">
           <span className="cw-header-name">{windowTitle}</span>
-          <span className="cw-header-status">{isOnline ? "Active now" : "Offline"}</span>
+          <span className={`cw-header-status${isOnline ? " cw-header-status--online" : ""}`}>
+            {isOnline ? "● Active now" : "○ Offline"}
+          </span>
         </div>
-        <button
-          type="button"
-          className="cw-close-btn"
-          aria-label="Close chat"
-          onClick={(e) => { e.stopPropagation(); closeChat(conversation.id); }}
-        >
-          ✕
-        </button>
+        <div className="cw-header-actions">
+          <button
+            type="button"
+            className="cw-header-btn"
+            aria-label={minimized ? "Expand" : "Minimise"}
+            onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="13" height="13" aria-hidden>
+              {minimized ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="cw-header-btn cw-header-btn--close"
+            aria-label="Close chat"
+            onClick={(e) => { e.stopPropagation(); closeChat(conversation.id); }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="13" height="13" aria-hidden>
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {!minimized && (
@@ -176,24 +185,39 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
           <div className="cw-body" ref={scrollRef} onScroll={(e) => {
             if ((e.target as HTMLDivElement).scrollTop < 50) void loadOlder();
           }}>
-            {loadingHistory && <p className="cw-loading">Loading…</p>}
+            {loadingHistory && (
+              <div className="cw-loading">
+                <span className="cw-loading-dots"><span/><span/><span/></span>
+              </div>
+            )}
             {!hasMore && messages.length > 0 && (
               <p className="cw-no-more">Beginning of conversation</p>
             )}
+
             {messages.map((msg, i) => {
               const isMine = msg.senderId === user?.id;
+              const prevMsg = messages[i - 1];
+              const nextMsg = messages[i + 1];
+              // Group consecutive messages from the same sender
+              const isGroupStart = !prevMsg || prevMsg.senderId !== msg.senderId;
+              const isGroupEnd   = !nextMsg || nextMsg.senderId !== msg.senderId;
               const isLast = i === messages.length - 1;
-              const seenByOther =
-                isMine && msg.readBy.some((r) => r.userId !== user?.id);
-              const showSeen =
-                isLast && isMine && (seenByOther || mySeenBy?.id === msg.id);
+              const seenByOther = isMine && msg.readBy.some((r) => r.userId !== user?.id);
+              const showSeen = isLast && isMine && (seenByOther || mySeenBy?.id === msg.id);
+
               return (
                 <div
                   key={msg.id}
-                  className={`cw-msg${isMine ? " cw-msg--mine" : " cw-msg--theirs"}`}
+                  className={[
+                    "cw-msg",
+                    isMine ? "cw-msg--mine" : "cw-msg--theirs",
+                    !isGroupStart ? "cw-msg--grouped" : "",
+                    isGroupEnd   ? "cw-msg--group-end" : "",
+                  ].filter(Boolean).join(" ")}
                 >
+                  {/* Avatar — only on last message of a group (theirs) */}
                   {!isMine && (
-                    <div className="cw-msg-avatar">
+                    <div className={`cw-msg-avatar${!isGroupEnd ? " cw-msg-avatar--hidden" : ""}`}>
                       {msg.senderAvatar ? (
                         <img src={msg.senderAvatar} alt="" />
                       ) : (
@@ -201,62 +225,90 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
                       )}
                     </div>
                   )}
+
                   <div className="cw-msg-content">
-                    <div className="cw-bubble">{msg.text}</div>
-                    {showSeen && <span className="cw-seen">Seen</span>}
+                    <div className={[
+                      "cw-bubble",
+                      isMine ? "cw-bubble--mine" : "cw-bubble--theirs",
+                      isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
+                      isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
+                    ].filter(Boolean).join(" ")}>
+                      {msg.text}
+                      <span className="cw-bubble-time">
+                        {formatRelativeTime(msg.createdAt)}
+                      </span>
+                    </div>
+                    {showSeen && (
+                      <span className="cw-seen">
+                        {otherParticipants[0]?.avatarUrl ? (
+                          <img src={otherParticipants[0].avatarUrl} alt="Seen" className="cw-seen-avatar" />
+                        ) : (
+                          <span className="cw-seen-initial">
+                            {(otherParticipants[0]?.displayName ?? "?")[0].toUpperCase()}
+                          </span>
+                        )}
+                        Seen
+                      </span>
+                    )}
                   </div>
                 </div>
               );
             })}
+
+            {/* Typing indicator */}
             {typingUsers.size > 0 && (
-              <div className="cw-typing-indicator">
-                <span className="cw-typing-dots">
-                  <span /><span /><span />
-                </span>
+              <div className="cw-msg cw-msg--theirs">
+                <div className="cw-msg-avatar">
+                  {otherParticipants[0]?.avatarUrl ? (
+                    <img src={otherParticipants[0].avatarUrl} alt="" />
+                  ) : (
+                    <span>{(otherParticipants[0]?.displayName ?? "?")[0].toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="cw-typing-bubble">
+                  <span className="cw-typing-dot" /><span className="cw-typing-dot" /><span className="cw-typing-dot" />
+                </div>
               </div>
             )}
+
             <div ref={bottomRef} />
           </div>
 
           {/* Emoji picker */}
           {showEmoji && (
-            <EmojiPicker
-              onPick={(e) => {
-                setText((t) => t + e);
-                inputRef.current?.focus();
-              }}
-            />
+            <EmojiPicker onPick={(e) => { setText((t) => t + e); inputRef.current?.focus(); }} />
           )}
 
           {/* Input */}
           <div className="cw-footer">
             <button
               type="button"
-              className="cw-emoji-toggle"
+              className={`cw-emoji-toggle${showEmoji ? " cw-emoji-toggle--active" : ""}`}
               aria-label="Emoji"
               onClick={() => setShowEmoji((v) => !v)}
             >
-              😊
+              {showEmoji ? "😊" : "🙂"}
             </button>
-            <textarea
-              ref={inputRef}
-              className="cw-input"
-              rows={1}
-              value={text}
-              placeholder="Aa"
-              onChange={(e) => handleInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-            />
+            <div className="cw-input-wrap">
+              <textarea
+                ref={inputRef}
+                className="cw-input"
+                rows={1}
+                value={text}
+                placeholder="Message…"
+                onChange={(e) => handleInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
             <button
               type="button"
-              className="cw-send-btn"
+              className={`cw-send-btn${text.trim() ? " cw-send-btn--active" : ""}`}
               aria-label="Send"
               disabled={!text.trim()}
               onClick={() => void handleSend()}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden="true">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden>
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
               </svg>
             </button>
           </div>
@@ -266,7 +318,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   );
 }
 
-// ── Messenger Panel (conversation list + open chat windows) ─────
+// ── Messenger Panel ──────────────────────────────────────────────────
 export function MessengerPanel() {
   const { isAuthenticated, user } = useAuth();
   const {
@@ -279,32 +331,44 @@ export function MessengerPanel() {
     openChat,
     refetchConversations,
   } = useMessenger();
+
+  const [search, setSearch] = useState("");
+
   if (!isAuthenticated) return null;
 
   const openConversations = openWindowIds
     .map((id) => conversations.find((c) => c.id === id))
     .filter(Boolean) as Conversation[];
 
+  const filteredConvos = search.trim()
+    ? conversations.filter((c) => {
+        const others = c.participants.filter((p) => p.id !== user?.id);
+        const name = c.name || others.map((p) => p.displayName).join(", ") || "";
+        return name.toLowerCase().includes(search.toLowerCase());
+      })
+    : conversations;
+
   return (
     <div className="mp-root">
-      {/* Open chat windows (right to left) */}
+      {/* Open chat windows */}
       <div className="mp-windows">
         {openConversations.map((convo) => (
           <ChatWindow key={convo.id} conversation={convo} />
         ))}
       </div>
 
-      {/* Conversation list panel */}
+      {/* FAB + conversation panel */}
       <div className="mp-panel-wrap">
+        {/* FAB toggle */}
         <button
           type="button"
-          className="mp-toggle-btn"
+          className={`mp-toggle-btn${panelOpen ? " mp-toggle-btn--open" : ""}`}
           aria-label={`Messenger${totalUnread > 0 ? `, ${totalUnread} unread` : ""}`}
           onClick={() => { setPanelOpen(!panelOpen); if (!panelOpen) refetchConversations(); }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden="true">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden>
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
           {totalUnread > 0 && (
             <span className="mp-badge">{totalUnread > 99 ? "99+" : totalUnread}</span>
           )}
@@ -312,40 +376,91 @@ export function MessengerPanel() {
 
         {panelOpen && (
           <div className="mp-panel">
+            {/* Panel header */}
             <div className="mp-panel-header">
               <span className="mp-panel-title">Messages</span>
+              <div className="mp-panel-header-actions">
+                {totalUnread > 0 && (
+                  <span className="mp-panel-unread-chip">{totalUnread} new</span>
+                )}
+                <button
+                  type="button"
+                  className="mp-panel-close-btn"
+                  aria-label="Close"
+                  onClick={() => setPanelOpen(false)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="14" height="14" aria-hidden>
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-            {conversations.length === 0 ? (
-              <p className="mp-empty">No conversations yet.<br />Go to a friend's profile and start a chat.</p>
+
+            {/* Search */}
+            <div className="mp-search-wrap">
+              <svg className="mp-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="14" height="14" aria-hidden>
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="search"
+                className="mp-search-input"
+                placeholder="Search conversations…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Conversation list */}
+            {filteredConvos.length === 0 ? (
+              <div className="mp-empty">
+                {search.trim() ? (
+                  <p>No conversations match "<strong>{search}</strong>"</p>
+                ) : (
+                  <p>No conversations yet.<br />Visit a friend's profile to start chatting.</p>
+                )}
+              </div>
             ) : (
               <ul className="mp-list">
-                {conversations.map((c) => {
+                {filteredConvos.map((c) => {
                   const others = c.participants.filter((p) => p.id !== user?.id);
                   const name = c.name || others.map((p) => p.displayName).join(", ") || "Chat";
                   const isOnline = others.some((p) => onlineUserIds.has(p.id));
+                  const initial = (name[0] ?? "?").toUpperCase();
+                  const timeAgo = c.lastMessageAt ? formatRelativeTime(c.lastMessageAt) : "";
                   return (
                     <li
                       key={c.id}
-                      className={`mp-item${c.unreadCount > 0 ? " mp-item--unread" : ""}`}
+                      role="button"
+                      tabIndex={0}
+                      className={`mp-item${c.unreadCount > 0 ? " mp-item--unread" : ""}${openWindowIds.includes(c.id) ? " mp-item--active" : ""}`}
                       onClick={() => { openChat(c.id); setPanelOpen(false); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { openChat(c.id); setPanelOpen(false); } }}
                     >
-                      <div className="mp-item-avatar">
-                        {others[0]?.avatarUrl ? (
-                          <img src={others[0].avatarUrl} alt="" />
-                        ) : (
-                          <span>{(name[0] ?? "?").toUpperCase()}</span>
-                        )}
-                        {isOnline && <span className="mp-online-dot" aria-hidden />}
+                      <div className="mp-item-avatar-wrap">
+                        <div className="mp-item-avatar">
+                          {others[0]?.avatarUrl ? (
+                            <img src={others[0].avatarUrl} alt="" />
+                          ) : (
+                            <span>{initial}</span>
+                          )}
+                        </div>
+                        {isOnline && <span className="mp-online-dot" aria-label="Online" />}
                       </div>
+
                       <div className="mp-item-meta">
-                        <span className="mp-item-name">{name}</span>
+                        <div className="mp-item-row">
+                          <span className="mp-item-name">{name}</span>
+                          {timeAgo && <span className="mp-item-time">{timeAgo}</span>}
+                        </div>
                         {c.lastMessageText && (
                           <span className="mp-item-last">
-                            {c.lastMessageText.slice(0, 35)}
-                            {c.lastMessageText.length > 35 ? "…" : ""}
+                            {c.lastMessageText.length > 38
+                              ? c.lastMessageText.slice(0, 38) + "…"
+                              : c.lastMessageText}
                           </span>
                         )}
                       </div>
+
                       {c.unreadCount > 0 && (
                         <span className="mp-item-badge">{c.unreadCount}</span>
                       )}
