@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
+import { useLazyQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
+import { useImageUpload } from "../lib/useImageUpload";
 import {
   GET_MESSAGES,
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
-import { GET_IMAGE_UPLOAD_URL } from "../graphql/upload";
 
 // ── Emoji picker ────────────────────────────────────────────────────
 const EMOJI_SET = ["😀","😂","❤️","👍","👎","😭","😍","🔥","🎉","😊","🙏","😎","🤔","😅","🥳","💯","👏","😢","😡","✨"];
@@ -88,7 +88,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const historyFetched = useRef(false);
 
   const [fetchMessages] = useLazyQuery(GET_MESSAGES, { fetchPolicy: "no-cache" });
-  const [getUploadUrl] = useMutation(GET_IMAGE_UPLOAD_URL);
+  const { uploadImage } = useImageUpload();
 
   useSubscription(TYPING_INDICATOR_SUB, {
     variables: { conversationId: conversation.id },
@@ -179,32 +179,18 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
       setUploading(true);
       setUploadError(null);
       try {
-        // 1. Get presigned URL from backend
-        const { data: urlData } = await getUploadUrl({
-          variables: { filename: pendingImage.file.name, contentType: pendingImage.file.type },
-        });
-        const { uploadUrl, publicUrl } = urlData.getImageUploadUrl as {
-          uploadUrl: string;
-          publicUrl: string;
-          key: string;
-        };
+        // Upload via backend REST endpoint (POST /uploads/image).
+        // This avoids any CORS issues with direct R2 presigned URLs in production.
+        const publicUrl = await uploadImage(pendingImage.file);
 
-        // 2. PUT the file directly to R2
-        const putResp = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": pendingImage.file.type },
-          body: pendingImage.file,
-        });
-        if (!putResp.ok) throw new Error("Upload failed");
-
-        // 3. Send message with image URL (+ optional caption)
         await sendMessage(conversation.id, trimmed, publicUrl);
 
         URL.revokeObjectURL(pendingImage.previewUrl);
         setPendingImage(null);
-      } catch {
-        setUploadError("Image upload failed. Please try again.");
-        setText(trimmed); // restore text
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Image upload failed.";
+        setUploadError(msg + " Please try again.");
+        setText(trimmed); // restore caption text
       } finally {
         setUploading(false);
       }
