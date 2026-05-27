@@ -944,6 +944,31 @@ export function FeedPostCard({
       ? 0
       : multiPercents.filter((value) => value === multiLeaderPct).length;
 
+  // Winner indices used to visually highlight the winning option when voting is closed
+  const binaryWinnerSide: 0 | 1 | null =
+    isVotingClosed && isBinaryCompare && binaryTotal > 0
+      ? up > down
+        ? 0
+        : down > up
+          ? 1
+          : null
+      : null;
+  const multiWinnerIndex: number | null = (() => {
+    if (!isVotingClosed || !isMultiCompare || multiTotalVotes <= 0 || multiPercents.length === 0) {
+      return null;
+    }
+    const topPct = Math.max(...multiPercents);
+    const leaders = multiPercents.filter((p) => p === topPct);
+    return leaders.length === 1 ? multiPercents.indexOf(topPct) : null;
+  })();
+
+  // True once the viewer has cast at least one vote on this post
+  const hasVoted = isBinaryCompare
+    ? viewer !== null
+    : isMultiCompare
+      ? multiPickDisplayed !== null
+      : false;
+
   const showClassicVoteBar = !compareUrls;
   const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
     post.authorProfileImageUrl,
@@ -1049,8 +1074,19 @@ export function FeedPostCard({
               compareUrls.length > 2
                 ? " ig-post-media-wrap--compare-swiper"
                 : ""
-            }`}
+            }${isVotingClosed ? " ig-post-media-wrap--voting-closed" : ""}`}
           >
+            {isVotingClosed && (
+              <div className="cx-voting-ended-strip" aria-label="Voting has ended">
+                <span className="cx-voting-ended-strip-trophy">🏆</span>
+                <span className="cx-voting-ended-strip-text">
+                  <span className="cx-voting-ended-strip-label">FINAL</span>
+                  <span className="cx-voting-ended-strip-sep">·</span>
+                  <span>Results are in</span>
+                </span>
+                <span className="cx-voting-ended-strip-lock">🔒</span>
+              </div>
+            )}
             {compareUrls.map((url, i) => {
               if (isBinaryCompare) {
                 const side = i as 0 | 1;
@@ -1059,22 +1095,34 @@ export function FeedPostCard({
                   (side === 0 && viewer === "UP") ||
                   (side === 1 && viewer === "DOWN");
                 const colTitle = compareOptionLabel(post, side);
+                const isWinner = binaryWinnerSide === side;
                 return (
                   <button
                     key={`${post.id}-cmp-${i}`}
                     type="button"
-                    className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}`}
+                    className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinner ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}`}
                     disabled={voteControlsDisabled}
                     aria-pressed={picked}
                     aria-label={
-                      picked
-                        ? `Remove vote for ${colTitle}`
-                        : `Vote for ${colTitle}`
+                      isVotingClosed
+                        ? `${colTitle} — ${isWinner ? "winner" : "result"}: ${pct !== null ? `${pct}%` : ""}`
+                        : picked
+                          ? `Remove vote for ${colTitle}`
+                          : `Vote for ${colTitle}`
                     }
                     onClick={() => handleBinaryCompareTap(side)}
                   >
                     <img src={url} alt="" width={1080} height={1080} loading="lazy" />
-                    <span className="ig-compare-pct">
+                    {isVotingClosed && isWinner && (
+                      <span className="cx-winner-crown-badge" aria-hidden>
+                        <span className="cx-winner-crown-icon">👑</span>
+                        <span>WINNER</span>
+                      </span>
+                    )}
+                    {isVotingClosed && !isWinner && (
+                      <span className="cx-loser-scrim" aria-hidden />
+                    )}
+                    <span className={`ig-compare-pct${isVotingClosed && isWinner ? " ig-compare-pct--winner" : ""}${isVotingClosed && !isWinner ? " ig-compare-pct--loser" : ""}`}>
                       <span className="ig-compare-pct-main">{pct !== null ? `${pct}%` : "—"}</span>
                       <span className="ig-compare-pct-sub">{colTitle}</span>
                       <span className="ig-compare-meter" aria-hidden>
@@ -1091,11 +1139,12 @@ export function FeedPostCard({
               const pct = multiPercents[i] ?? 0;
               const picked = multiPickDisplayed === i;
               const colTitle = compareOptionLabel(post, i);
+              const isWinnerCell = multiWinnerIndex === i;
               return (
                 <button
                   key={`${post.id}-cmp-${i}`}
                   type="button"
-                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}`}
+                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}`}
                   disabled={voteControlsDisabled}
                   aria-pressed={picked}
                   aria-label={
@@ -1110,7 +1159,16 @@ export function FeedPostCard({
                   onClick={() => void handleMultiCompareTap(i)}
                 >
                   <img src={url} alt="" width={1080} height={1080} loading="lazy" />
-                  <span className="ig-compare-pct">
+                  {isVotingClosed && isWinnerCell && (
+                    <span className="cx-winner-crown-badge" aria-hidden>
+                      <span className="cx-winner-crown-icon">👑</span>
+                      <span>WINNER</span>
+                    </span>
+                  )}
+                  {isVotingClosed && !isWinnerCell && (
+                    <span className="cx-loser-scrim" aria-hidden />
+                  )}
+                  <span className={`ig-compare-pct${isVotingClosed && isWinnerCell ? " ig-compare-pct--winner" : ""}${isVotingClosed && !isWinnerCell ? " ig-compare-pct--loser" : ""}`}>
                     <span className="ig-compare-pct-main">{`${pct}%`}</span>
                     <span className="ig-compare-pct-sub">{colTitle}</span>
                     <span className="ig-compare-meter" aria-hidden>
@@ -1124,6 +1182,25 @@ export function FeedPostCard({
               );
             })}
           </div>
+          {/* Tap-to-vote hint — visible before any vote is cast, hidden once voted or closed */}
+          {!isVotingClosed && (
+            <div
+              className={`cx-tap-to-vote-hint${hasVoted ? " cx-tap-to-vote-hint--voted" : ""}`}
+              aria-live="polite"
+            >
+              {hasVoted ? (
+                <>
+                  <span className="cx-tap-to-vote-icon">✓</span>
+                  <span>Vote recorded — tap to change</span>
+                </>
+              ) : (
+                <>
+                  <span className="cx-tap-to-vote-icon">👆</span>
+                  <span>Tap an image to cast your vote</span>
+                </>
+              )}
+            </div>
+          )}
         </>
       ) : post.imageUrls[0] ? (
         <div className="ig-post-media-wrap">
@@ -1148,7 +1225,7 @@ export function FeedPostCard({
             <span
               className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
             >
-              {isVotingClosed ? "Result" : votingStatusLabel}
+              {isVotingClosed ? "🏆 Result" : votingStatusLabel}
             </span>
             {isVotingClosed && votingWinnerSummary ? (
               <span className="cx-voting-result">{votingWinnerSummary}</span>
@@ -1211,11 +1288,13 @@ export function FeedPostCard({
 
         {isBinaryCompare ? (
           <div
-            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}`}
+            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
             aria-live="polite"
           >
             <div className="cx-pulse-card-head">
-              <span className="cx-pulse-card-title">Live split</span>
+              <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
+                {isVotingClosed ? "Final results" : "Live split"}
+              </span>
               <span className="cx-pulse-card-metric">
                 {binaryTotal > 0
                   ? `${binaryTotal.toLocaleString()} votes`
@@ -1232,10 +1311,14 @@ export function FeedPostCard({
                 pct != null &&
                 pct === binaryLeaderPct &&
                 pct > 0;
+              const isFinalWinner = isVotingClosed && binaryWinnerSide === side;
               return (
-                <div key={side} className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}`}>
+                <div key={side} className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}${isFinalWinner ? " cx-pulse-row--final-winner" : ""}${isVotingClosed && !isFinalWinner ? " cx-pulse-row--final-loser" : ""}`}>
                   <div className="cx-pulse-row-top">
-                    <span className="cx-pulse-name">{label}</span>
+                    <span className="cx-pulse-name">
+                      {isFinalWinner && <span className="cx-pulse-medal" aria-hidden>🥇 </span>}
+                      {label}
+                    </span>
                     <div className="cx-pulse-row-actions">
                       <span className="cx-pulse-count">
                         {count.toLocaleString()}
@@ -1252,7 +1335,7 @@ export function FeedPostCard({
                   </div>
                   <div className="cx-pulse-track" aria-hidden>
                     <div
-                      className={`cx-pulse-fill cx-pulse-fill--${side === 0 ? "a" : "b"}`}
+                      className={`cx-pulse-fill cx-pulse-fill--${side === 0 ? "a" : "b"}${isFinalWinner ? " cx-pulse-fill--winner" : ""}`}
                       style={{ width: pct != null ? `${pct}%` : "0%" }}
                     />
                   </div>
@@ -1262,11 +1345,13 @@ export function FeedPostCard({
           </div>
         ) : isMultiCompare ? (
           <div
-            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}`}
+            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
             aria-live="polite"
           >
             <div className="cx-pulse-card-head">
-              <span className="cx-pulse-card-title">Breakdown</span>
+              <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
+                {isVotingClosed ? "Final results" : "Breakdown"}
+              </span>
               <span className="cx-pulse-card-metric">
                 {multiTotalVotes.toLocaleString()} votes
               </span>
