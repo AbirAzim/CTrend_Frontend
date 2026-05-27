@@ -962,6 +962,13 @@ export function FeedPostCard({
     return leaders.length === 1 ? multiPercents.indexOf(topPct) : null;
   })();
 
+  // True once the viewer has cast at least one vote on this post
+  const hasVoted = isBinaryCompare
+    ? viewer !== null
+    : isMultiCompare
+      ? multiPickDisplayed !== null
+      : false;
+
   const showClassicVoteBar = !compareUrls;
   const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
     post.authorProfileImageUrl,
@@ -1088,7 +1095,7 @@ export function FeedPostCard({
                   <button
                     key={`${post.id}-cmp-${i}`}
                     type="button"
-                    className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinner ? " ig-compare-cell--winner" : ""}`}
+                    className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinner ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}`}
                     disabled={voteControlsDisabled}
                     aria-pressed={picked}
                     aria-label={
@@ -1123,7 +1130,7 @@ export function FeedPostCard({
                 <button
                   key={`${post.id}-cmp-${i}`}
                   type="button"
-                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}`}
+                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}`}
                   disabled={voteControlsDisabled}
                   aria-pressed={picked}
                   aria-label={
@@ -1152,6 +1159,25 @@ export function FeedPostCard({
               );
             })}
           </div>
+          {/* Tap-to-vote hint — visible before any vote is cast, hidden once voted or closed */}
+          {!isVotingClosed && (
+            <div
+              className={`cx-tap-to-vote-hint${hasVoted ? " cx-tap-to-vote-hint--voted" : ""}`}
+              aria-live="polite"
+            >
+              {hasVoted ? (
+                <>
+                  <span className="cx-tap-to-vote-icon">✓</span>
+                  <span>Vote recorded — tap to change</span>
+                </>
+              ) : (
+                <>
+                  <span className="cx-tap-to-vote-icon">👆</span>
+                  <span>Tap an image to cast your vote</span>
+                </>
+              )}
+            </div>
+          )}
         </>
       ) : post.imageUrls[0] ? (
         <div className="ig-post-media-wrap">

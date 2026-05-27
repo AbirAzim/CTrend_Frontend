@@ -1921,6 +1921,64 @@ a.cx-friend-avatar:hover {
   line-height: 1;
 }
 
+/* ── Tap-to-vote hint ───────────────────────────────────────────────── */
+
+@keyframes hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+
+.cx-tap-to-vote-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 16px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgb(var(--cx-accent-rgb));
+  background: rgb(var(--cx-accent-rgb) / 0.07);
+  border-bottom: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
+}
+
+.cx-tap-to-vote-hint--voted {
+  color: #059669;
+  background: rgb(5 150 105 / 0.07);
+  border-bottom-color: rgb(5 150 105 / 0.18);
+}
+
+.cx-tap-to-vote-icon {
+  font-size: 1rem;
+  line-height: 1;
+  animation: hint-bob 1.6s ease-in-out infinite;
+}
+
+.cx-tap-to-vote-hint--voted .cx-tap-to-vote-icon {
+  animation: none;
+}
+
+/* Pulsing glow on compare cells before a vote is cast */
+@keyframes vote-invite {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1.5px rgb(var(--cx-accent-rgb) / 0.25);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px rgb(var(--cx-accent-rgb) / 0.55),
+      0 0 18px rgb(var(--cx-accent-rgb) / 0.2);
+  }
+}
+
+.ig-compare-cell--unvoted {
+  animation: vote-invite 2.4s ease-in-out infinite;
+}
+
+/* Pause animation on hover so the scale effect is clean */
+.ig-compare-cell--unvoted:hover:not(:disabled) {
+  animation: none;
+}
+
 /* Closed compare cell — cursor + slight dim for non-winners */
 .ig-compare-cell--closed {
   cursor: not-allowed;
@@ -2419,6 +2477,34 @@ a.cx-friend-avatar:hover {
   background: #fff;
   padding-bottom: 8px;
   border-bottom: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Search input inside people modals */
+.cx-modal-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.22);
+  background: rgb(var(--cx-accent-rgb) / 0.06);
+  color: var(--cx-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.18s var(--cx-ease-out), box-shadow 0.18s var(--cx-ease-out);
+}
+
+.cx-modal-search-input:focus {
+  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+  box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.12);
+}
+
+.cx-modal-search-input::placeholder {
+  color: var(--ig-muted);
+  opacity: 1;
 }
 
 .cx-modal-close {
@@ -4134,6 +4220,26 @@ a.cx-action-chip {
 :root[data-theme="dark"] .panel {
   background: rgb(15 23 42 / 0.88);
   border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .ig-modal-card .ig-post-comments-head {
+  background: rgb(15 23 42 / 0.88);
+  border-bottom-color: rgb(148 163 184 / 0.18);
+}
+
+:root[data-theme="dark"] .cx-modal-search-input {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(148 163 184 / 0.28);
+  color: #e6edff;
+}
+
+:root[data-theme="dark"] .cx-modal-search-input:focus {
+  border-color: rgb(165 180 252 / 0.55);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.18);
+}
+
+:root[data-theme="dark"] .cx-modal-search-input::placeholder {
+  color: #94a3b8;
 }
 
 :root[data-theme="dark"] .ig-topbar-logout {
