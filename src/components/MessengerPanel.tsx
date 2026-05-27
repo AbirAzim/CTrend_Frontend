@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLazyQuery, useSubscription } from "@apollo/client";
+import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -7,6 +7,7 @@ import {
   GET_MESSAGES,
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
+import { GET_IMAGE_UPLOAD_URL } from "../graphql/upload";
 
 // ── Emoji picker ────────────────────────────────────────────────────
 const EMOJI_SET = ["😀","😂","❤️","👍","👎","😭","😍","🔥","🎉","😊","🙏","😎","🤔","😅","🥳","💯","👏","😢","😡","✨"];
@@ -20,6 +21,36 @@ function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
         </button>
       ))}
     </div>
+  );
+}
+
+// ── Image bubble ─────────────────────────────────────────────────────
+function ImageBubble({ src, caption }: { src: string; caption?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="cw-bubble-img-wrap">
+        <img
+          src={src}
+          alt="Shared image"
+          className="cw-bubble-img"
+          onClick={() => setOpen(true)}
+          loading="lazy"
+        />
+        {caption && <p className="cw-bubble-caption">{caption}</p>}
+      </div>
+      {open && (
+        <div className="cw-lightbox" onClick={() => setOpen(false)}>
+          <button
+            type="button"
+            className="cw-lightbox-close"
+            aria-label="Close"
+            onClick={() => setOpen(false)}
+          >×</button>
+          <img src={src} alt="Full size" className="cw-lightbox-img" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -44,12 +75,20 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const [hasMore, setHasMore] = useState(true);
   const [minimized, setMinimized] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+
+  // Image state
+  const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const historyFetched = useRef(false);
 
   const [fetchMessages] = useLazyQuery(GET_MESSAGES, { fetchPolicy: "no-cache" });
+  const [getUploadUrl] = useMutation(GET_IMAGE_UPLOAD_URL);
 
   useSubscription(TYPING_INDICATOR_SUB, {
     variables: { conversationId: conversation.id },
@@ -89,6 +128,15 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     if (!minimized) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, minimized]);
 
+  // Mark as read whenever new messages land while the window is visible.
+  // This covers the case where the window is already open when a message arrives
+  // — the conversation.id effect above only fires on window open, not on new msgs.
+  useEffect(() => {
+    if (!minimized && messages.length > 0) {
+      markRead(conversation.id);
+    }
+  }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadOlder() {
     if (loadingHistory || !hasMore) return;
     setLoadingHistory(true);
@@ -102,13 +150,67 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     setLoadingHistory(false);
   }
 
+  function handlePickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // revoke old preview
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+    setUploadError(null);
+    // reset so the same file can be re-picked
+    e.target.value = "";
+  }
+
+  function removePendingImage() {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage(null);
+    setUploadError(null);
+  }
+
   async function handleSend() {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && !pendingImage) return;
+
     setText("");
     setShowEmoji(false);
     setTyping(conversation.id, false);
-    await sendMessage(conversation.id, trimmed);
+
+    if (pendingImage) {
+      setUploading(true);
+      setUploadError(null);
+      try {
+        // 1. Get presigned URL from backend
+        const { data: urlData } = await getUploadUrl({
+          variables: { filename: pendingImage.file.name, contentType: pendingImage.file.type },
+        });
+        const { uploadUrl, publicUrl } = urlData.getImageUploadUrl as {
+          uploadUrl: string;
+          publicUrl: string;
+          key: string;
+        };
+
+        // 2. PUT the file directly to R2
+        const putResp = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": pendingImage.file.type },
+          body: pendingImage.file,
+        });
+        if (!putResp.ok) throw new Error("Upload failed");
+
+        // 3. Send message with image URL (+ optional caption)
+        await sendMessage(conversation.id, trimmed, publicUrl);
+
+        URL.revokeObjectURL(pendingImage.previewUrl);
+        setPendingImage(null);
+      } catch {
+        setUploadError("Image upload failed. Please try again.");
+        setText(trimmed); // restore text
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      await sendMessage(conversation.id, trimmed);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -134,6 +236,8 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     .filter((m) => m.senderId === user?.id)
     .reverse()
     .find((m) => m.readBy.some((r) => r.userId !== user?.id));
+
+  const canSend = (text.trim().length > 0 || pendingImage !== null) && !uploading;
 
   return (
     <div className={`cw-window${minimized ? " cw-window--min" : ""}`}>
@@ -182,9 +286,14 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
       {!minimized && (
         <>
           {/* Message list */}
-          <div className="cw-body" ref={scrollRef} onScroll={(e) => {
-            if ((e.target as HTMLDivElement).scrollTop < 50) void loadOlder();
-          }}>
+          <div
+            className="cw-body"
+            ref={scrollRef}
+            onClick={() => markRead(conversation.id)}
+            onScroll={(e) => {
+              if ((e.target as HTMLDivElement).scrollTop < 50) void loadOlder();
+            }}
+          >
             {loadingHistory && (
               <div className="cw-loading">
                 <span className="cw-loading-dots"><span/><span/><span/></span>
@@ -198,12 +307,13 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
               const isMine = msg.senderId === user?.id;
               const prevMsg = messages[i - 1];
               const nextMsg = messages[i + 1];
-              // Group consecutive messages from the same sender
               const isGroupStart = !prevMsg || prevMsg.senderId !== msg.senderId;
               const isGroupEnd   = !nextMsg || nextMsg.senderId !== msg.senderId;
               const isLast = i === messages.length - 1;
               const seenByOther = isMine && msg.readBy.some((r) => r.userId !== user?.id);
               const showSeen = isLast && isMine && (seenByOther || mySeenBy?.id === msg.id);
+              const hasImage = Boolean(msg.imageUrl);
+              const hasText = Boolean(msg.text?.trim());
 
               return (
                 <div
@@ -227,17 +337,35 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
                   )}
 
                   <div className="cw-msg-content">
-                    <div className={[
-                      "cw-bubble",
-                      isMine ? "cw-bubble--mine" : "cw-bubble--theirs",
-                      isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
-                      isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
-                    ].filter(Boolean).join(" ")}>
-                      {msg.text}
-                      <span className="cw-bubble-time">
-                        {formatRelativeTime(msg.createdAt)}
-                      </span>
-                    </div>
+                    {/* Image-only or image+caption bubble */}
+                    {hasImage ? (
+                      <div className={[
+                        "cw-bubble",
+                        "cw-bubble--img",
+                        isMine ? "cw-bubble--mine" : "cw-bubble--theirs",
+                        isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
+                        isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
+                      ].filter(Boolean).join(" ")}>
+                        <ImageBubble src={msg.imageUrl!} caption={hasText ? msg.text : undefined} />
+                        <span className="cw-bubble-time">
+                          {formatRelativeTime(msg.createdAt)}
+                        </span>
+                      </div>
+                    ) : (
+                      /* Text-only bubble */
+                      <div className={[
+                        "cw-bubble",
+                        isMine ? "cw-bubble--mine" : "cw-bubble--theirs",
+                        isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
+                        isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
+                      ].filter(Boolean).join(" ")}>
+                        {msg.text}
+                        <span className="cw-bubble-time">
+                          {formatRelativeTime(msg.createdAt)}
+                        </span>
+                      </div>
+                    )}
+
                     {showSeen && (
                       <span className="cw-seen">
                         {otherParticipants[0]?.avatarUrl ? (
@@ -274,12 +402,59 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
             <div ref={bottomRef} />
           </div>
 
+          {/* Pending image preview */}
+          {pendingImage && (
+            <div className="cw-img-preview-bar">
+              <div className="cw-img-preview-thumb-wrap">
+                <img
+                  src={pendingImage.previewUrl}
+                  alt="Preview"
+                  className="cw-img-preview-thumb"
+                />
+                {uploading && (
+                  <div className="cw-img-preview-spinner">
+                    <span className="cw-upload-spinner" />
+                  </div>
+                )}
+              </div>
+              <div className="cw-img-preview-meta">
+                <span className="cw-img-preview-name">{pendingImage.file.name}</span>
+                <span className="cw-img-preview-size">
+                  {(pendingImage.file.size / 1024).toFixed(0)} KB
+                </span>
+                {uploadError && <span className="cw-img-preview-error">{uploadError}</span>}
+              </div>
+              {!uploading && (
+                <button
+                  type="button"
+                  className="cw-img-preview-remove"
+                  aria-label="Remove image"
+                  onClick={removePendingImage}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="14" height="14" aria-hidden>
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Emoji picker */}
           {showEmoji && (
             <EmojiPicker onPick={(e) => { setText((t) => t + e); inputRef.current?.focus(); }} />
           )}
 
-          {/* Input */}
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+            style={{ display: "none" }}
+            onChange={handlePickImage}
+            aria-label="Choose image"
+          />
+
+          {/* Footer */}
           <div className="cw-footer">
             <button
               type="button"
@@ -289,27 +464,49 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
             >
               {showEmoji ? "😊" : "🙂"}
             </button>
+
+            {/* Image attach button */}
+            <button
+              type="button"
+              className={`cw-img-btn${pendingImage ? " cw-img-btn--active" : ""}`}
+              aria-label="Attach image"
+              title="Send image"
+              onClick={() => { setShowEmoji(false); fileInputRef.current?.click(); }}
+              disabled={uploading}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17" aria-hidden>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+
             <div className="cw-input-wrap">
               <textarea
                 ref={inputRef}
                 className="cw-input"
                 rows={1}
                 value={text}
-                placeholder="Message…"
+                placeholder={pendingImage ? "Add a caption…" : "Message…"}
                 onChange={(e) => handleInput(e.target.value)}
                 onKeyDown={handleKeyDown}
+                disabled={uploading}
               />
             </div>
             <button
               type="button"
-              className={`cw-send-btn${text.trim() ? " cw-send-btn--active" : ""}`}
+              className={`cw-send-btn${canSend ? " cw-send-btn--active" : ""}`}
               aria-label="Send"
-              disabled={!text.trim()}
+              disabled={!canSend}
               onClick={() => void handleSend()}
             >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden>
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
+              {uploading ? (
+                <span className="cw-upload-spinner cw-upload-spinner--sm" />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden>
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              )}
             </button>
           </div>
         </>
