@@ -126,3 +126,53 @@ export function playNotificationChime(): void {
     } catch { /* ignore */ }
   });
 }
+
+/**
+ * Rising "bwoop" confirmation — two-stage pop + shimmer.
+ *
+ * Stage 1 (0 – 220 ms): triangle-wave pluck that sweeps C4→G5 (262→784 Hz).
+ *   Triangle has richer harmonics than pure sine, giving a warm "thwop" feel
+ *   without harshness.  Quick attack (5 ms) + smooth exponential decay.
+ *
+ * Stage 2 (80 – 350 ms): a quiet high-frequency sparkle (sine, ~2 600 Hz)
+ *   that fades in as the pluck fades out.  This "shimmer" layer reads as
+ *   the vote "landing" with a satisfying glint.
+ *
+ * Total duration ≈ 360 ms — short enough to never feel intrusive.
+ */
+export function playVoteSound(): void {
+  void runningCtx().then((ctx) => {
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+
+      // — Stage 1: rising pluck (triangle, C4 → G5) —
+      const pluck     = ctx.createOscillator();
+      const pluckGain = ctx.createGain();
+      pluck.type = "triangle";
+      pluck.frequency.setValueAtTime(262, now);
+      pluck.frequency.exponentialRampToValueAtTime(784, now + 0.18);
+      pluckGain.gain.setValueAtTime(0,    now);
+      pluckGain.gain.linearRampToValueAtTime(0.18, now + 0.005);
+      pluckGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      pluck.connect(pluckGain);
+      pluckGain.connect(ctx.destination);
+      pluck.start(now);
+      pluck.stop(now + 0.24);
+
+      // — Stage 2: shimmer sparkle (sine, ~2 600 Hz) —
+      const spark     = ctx.createOscillator();
+      const sparkGain = ctx.createGain();
+      spark.type = "sine";
+      spark.frequency.setValueAtTime(2600, now + 0.08);
+      spark.frequency.exponentialRampToValueAtTime(2200, now + 0.32);
+      sparkGain.gain.setValueAtTime(0,     now + 0.08);
+      sparkGain.gain.linearRampToValueAtTime(0.055, now + 0.12);
+      sparkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+      spark.connect(sparkGain);
+      sparkGain.connect(ctx.destination);
+      spark.start(now + 0.08);
+      spark.stop(now + 0.38);
+    } catch { /* ignore */ }
+  });
+}

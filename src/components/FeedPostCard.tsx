@@ -28,6 +28,7 @@ import { apolloClient } from "../lib/apolloClient";
 import { postPermalink } from "../lib/postPermalink";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { playVoteSound } from "../lib/notificationSound";
 import type { FeedPostView, VoteDirectionGql } from "../types/feed";
 
 function storyInitial(name: string): string {
@@ -245,6 +246,15 @@ export function FeedPostCard({
   const [commentError, setCommentError] = useState<string | null>(null);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
+  const [justVotedIndex, setJustVotedIndex] = useState<number | null>(null);
+  const justVotedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [justUnvotedIndex, setJustUnvotedIndex] = useState<number | null>(null);
+  const justUnvotedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voteInFlight = useRef(false);
+  /** Latest vote intent queued while a mutation is already in flight. */
+  const pendingVoteRef = useRef<{ selectedOptionIndex: number } | null>(null);
+  /** Epoch ms: suppress subscription overrides until this timestamp expires. */
+  const voteGuardUntilRef = useRef(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [shareHint, setShareHint] = useState<string | null>(null);
@@ -289,6 +299,13 @@ export function FeedPostCard({
     onData: ({ data }) => {
       const next = data.data?.postVoteUpdated;
       if (!next || next.id !== post.id) {
+        return;
+      }
+      // Suppress subscription while a vote mutation is in flight or just settled,
+      // so a stale broadcast can't revert the user's latest optimistic state.
+      if (voteInFlight.current || Date.now() < voteGuardUntilRef.current) {
+        setVoteFx(true);
+        setTimeout(() => setVoteFx(false), 280);
         return;
       }
       setOptimisticVote({
@@ -373,6 +390,13 @@ export function FeedPostCard({
   }, [showVoters]);
 
   useEffect(() => {
+    // When Apollo writes subscription data to the cache, post props change and
+    // this effect runs.  Don't wipe optimistic state while a vote sequence is
+    // still in flight — clearing it here would revert the UI to the stale
+    // server snapshot that triggered the prop change.
+    if (voteInFlight.current || Date.now() < voteGuardUntilRef.current) {
+      return;
+    }
     setOptimisticVote(null);
     setHypeCountLive(post.hypeCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
@@ -530,7 +554,7 @@ export function FeedPostCard({
     post.viewerCompareChoice ?? null,
   );
 
-  const [voteMut, { loading: voting }] = useMutation<VotePostMutationData>(VOTE_POST);
+  const [voteMut] = useMutation<VotePostMutationData>(VOTE_POST);
 
   const useApiMulti =
     voteMode === "api" &&
@@ -613,7 +637,9 @@ export function FeedPostCard({
       : votingHasEndDate
         ? `Ends ${formatRelativeTime(activeVotingEndsAt) || ""}`
       : "Voting open";
-  const voteControlsDisabled = (voteMode === "api" && voting) || isVotingClosed;
+  // Buttons stay enabled while mutation is in flight — `voteInFlight` ref
+  // prevents duplicate submissions without the cursor: not-allowed flash.
+  const voteControlsDisabled = isVotingClosed;
 
   const meLabel =
     authUser?.displayName?.trim() ||
@@ -663,6 +689,19 @@ export function FeedPostCard({
     });
   }
 
+  function setJustVoted(index: number) {
+    if (justVotedTimer.current !== null) clearTimeout(justVotedTimer.current);
+    setJustVotedIndex(index);
+    justVotedTimer.current = setTimeout(() => setJustVotedIndex(null), 750);
+  }
+
+  /** Triggers the exit animation on the cell the user is leaving when switching votes. */
+  function setJustUnvoted(index: number) {
+    if (justUnvotedTimer.current !== null) clearTimeout(justUnvotedTimer.current);
+    setJustUnvotedIndex(index);
+    justUnvotedTimer.current = setTimeout(() => setJustUnvotedIndex(null), 500);
+  }
+
   function applyServerVoteSnapshot(
     payload: VotePostMutationData["votePost"] | undefined,
     selectedOptionIndex: number,
@@ -701,6 +740,9 @@ export function FeedPostCard({
       isVotingOpen: activeIsVotingOpen,
       votingEndsAt: activeVotingEndsAt,
     });
+    // Hold the subscription guard briefly so late-arriving broadcasts for
+    // older votes don't overwrite the confirmed server result.
+    voteGuardUntilRef.current = Date.now() + 500;
     setVoteFx(true);
     setTimeout(() => setVoteFx(false), 220);
   }
@@ -733,18 +775,24 @@ export function FeedPostCard({
         if (localViewer === "DOWN") {
           nextDown -= 1;
           nextUp += 1;
+          setJustUnvoted(1); // leaving the DOWN cell
         } else if (localViewer !== "UP") {
           nextUp += 1;
         }
         nextV = "UP";
+        setJustVoted(0);
+        playVoteSound();
       } else if (direction === "DOWN") {
         if (localViewer === "UP") {
           nextUp -= 1;
           nextDown += 1;
+          setJustUnvoted(0); // leaving the UP cell
         } else if (localViewer !== "DOWN") {
           nextDown += 1;
         }
         nextV = "DOWN";
+        setJustVoted(1);
+        playVoteSound();
       }
 
       setLocalUp(Math.max(0, nextUp));
@@ -758,22 +806,87 @@ export function FeedPostCard({
     }
 
     const selectedOptionIndex = clicked === "UP" ? 0 : 1;
-    try {
-      const { data } = await voteMut({
-        variables: {
-          postId: post.id,
-          selectedOptionIndex,
-          anonymous: anonymousVote,
-        },
-      });
-      applyServerVoteSnapshot(data?.votePost, selectedOptionIndex);
-    } catch (err: unknown) {
-      const message = getApolloErrorMessage(err);
-      await refreshPostVotingState();
-      if (/voting period has ended/i.test(message)) {
-        return;
+
+    // Compute instant optimistic counts before the server round-trip.
+    const curUp   = optimisticVote?.upvoteCount   ?? post.upvoteCount;
+    const curDown = optimisticVote?.downvoteCount  ?? post.downvoteCount;
+    const curVote = optimisticVote?.viewerVote     ?? post.viewerVote ?? null;
+    let newUp   = curUp;
+    let newDown = curDown;
+    if (clicked === "UP") {
+      newUp += 1;
+      if (curVote === "DOWN") newDown = Math.max(0, newDown - 1);
+    } else {
+      newDown += 1;
+      if (curVote === "UP") newUp = Math.max(0, newUp - 1);
+    }
+    const newBinaryTotal = newUp + newDown;
+    const curBinaryStats = optimisticVote?.optionStats ?? activeOptionStats ?? null;
+    const newBinaryStats = curBinaryStats
+      ? curBinaryStats.map((s) => {
+          const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
+          return { ...s, count: c, percentage: newBinaryTotal > 0 ? (c / newBinaryTotal) * 100 : 0 };
+        })
+      : null;
+
+    // Show feedback instantly — do not wait for the server.
+    playVoteSound();
+    // If switching from the other side, trigger the exit animation on that cell.
+    const prevPickedIndex = curVote === "UP" ? 0 : curVote === "DOWN" ? 1 : null;
+    if (prevPickedIndex !== null && prevPickedIndex !== selectedOptionIndex) {
+      setJustUnvoted(prevPickedIndex);
+    }
+    setOptimisticVote({
+      upvoteCount:           newUp,
+      downvoteCount:         newDown,
+      viewerVote:            clicked,
+      mySelectedOptionIndex: selectedOptionIndex,
+      optionStats:           newBinaryStats,
+      isVotingOpen:          optimisticVote?.isVotingOpen ?? activeIsVotingOpen,
+      votingEndsAt:          optimisticVote?.votingEndsAt ?? activeVotingEndsAt,
+    });
+    setJustVoted(selectedOptionIndex);
+
+    // Arm the subscription guard so a concurrent broadcast can't overwrite our state.
+    voteGuardUntilRef.current = Date.now() + 2000;
+    if (voteInFlight.current) {
+      // A mutation is already in flight — queue this as the latest intent and
+      // let the running loop pick it up when it completes.
+      pendingVoteRef.current = { selectedOptionIndex };
+      return;
+    }
+    voteInFlight.current = true;
+    let currentIdx = selectedOptionIndex;
+    // Loop: after each mutation, check whether a newer tap came in.  If so,
+    // skip applying that result and immediately fire another mutation for the
+    // latest intent — ensuring the server always lands on the user's last choice.
+    while (true) {
+      try {
+        const { data } = await voteMut({
+          variables: {
+            postId: post.id,
+            selectedOptionIndex: currentIdx,
+            anonymous: anonymousVote,
+          },
+        });
+        const pending = pendingVoteRef.current;
+        pendingVoteRef.current = null;
+        if (!pending) {
+          applyServerVoteSnapshot(data?.votePost, currentIdx);
+          break;
+        }
+        // Newer intent queued — discard this stale result and loop.
+        currentIdx = pending.selectedOptionIndex;
+      } catch (err: unknown) {
+        pendingVoteRef.current = null;
+        setOptimisticVote(null); // revert on error
+        const message = getApolloErrorMessage(err);
+        await refreshPostVotingState();
+        if (/voting period has ended/i.test(message)) break;
+        break;
       }
     }
+    voteInFlight.current = false;
   }
 
   function handleBinaryCompareTap(side: 0 | 1) {
@@ -796,22 +909,74 @@ export function FeedPostCard({
       if (activeMySelectedOptionIndex === index) {
         return;
       }
-      try {
-        const { data } = await voteMut({
-          variables: {
-            postId: post.id,
-            selectedOptionIndex: index,
-            anonymous: anonymousVote,
-          },
+
+      // Compute instant optimistic counts — increment new pick, decrement old.
+      const curPickMulti  = activeMySelectedOptionIndex;
+      const curStatsMulti = optimisticVote?.optionStats ?? activeOptionStats ?? null;
+      const newStatsMulti = (() => {
+        if (!curStatsMulti) return null;
+        const updated = curStatsMulti.map((s) => {
+          let c = s.count;
+          if (s.index === index) c += 1;
+          if (curPickMulti !== null && s.index === curPickMulti) c = Math.max(0, c - 1);
+          return { ...s, count: c };
         });
-        applyServerVoteSnapshot(data?.votePost, index);
-      } catch (err: unknown) {
-        const message = getApolloErrorMessage(err);
-        await refreshPostVotingState();
-        if (/voting period has ended/i.test(message)) {
-          return;
+        const total = updated.reduce((a, s) => a + s.count, 0);
+        return updated.map((s) => ({
+          ...s,
+          percentage: total > 0 ? (s.count / total) * 100 : 0,
+        }));
+      })();
+
+      // Instant feedback before server round-trip.
+      playVoteSound();
+      if (curPickMulti !== null && curPickMulti !== index) {
+        setJustUnvoted(curPickMulti); // exit animation on the cell being left
+      }
+      setOptimisticVote({
+        upvoteCount:           optimisticVote?.upvoteCount  ?? post.upvoteCount,
+        downvoteCount:         optimisticVote?.downvoteCount ?? post.downvoteCount,
+        viewerVote:            optimisticVote?.viewerVote   ?? post.viewerVote,
+        mySelectedOptionIndex: index,
+        optionStats:           newStatsMulti,
+        isVotingOpen:          optimisticVote?.isVotingOpen  ?? activeIsVotingOpen,
+        votingEndsAt:          optimisticVote?.votingEndsAt  ?? activeVotingEndsAt,
+      });
+      setJustVoted(index);
+
+      voteGuardUntilRef.current = Date.now() + 2000;
+      if (voteInFlight.current) {
+        pendingVoteRef.current = { selectedOptionIndex: index };
+        return;
+      }
+      voteInFlight.current = true;
+      let currentMultiIdx = index;
+      while (true) {
+        try {
+          const { data } = await voteMut({
+            variables: {
+              postId: post.id,
+              selectedOptionIndex: currentMultiIdx,
+              anonymous: anonymousVote,
+            },
+          });
+          const pending = pendingVoteRef.current;
+          pendingVoteRef.current = null;
+          if (!pending) {
+            applyServerVoteSnapshot(data?.votePost, currentMultiIdx);
+            break;
+          }
+          currentMultiIdx = pending.selectedOptionIndex;
+        } catch (err: unknown) {
+          pendingVoteRef.current = null;
+          setOptimisticVote(null);
+          const message = getApolloErrorMessage(err);
+          await refreshPostVotingState();
+          if (/voting period has ended/i.test(message)) break;
+          break;
         }
       }
+      voteInFlight.current = false;
       return;
     }
 
@@ -832,6 +997,8 @@ export function FeedPostCard({
         return next;
       });
       setMultiPick(index);
+      setJustVoted(index);
+      playVoteSound();
       return;
     }
 
@@ -843,6 +1010,9 @@ export function FeedPostCard({
       return next;
     });
     setMultiPick(index);
+    setJustUnvoted(j); // exit animation on the cell being left
+    setJustVoted(index);
+    playVoteSound();
   }
 
   const binaryTotal = up + down;
@@ -967,7 +1137,7 @@ export function FeedPostCard({
     ? viewer !== null
     : isMultiCompare
       ? multiPickDisplayed !== null
-      : false;
+      : viewer !== null; // classic UP/DOWN bar
 
   const showClassicVoteBar = !compareUrls;
   const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
@@ -1087,6 +1257,35 @@ export function FeedPostCard({
                 <span className="cx-voting-ended-strip-lock">🔒</span>
               </div>
             )}
+            {/* Floating vote-status chip — overlaid over the voted cell */}
+            {!isVotingClosed && (
+              <span
+                className={`cx-vote-status-chip cx-vote-status-chip--overlay${
+                  hasVoted
+                    ? " cx-vote-status-chip--voted" +
+                      (isBinaryCompare
+                        ? viewer === "DOWN"
+                          ? " cx-vote-status-chip--side-b cx-vote-status-chip--pos-right"
+                          : " cx-vote-status-chip--pos-left"
+                        : isMultiCompare
+                          ? " cx-vote-status-chip--side-multi"
+                          : "")
+                    : " cx-vote-status-chip--pending"
+                }`}
+                aria-label={hasVoted ? "You have voted on this post" : "You haven't voted yet"}
+              >
+                {hasVoted ? (
+                  <>
+                    <svg viewBox="0 0 14 14" fill="currentColor" width="10" height="10" aria-hidden style={{opacity: 0.9}}>
+                      <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
+                    </svg>
+                    Voted
+                  </>
+                ) : (
+                  "Cast Vote"
+                )}
+              </span>
+            )}
             {compareUrls.map((url, i) => {
               if (isBinaryCompare) {
                 const side = i as 0 | 1;
@@ -1100,19 +1299,31 @@ export function FeedPostCard({
                   <button
                     key={`${post.id}-cmp-${i}`}
                     type="button"
-                    className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinner ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}`}
+                    className={`ig-compare-cell ig-compare-cell--binary-${side === 0 ? "a" : "b"}${picked ? " ig-compare-cell--picked" : ""}${hasVoted && !picked && !isVotingClosed ? " ig-compare-cell--unchosen" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinner ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}${justVotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-voted" : ""}${justUnvotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-unvoted" : ""}`}
                     disabled={voteControlsDisabled}
                     aria-pressed={picked}
                     aria-label={
                       isVotingClosed
                         ? `${colTitle} — ${isWinner ? "winner" : "result"}: ${pct !== null ? `${pct}%` : ""}`
                         : picked
-                          ? `Remove vote for ${colTitle}`
+                          ? `Your choice: ${colTitle} — tap to change`
                           : `Vote for ${colTitle}`
                     }
                     onClick={() => handleBinaryCompareTap(side)}
                   >
                     <img src={url} alt="" width={1080} height={1080} loading="lazy" />
+                    {/* Permanent "your pick" seal — top-right corner pin */}
+                    {picked && !isVotingClosed && (
+                      <span className="cx-voted-pin" aria-label="Your choice">
+                        <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
+                          <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
+                        </svg>
+                      </span>
+                    )}
+                    {/* One-shot light flash on vote */}
+                    {justVotedIndex === i && !isVotingClosed && (
+                      <span className="cx-vote-flash" aria-hidden />
+                    )}
                     {isVotingClosed && isWinner && (
                       <span className="cx-winner-crown-badge" aria-hidden>
                         <span className="cx-winner-crown-icon">👑</span>
@@ -1144,21 +1355,27 @@ export function FeedPostCard({
                 <button
                   key={`${post.id}-cmp-${i}`}
                   type="button"
-                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}`}
+                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}${hasVoted && !picked && !isVotingClosed ? " ig-compare-cell--unchosen" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}${justVotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-voted" : ""}${justUnvotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-unvoted" : ""}`}
                   disabled={voteControlsDisabled}
                   aria-pressed={picked}
                   aria-label={
-                    voteMode === "api"
-                      ? picked
-                        ? `Your vote: ${colTitle}`
-                        : `Vote for ${colTitle}`
-                      : picked
-                        ? `Remove vote for ${colTitle}`
-                        : `Vote for ${colTitle}`
+                    picked
+                      ? `Your choice: ${colTitle} — tap to change`
+                      : `Vote for ${colTitle}`
                   }
                   onClick={() => void handleMultiCompareTap(i)}
                 >
                   <img src={url} alt="" width={1080} height={1080} loading="lazy" />
+                  {picked && !isVotingClosed && (
+                    <span className="cx-voted-pin" aria-label="Your choice">
+                      <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
+                        <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
+                      </svg>
+                    </span>
+                  )}
+                  {justVotedIndex === i && !isVotingClosed && (
+                    <span className="cx-vote-flash" aria-hidden />
+                  )}
                   {isVotingClosed && isWinnerCell && (
                     <span className="cx-winner-crown-badge" aria-hidden>
                       <span className="cx-winner-crown-icon">👑</span>
@@ -1417,7 +1634,7 @@ export function FeedPostCard({
             <div className="ig-vote-actions">
               <button
                 type="button"
-                className={`ig-vote-btn${viewer === "UP" ? " ig-vote-btn--active-up" : ""}`}
+                className={`ig-vote-btn${viewer === "UP" ? " ig-vote-btn--active-up" : ""}${justVotedIndex === 0 ? " ig-vote-btn--just-voted" : ""}`}
                 disabled={voteControlsDisabled}
                 aria-pressed={viewer === "UP"}
                 aria-label={viewer === "UP" ? "Remove upvote" : "Upvote"}
@@ -1428,7 +1645,7 @@ export function FeedPostCard({
               </button>
               <button
                 type="button"
-                className={`ig-vote-btn${viewer === "DOWN" ? " ig-vote-btn--active-down" : ""}`}
+                className={`ig-vote-btn${viewer === "DOWN" ? " ig-vote-btn--active-down" : ""}${justVotedIndex === 1 ? " ig-vote-btn--just-voted" : ""}`}
                 disabled={voteControlsDisabled}
                 aria-pressed={viewer === "DOWN"}
                 aria-label={viewer === "DOWN" ? "Remove downvote" : "Downvote"}
