@@ -535,6 +535,18 @@ a:hover {
     background 0.28s var(--cx-ease-out);
 }
 
+body.capacitor-android .ig-topbar,
+body.capacitor .ig-topbar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgb(255 255 255 / 0.94);
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.2s ease-out,
+    box-shadow 0.2s ease-out,
+    background 0.18s ease-out;
+}
+
 .ig-topbar--hidden {
   opacity: 0.14;
   transform: translateY(-10px) scale(0.98);
@@ -577,6 +589,19 @@ a:hover {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+/* Performance mode for native WebView. */
+body.capacitor-android .ig-app::before,
+body.capacitor .ig-app::before {
+  animation: none;
+  background: linear-gradient(165deg, #f3f2f5 0%, #eef2f8 55%, #e9edf4 100%);
+}
+
+body.capacitor-android .ig-logo,
+body.capacitor .ig-logo {
+  animation: none;
+  background-size: 100% auto;
 }
 
 .ig-logo:hover {
@@ -695,6 +720,52 @@ a:hover {
   transition:
     transform 0.4s var(--cx-ease-spring),
     opacity 0.4s var(--cx-ease-out);
+}
+
+body.capacitor-android .ig-bottom-nav,
+body.capacitor .ig-bottom-nav {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.12);
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.2s ease-out;
+}
+
+body.capacitor-android .ig-main-scroll,
+body.capacitor .ig-main-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Big smoothness boost on Android: reduce card paint/animation cost. */
+body.capacitor-android .ig-feed .ig-post,
+body.capacitor .ig-feed .ig-post {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  box-shadow: 0 1px 6px rgb(15 23 42 / 0.08);
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 560px;
+}
+
+body.capacitor-android .ig-post::before,
+body.capacitor .ig-post::before {
+  display: none;
+}
+
+body.capacitor-android .ig-post .ig-avatar.sm,
+body.capacitor .ig-post .ig-avatar.sm {
+  transition: none;
+  box-shadow: none;
+}
+
+body.capacitor-android .ig-post-media,
+body.capacitor .ig-post-media {
+  transition: none !important;
+  transform: none !important;
 }
 
 .ig-bottom-nav--hidden {
