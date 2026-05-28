@@ -2691,23 +2691,24 @@ a.cx-friend-avatar:hover {
   flex-shrink: 0;
 }
 
-/* Cast Vote — pulsing accent outline */
-@keyframes cx-chip-border-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--cx-accent-rgb) / 0); }
-     50%    { box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.18); }
+/* Cast Vote — solid pill with a breathing glow */
+@keyframes cx-chip-pending-pulse {
+  0%, 100% { box-shadow: 0 2px 10px rgb(var(--cx-accent-rgb) / 0.25), 0 0 0 0   rgb(var(--cx-accent-rgb) / 0); }
+     50%    { box-shadow: 0 2px 14px rgb(var(--cx-accent-rgb) / 0.45), 0 0 0 4px rgb(var(--cx-accent-rgb) / 0.14); }
 }
 
 .cx-vote-status-chip--pending {
-  background: transparent;
+  background: rgba(255 255 255 / 0.95);
   color: var(--cx-accent);
-  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.38);
-  animation: cx-chip-border-pulse 2.4s ease-in-out infinite;
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.7);
+  animation: cx-chip-pending-pulse 2.2s ease-in-out infinite;
 }
 
 /* Dark-mode */
 :root[data-theme="dark"] .cx-vote-status-chip--pending {
-  color: var(--cx-accent);
-  border-color: rgb(var(--cx-accent-rgb) / 0.45);
+  background: rgba(30 27 75 / 0.88);
+  color: #a5b4fc;
+  border-color: rgba(165 180 252 / 0.6);
 }
 
 .cx-pulse-inline {
@@ -8756,6 +8757,48 @@ a.cx-profile-btn-accent {
 .mp-panel-close-btn:hover { background: rgba(0,0,0,.1); }
 [data-theme="dark"] .mp-panel-close-btn { background: rgba(255,255,255,.08); }
 [data-theme="dark"] .mp-panel-close-btn:hover { background: rgba(255,255,255,.14); }
+
+/* Compose / back icon button — same size as close btn */
+.mp-panel-icon-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,.06);
+  color: var(--cx-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.mp-panel-icon-btn:hover { background: rgb(var(--cx-accent-rgb) / 0.12); }
+[data-theme="dark"] .mp-panel-icon-btn { background: rgba(255,255,255,.08); }
+
+/* Friend row */
+.mp-item--friend { cursor: pointer; }
+.mp-item--friend:hover .mp-item-last { color: var(--cx-accent); }
+.mp-item--starting { opacity: 0.6; pointer-events: none; }
+
+.mp-item-msg-icon {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: rgb(var(--cx-accent-rgb) / 0.5);
+  transition: color 0.15s;
+}
+.mp-item--friend:hover .mp-item-msg-icon { color: var(--cx-accent); }
+
+/* "Message a friend" inline link in empty state */
+.mp-new-msg-link {
+  background: none;
+  border: none;
+  color: var(--cx-accent);
+  font-weight: 700;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* Search */
 .mp-search-wrap {

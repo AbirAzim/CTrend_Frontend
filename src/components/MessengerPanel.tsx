@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLazyQuery, useSubscription } from "@apollo/client";
+import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -8,6 +8,7 @@ import {
   GET_MESSAGES,
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
+import { MY_FRIENDS } from "../graphql/friends";
 
 // ── Emoji picker ────────────────────────────────────────────────────
 const EMOJI_SET = ["😀","😂","❤️","👍","👎","😭","😍","🔥","🎉","😊","🙏","😎","🤔","😅","🥳","💯","👏","😢","😡","✨"];
@@ -521,6 +522,13 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
 }
 
 // ── Messenger Panel ──────────────────────────────────────────────────
+type FriendRow = {
+  id: string;
+  displayName?: string | null;
+  username: string;
+  profileImageUrl?: string | null;
+};
+
 export function MessengerPanel() {
   const { isAuthenticated, user } = useAuth();
   const {
@@ -530,11 +538,18 @@ export function MessengerPanel() {
     totalUnread,
     panelOpen,
     setPanelOpen,
-    openChat,
     refetchConversations,
+    startDirectConversation,
   } = useMessenger();
 
   const [search, setSearch] = useState("");
+  const [startingId, setStartingId] = useState<string | null>(null);
+
+  // Always load friends so we can show a unified contact list
+  const { data: friendsData, loading: friendsLoading } = useQuery<{ myFriends: FriendRow[] }>(
+    MY_FRIENDS,
+    { skip: !isAuthenticated, fetchPolicy: "cache-and-network" },
+  );
 
   if (!isAuthenticated) return null;
 
@@ -542,13 +557,60 @@ export function MessengerPanel() {
     .map((id) => conversations.find((c) => c.id === id))
     .filter(Boolean) as Conversation[];
 
-  const filteredConvos = search.trim()
-    ? conversations.filter((c) => {
-        const others = c.participants.filter((p) => p.id !== user?.id);
-        const name = c.name || others.map((p) => p.displayName).join(", ") || "";
-        return name.toLowerCase().includes(search.toLowerCase());
-      })
-    : conversations;
+  // Build userId → direct conversation lookup
+  const directConvoByUserId = new Map<string, Conversation>();
+  for (const convo of conversations) {
+    if (convo.type === "DIRECT" || convo.participantIds.length === 2) {
+      const other = convo.participants.find((p) => p.id !== user?.id);
+      if (other) directConvoByUserId.set(other.id, convo);
+    }
+  }
+
+  // Unified list: every friend appears once, enriched with convo data if it exists
+  const allFriends: FriendRow[] = friendsData?.myFriends ?? [];
+  type MergedRow = FriendRow & { convo: Conversation | null };
+  const mergedRows: MergedRow[] = allFriends.map((f) => ({
+    ...f,
+    convo: directConvoByUserId.get(f.id) ?? null,
+  }));
+
+  // Sort: friends with recent activity first, then alphabetical
+  mergedRows.sort((a, b) => {
+    if (a.convo && b.convo) {
+      return (b.convo.lastMessageAt ?? "") > (a.convo.lastMessageAt ?? "") ? 1 : -1;
+    }
+    if (a.convo) return -1;
+    if (b.convo) return 1;
+    const nameA = (a.displayName ?? a.username).toLowerCase();
+    const nameB = (b.displayName ?? b.username).toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  const filteredRows = search.trim()
+    ? mergedRows.filter((r) =>
+        (r.displayName ?? r.username).toLowerCase().includes(search.toLowerCase()),
+      )
+    : mergedRows;
+
+  async function handleOpen(friendId: string) {
+    setStartingId(friendId);
+    try {
+      await startDirectConversation(friendId);
+      setSearch("");
+    } finally {
+      setStartingId(null);
+    }
+  }
+
+  function handleTogglePanel() {
+    if (panelOpen) {
+      setPanelOpen(false);
+      setSearch("");
+    } else {
+      setPanelOpen(true);
+      refetchConversations();
+    }
+  }
 
   return (
     <div className="mp-root">
@@ -566,7 +628,7 @@ export function MessengerPanel() {
           type="button"
           className={`mp-toggle-btn${panelOpen ? " mp-toggle-btn--open" : ""}`}
           aria-label={`Messenger${totalUnread > 0 ? `, ${totalUnread} unread` : ""}`}
-          onClick={() => { setPanelOpen(!panelOpen); if (!panelOpen) refetchConversations(); }}
+          onClick={handleTogglePanel}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden>
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -589,7 +651,7 @@ export function MessengerPanel() {
                   type="button"
                   className="mp-panel-close-btn"
                   aria-label="Close"
-                  onClick={() => setPanelOpen(false)}
+                  onClick={() => { setPanelOpen(false); setSearch(""); }}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="14" height="14" aria-hidden>
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -606,42 +668,47 @@ export function MessengerPanel() {
               <input
                 type="search"
                 className="mp-search-input"
-                placeholder="Search conversations…"
+                placeholder="Search people…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
 
-            {/* Conversation list */}
-            {filteredConvos.length === 0 ? (
+            {/* Unified people list */}
+            {friendsLoading && allFriends.length === 0 ? (
+              <div className="mp-empty"><p>Loading…</p></div>
+            ) : filteredRows.length === 0 ? (
               <div className="mp-empty">
-                {search.trim() ? (
-                  <p>No conversations match "<strong>{search}</strong>"</p>
-                ) : (
-                  <p>No conversations yet.<br />Visit a friend's profile to start chatting.</p>
-                )}
+                {search.trim()
+                  ? <p>No one matches "<strong>{search}</strong>"</p>
+                  : <p>Add friends to start messaging.</p>
+                }
               </div>
             ) : (
               <ul className="mp-list">
-                {filteredConvos.map((c) => {
-                  const others = c.participants.filter((p) => p.id !== user?.id);
-                  const name = c.name || others.map((p) => p.displayName).join(", ") || "Chat";
-                  const isOnline = others.some((p) => onlineUserIds.has(p.id));
+                {filteredRows.map((row) => {
+                  const name = row.displayName?.trim() || row.username;
                   const initial = (name[0] ?? "?").toUpperCase();
-                  const timeAgo = c.lastMessageAt ? formatRelativeTime(c.lastMessageAt) : "";
+                  const isOnline = onlineUserIds.has(row.id);
+                  const isOpening = startingId === row.id;
+                  const convo = row.convo;
+                  const timeAgo = convo?.lastMessageAt ? formatRelativeTime(convo.lastMessageAt) : "";
+                  const hasUnread = (convo?.unreadCount ?? 0) > 0;
+                  const isOpen = convo ? openWindowIds.includes(convo.id) : false;
+
                   return (
                     <li
-                      key={c.id}
+                      key={row.id}
                       role="button"
                       tabIndex={0}
-                      className={`mp-item${c.unreadCount > 0 ? " mp-item--unread" : ""}${openWindowIds.includes(c.id) ? " mp-item--active" : ""}`}
-                      onClick={() => { openChat(c.id); setPanelOpen(false); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { openChat(c.id); setPanelOpen(false); } }}
+                      className={`mp-item${hasUnread ? " mp-item--unread" : ""}${isOpen ? " mp-item--active" : ""}${isOpening ? " mp-item--starting" : ""}`}
+                      onClick={() => { if (!isOpening) void handleOpen(row.id); }}
+                      onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isOpening) void handleOpen(row.id); }}
                     >
                       <div className="mp-item-avatar-wrap">
                         <div className="mp-item-avatar">
-                          {others[0]?.avatarUrl ? (
-                            <img src={others[0].avatarUrl} alt="" />
+                          {row.profileImageUrl ? (
+                            <img src={row.profileImageUrl} alt="" />
                           ) : (
                             <span>{initial}</span>
                           )}
@@ -654,17 +721,20 @@ export function MessengerPanel() {
                           <span className="mp-item-name">{name}</span>
                           {timeAgo && <span className="mp-item-time">{timeAgo}</span>}
                         </div>
-                        {c.lastMessageText && (
-                          <span className="mp-item-last">
-                            {c.lastMessageText.length > 38
-                              ? c.lastMessageText.slice(0, 38) + "…"
-                              : c.lastMessageText}
-                          </span>
-                        )}
+                        <span className="mp-item-last">
+                          {isOpening
+                            ? "Opening…"
+                            : convo?.lastMessageText
+                              ? convo.lastMessageText.length > 36
+                                ? convo.lastMessageText.slice(0, 36) + "…"
+                                : convo.lastMessageText
+                              : "Say hi 👋"
+                          }
+                        </span>
                       </div>
 
-                      {c.unreadCount > 0 && (
-                        <span className="mp-item-badge">{c.unreadCount}</span>
+                      {hasUnread && (
+                        <span className="mp-item-badge">{convo!.unreadCount}</span>
                       )}
                     </li>
                   );
