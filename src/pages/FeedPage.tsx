@@ -13,6 +13,7 @@ import {
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { ME } from "../graphql/profile";
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { useAuth } from "../context/AuthContext";
@@ -200,7 +201,7 @@ export function FeedPage() {
     Boolean,
   ) as FriendRow[];
   for (const person of allKnownUsers) {
-    const image = person.profileImageUrl?.trim();
+    const image = normalizeProfileImageUrl(person.profileImageUrl);
     if (!image) {
       continue;
     }
@@ -339,8 +340,8 @@ export function FeedPage() {
           {visibleSuggestions.map((s) => (
             <li key={s.id} className="cx-friend-item">
               <Link to={`/profile/${s.id}`} className="cx-friend-avatar">
-                {s.profileImageUrl ? (
-                  <img src={s.profileImageUrl} alt="" />
+                {normalizeProfileImageUrl(s.profileImageUrl) ? (
+                  <img src={normalizeProfileImageUrl(s.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
                 ) : (
                   friendInitial(s)
                 )}
@@ -433,8 +434,8 @@ export function FeedPage() {
             <li key={f.id} className="cx-friend-item">
               <div className="cx-friend-avatar-wrap">
                 <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                  {f.profileImageUrl ? (
-                    <img src={f.profileImageUrl} alt="" />
+                  {normalizeProfileImageUrl(f.profileImageUrl) ? (
+                    <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
                   ) : (
                     friendInitial(f)
                   )}
@@ -474,8 +475,8 @@ export function FeedPage() {
           {visibleRequestedMe.map((f) => (
             <li key={`in-${f.id}`} className="cx-friend-item">
               <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                {f.profileImageUrl ? (
-                  <img src={f.profileImageUrl} alt="" />
+                {normalizeProfileImageUrl(f.profileImageUrl) ? (
+                  <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
                 ) : (
                   friendInitial(f)
                 )}
@@ -529,8 +530,8 @@ export function FeedPage() {
           {visibleRequestedByMe.map((f) => (
             <li key={`out-${f.id}`} className="cx-friend-item">
               <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                {f.profileImageUrl ? (
-                  <img src={f.profileImageUrl} alt="" />
+                {normalizeProfileImageUrl(f.profileImageUrl) ? (
+                  <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
                 ) : (
                   friendInitial(f)
                 )}
@@ -589,7 +590,9 @@ export function FeedPage() {
                     <li key={`${activePeopleModal}-${f.id}`} className="cx-friend-item">
                       <div className="cx-friend-avatar-wrap">
                         <Link to={`/profile/${f.id}`} className="cx-friend-avatar" onClick={() => setActivePeopleModal(null)}>
-                          {f.profileImageUrl ? <img src={f.profileImageUrl} alt="" /> : friendInitial(f)}
+                          {normalizeProfileImageUrl(f.profileImageUrl) ? (
+                            <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                          ) : friendInitial(f)}
                         </Link>
                         {activePeopleModal === "friends" && onlineUserIds.has(f.id) && <span className="cx-friend-online-dot" aria-hidden />}
                       </div>

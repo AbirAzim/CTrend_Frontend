@@ -183,8 +183,12 @@ export function AppShell() {
             <NavLink
               to="/admin"
               className="ig-topbar-cta ig-topbar-admin"
+              aria-label="Admin dashboard"
               title="Admin dashboard"
             >
+              <span className="ig-topbar-cta-glyph" aria-hidden>
+                ⚙
+              </span>
               <span className="ig-topbar-cta-label">Admin</span>
             </NavLink>
           )}
@@ -212,7 +216,7 @@ export function AppShell() {
               <IconLogout />
             </button>
           ) : (
-            <NavLink to="/login" className="ig-topbar-cta">
+            <NavLink to="/login" className="ig-topbar-cta ig-topbar-cta--auth">
               <span className="ig-topbar-cta-label">Log in</span>
             </NavLink>
           )}
