@@ -211,6 +211,24 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
     setTyping(conversation.id, val.length > 0);
   }
 
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    const imageItem = items.find((item) => item.type.startsWith("image/"));
+    if (imageItem) {
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+      const ext = imageItem.type.split("/")[1] ?? "png";
+      const named = new File([file], `paste-${Date.now()}.${ext}`, { type: imageItem.type });
+      setPendingImage({ file: named, previewUrl: URL.createObjectURL(named) });
+      setUploadError(null);
+      // Focus the textarea so the user can immediately type a caption
+      inputRef.current?.focus();
+    }
+    // Text paste: let default browser behaviour handle it
+  }
+
   const otherParticipants = conversation.participants.filter((p) => p.id !== user?.id);
   const windowTitle =
     conversation.name ||
@@ -226,7 +244,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const canSend = (text.trim().length > 0 || pendingImage !== null) && !uploading;
 
   return (
-    <div className={`cw-window${minimized ? " cw-window--min" : ""}`}>
+    <div className={`cw-window${minimized ? " cw-window--min" : ""}`} onPaste={handlePaste}>
       {/* Header */}
       <div className="cw-header" onClick={() => setMinimized((v) => !v)}>
         <div className="cw-header-avatar-wrap">
@@ -476,6 +494,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
                 placeholder={pendingImage ? "Add a caption…" : "Message…"}
                 onChange={(e) => handleInput(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 disabled={uploading}
               />
             </div>

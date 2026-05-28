@@ -1212,42 +1212,57 @@ a.cx-friend-avatar:hover {
 
 .ig-post {
   background: var(--ig-white);
-  border: 1px solid var(--ig-border);
   border-radius: var(--cx-radius-xl);
-  margin-bottom: 8px;
+  margin-bottom: 14px;
   overflow: hidden;
-  box-shadow: var(--cx-shadow-soft);
   position: relative;
+  /* Neutral hairline — no accent tint */
+  border: 1px solid rgb(var(--cx-ink-rgb) / 0.07);
+  box-shadow:
+    0 1px 2px rgb(var(--cx-ink-rgb) / 0.04),
+    0 4px 12px rgb(var(--cx-ink-rgb) / 0.06),
+    0 16px 36px rgb(var(--cx-ink-rgb) / 0.04);
   transition:
-    box-shadow 0.35s var(--cx-ease-out),
-    transform 0.35s var(--cx-ease-out);
+    box-shadow 0.4s var(--cx-ease-out),
+    transform 0.4s var(--cx-ease-out);
 }
 
+/* Left accent stripe — slides in on hover, communicates focus without a coloured border */
 .ig-post::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: linear-gradient(90deg, #4f46e5, #0ea5a4, #f97316);
-  opacity: 0.75;
+  top: 16px;
+  bottom: 16px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--cx-gradient-cta);
+  opacity: 0;
+  transition: opacity 0.3s var(--cx-ease-out);
   pointer-events: none;
+  z-index: 1;
 }
 
 .ig-post:hover {
-  box-shadow: var(--cx-shadow-lift);
-  transform: translateY(-2px);
+  /* Shadow deepens + card lifts — no border-color change, no accent tint */
+  box-shadow:
+    0 2px 4px rgb(var(--cx-ink-rgb) / 0.05),
+    0 8px 24px rgb(var(--cx-ink-rgb) / 0.09),
+    0 24px 52px rgb(var(--cx-ink-rgb) / 0.07);
+  transform: translateY(-3px);
+}
+
+.ig-post:hover::before {
+  opacity: 1;
 }
 
 .ig-post-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 10px;
-  background: linear-gradient(
-    180deg,
-    rgb(248 250 252 / 0.94),
-    rgb(255 255 255 / 0.42)
-  );
+  padding: 10px 12px;
+  background: transparent;
+  border-bottom: 1px solid rgb(var(--cx-accent-rgb) / 0.07);
 }
 
 .ig-post-user {
@@ -1398,8 +1413,8 @@ a.cx-friend-avatar:hover {
 .ig-post-media-wrap--compare {
   display: flex;
   flex-direction: row;
-  gap: 4px;
-  padding: 4px;
+  gap: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -1444,6 +1459,12 @@ a.cx-friend-avatar:hover {
   text-align: center;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   COMPARE CELL INTERACTION DESIGN
+   Core principle: cell boundary is STABLE. Only the image inside
+   breathes, effects layer via ::before. No outer scale jank.
+   ═══════════════════════════════════════════════════════════════ */
+
 .ig-compare-cell {
   flex: 1 1 0;
   min-width: 0;
@@ -1454,33 +1475,102 @@ a.cx-friend-avatar:hover {
   background: #0c0a18;
   cursor: pointer;
   display: block;
+  overflow: hidden;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
   transition:
-    transform 0.25s var(--cx-ease-spring),
-    box-shadow 0.25s var(--cx-ease-out);
+    box-shadow 0.28s var(--cx-ease-out),
+    filter 0.28s var(--cx-ease-out);
 }
 
-.ig-compare-cell:hover:not(:disabled) {
-  transform: scale(1.02);
-  z-index: 1;
+/* ── Diagonal sheen — sweeps across on each hover entry ─────────── */
+@keyframes cx-cell-sheen {
+  from { transform: translateX(-140%); }
+  to   { transform: translateX(200%);  }
 }
 
-.ig-compare-cell:active:not(:disabled) {
-  transform: scale(0.98);
+.ig-compare-cell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 52%;
+  height: 100%;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255 255 255 / 0.16) 50%,
+    transparent 80%
+  );
+  transform: translateX(-140%);
+  pointer-events: none;
+  z-index: 6;
 }
 
-.ig-compare-cell:disabled {
-  cursor: not-allowed;
-  opacity: 0.92;
+.ig-compare-cell:hover:not(:disabled):not(.ig-compare-cell--closed)::before {
+  animation: cx-cell-sheen 0.56s cubic-bezier(0.28, 0, 0.48, 1) forwards;
 }
 
+/* ── Image inner zoom ──────────────────────────────────────────── */
 .ig-compare-cell img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
   vertical-align: middle;
+  transform-origin: center;
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+}
+
+.ig-compare-cell:hover:not(:disabled) img {
+  transform: scale(1.09);
+}
+
+/* ── Hover state ───────────────────────────────────────────────── */
+.ig-compare-cell:hover:not(:disabled) {
+  z-index: 2;
+}
+
+/* Vote-color preview glow — whispers "this is what you'll get" */
+.ig-compare-cell--binary-a:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow:
+    inset 0 0 0 2px rgba(52 211 153 / 0.85),
+    0 0 36px rgba(52 211 153 / 0.32);
+}
+
+.ig-compare-cell--binary-b:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow:
+    inset 0 0 0 2px rgba(251 146 60 / 0.85),
+    0 0 36px rgba(251 146 60 / 0.32);
+}
+
+.ig-compare-cell--multi:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow:
+    inset 0 0 0 2px rgba(129 140 248 / 0.85),
+    0 0 36px rgba(129 140 248 / 0.3);
+}
+
+/* Picked cell: subtle zoom only — it's already chosen, no need to shout */
+.ig-compare-cell--picked:hover:not(:disabled) img {
+  transform: scale(1.04);
+}
+
+/* ── Active / press ────────────────────────────────────────────── */
+.ig-compare-cell:active:not(:disabled) {
+  transform: scale(0.972);
+  transition: transform 0.07s ease-out;
+}
+
+.ig-compare-cell:active:not(:disabled) img {
+  transform: scale(1.0);
+  transition: transform 0.07s ease-out;
+}
+
+/* ── Disabled ──────────────────────────────────────────────────── */
+.ig-compare-cell:disabled {
+  cursor: not-allowed;
+  opacity: 0.92;
 }
 
 .ig-compare-cell--binary-a.ig-compare-cell--picked {
@@ -1867,7 +1957,27 @@ a.cx-friend-avatar:hover {
   height: 100%;
   border-radius: inherit;
   min-width: 0;
+  position: relative;
+  overflow: hidden;
   transition: width 0.45s var(--cx-ease-out);
+}
+
+.cx-pulse-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 20%,
+    rgba(255 255 255 / 0.55) 50%,
+    transparent 80%
+  );
+  transform: translateX(-200%);
+  pointer-events: none;
+}
+
+.cx-pulse-card--votefx .cx-pulse-fill::after {
+  animation: cx-bar-sweep 0.58s var(--cx-ease-out) forwards;
 }
 
 .cx-pulse-fill--a {
@@ -2201,6 +2311,7 @@ a.cx-friend-avatar:hover {
   color: #059669;
   background: rgb(5 150 105 / 0.07);
   border-bottom-color: rgb(5 150 105 / 0.18);
+  animation: cx-vote-hint-in 0.42s var(--cx-ease-spring);
 }
 
 .cx-tap-to-vote-icon {
@@ -2214,24 +2325,288 @@ a.cx-friend-avatar:hover {
 }
 
 /* Pulsing glow on compare cells before a vote is cast */
+/* Neutral brightness breath — no coloured border, works on any image */
 @keyframes vote-invite {
-  0%, 100% {
-    box-shadow: inset 0 0 0 1.5px rgb(var(--cx-accent-rgb) / 0.25);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 2px rgb(var(--cx-accent-rgb) / 0.55),
-      0 0 18px rgb(var(--cx-accent-rgb) / 0.2);
-  }
+  0%, 100% { filter: brightness(0.9) saturate(0.92); }
+  50%       { filter: brightness(1.04) saturate(1.0); }
 }
 
 .ig-compare-cell--unvoted {
-  animation: vote-invite 2.4s ease-in-out infinite;
+  animation: vote-invite 2.6s ease-in-out infinite;
 }
 
-/* Pause animation on hover so the scale effect is clean */
+/* Let hover effects take full control */
 .ig-compare-cell--unvoted:hover:not(:disabled) {
   animation: none;
+  filter: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VOTE FEEDBACK SYSTEM — creative redesign
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Cell spring on tap ──────────────────────────────────────────── */
+@keyframes cx-vote-pop {
+  0%   { transform: scale(1);     }
+  30%  { transform: scale(1.065); }
+  62%  { transform: scale(0.975); }
+  82%  { transform: scale(1.018); }
+  100% { transform: scale(1);     }
+}
+
+.ig-compare-cell--just-voted {
+  animation: cx-vote-pop 0.48s var(--cx-ease-spring);
+  z-index: 2;
+}
+
+/* ── 2. Light flash — full-cell radial bloom on vote ────────────────── */
+/* Like Instagram's double-tap heart but for the whole frame */
+@keyframes cx-vote-flash {
+  0%   { opacity: 0;    }
+  18%  { opacity: 1;    }
+  100% { opacity: 0;    }
+}
+
+.cx-vote-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255 255 255 / 0.58) 0%,
+    rgba(var(--cx-accent-rgb) / 0.22) 45%,
+    transparent 72%
+  );
+  pointer-events: none;
+  z-index: 18;
+  animation: cx-vote-flash 0.55s var(--cx-ease-out) forwards;
+}
+
+/* ── 3. Voted pin — persistent corner star badge on the chosen image ─── */
+/* Gradient circle with a ★ star inside — "my pick", no text, no rings */
+@keyframes cx-voted-pin-in {
+  0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+  55%  { transform: scale(1.2) rotate(8deg);  opacity: 1; }
+  75%  { transform: scale(0.91) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg);    opacity: 1; }
+}
+
+.cx-voted-pin {
+  position: absolute;
+  /* Lower-right of the image, above the percentage overlay */
+  bottom: 60px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  /* default: light emerald (binary-a / classic bar) */
+  background: linear-gradient(135deg, #10b981, #6ee7b7);
+  border: 2.5px solid rgba(255 255 255 / 0.92);
+  box-shadow:
+    0 3px 12px rgba(52 211 153 / 0.5),
+    0 0 0 4px rgba(52 211 153 / 0.18);
+  pointer-events: none;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #065f46;
+  animation: cx-voted-pin-in 0.52s var(--cx-ease-spring) forwards;
+}
+
+/* Binary-B picked: light orange to match the right-side vote colour */
+.ig-compare-cell--binary-b .cx-voted-pin {
+  background: linear-gradient(135deg, #fb923c, #fdba74);
+  color: #7c2d12;
+  box-shadow:
+    0 3px 12px rgba(251 146 60 / 0.5),
+    0 0 0 4px rgba(251 146 60 / 0.2);
+}
+
+/* Multi-compare picked: light violet to match the multi vote accent */
+.ig-compare-cell--multi .cx-voted-pin {
+  background: linear-gradient(135deg, #818cf8, #c4b5fd);
+  color: #312e81;
+  box-shadow:
+    0 3px 12px rgba(167 139 250 / 0.5),
+    0 0 0 4px rgba(167 139 250 / 0.2);
+}
+
+/* ── 4. Unchosen cells dim when user has voted ───────────────────────── */
+/* Your choice "spotlights" — everything else steps back */
+.ig-compare-cell--unchosen {
+  filter: brightness(0.72) saturate(0.55);
+  transition:
+    filter 0.45s var(--cx-ease-out),
+    opacity 0.45s var(--cx-ease-out);
+}
+
+/* Unchosen: restore full brightness on hover so the dim reads as interactive */
+.ig-compare-cell--unchosen:hover:not(:disabled) {
+  filter: brightness(1.0) saturate(1.0);
+}
+
+/* "↺ Switch" pill — materialises in the dead centre of the cell */
+.ig-compare-cell--unchosen::after {
+  content: "↺  Switch";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* start slightly below centre, springs up to exact centre on hover */
+  transform: translate(-50%, calc(-50% + 10px)) scale(0.88);
+  opacity: 0;
+  white-space: nowrap;
+  font-family: var(--cx-font-display);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255 255 255 / 0.97);
+  background: rgba(0 0 0 / 0.65);
+  backdrop-filter: blur(14px) saturate(1.8);
+  -webkit-backdrop-filter: blur(14px) saturate(1.8);
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255 255 255 / 0.24);
+  pointer-events: none;
+  z-index: 20;
+  transition:
+    opacity 0.18s var(--cx-ease-out),
+    transform 0.22s var(--cx-ease-spring);
+}
+
+.ig-compare-cell--unchosen:hover:not(:disabled)::after {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ── 4b. Vote-switch exit — plays on the cell you're leaving ──────────── */
+/* Brief white flash → quick dim → settles into unchosen state */
+@keyframes cx-vote-switch-out {
+  0%   { filter: brightness(1.55) saturate(0.15); }
+  28%  { filter: brightness(0.5)  saturate(0.15); }
+  100% { filter: brightness(0.72) saturate(0.55); }
+}
+
+/* Must come AFTER --unchosen so the animation wins the filter cascade */
+.ig-compare-cell--just-unvoted {
+  animation: cx-vote-switch-out 0.42s var(--cx-ease-out) both;
+}
+
+/* ── 5. Hint bar entrance ────────────────────────────────────────────── */
+@keyframes cx-vote-hint-in {
+  0%   { opacity: 0; transform: translateY(7px); }
+  55%  { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── 6. Progress bar shine sweep on vote ────────────────────────────── */
+@keyframes cx-bar-sweep {
+  from { transform: translateX(-200%); }
+  to   { transform: translateX(300%);  }
+}
+
+/* ── 7. Classic UP/DOWN button bounce ───────────────────────────────── */
+@keyframes cx-vote-btn-bounce {
+  0%   { transform: scale(1);    }
+  32%  { transform: scale(1.28); }
+  60%  { transform: scale(0.88); }
+  80%  { transform: scale(1.1);  }
+  100% { transform: scale(1);    }
+}
+
+.ig-vote-btn--just-voted {
+  animation: cx-vote-btn-bounce 0.45s var(--cx-ease-spring);
+}
+
+/* ── 8. Compare-overlay vote-status chip ────────────────────────────── */
+.cx-vote-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-family: var(--cx-font-display);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* Floating overlay variant — sits inside the compare media section */
+.cx-vote-status-chip--overlay {
+  position: absolute;
+  top: 12px;
+  /* Default: centred (pending / multi) */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  /* Frosted glass backing so the chip reads clearly over any image */
+  backdrop-filter: blur(12px) saturate(1.6);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6);
+  border: 1px solid rgba(255 255 255 / 0.35);
+  animation: cx-chip-drop-in 0.38s var(--cx-ease-spring) both;
+}
+
+/* Voted left cell (binary-A) — chip floats in the centre of the left half */
+.cx-vote-status-chip--overlay.cx-vote-status-chip--pos-left {
+  left: 25%;
+}
+
+/* Voted right cell (binary-B) — chip floats in the centre of the right half */
+.cx-vote-status-chip--overlay.cx-vote-status-chip--pos-right {
+  left: 75%;
+}
+
+@keyframes cx-chip-drop-in {
+  from { transform: translateX(-50%) translateY(-14px) scale(0.88); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0)     scale(1);    opacity: 1; }
+}
+
+/* Voted — lighter emerald: airy and confirmed, not heavy */
+/* Default voted chip: green (binary-a / classic bar) */
+.cx-vote-status-chip--voted {
+  background: linear-gradient(120deg, #10b981, #6ee7b7);
+  color: #065f46;
+  box-shadow: 0 2px 10px rgba(52 211 153 / 0.4);
+}
+
+/* Voted chip colour matches the chosen side */
+.cx-vote-status-chip--voted.cx-vote-status-chip--side-b {
+  background: linear-gradient(120deg, #fb923c, #fdba74);
+  color: #7c2d12;
+  box-shadow: 0 2px 10px rgba(251 146 60 / 0.4);
+}
+.cx-vote-status-chip--voted.cx-vote-status-chip--side-multi {
+  background: linear-gradient(120deg, #818cf8, #c4b5fd);
+  color: #312e81;
+  box-shadow: 0 2px 10px rgba(167 139 250 / 0.4);
+}
+
+/* Tiny heart icon inside the "Voted" chip inherits the chip's text color */
+.cx-vote-status-chip svg {
+  flex-shrink: 0;
+}
+
+/* Cast Vote — pulsing accent outline */
+@keyframes cx-chip-border-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--cx-accent-rgb) / 0); }
+     50%    { box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.18); }
+}
+
+.cx-vote-status-chip--pending {
+  background: transparent;
+  color: var(--cx-accent);
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.38);
+  animation: cx-chip-border-pulse 2.4s ease-in-out infinite;
+}
+
+/* Dark-mode */
+:root[data-theme="dark"] .cx-vote-status-chip--pending {
+  color: var(--cx-accent);
+  border-color: rgb(var(--cx-accent-rgb) / 0.45);
 }
 
 .cx-pulse-inline {
@@ -4161,7 +4536,8 @@ a.cx-action-chip {
 }
 
 :root[data-theme="dark"] .ig-post-header {
-  background: linear-gradient(180deg, rgb(30 41 59 / 0.82), rgb(15 23 42 / 0.42));
+  background: transparent;
+  border-bottom-color: rgb(var(--cx-accent-rgb) / 0.12);
 }
 
 :root[data-theme="dark"] .ig-post-detail-bar {
