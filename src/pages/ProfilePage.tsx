@@ -12,6 +12,7 @@ import { useMessenger } from "../context/MessengerContext";
 import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import type { FeedPostView } from "../types/feed";
 
 function initialFromUser(name: string | undefined, email: string): string {
@@ -42,7 +43,7 @@ function gmailAvatarFromEmail(email: string): string | null {
   if (!normalized.endsWith("@gmail.com")) {
     return null;
   }
-  return `https://www.google.com/s2/photos/profile/${encodeURIComponent(normalized)}?sz=256`;
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(normalized)}&background=312e81&color=ffffff&size=256&format=png`;
 }
 
 type FriendRow = {
@@ -219,7 +220,7 @@ export function ProfilePage() {
     me?.username ?? user?.username ?? user?.email.split("@")[0] ?? "user";
   const bio = me?.bio ?? user?.bio ?? "";
   const heroAvatarUrl =
-    me?.profileImageUrl?.trim() || gmailAvatarFromEmail(user?.email ?? "");
+    normalizeProfileImageUrl(me?.profileImageUrl) || gmailAvatarFromEmail(user?.email ?? "");
 
   useEffect(() => {
     if (me) {
@@ -771,8 +772,8 @@ export function ProfilePage() {
               <li key={f.id} className="cx-friend-item">
                 <div className="cx-friend-avatar-wrap">
                   <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                    {f.profileImageUrl ? (
-                      <img src={f.profileImageUrl} alt="" />
+                    {normalizeProfileImageUrl(f.profileImageUrl) ? (
+                      <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
                     ) : (
                       friendInitial(f)
                     )}

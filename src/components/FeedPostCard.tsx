@@ -47,10 +47,9 @@ function authorAvatarUrlCandidates(
   if (!email) {
     return [];
   }
-  const encoded = encodeURIComponent(email);
+  const name = encodeURIComponent(email.split("@")[0] || "user");
   return [
-    `https://profiles.google.com/s2/photos/profile/${encoded}?sz=96`,
-    `https://www.google.com/s2/photos/profile/${encoded}?sz=96`,
+    `https://ui-avatars.com/api/?name=${name}&background=312e81&color=ffffff&size=96&format=png`,
   ];
 }
 
