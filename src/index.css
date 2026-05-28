@@ -1913,6 +1913,21 @@ a.cx-friend-avatar:hover {
   color: var(--ig-text);
 }
 
+/* ── Caption — always-visible above compare images ──────────────────── */
+.cx-post-caption-bar {
+  padding: 8px 14px 16px;
+  font-size: 0.9375rem; /* ~15px — same as Facebook caption */
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--cx-ink);
+  word-break: break-word;
+}
+
+:root[data-theme="dark"] .cx-post-caption-bar {
+  color: #e4e6eb; /* Facebook dark-mode caption colour */
+}
+
 .cx-pulse-card {
   padding: 12px;
   border-radius: 16px;
