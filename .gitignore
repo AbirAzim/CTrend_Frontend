@@ -27,6 +27,7 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+.env.production
 .env.backend
 
 # vercel
@@ -38,3 +39,9 @@ next-env.d.ts
 
 # vite
 /dist
+
+# android/capacitor local files
+android/.gradle/
+android/local.properties
+*.jks
+*.keystore

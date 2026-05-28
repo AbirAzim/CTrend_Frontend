@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capawesome/capacitor-google-sign-in": "^0.1.2",
     "@react-oauth/google": "^0.13.5",
     "apollo3-cache-persist": "^0.15.0",
     "graphql": "^16.11.0",
@@ -21,6 +24,7 @@
     "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
     "@eslint/js": "^9.25.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.2",
