@@ -18,6 +18,7 @@ import {
   MESSAGE_RECEIVED,
   MESSAGE_READ_SUB,
   PRESENCE_CHANGED,
+  START_DIRECT_CONVERSATION,
 } from "../graphql/messages";
 import { useAuth } from "./AuthContext";
 import { playMessageSound } from "../lib/notificationSound";
@@ -69,6 +70,7 @@ type MessengerContextValue = {
   prependMessages: (conversationId: string, msgs: Message[]) => void;
   ensureConversation: (convo: Conversation) => void;
   refetchConversations: () => void;
+  startDirectConversation: (userId: string) => Promise<void>;
 };
 
 const MessengerContext = createContext<MessengerContextValue | null>(null);
@@ -138,6 +140,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   const [sendMessageMut] = useMutation(SEND_MESSAGE);
   const [markReadMut] = useMutation(MARK_CONVERSATION_READ);
   const [setTypingMut] = useMutation(SET_TYPING);
+  const [startDirectMut] = useMutation(START_DIRECT_CONVERSATION);
 
   useSubscription(MESSAGE_RECEIVED, {
     skip: !isAuthenticated,
@@ -315,6 +318,20 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const startDirectConversation = useCallback(async (userId: string) => {
+    const { data } = await startDirectMut({ variables: { userId } });
+    const convo = data?.startDirectConversation as Conversation | undefined;
+    if (!convo) return;
+    setConversations((prev) =>
+      prev.some((c) => c.id === convo.id) ? prev : [convo, ...prev],
+    );
+    setOpenWindowIds((prev) => {
+      if (prev.includes(convo.id)) return prev;
+      return [convo.id, ...prev].slice(0, MAX_OPEN_WINDOWS);
+    });
+    setPanelOpen(false);
+  }, [startDirectMut]);
+
   const totalUnread = useMemo(
     () => conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
     [conversations],
@@ -337,6 +354,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       prependMessages,
       ensureConversation,
       refetchConversations,
+      startDirectConversation,
     }),
     [
       conversations,
@@ -353,6 +371,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       prependMessages,
       ensureConversation,
       refetchConversations,
+      startDirectConversation,
     ],
   );
 
