@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">CTrend</string>
-    <string name="title_activity_main">CTrend</string>
+    <string name="app_name">Ke Jitbe</string>
+    <string name="title_activity_main">Ke Jitbe</string>
     <string name="package_name">com.ctrend.app</string>
     <string name="custom_url_scheme">com.ctrend.app</string>
 </resources>
