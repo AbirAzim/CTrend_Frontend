@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
       : undefined;
 
   return {
+    base: "./",
     plugins: [react()],
     server: {
       port: 5173,
