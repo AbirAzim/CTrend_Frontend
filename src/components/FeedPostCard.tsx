@@ -1180,7 +1180,7 @@ export function FeedPostCard({
             <span className="ig-post-username">
               {post.authorDisplayName?.trim() || post.authorUsername}
             </span>
-            <span className="ig-post-meta">@{post.authorUsername}</span>
+            <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
           </div>
         </div>
         <div className="ig-more-wrap" ref={moreRef}>
@@ -1235,6 +1235,13 @@ export function FeedPostCard({
           )}
         </div>
       </header>
+
+      {/* Caption — always visible above the compare images */}
+      {post.caption && (
+        <div className="cx-post-caption-bar">
+          {post.caption}
+        </div>
+      )}
 
       {compareUrls ? (
         <>
@@ -1493,12 +1500,7 @@ export function FeedPostCard({
               </div>
             ) : null}
 
-            {post.caption ? (
-              <div className="cx-post-copy">
-                <span className="cx-post-handle">@{post.authorUsername}</span>
-                <p className="cx-post-caption-text">{post.caption}</p>
-              </div>
-            ) : null}
+            {/* Caption now shown above the compare images — not duplicated here */}
           </div>
         ) : null}
 
