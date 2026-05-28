@@ -5,6 +5,10 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GOOGLE_LOGIN, LOGIN } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import {
+  getNativeGoogleIdToken,
+  isNativeGoogleAuthAvailable,
+} from "../lib/nativeGoogleAuth";
 
 function formatAuthError(message: string | undefined): string {
   if (!message) return "Something went wrong.";
@@ -19,6 +23,7 @@ export function LoginPage() {
     (location.state as { from?: string } | null)?.from ?? "/";
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
+  const canUseNativeGoogle = isNativeGoogleAuthAvailable(googleClientId);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +44,29 @@ export function LoginPage() {
         variables: { email: email.trim(), password },
       });
       const payload = data?.login;
+      if (!payload?.accessToken || !payload.user) {
+        setFormError("Invalid response from server.");
+        return;
+      }
+      setSession(payload.accessToken, payload.user);
+      navigate(from, { replace: true });
+    } catch (err: unknown) {
+      setFormError(formatAuthError(getApolloErrorMessage(err)));
+    }
+  }
+
+  async function onNativeGoogleLogin() {
+    setFormError(null);
+    try {
+      const idToken = await getNativeGoogleIdToken(googleClientId);
+      if (!idToken) {
+        setFormError("Google did not return a credential.");
+        return;
+      }
+      const { data } = await googleLogin({
+        variables: { idToken },
+      });
+      const payload = data?.googleLogin;
       if (!payload?.accessToken || !payload.user) {
         setFormError("Invalid response from server.");
         return;
@@ -100,33 +128,46 @@ export function LoginPage() {
 
         {googleClientId ? (
           <div className="google-row">
-            <GoogleLogin
-              text="signin_with"
-              width="100%"
-              onSuccess={async (cred) => {
-                setFormError(null);
-                if (!cred.credential) {
-                  setFormError("Google did not return a credential.");
-                  return;
-                }
-                try {
-                  const { data } = await googleLogin({
-                    variables: { idToken: cred.credential },
-                  });
-                  const payload = data?.googleLogin;
-                  if (!payload?.accessToken || !payload.user) {
-                    setFormError("Invalid response from server.");
+            {canUseNativeGoogle ? (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={onNativeGoogleLogin}
+                disabled={googleLoading}
+              >
+                Continue with Google
+              </button>
+            ) : (
+              <GoogleLogin
+                text="signin_with"
+                width="100%"
+                onSuccess={async (cred) => {
+                  setFormError(null);
+                  if (!cred.credential) {
+                    setFormError("Google did not return a credential.");
                     return;
                   }
-                  setSession(payload.accessToken, payload.user);
-                  navigate(from, { replace: true });
-                } catch (err: unknown) {
-                  setFormError(formatAuthError(getApolloErrorMessage(err)));
+                  try {
+                    const { data } = await googleLogin({
+                      variables: { idToken: cred.credential },
+                    });
+                    const payload = data?.googleLogin;
+                    if (!payload?.accessToken || !payload.user) {
+                      setFormError("Invalid response from server.");
+                      return;
+                    }
+                    setSession(payload.accessToken, payload.user);
+                    navigate(from, { replace: true });
+                  } catch (err: unknown) {
+                    setFormError(formatAuthError(getApolloErrorMessage(err)));
+                  }
+                }}
+                onError={() =>
+                  setFormError("Google sign-in was cancelled or failed.")
                 }
-              }}
-              onError={() => setFormError("Google sign-in was cancelled or failed.")}
-              useOneTap={false}
-            />
+                useOneTap={false}
+              />
+            )}
             {googleLoading && (
               <p className="muted small">Completing Google sign-in…</p>
             )}

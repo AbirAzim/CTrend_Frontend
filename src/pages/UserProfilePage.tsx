@@ -13,6 +13,7 @@ import {
 } from "../graphql/friends";
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { USER_POSTS } from "../graphql/profile";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 
 type UserProfile = {
   id: string;
@@ -258,8 +259,12 @@ export function UserProfilePage() {
       <header className="cx-profile-hero">
         <div className="cx-profile-hero-blob" aria-hidden />
         <span className="ig-profile-avatar lg cx-profile-avatar">
-          {profile.profileImageUrl ? (
-            <img src={profile.profileImageUrl} alt={`${name} profile`} />
+          {normalizeProfileImageUrl(profile.profileImageUrl) ? (
+            <img
+              src={normalizeProfileImageUrl(profile.profileImageUrl) ?? ""}
+              alt={`${name} profile`}
+              referrerPolicy="no-referrer"
+            />
           ) : (
             initial
           )}

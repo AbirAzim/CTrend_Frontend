@@ -69,6 +69,7 @@ export function AppShell() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const lastYRef = useRef(0);
+  const scrollRafRef = useRef<number | null>(null);
   const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
     skip: !isAuthenticated,
     fetchPolicy: "cache-and-network",
@@ -100,27 +101,39 @@ export function AppShell() {
   useEffect(() => {
     lastYRef.current = window.scrollY;
     function onScroll() {
-      const y = window.scrollY;
-      const delta = y - lastYRef.current;
-      if (Math.abs(delta) < 8) {
+      if (scrollRafRef.current != null) {
         return;
       }
-      lastYRef.current = y;
-      if (y < 60) {
-        setNavHidden(false);
-        setTopbarHidden(false);
-        return;
-      }
-      if (delta > 0) {
-        setNavHidden(true);
-        setTopbarHidden(false);
-      } else {
-        setNavHidden(false);
-        setTopbarHidden(true);
-      }
+      scrollRafRef.current = window.requestAnimationFrame(() => {
+        scrollRafRef.current = null;
+        const y = window.scrollY;
+        const delta = y - lastYRef.current;
+        if (Math.abs(delta) < 8) {
+          return;
+        }
+        lastYRef.current = y;
+        if (y < 60) {
+          setNavHidden(false);
+          setTopbarHidden(false);
+          return;
+        }
+        if (delta > 0) {
+          setNavHidden(true);
+          setTopbarHidden(false);
+        } else {
+          setNavHidden(false);
+          setTopbarHidden(true);
+        }
+      });
     }
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (scrollRafRef.current != null) {
+        window.cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -183,8 +196,12 @@ export function AppShell() {
             <NavLink
               to="/admin"
               className="ig-topbar-cta ig-topbar-admin"
+              aria-label="Admin dashboard"
               title="Admin dashboard"
             >
+              <span className="ig-topbar-cta-glyph" aria-hidden>
+                ⚙
+              </span>
               <span className="ig-topbar-cta-label">Admin</span>
             </NavLink>
           )}
@@ -212,7 +229,7 @@ export function AppShell() {
               <IconLogout />
             </button>
           ) : (
-            <NavLink to="/login" className="ig-topbar-cta">
+            <NavLink to="/login" className="ig-topbar-cta ig-topbar-cta--auth">
               <span className="ig-topbar-cta-label">Log in</span>
             </NavLink>
           )}
