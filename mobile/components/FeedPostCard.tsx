@@ -254,6 +254,8 @@ function FeedPostCardComponent({ post }: Props) {
   const isOwner = !!user && !!post.authorId && user.id === post.authorId;
   void isOwner;
 
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+
   function goToPost() {
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     router.push(`/post/${post.id}` as `/${string}`);
@@ -572,14 +574,14 @@ function FeedPostCardComponent({ post }: Props) {
           <View style={st.countdownPill}>
             <Text style={st.countdownText}>{countdownStr} LEFT</Text>
           </View>
-          <Pressable style={st.seeDetailsBtn} onPress={() => goToPost()}>
-            <Text style={st.seeDetailsBtnText}>SEE DETAILS</Text>
+          <Pressable style={st.seeDetailsBtn} onPress={() => setDetailsExpanded(v => !v)}>
+            <Text style={st.seeDetailsBtnText}>{detailsExpanded ? "HIDE DETAILS" : "SEE DETAILS"}</Text>
           </Pressable>
         </View>
       ) : null}
 
-      {/* Live Split */}
-      {isBinary && binaryTotal > 0 ? (
+      {/* Live Split — only shown when expanded */}
+      {detailsExpanded && isBinary && binaryTotal > 0 ? (
         <View style={st.liveSplit}>
           <View style={st.liveSplitHeader}>
             <Text style={st.liveSplitTitle}>LIVE SPLIT</Text>
@@ -621,7 +623,7 @@ function FeedPostCardComponent({ post }: Props) {
         {(([
           { i: 0, label: "DISCUSS", icon: "💬", onPress: goToPost },
           { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
-          { i: 2, label: "OPEN", icon: "⛶", onPress: goToPost },
+          { i: 2, label: "FULL PAGE", icon: "⛶", onPress: goToPost },
           {
             i: 3,
             label: `HYPE${hypeCount > 0 ? " " + String(hypeCount) : ""}`,

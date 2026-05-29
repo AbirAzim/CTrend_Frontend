@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -228,6 +229,10 @@ export default function ChatScreen() {
         if (prev.find((m) => m.id === msg.id)) return prev;
         return [msg, ...prev];
       });
+      // Play sound only for incoming messages (not own)
+      if (msg.senderId !== user?.id) {
+        Vibration.vibrate(200);
+      }
       // Mark read when new message arrives while screen is open
       void markRead({ variables: { conversationId },
         refetchQueries: [MY_CONVERSATIONS],
