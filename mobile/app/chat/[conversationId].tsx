@@ -1,7 +1,7 @@
 import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { createAudioPlayer } from "expo-audio";
+import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -176,12 +177,8 @@ export default function ChatScreen() {
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const playerRef = useRef(createAudioPlayer(require("../../assets/notification.wav")));
+  const notifPlayer = useAudioPlayer(require("../../assets/notification.wav"));
 
-  useEffect(() => {
-    const player = playerRef.current;
-    return () => { player.release(); };
-  }, []);
 
   // ── Fetch conversation metadata for header ──────────────────────────────────
   const { data: convsData } = useQuery<ConversationsData>(MY_CONVERSATIONS, {
@@ -238,8 +235,8 @@ export default function ChatScreen() {
       });
       // Play sound only for incoming messages (not own)
       if (msg.senderId !== user?.id) {
-        playerRef.current.seekTo(0);
-        playerRef.current.play();
+        notifPlayer.seekTo(0).then(() => notifPlayer.play()).catch(() => {});
+        Vibration.vibrate(150);
       }
       // Mark read when new message arrives while screen is open
       void markRead({ variables: { conversationId },
@@ -443,8 +440,8 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="padding"
-        keyboardVerticalOffset={insets.top + 62}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 62 : 0}
       >
         {/* Messages */}
         {initialLoading && messages.length === 0 ? (
