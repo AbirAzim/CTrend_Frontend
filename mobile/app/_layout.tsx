@@ -1,6 +1,7 @@
 import { ApolloProvider } from "@apollo/client/react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { apolloClient } from "../lib/apolloClient";
 import { AuthProvider } from "../context/AuthContext";
@@ -19,8 +20,10 @@ export default function RootLayout() {
         <AuthProvider>
           <ThemeProvider>
             <TabBarProvider>
-              <AppStatusBar />
-              <Stack screenOptions={{ headerShown: false }} />
+              <KeyboardProvider>
+                <AppStatusBar />
+                <Stack screenOptions={{ headerShown: false }} />
+              </KeyboardProvider>
             </TabBarProvider>
           </ThemeProvider>
         </AuthProvider>
