@@ -181,10 +181,11 @@ export default function ChatScreen() {
   });
 
   const conv = convsData?.myConversations.find((c) => c.id === conversationId);
-  const otherParticipant = conv?.participants.find((p) => p.id !== user?.id);
-  const headerName = conv?.type === "DIRECT"
-    ? otherParticipant?.displayName?.trim() || "Chat"
-    : conv?.name?.trim() || "Group";
+  const otherParticipants = (conv?.participants ?? []).filter((p) => p.id !== user?.id);
+  const otherParticipant = otherParticipants[0] ?? null;
+  const headerName = conv?.name?.trim()
+    || otherParticipants.map((p) => p.displayName?.trim() || "User").join(", ")
+    || "Chat";
   const headerAvatar = normalizeProfileImageUrl(otherParticipant?.avatarUrl);
   const headerInitial = headerName.slice(0, 1).toUpperCase();
 
@@ -419,7 +420,7 @@ export default function ChatScreen() {
 
         <View style={styles.headerMeta}>
           <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{headerName}</Text>
-          {conv?.type === "DIRECT" && (
+          {otherParticipants.length === 1 && (
             <Text style={[styles.headerStatus, { color: partnerOnline ? "#22c55e" : colors.muted }]}>
               {partnerOnline ? "● Online" : "Offline"}
             </Text>
@@ -429,8 +430,8 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
+        behavior="padding"
+        keyboardVerticalOffset={insets.top + 62}
       >
         {/* Messages */}
         {initialLoading && messages.length === 0 ? (
