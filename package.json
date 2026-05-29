@@ -1,20 +1,25 @@
 {
-  "name": "ctrend-frontend",
+  "name": "ctrend-root",
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "mobile"
+  ],
   "scripts": {
     "dev": "vite",
     "local": "VITE_GRAPHQL_HTTP=http://localhost:4000/graphql VITE_GRAPHQL_WS=ws://localhost:4000/graphql VITE_ENABLE_ENGAGEMENT_GQL=true vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mobile:start": "npm run start -w mobile",
+    "mobile:android": "npm run android -w mobile",
+    "mobile:prebuild": "npm run prebuild -w mobile -- --platform android",
+    "mobile:apk": "npm run apk -w mobile"
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",
-    "@capacitor/android": "^8.3.4",
-    "@capacitor/core": "^8.3.4",
-    "@capawesome/capacitor-google-sign-in": "^0.1.2",
     "@react-oauth/google": "^0.13.5",
     "apollo3-cache-persist": "^0.15.0",
     "graphql": "^16.11.0",
@@ -24,8 +29,6 @@
     "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^8.3.4",
     "@eslint/js": "^9.25.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.2",

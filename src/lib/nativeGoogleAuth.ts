@@ -1,25 +1,12 @@
-import { Capacitor } from "@capacitor/core";
-import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
-
-let initialized = false;
-
+/** Web-only; native Google sign-in lives in the Expo app (`mobile/`). */
 export function isNativeGoogleAuthAvailable(clientId: string): boolean {
-  return Boolean(clientId) && Capacitor.isNativePlatform();
-}
-
-async function ensureInitialized(clientId: string): Promise<void> {
-  if (initialized) return;
-  await GoogleSignIn.initialize({
-    clientId,
-  });
-  initialized = true;
+  void clientId;
+  return false;
 }
 
 export async function getNativeGoogleIdToken(
   clientId: string,
 ): Promise<string | null> {
-  if (!isNativeGoogleAuthAvailable(clientId)) return null;
-  await ensureInitialized(clientId);
-  const result = await GoogleSignIn.signIn();
-  return result.idToken ?? null;
+  void clientId;
+  return null;
 }
