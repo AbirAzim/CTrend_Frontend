@@ -580,11 +580,30 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
   const [viewerVote, setViewerVote] = useState(post.viewerVote);
   const [up, setUp] = useState(post.upvoteCount);
   const [down, setDown] = useState(post.downvoteCount);
+  const [anonymous, setAnonymous] = useState(false);
 
   const total = up + down;
   const leftPct = total > 0 ? Math.round((100 * up) / total) : 50;
   const rightPct = 100 - leftPct;
   const isVotingClosed = post.isVotingOpen === false;
+
+  // Countdown timer
+  const [timeLeft, setTimeLeft] = useState("");
+  useEffect(() => {
+    if (!post.votingEndsAt || isVotingClosed) return;
+    function calc() {
+      const diff = new Date(post.votingEndsAt!).getTime() - Date.now();
+      if (diff <= 0) { setTimeLeft("Voting ended"); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h ${m}m left` : `${m}m ${s}s left`);
+    }
+    calc();
+    const t = setInterval(calc, 1000);
+    return () => clearInterval(t);
+  }, [post.votingEndsAt, isVotingClosed]);
 
   function labelFor(i: number) {
     return post.optionStats?.find((s) => s.index === i)?.label?.trim()
@@ -602,7 +621,7 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
     setUp((n) => n + (idx === 0 ? 1 : 0) - (prev === "UP" ? 1 : 0));
     setDown((n) => n + (idx === 1 ? 1 : 0) - (prev === "DOWN" ? 1 : 0));
     try {
-      await voteMut({ variables: { postId: post.id, selectedOptionIndex: idx, anonymous: false } });
+      await voteMut({ variables: { postId: post.id, selectedOptionIndex: idx, anonymous } });
     } catch {
       setViewerVote(prev);
       setUp(post.upvoteCount);
@@ -612,8 +631,7 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
 
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
   const initial = authorName.slice(0, 1).toUpperCase();
-  const authorAvatarUrl = post.authorProfileImageUrl
-    || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName.slice(0, 2))}&background=312e81&color=ffffff&size=96&format=png`;
+  const authorAvatarUrl = post.authorProfileImageUrl ?? null;
   const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls.slice(0, 2) : null;
   const hasVoted = viewerVote !== null;
 
@@ -623,18 +641,12 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
         style={st.postHeader}
         onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
       >
-        {authorAvatarUrl ? (
-          <Image
-            source={{ uri: authorAvatarUrl }}
-            style={[st.postAvatar, { overflow: "hidden" }]}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={st.postAvatar}>
-            <Text style={st.postAvatarText}>{initial}</Text>
-          </View>
-        )}
+        <View style={[st.postAvatar, { overflow: "hidden" }]}>
+          {authorAvatarUrl
+            ? <Image source={{ uri: authorAvatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+            : <Text style={st.postAvatarText}>{initial}</Text>
+          }
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={st.postAuthor}>{authorName}</Text>
           <Text style={st.postTime}>{formatRelativeTime(post.createdAt)}</Text>
@@ -681,19 +693,72 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
         </View>
       ) : null}
 
-      {compareUrls && !isVotingClosed ? (
-        <View style={st.postVoteHint}>
+      {/* Vote hint + anonymous toggle */}
+      {compareUrls && !isVotingClosed && (
+        <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
           <Text style={[st.postVoteHintText, hasVoted && st.postVoteHintVoted]}>
-            {hasVoted ? "✓ Vote recorded" : "👆 Tap an image to vote"}
+            {hasVoted ? "✓ Vote recorded — tap to change" : "👆 Tap an image to vote"}
           </Text>
+          {timeLeft ? (
+            <Text style={[st.postVoteHintText, { marginTop: 4, color: "#f59e0b", fontWeight: "700" }]}>
+              ⏱ {timeLeft}
+            </Text>
+          ) : null}
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}
+            onPress={() => setAnonymous((v) => !v)}
+          >
+            <View style={{
+              width: 18, height: 18, borderRadius: 4, borderWidth: 2,
+              borderColor: anonymous ? "#6366f1" : "#64748b",
+              backgroundColor: anonymous ? "#6366f1" : "transparent",
+              alignItems: "center", justifyContent: "center",
+            }}>
+              {anonymous && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "900" }}>✓</Text>}
+            </View>
+            <Text style={[st.postVoteHintText, { color: anonymous ? "#6366f1" : undefined }]}>Vote anonymously</Text>
+          </Pressable>
+          {post.votingEndsAt && (
+            <Text style={[st.postVoteHintText, { marginTop: 4 }]}>
+              Ends at {new Date(post.votingEndsAt).toLocaleString()}
+            </Text>
+          )}
         </View>
-      ) : null}
+      )}
 
-      {isVotingClosed ? (
+      {isVotingClosed && (
         <View style={st.postVoteHint}>
           <Text style={st.postVoteHintText}>{total} votes · Voting closed</Text>
         </View>
-      ) : null}
+      )}
+
+      {/* LIVE SPLIT section */}
+      {compareUrls && (
+        <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <Text style={{ fontSize: 12, fontWeight: "800", color: "#6366f1", letterSpacing: 1 }}>LIVE SPLIT</Text>
+            <Text style={{ fontSize: 12, color: "#64748b" }}>{total} vote{total !== 1 ? "s" : ""}</Text>
+          </View>
+          {[0, 1].map((i) => {
+            const count = i === 0 ? up : down;
+            const pct = total > 0 ? Math.round((100 * count) / total) : 50;
+            const barColor = i === 0 ? "#22c55e" : "#f97316";
+            return (
+              <View key={i} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#e2e8f0", flex: 1 }} numberOfLines={1}>
+                    {labelFor(i)}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#94a3b8", marginLeft: 8 }}>{count} · {pct}%</Text>
+                </View>
+                <View style={{ height: 6, borderRadius: 3, backgroundColor: "#1e293b" }}>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${pct}%` }} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
