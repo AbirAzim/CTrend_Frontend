@@ -1,12 +1,15 @@
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   ListRenderItem,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -14,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBar } from "../../context/TabBarContext";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "@ctrend/shared/graphql/feed";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
@@ -109,11 +113,39 @@ function FeedTopBar() {
   );
 }
 
+const TAB_BAR_H = 72;
+
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const client = useApolloClient();
   const { colors } = useTheme();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
+  const { translateY } = useTabBar();
+  const lastScrollY = useRef(0);
+  const tabBarVisible = useRef(true);
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const y = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    lastScrollY.current = y;
+
+    if (y < 60) {
+      // Always show near the top
+      if (!tabBarVisible.current) {
+        tabBarVisible.current = true;
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      }
+      return;
+    }
+
+    if (diff > 4 && tabBarVisible.current) {
+      tabBarVisible.current = false;
+      Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start();
+    } else if (diff < -4 && !tabBarVisible.current) {
+      tabBarVisible.current = true;
+      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    }
+  }
 
   const { data, loading, error, refetch, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
@@ -165,7 +197,9 @@ export default function FeedScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           style={[styles.list, { backgroundColor: colors.bg }]}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           initialNumToRender={4}
           maxToRenderPerBatch={4}
           windowSize={7}

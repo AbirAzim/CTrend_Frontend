@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { apolloClient } from "../lib/apolloClient";
 import { AuthProvider } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
+import { TabBarProvider } from "../context/TabBarContext";
 
 function AppStatusBar() {
   const { isDark } = useTheme();
@@ -17,8 +18,10 @@ export default function RootLayout() {
       <ApolloProvider client={apolloClient}>
         <AuthProvider>
           <ThemeProvider>
-            <AppStatusBar />
-            <Stack screenOptions={{ headerShown: false }} />
+            <TabBarProvider>
+              <AppStatusBar />
+              <Stack screenOptions={{ headerShown: false }} />
+            </TabBarProvider>
           </ThemeProvider>
         </AuthProvider>
       </ApolloProvider>

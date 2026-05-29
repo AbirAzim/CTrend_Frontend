@@ -1,36 +1,124 @@
+import { useQuery } from "@apollo/client/react";
 import { Tabs, router } from "expo-router";
-import { Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
+
+const TAB_BAR_HEIGHT = 72;
+
+// ─── Animated custom tab bar ──────────────────────────────────────────────────
+
+function AnimatedTabBar(props: {
+  state: { index: number; routes: Array<{ key: string; name: string }> };
+  descriptors: Record<string, { options: { title?: string; tabBarIcon?: (p: { color: ColorValue; size: number; focused: boolean }) => React.ReactNode; tabBarBadge?: string | number } }>;
+  navigation: { emit: (e: { type: string; target: string; canPreventDefault: boolean }) => { defaultPrevented: boolean }; navigate: (name: string) => void };
+}) {
+  const { colors } = useTheme();
+  const { isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { translateY } = useTabBar();
+
+  const { data: convData } = useQuery<{ myConversations: Array<{ unreadCount: number }> }>(
+    MY_CONVERSATIONS,
+    { fetchPolicy: "cache-and-network", skip: !isAuthenticated, pollInterval: 15000 },
+  );
+  const totalUnread = (convData?.myConversations ?? []).reduce((s, c) => s + (c.unreadCount > 0 ? 1 : 0), 0);
+
+  const animStyle = { transform: [{ translateY }] };
+
+  return (
+    <Animated.View
+      style={[
+        styles.tabBar,
+        {
+          backgroundColor: colors.tabBg,
+          borderTopColor: colors.border,
+          paddingBottom: insets.bottom,
+          height: TAB_BAR_HEIGHT + insets.bottom,
+        },
+        animStyle,
+      ]}
+    >
+      {props.state.routes.map((route, index) => {
+        const focused = props.state.index === index;
+        const descriptor = props.descriptors[route.key];
+        const label = descriptor.options.title ?? route.name;
+        const isCreate = route.name === "create";
+        const tintColor: ColorValue = focused ? colors.accent : colors.muted;
+
+        const icon = descriptor.options.tabBarIcon?.({
+          color: tintColor,
+          size: 22,
+          focused,
+        });
+
+        const mesagesIdx = props.state.routes.findIndex(r => r.name === "messages");
+        const isMessages = index === mesagesIdx;
+
+        function handlePress() {
+          const event = props.navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!event.defaultPrevented) {
+            if (!isAuthenticated && route.name !== "index") {
+              router.push("/auth/login" as never);
+              return;
+            }
+            props.navigation.navigate(route.name);
+          }
+        }
+
+        if (isCreate) {
+          return (
+            <Pressable key={route.key} style={styles.createBtn} onPress={handlePress}>
+              <View style={[styles.createFab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}>
+                <Text style={styles.createFabText}>+</Text>
+              </View>
+            </Pressable>
+          );
+        }
+
+        return (
+          <Pressable key={route.key} style={styles.tabBtn} onPress={handlePress}>
+            <View style={styles.tabIconWrap}>
+              {icon}
+              {isMessages && totalUnread > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.badgeText}>{totalUnread > 9 ? "9+" : totalUnread}</Text>
+                </View>
+              )}
+            </View>
+            {!isCreate && (
+              <Text style={[styles.tabLabel, { color: tintColor }]} numberOfLines={1}>
+                {label}
+              </Text>
+            )}
+          </Pressable>
+        );
+      })}
+    </Animated.View>
+  );
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function TabsLayout() {
-  const { hydrated, isAuthenticated } = useAuth();
+  const { hydrated } = useAuth();
   const { colors } = useTheme();
-  if (!hydrated) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  const { translateY } = useTabBar();
 
-  function guardedTabPress(e: { preventDefault: () => void }) {
-    if (!isAuthenticated) {
-      e.preventDefault();
-      router.push("/auth/login" as never);
-    }
-  }
+  if (!hydrated) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: {
-          backgroundColor: colors.tabBg,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          elevation: 0,
-          height: 58,
-          paddingBottom: 6,
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "700" },
-      }}
+      tabBar={(props) => <AnimatedTabBar {...props as Parameters<typeof AnimatedTabBar>[0]} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen
         name="index"
@@ -45,18 +133,13 @@ export default function TabsLayout() {
           title: "Keeps",
           tabBarIcon: ({ color, size }) => <BookmarkIcon color={color} size={size} bg={colors.tabBg} />,
         }}
-        listeners={{ tabPress: guardedTabPress }}
       />
       <Tabs.Screen
         name="create"
         options={{
           title: "",
-          tabBarIcon: () => <CreateFabIcon accent={colors.accent} />,
-          tabBarButton: ({ ref: _ref, ...props }) => (
-            <Pressable {...props} style={[styles.fabTabBtn, props.style as object]} />
-          ),
+          tabBarIcon: () => null,
         }}
-        listeners={{ tabPress: guardedTabPress }}
       />
       <Tabs.Screen
         name="messages"
@@ -64,7 +147,6 @@ export default function TabsLayout() {
           title: "Messages",
           tabBarIcon: ({ color, size }) => <ChatIcon color={color} size={size} />,
         }}
-        listeners={{ tabPress: guardedTabPress }}
       />
       <Tabs.Screen
         name="profile"
@@ -72,13 +154,14 @@ export default function TabsLayout() {
           title: "Profile",
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-        listeners={{ tabPress: guardedTabPress }}
       />
     </Tabs>
   );
 }
 
-function HomeIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
+function HomeIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   const s = size;
   return (
     <View style={{ width: s, height: s, alignItems: "center", justifyContent: "flex-end" }}>
@@ -94,7 +177,7 @@ function HomeIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
   );
 }
 
-function BookmarkIcon({ color, size = 22, bg }: { color: ColorValue; size?: number; bg: ColorValue }) {
+function BookmarkIcon({ color, size = 24, bg }: { color: ColorValue; size?: number; bg: ColorValue }) {
   const s = size;
   const w = s * 0.6;
   const h = s * 0.85;
@@ -110,15 +193,7 @@ function BookmarkIcon({ color, size = 22, bg }: { color: ColorValue; size?: numb
   );
 }
 
-function CreateFabIcon({ accent }: { accent: string }) {
-  return (
-    <View style={[styles.fabIcon, { backgroundColor: accent, shadowColor: accent }]}>
-      <Text style={styles.fabIconPlus}>+</Text>
-    </View>
-  );
-}
-
-function ChatIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
+function ChatIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   const s = size;
   return (
     <View style={{ width: s, height: s }}>
@@ -133,7 +208,7 @@ function ChatIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
   );
 }
 
-function UserIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
+function UserIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   const s = size;
   const headR = s * 0.22;
   return (
@@ -144,16 +219,63 @@ function UserIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  fabTabBtn: { flex: 1, alignItems: "center", justifyContent: "center" },
-  fabIcon: {
-    width: 44, height: 30,
-    borderRadius: 10,
-    justifyContent: "center", alignItems: "center",
-    elevation: 2,
+  tabBar: {
+    flexDirection: "row",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 10,
+    paddingBottom: 4,
+    gap: 4,
+  },
+  tabIconWrap: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabLabel: { fontSize: 10, fontWeight: "700" },
+  badge: {
+    position: "absolute",
+    top: -5,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  createBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  createFab: {
+    width: 46,
+    height: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
   },
-  fabIconPlus: { color: "#fff", fontSize: 22, fontWeight: "300", lineHeight: 26 },
+  createFabText: { color: "#fff", fontSize: 22, fontWeight: "300", lineHeight: 26 },
 });
