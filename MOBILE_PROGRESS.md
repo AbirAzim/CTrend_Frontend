@@ -332,64 +332,84 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### 🔲 PHASE 6 — Friends System
-- [ ] Friends screen (`friends/index.tsx`) with 3 tabs
-- [ ] Suggestions tab: ADD_FRIEND button per user
-- [ ] Requests tab: Accept/Decline (requestedMe), Pending badge (requestedByMe)
-- [ ] My Friends tab: online dot, Message button → START_DIRECT_CONVERSATION
-- [ ] Search within each tab
-- [ ] Friend count badges on tabs
-- [ ] Link from profile screen
-- [ ] Dark theme
+### ⚠️ PHASE 6 — Friends System (BUILT — NOT YET TESTED)
+
+- [ ] Friends screen (`friends/index.tsx`) with 3 tabs (Suggestions, Requests, Friends)
+- [ ] Suggestions tab: `FRIEND_SUGGESTIONS` list, Add button turns Pending after press, search filter
+- [ ] Requests tab: Incoming (Accept/Decline) + Sent (Pending) sub-sections, badge count on tab label
+- [ ] My Friends tab: online dot via `ONLINE_USER_IDS` (polls 30s), Message button → `START_DIRECT_CONVERSATION` → `/chat/[id]`, long-press row → Unfriend with Alert confirm
+- [ ] Search bar clears on tab switch
+- [ ] Toast feedback: request sent, accepted, declined, unfriended, chat fail
+- [ ] Tap user row → `/profile/[userId]` (Phase 7)
+- [ ] "👥 Friends" button on profile tab navigates to friends screen
+- [ ] Dark theme, full color palette
 
 **APIs:** FRIEND_SUGGESTIONS, MY_FRIENDS, FRIEND_REQUESTS, ADD_FRIEND, RESPOND_FRIEND_REQUEST, UNFRIEND, ONLINE_USER_IDS, START_DIRECT_CONVERSATION
 
 ---
 
-### 🔲 PHASE 7 — Other User's Profile
+### ⚠️ PHASE 7 — Other User's Profile (BUILT — NOT YET TESTED)
+
 - [ ] User profile screen (`profile/[userId].tsx`)
-- [ ] Avatar, name, bio, online status
-- [ ] FRIENDSHIP_STATUS → dynamic friend action button
-- [ ] Message button (friends only) → START_DIRECT_CONVERSATION
-- [ ] Posts grid (USER_POSTS) — tap → post detail
-- [ ] Locked notice if not friends
-- [ ] Tap author avatar anywhere in app → navigate here
+- [ ] Avatar (with online dot if friend), name, bio, interests, online pill
+- [ ] Own profile → redirect to `/tabs/profile`
+- [ ] `FRIENDSHIP_STATUS` → dynamic button: Add Friend / Pending / Accept Request / ✓ Friends (tap to unfriend)
+- [ ] Message button visible only when friends → `START_DIRECT_CONVERSATION` → `/chat/[id]`
+- [ ] Posts grid: 3-column square thumbnails (USER_POSTS), tap → post detail; vote count overlay
+- [ ] `ONLINE_USER_IDS` poll (30s) — online dot + pill shown only to friends
+- [ ] Author tap in FeedPostCard header → `/profile/[authorId]`
+- [ ] Author tap in PostDetailCard header → `/profile/[authorId]` + real avatar shown
 - [ ] Dark theme
 
-**APIs:** GET_USER_PROFILE, FRIENDSHIP_STATUS, USER_POSTS, ADD_FRIEND, RESPOND_FRIEND_REQUEST, UNFRIEND, START_DIRECT_CONVERSATION
+**APIs:** GET_USER_PROFILE, FRIENDSHIP_STATUS, USER_POSTS, ADD_FRIEND, RESPOND_FRIEND_REQUEST, UNFRIEND, START_DIRECT_CONVERSATION, ONLINE_USER_IDS
 
 ---
 
-### 🔲 PHASE 8 — Full Messaging
-- [ ] Conversation list (`tabs/messages.tsx`) — MY_CONVERSATIONS, unread count
-- [ ] MESSAGE_RECEIVED subscription bumps conversations to top
-- [ ] Start new DM FAB → friend picker → START_DIRECT_CONVERSATION
+### ⚠️ PHASE 8 — Full Messaging (BUILT — NOT YET TESTED)
+
+- [ ] Conversation list (`tabs/messages.tsx`) — MY_CONVERSATIONS sorted by last message time
+- [ ] `MESSAGE_RECEIVED` subscription refetches conversation list
+- [ ] Unread count badge on each row, bold preview text for unread
+- [ ] Online dot on conversation avatar
+- [ ] "+ New" button → friend picker modal (search + tap to start DM)
+- [ ] Empty state with "Start a Chat" button
 - [ ] Chat screen (`chat/[conversationId].tsx`)
-  - [ ] Messages list (FlashList), load 30 + paginate older
-  - [ ] Text input with typing indicator (SET_TYPING, TYPING_INDICATOR_SUB)
-  - [ ] Image picker + upload + send
-  - [ ] Seen receipts (MESSAGE_READ_SUB)
-  - [ ] Mark read on open (MARK_CONVERSATION_READ)
-  - [ ] Online status in header (PRESENCE_CHANGED)
-  - [ ] Emoji picker (20 presets)
-- [ ] Dark theme
+  - [ ] Messages: inverted FlatList, load 30 per page, `onEndReached` loads older
+  - [ ] Own messages: right-aligned accent bubble; others: left-aligned card bubble + avatar
+  - [ ] Image messages: 200×200 preview with optional caption
+  - [ ] Seen receipts: ✓✓ shown on own messages when readBy > 1
+  - [ ] `MARK_CONVERSATION_READ` called on mount + on new message while open
+  - [ ] Typing: `SET_TYPING` on input change (2s auto-off), `TYPING_INDICATOR_SUB` shows "X is typing…"
+  - [ ] Image picker (expo-image-picker) + S3 upload + send with imageUrl
+  - [ ] Image preview bar before send with remove button
+  - [ ] Emoji picker: 20 preset emojis in horizontal scroll row
+  - [ ] Online status in header via `PRESENCE_CHANGED` subscription
+  - [ ] Pagination via `client.query` with skip/take
+  - [ ] Dark theme
 
-**APIs:** MY_CONVERSATIONS, GET_MESSAGES, SEND_MESSAGE, MARK_CONVERSATION_READ, SET_TYPING, START_DIRECT_CONVERSATION, MESSAGE_RECEIVED, TYPING_INDICATOR_SUB, MESSAGE_READ_SUB, PRESENCE_CHANGED
-**Deps:** `@shopify/flash-list` (install needed)
+**APIs:** MY_CONVERSATIONS, GET_MESSAGES, SEND_MESSAGE, MARK_CONVERSATION_READ, SET_TYPING, START_DIRECT_CONVERSATION, MESSAGE_RECEIVED, TYPING_INDICATOR_SUB, MESSAGE_READ_SUB, PRESENCE_CHANGED, GET_IMAGE_UPLOAD_URL, MY_FRIENDS
+**Note:** Used FlatList (inverted) instead of FlashList — @shopify/flash-list not needed
 
 ---
 
-### 🔲 PHASE 9 — Campaign Detail
+### ⚠️ PHASE 9 — Campaign Detail (BUILT — NOT YET TESTED)
+
 - [ ] Campaign detail screen (`campaign/[slug].tsx`)
-- [ ] Hero: banner image, title, description, dates, prize
-- [ ] Rules: English/Bengali tabs, markdown rendered
-- [ ] Fixtures section (if fixturesEnabled)
-- [ ] Group standings table (computed from finished fixtures)
-- [ ] Match cards: teams, score/time, live indicator, vote button
+- [ ] Hero: banner image with overlay title, fallback text title
+- [ ] Meta strip: prize (৳), start date, end date
+- [ ] Description paragraph
+- [ ] Rules: numbered list, EN/বাং toggle (shows only when `rulesBn` is present)
+- [ ] Group standings: computed from finished fixtures, green/amber position indicators
+- [ ] Upcoming matches: grouped by stage, sorted by kickoff time
+- [ ] Finished matches: sorted newest first
+- [ ] Fixture card: team crests, score or kickoff time, live badge + red dot, Full Time label, winner highlighted gold
+- [ ] "Cast your vote" → `/post/[campaignPostId]` (upcoming); "View result" (finished)
+- [ ] `CAMPAIGN_BY_SLUG` added to `packages/shared/src/graphql/campaigns.ts`
+- [ ] `fixturesEnabled` added to `ACTIVE_CAMPAIGNS` query
+- [ ] No extra deps needed (rules are plain text, not markdown)
 - [ ] Dark theme
 
 **APIs:** CAMPAIGN_BY_SLUG, WORLD_CUP_FIXTURES
-**Deps:** `react-native-markdown-display` (install needed)
 
 ---
 
@@ -538,3 +558,8 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-05-29 | Phase 3 | Toast feedback, bell wired to notifications, voters "All" tab fix — APK ✅ |
 | 2026-05-29 | Phase 4 | Notifications screen (already built) — bell button wired ✅ |
 | 2026-05-29 | Phase 5 | Edit profile — avatar upload, display name, bio, interest tags — APK ✅ |
+| 2026-05-29 | Bug fix | Profile images: added authorProfileImageUrl to FEED_POSTS/GET_POST_BY_ID/MY_SAVED_POSTS queries, mapped in mapGqlPostToFeedView, voter avatars in post detail |
+| 2026-05-29 | Phase 6 | Friends system — 3-tab screen (Suggestions/Requests/Friends), online dots, DM button, unfriend, search — APK not yet installed |
+| 2026-05-29 | Phase 7 | Other user profile — avatar, bio, interests, friendship button, posts grid, author taps wired everywhere — APK not yet installed |
+| 2026-05-29 | Phase 8 | Full messaging — conversation list with unread badges, new DM modal, chat screen with pagination/typing/emoji/image upload/seen receipts/presence — APK not yet installed |
+| 2026-05-29 | Phase 9 | Campaign detail — hero, meta, rules EN/BN, group standings, fixture cards with live/score/vote — APK not yet installed |

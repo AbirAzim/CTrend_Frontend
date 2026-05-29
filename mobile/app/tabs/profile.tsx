@@ -28,11 +28,11 @@ type MeData = {
 };
 
 export default function ProfileScreen() {
-  const { logout, isAuthenticated, hydrated } = useAuth();
+  const { logout, isAuthenticated, hydrated, user: storedUser } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { data, loading } = useQuery<MeData>(ME, {
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     skip: !isAuthenticated,
   });
 
@@ -46,8 +46,8 @@ export default function ProfileScreen() {
     return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   }
   const me = data?.me;
-  const avatar = normalizeProfileImageUrl(me?.profileImageUrl);
-  const name = me?.displayName?.trim() || me?.username || "You";
+  const avatar = normalizeProfileImageUrl(me?.profileImageUrl ?? storedUser?.profileImageUrl);
+  const name = me?.displayName?.trim() || me?.username || storedUser?.displayName || storedUser?.username || "You";
   const initial = name.slice(0, 1).toUpperCase();
 
   async function handleLogout() {
@@ -78,12 +78,20 @@ export default function ProfileScreen() {
           {me?.bio ? <Text style={[styles.bio, { color: colors.subtext }]}>{me.bio}</Text> : null}
           {me?.email ? <Text style={[styles.email, { color: colors.subtext }]}>{me.email}</Text> : null}
 
-          <Pressable
-            style={[styles.editBtn, { backgroundColor: colors.card, borderColor: colors.accent }]}
-            onPress={() => router.push("/profile/edit" as `/${string}`)}
-          >
-            <Text style={[styles.editBtnText, { color: colors.accent }]}>✎  Edit Profile</Text>
-          </Pressable>
+          <View style={styles.profileActions}>
+            <Pressable
+              style={[styles.editBtn, { backgroundColor: colors.card, borderColor: colors.accent }]}
+              onPress={() => router.push("/profile/edit" as `/${string}`)}
+            >
+              <Text style={[styles.editBtnText, { color: colors.accent }]}>✎  Edit Profile</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.editBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push("/friends" as `/${string}`)}
+            >
+              <Text style={[styles.editBtnText, { color: colors.text }]}>👥  Friends</Text>
+            </Pressable>
+          </View>
         </>
       )}
 
@@ -108,9 +116,16 @@ const styles = StyleSheet.create({
   username: { fontSize: 14, marginBottom: 4 },
   bio: { fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 8 },
   email: { fontSize: 13, marginBottom: 24 },
+  profileActions: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
   editBtn: {
-    marginTop: 18, borderRadius: 12,
-    paddingVertical: 11, paddingHorizontal: 32,
+    borderRadius: 12,
+    paddingVertical: 11, paddingHorizontal: 24,
     borderWidth: 1,
   },
   editBtnText: { fontSize: 14, fontWeight: "700" },
