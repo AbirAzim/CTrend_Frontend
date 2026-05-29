@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +28,8 @@ import {
   DELETE_POST,
   EXTEND_POST_VOTING,
   GET_POST_BY_ID,
+  SET_POST_HYPE,
+  SET_POST_KEEP,
   VOTERS_BY_POST,
   VOTE_POST,
 } from "@ctrend/shared/graphql/feed";
@@ -37,6 +40,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
+import { postPermalink } from "../../lib/postPermalink";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -299,6 +303,22 @@ function makeStyles(c: ColorPalette) {
     loadingRow: { paddingVertical: 24, alignItems: "center" },
     errorRow: { paddingHorizontal: 14, paddingVertical: 12 },
     errorText: { fontSize: 14, color: "#f87171" },
+
+    // Action chips
+    actionsContent: {
+      flexDirection: "row" as const,
+      paddingHorizontal: 12, paddingVertical: 8, gap: 7,
+      alignItems: "center" as const,
+    },
+    actionChip: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 5,
+      borderRadius: 999, paddingVertical: 7, paddingHorizontal: 13,
+      borderWidth: 1, borderColor: c.border,
+    },
+    actionChipHypeActive: { borderColor: "#fb7185", backgroundColor: "rgba(251,113,133,0.12)" },
+    actionChipSaveActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)" },
+    actionChipIcon: { fontSize: 13, lineHeight: 18 as number, color: c.subtext },
+    actionChipLabel: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 0.3, color: c.subtext },
 
     // Inline post card
     postCard: { backgroundColor: c.card, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
@@ -572,15 +592,22 @@ function ExtendSheet({ visible, onClose, onExtend, extending, st, insets }: Exte
 type PostDetailCardProps = {
   post: ReturnType<typeof mapGqlPostToFeedView>;
   st: ReturnType<typeof makeStyles>;
+  colors: ColorPalette;
+  onVoters: () => void;
 };
 
-function PostDetailCard({ post, st }: PostDetailCardProps) {
+function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const { isAuthenticated } = useAuth();
   const [voteMut] = useMutation(VOTE_POST);
+  const [hypeMut] = useMutation(SET_POST_HYPE);
+  const [keepMut] = useMutation(SET_POST_KEEP);
   const [viewerVote, setViewerVote] = useState(post.viewerVote);
   const [up, setUp] = useState(post.upvoteCount);
   const [down, setDown] = useState(post.downvoteCount);
   const [anonymous, setAnonymous] = useState(false);
+  const [hyped, setHyped] = useState(false);
+  const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
+  const [kept, setKept] = useState(Boolean(post.viewerHasSaved));
 
   const total = up + down;
   const leftPct = total > 0 ? Math.round((100 * up) / total) : 50;
@@ -627,6 +654,29 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
       setUp(post.upvoteCount);
       setDown(post.downvoteCount);
     }
+  }
+
+  async function handleHype() {
+    if (!isAuthenticated) { router.push("/auth/login"); return; }
+    const next = !hyped;
+    setHyped(next);
+    setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
+    try { await hypeMut({ variables: { postId: post.id, active: next } }); }
+    catch { setHyped(!next); setHypeCount((n) => Math.max(0, n + (next ? -1 : 1))); }
+  }
+
+  async function handleKeep() {
+    if (!isAuthenticated) { router.push("/auth/login"); return; }
+    const next = !kept;
+    setKept(next);
+    try { await keepMut({ variables: { postId: post.id, keep: next } }); }
+    catch { setKept(!next); }
+  }
+
+  async function handleShare() {
+    try {
+      await Share.share({ url: postPermalink(post.id), message: post.caption ?? "Check out this comparison!" });
+    } catch { /* ignore */ }
   }
 
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
@@ -710,13 +760,13 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
           >
             <View style={{
               width: 18, height: 18, borderRadius: 4, borderWidth: 2,
-              borderColor: anonymous ? "#6366f1" : "#64748b",
-              backgroundColor: anonymous ? "#6366f1" : "transparent",
+              borderColor: anonymous ? colors.accent : colors.subtext,
+              backgroundColor: anonymous ? colors.accent : "transparent",
               alignItems: "center", justifyContent: "center",
             }}>
               {anonymous && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "900" }}>✓</Text>}
             </View>
-            <Text style={[st.postVoteHintText, { color: anonymous ? "#6366f1" : undefined }]}>Vote anonymously</Text>
+            <Text style={[st.postVoteHintText, { color: anonymous ? colors.accent : colors.text }]}>Vote anonymously</Text>
           </Pressable>
           {post.votingEndsAt && (
             <Text style={[st.postVoteHintText, { marginTop: 4 }]}>
@@ -736,8 +786,8 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
       {compareUrls && (
         <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <Text style={{ fontSize: 12, fontWeight: "800", color: "#6366f1", letterSpacing: 1 }}>LIVE SPLIT</Text>
-            <Text style={{ fontSize: 12, color: "#64748b" }}>{total} vote{total !== 1 ? "s" : ""}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "800", color: colors.accent, letterSpacing: 1 }}>LIVE SPLIT</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>{total} vote{total !== 1 ? "s" : ""}</Text>
           </View>
           {[0, 1].map((i) => {
             const count = i === 0 ? up : down;
@@ -746,12 +796,12 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
             return (
               <View key={i} style={{ marginBottom: 10 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#e2e8f0", flex: 1 }} numberOfLines={1}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text, flex: 1 }} numberOfLines={1}>
                     {labelFor(i)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#94a3b8", marginLeft: 8 }}>{count} · {pct}%</Text>
+                  <Text style={{ fontSize: 12, color: colors.subtext, marginLeft: 8 }}>{count} · {pct}%</Text>
                 </View>
-                <View style={{ height: 6, borderRadius: 3, backgroundColor: "#1e293b" }}>
+                <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.section }}>
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${pct}%` }} />
                 </View>
               </View>
@@ -759,6 +809,53 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
           })}
         </View>
       )}
+
+      {/* Action chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ borderTopWidth: 1, borderTopColor: colors.border }}
+        contentContainerStyle={st.actionsContent}
+      >
+        {([
+          { i: 0, label: "DISCUSS", icon: "💬", onPress: () => {} },
+          { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
+          {
+            i: 2,
+            label: `HYPE${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
+            icon: hyped ? "♥" : "♡",
+            onPress: () => void handleHype(),
+            active: hyped,
+            activeStyle: st.actionChipHypeActive,
+            activeTextColor: "#fb7185",
+          },
+          {
+            i: 3,
+            label: "KEEP",
+            icon: "🔖",
+            onPress: () => void handleKeep(),
+            active: kept,
+            activeStyle: st.actionChipSaveActive,
+            activeTextColor: "#f59e0b",
+          },
+          { i: 4, label: "VOTERS", icon: "👥", onPress: onVoters },
+        ] as Array<{ i: number; label: string; icon: string; onPress: () => void; active?: boolean; activeStyle?: object; activeTextColor?: string }>)
+          .map(({ i, label, icon, onPress, active, activeStyle, activeTextColor }) => (
+            <Pressable
+              key={i}
+              style={[st.actionChip, active && activeStyle]}
+              onPress={onPress}
+              hitSlop={4}
+            >
+              <Text style={[st.actionChipIcon, active && activeTextColor ? { color: activeTextColor } : null]}>
+                {icon}
+              </Text>
+              <Text style={[st.actionChipLabel, active && activeTextColor ? { color: activeTextColor } : null]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+      </ScrollView>
     </View>
   );
 }
@@ -943,7 +1040,7 @@ export default function PostDetailScreen() {
               <Text style={st.errorText}>Could not load post.</Text>
             </View>
           ) : post ? (
-            <PostDetailCard post={post} st={st} />
+            <PostDetailCard post={post} st={st} colors={colors} onVoters={() => setVotersVisible(true)} />
           ) : null}
 
           {/* Owner actions */}
@@ -969,16 +1066,6 @@ export default function PostDetailScreen() {
                 )}
               </Pressable>
             </View>
-          ) : null}
-
-          {/* Voters button */}
-          {post ? (
-            <Pressable
-              style={[st.ownerBtn, { marginHorizontal: 14, marginBottom: 4, alignItems: "center" }]}
-              onPress={() => setVotersVisible(true)}
-            >
-              <Text style={st.ownerBtnText}>👥 See voters</Text>
-            </Pressable>
           ) : null}
 
           {/* Comments */}
