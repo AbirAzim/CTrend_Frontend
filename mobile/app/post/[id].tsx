@@ -32,6 +32,7 @@ import {
 } from "@ctrend/shared/graphql/feed";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
@@ -59,7 +60,7 @@ type GqlVoter = {
   selectedOptionIndex: number;
   anonymous: boolean;
   createdAt: string;
-  user: { id: string; username: string; displayName: string | null } | null;
+  user: { id: string; username: string; displayName: string | null; profileImageUrl?: string | null } | null;
 };
 
 type CommentsData = { commentsByPost: GqlComment[] };
@@ -231,6 +232,7 @@ function makeStyles(c: ColorPalette) {
       backgroundColor: "#312e81",
       alignItems: "center",
       justifyContent: "center",
+      overflow: "hidden",
     },
     voterAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" },
     voterName: { fontSize: 14, fontWeight: "700", color: c.text },
@@ -485,6 +487,7 @@ function VotersSheet({ postId, visible, onClose, optionLabels, st, insets }: Vot
                   ? "Anonymous"
                   : v.user?.displayName?.trim() || v.user?.username || "Unknown";
                 const initial = name.slice(0, 1).toUpperCase();
+                const voterImg = !v.anonymous ? normalizeProfileImageUrl(v.user?.profileImageUrl) : null;
                 return (
                   <Pressable
                     key={v.voteId}
@@ -497,7 +500,10 @@ function VotersSheet({ postId, visible, onClose, optionLabels, st, insets }: Vot
                     }}
                   >
                     <View style={st.voterAvatar}>
-                      <Text style={st.voterAvatarText}>{initial}</Text>
+                      {voterImg
+                        ? <Image source={{ uri: voterImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                        : <Text style={st.voterAvatarText}>{initial}</Text>
+                      }
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={st.voterName}>{name}</Text>
@@ -611,15 +617,27 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
 
   return (
     <View style={st.postCard}>
-      <View style={st.postHeader}>
-        <View style={st.postAvatar}>
-          <Text style={st.postAvatarText}>{initial}</Text>
-        </View>
+      <Pressable
+        style={st.postHeader}
+        onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
+      >
+        {post.authorProfileImageUrl ? (
+          <Image
+            source={{ uri: post.authorProfileImageUrl }}
+            style={[st.postAvatar, { overflow: "hidden" }]}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        ) : (
+          <View style={st.postAvatar}>
+            <Text style={st.postAvatarText}>{initial}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={st.postAuthor}>{authorName}</Text>
           <Text style={st.postTime}>{formatRelativeTime(post.createdAt)}</Text>
         </View>
-      </View>
+      </Pressable>
 
       {post.caption ? <Text style={st.postCaption}>{post.caption}</Text> : null}
 

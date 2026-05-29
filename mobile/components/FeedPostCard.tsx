@@ -91,7 +91,8 @@ function calcCountdown(endsAt: string | null | undefined): string | null {
 function makeStyles(c: ColorPalette) {
   return {
     card: { backgroundColor: c.card, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
-    header: { flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+    header: { flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: 14, paddingVertical: 12 },
+    authorRow: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
     avatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: "hidden" as const },
     avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarFallback: { backgroundColor: "#312e81", justifyContent: "center" as const, alignItems: "center" as const },
@@ -477,19 +478,24 @@ function FeedPostCardComponent({ post }: Props) {
     <View style={st.card}>
       {/* Header */}
       <View style={st.header}>
-        <View style={st.avatarWrap}>
-          {post.authorProfileImageUrl ? (
-            <Image source={{ uri: post.authorProfileImageUrl }} style={st.avatar} contentFit="cover" cachePolicy="memory-disk" />
-          ) : (
-            <View style={[st.avatar, st.avatarFallback]}>
-              <Text style={st.avatarText}>{authorInitial}</Text>
-            </View>
-          )}
-        </View>
-        <View style={st.authorMeta}>
-          <Text style={st.authorName}>{authorName}</Text>
-          {timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
-        </View>
+        <Pressable
+          style={st.authorRow}
+          onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
+        >
+          <View style={st.avatarWrap}>
+            {post.authorProfileImageUrl ? (
+              <Image source={{ uri: post.authorProfileImageUrl }} style={st.avatar} contentFit="cover" cachePolicy="memory-disk" />
+            ) : (
+              <View style={[st.avatar, st.avatarFallback]}>
+                <Text style={st.avatarText}>{authorInitial}</Text>
+              </View>
+            )}
+          </View>
+          <View style={st.authorMeta}>
+            <Text style={st.authorName}>{authorName}</Text>
+            {timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
+          </View>
+        </Pressable>
         <Pressable style={st.moreBtn} hitSlop={8}>
           <Text style={st.moreBtnText}>⋯</Text>
         </Pressable>

@@ -1,5 +1,5 @@
 import { Tabs, router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -52,7 +52,7 @@ export default function TabsLayout() {
         options={{
           title: "",
           tabBarIcon: () => <CreateFabIcon accent={colors.accent} />,
-          tabBarButton: (props) => (
+          tabBarButton: ({ ref: _ref, ...props }) => (
             <Pressable {...props} style={[styles.fabTabBtn, props.style as object]} />
           ),
         }}
@@ -78,7 +78,7 @@ export default function TabsLayout() {
   );
 }
 
-function HomeIcon({ color, size = 22 }: { color: string; size?: number }) {
+function HomeIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
   const s = size;
   return (
     <View style={{ width: s, height: s, alignItems: "center", justifyContent: "flex-end" }}>
@@ -94,7 +94,7 @@ function HomeIcon({ color, size = 22 }: { color: string; size?: number }) {
   );
 }
 
-function BookmarkIcon({ color, size = 22, bg }: { color: string; size?: number; bg: string }) {
+function BookmarkIcon({ color, size = 22, bg }: { color: ColorValue; size?: number; bg: ColorValue }) {
   const s = size;
   const w = s * 0.6;
   const h = s * 0.85;
@@ -118,7 +118,7 @@ function CreateFabIcon({ accent }: { accent: string }) {
   );
 }
 
-function ChatIcon({ color, size = 22 }: { color: string; size?: number }) {
+function ChatIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
   const s = size;
   return (
     <View style={{ width: s, height: s }}>
@@ -133,7 +133,7 @@ function ChatIcon({ color, size = 22 }: { color: string; size?: number }) {
   );
 }
 
-function UserIcon({ color, size = 22 }: { color: string; size?: number }) {
+function UserIcon({ color, size = 22 }: { color: ColorValue; size?: number }) {
   const s = size;
   const headR = s * 0.22;
   return (
