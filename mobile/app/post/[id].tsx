@@ -612,6 +612,8 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
 
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
   const initial = authorName.slice(0, 1).toUpperCase();
+  const authorAvatarUrl = post.authorProfileImageUrl
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName.slice(0, 2))}&background=312e81&color=ffffff&size=96&format=png`;
   const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls.slice(0, 2) : null;
   const hasVoted = viewerVote !== null;
 
@@ -621,9 +623,9 @@ function PostDetailCard({ post, st }: PostDetailCardProps) {
         style={st.postHeader}
         onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
       >
-        {post.authorProfileImageUrl ? (
+        {authorAvatarUrl ? (
           <Image
-            source={{ uri: post.authorProfileImageUrl }}
+            source={{ uri: authorAvatarUrl }}
             style={[st.postAvatar, { overflow: "hidden" }]}
             contentFit="cover"
             cachePolicy="memory-disk"

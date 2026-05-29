@@ -26,14 +26,12 @@ function CampaignCard({ c }: { c: Campaign }) {
       }}
       onPress={() => router.push(`/campaign/${c.slug}` as `/${string}`)}
     >
-      {c.bannerImageUrl ? (
-        <Image
-          source={{ uri: c.bannerImageUrl }}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-        />
-      ) : null}
+      <Image
+        source={c.bannerImageUrl ? { uri: c.bannerImageUrl } : require("../assets/worldcup-players.png")}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
       <View style={{ ...{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, backgroundColor: "rgba(20, 5, 40, 0.70)" }} />
       <View style={{ padding: 14, gap: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>

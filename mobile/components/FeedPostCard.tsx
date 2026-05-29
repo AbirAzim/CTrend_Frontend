@@ -472,6 +472,9 @@ function FeedPostCardComponent({ post }: Props) {
 
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
   const authorInitial = authorName.slice(0, 1).toUpperCase();
+  const uiAvatarName = encodeURIComponent(authorName.slice(0, 2));
+  const authorAvatarUrl = post.authorProfileImageUrl
+    || `https://ui-avatars.com/api/?name=${uiAvatarName}&background=312e81&color=ffffff&size=96&format=png`;
   const timeLabel = formatRelativeTime(post.createdAt);
 
   return (
@@ -483,13 +486,7 @@ function FeedPostCardComponent({ post }: Props) {
           onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
         >
           <View style={st.avatarWrap}>
-            {post.authorProfileImageUrl ? (
-              <Image source={{ uri: post.authorProfileImageUrl }} style={st.avatar} contentFit="cover" cachePolicy="memory-disk" />
-            ) : (
-              <View style={[st.avatar, st.avatarFallback]}>
-                <Text style={st.avatarText}>{authorInitial}</Text>
-              </View>
-            )}
+            <Image source={{ uri: authorAvatarUrl }} style={st.avatar} contentFit="cover" cachePolicy="memory-disk" />
           </View>
           <View style={st.authorMeta}>
             <Text style={st.authorName}>{authorName}</Text>
