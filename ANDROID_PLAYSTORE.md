@@ -1,9 +1,15 @@
 # CTrend → Android Play Store
 
-This guide takes the existing React + Vite web app and wraps it into a native
-Android app using **Capacitor**. Capacitor embeds the built web app inside a
-native WebView, which means all your existing GraphQL calls, routing, and UI
-work unchanged — you just add a native shell around them.
+> **Deprecated:** Capacitor was removed. Use the Expo React Native app in
+> [`mobile/`](mobile/README.md) for Android builds.
+
+---
+
+## Legacy: Capacitor (removed)
+
+This guide took the React + Vite web app and wrapped it in **Capacitor**
+(WebView). That `android/` project is gone; keep this file only for historical
+reference.
 
 ---
 

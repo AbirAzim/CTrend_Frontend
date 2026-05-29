@@ -1,5 +1,5 @@
 import { useApolloClient, useLazyQuery, useMutation, useQuery, useSubscription } from "@apollo/client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "../graphql/feed";
@@ -92,6 +92,13 @@ export function FeedPage() {
     "suggestions" | "friends" | "requestedMe" | "requestedByMe" | null
   >(null);
   const [modalSearch, setModalSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(8);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [isWideScreen, setIsWideScreen] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 980px)").matches,
+  );
 
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
     skip: useMockFeed,
@@ -103,13 +110,13 @@ export function FeedPage() {
     refetch: refetchFriends,
   } = useQuery(MY_FRIENDS, {
     skip: useMockFeed || !isAuthenticated,
-    fetchPolicy: "cache-and-network",
+    fetchPolicy: "cache-first",
   });
   const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery(
     FRIEND_REQUESTS,
     {
       skip: useMockFeed || !isAuthenticated,
-      fetchPolicy: "cache-and-network",
+      fetchPolicy: "cache-first",
     },
   );
   const {
@@ -121,12 +128,12 @@ export function FeedPage() {
     {
       variables: { limit: 8 },
       skip: useMockFeed || !isAuthenticated,
-      fetchPolicy: "cache-and-network",
+      fetchPolicy: "cache-first",
     },
   );
   const { data: meData, refetch: refetchMe } = useQuery(ME, {
     skip: useMockFeed || !isAuthenticated,
-    fetchPolicy: "cache-and-network",
+    fetchPolicy: "cache-first",
   });
   const [addFriend, { loading: addingFriend }] = useMutation(ADD_FRIEND, {
     refetchQueries: [
@@ -195,39 +202,37 @@ export function FeedPage() {
   const visibleRequestedByMe = requestedByMe.slice(0, SIDE_PREVIEW_LIMIT);
   const me = meData?.me as FriendRow | undefined;
 
-  const profileByUsername = new Map<string, string>();
-  const profileByEmail = new Map<string, string>();
-  const allKnownUsers = [me, ...friends, ...suggestions, ...requestedMe, ...requestedByMe].filter(
-    Boolean,
-  ) as FriendRow[];
-  for (const person of allKnownUsers) {
-    const image = normalizeProfileImageUrl(person.profileImageUrl);
-    if (!image) {
-      continue;
+  const posts: FeedPostView[] = useMemo(() => {
+    const profileByUsername = new Map<string, string>();
+    const profileByEmail = new Map<string, string>();
+    const allKnownUsers = [me, ...friends, ...suggestions, ...requestedMe, ...requestedByMe].filter(
+      Boolean,
+    ) as FriendRow[];
+    for (const person of allKnownUsers) {
+      const image = normalizeProfileImageUrl(person.profileImageUrl);
+      if (!image) continue;
+      const username = person.username?.trim().toLowerCase();
+      const email = person.email?.trim().toLowerCase();
+      if (username) profileByUsername.set(username, image);
+      if (email) profileByEmail.set(email, image);
     }
-    const username = person.username?.trim().toLowerCase();
-    const email = person.email?.trim().toLowerCase();
-    if (username) {
-      profileByUsername.set(username, image);
-    }
-    if (email) {
-      profileByEmail.set(email, image);
-    }
-  }
+    return postsRaw.map((p) => {
+      if (p.authorProfileImageUrl?.trim()) return p;
+      const byUsername = profileByUsername.get(p.authorUsername.trim().toLowerCase());
+      const byEmail = p.authorEmail
+        ? profileByEmail.get(p.authorEmail.trim().toLowerCase())
+        : undefined;
+      return {
+        ...p,
+        authorProfileImageUrl: byUsername ?? byEmail ?? null,
+      };
+    });
+  }, [me, friends, suggestions, requestedMe, requestedByMe, postsRaw]);
 
-  const posts: FeedPostView[] = postsRaw.map((p) => {
-    if (p.authorProfileImageUrl?.trim()) {
-      return p;
-    }
-    const byUsername = profileByUsername.get(p.authorUsername.trim().toLowerCase());
-    const byEmail = p.authorEmail
-      ? profileByEmail.get(p.authorEmail.trim().toLowerCase())
-      : undefined;
-    return {
-      ...p,
-      authorProfileImageUrl: byUsername ?? byEmail ?? null,
-    };
-  });
+  const visiblePosts = useMemo(
+    () => posts.slice(0, visibleCount),
+    [posts, visibleCount],
+  );
 
   const showApiError = !useMockFeed && Boolean(error);
   const showEmpty =
@@ -251,6 +256,35 @@ export function FeedPage() {
         .catch(() => {/* post not visible to viewer — ignore */});
     },
   });
+
+  useEffect(() => {
+    if (posts.length <= visibleCount) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + 6, posts.length));
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [posts.length, visibleCount]);
+
+  useEffect(() => {
+    setVisibleCount((prev) => Math.min(Math.max(8, prev), Math.max(8, posts.length)));
+  }, [posts.length]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(min-width: 980px)");
+    const update = () => setIsWideScreen(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (useMockFeed) {
@@ -317,6 +351,7 @@ export function FeedPage() {
 
   return (
     <div className="cx-feed-layout">
+      {isWideScreen ? (
       <aside className="cx-side-panel cx-side-panel--left" aria-label="Friend suggestions">
         <div className="cx-side-head">
           <h3 className="cx-side-panel-title">Suggestions</h3>
@@ -364,6 +399,7 @@ export function FeedPage() {
           ))}
         </ul>
       </aside>
+      ) : null}
 
       <div className="ig-feed">
         <CampaignBanners />
@@ -395,13 +431,18 @@ export function FeedPage() {
           </div>
         )}
 
-        {posts.map((post) => (
+        {visiblePosts.map((post) => (
           <FeedPostCard
             key={post.id}
             post={post}
             voteMode={useMockFeed ? "local" : "api"}
           />
         ))}
+        {visiblePosts.length < posts.length ? (
+          <div ref={loadMoreRef} className="ig-feed-status">
+            Loading more posts…
+          </div>
+        ) : null}
 
         {friendError ? (
           <div className="ig-feed-banner ig-feed-banner--error" role="alert">
@@ -410,6 +451,7 @@ export function FeedPage() {
         ) : null}
       </div>
 
+      {isWideScreen ? (
       <aside className="cx-side-panel cx-side-panel--right" aria-label="My friends">
         <div className="cx-side-head">
           <h3 className="cx-side-panel-title">Friends</h3>
@@ -547,7 +589,8 @@ export function FeedPage() {
           ))}
         </ul>
       </aside>
-      {activePeopleModal ? (
+      ) : null}
+      {isWideScreen && activePeopleModal ? (
         <div
           className="ig-modal-overlay"
           role="dialog"
