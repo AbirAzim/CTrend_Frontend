@@ -1,4 +1,5 @@
 import { useMutation, useSubscription } from "@apollo/client/react";
+import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -95,56 +96,67 @@ function calcCountdown(endsAt: string | null | undefined): string | null {
 
 function makeStyles(c: ColorPalette) {
   return {
-    card: { backgroundColor: c.card, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
-    header: { flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: 14, paddingVertical: 12 },
+    card: {
+      backgroundColor: c.card, marginBottom: 12,
+      marginHorizontal: 12, borderRadius: 20,
+      borderWidth: 1, borderColor: c.border,
+      overflow: "hidden" as const,
+      // depth shadow
+      elevation: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+    },
+    header: { flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: 14, paddingVertical: 13 },
     authorRow: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
-    avatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: "hidden" as const },
-    avatar: { width: 40, height: 40, borderRadius: 20 },
+    avatarWrap: { width: 42, height: 42, borderRadius: 21, overflow: "hidden" as const },
+    avatar: { width: 42, height: 42, borderRadius: 21 },
     avatarFallback: { backgroundColor: "#312e81", justifyContent: "center" as const, alignItems: "center" as const },
     avatarText: { color: "#ffffff", fontSize: 16, fontWeight: "700" as const },
     authorMeta: { flex: 1 },
-    authorName: { fontSize: 14, fontWeight: "700" as const, color: c.text },
-    timeLabel: { fontSize: 12, color: c.muted, marginTop: 1 },
-    moreBtn: { padding: 6 },
-    moreBtnText: { fontSize: 22, color: c.subtext },
-    caption: { paddingHorizontal: 14, paddingBottom: 10, fontSize: 14, color: c.text, lineHeight: 20 },
-    compareWrap: { flexDirection: "row" as const, gap: 2 },
+    authorName: { fontSize: 14, fontWeight: "800" as const, color: c.text, letterSpacing: 0.1 },
+    timeLabel: { fontSize: 11, color: c.muted, marginTop: 2 },
+    moreBtn: { padding: 8 },
+    moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
+    caption: { paddingHorizontal: 14, paddingBottom: 10, fontSize: 14, color: c.text, lineHeight: 21, fontWeight: "400" as const },
+    compareWrap: { flexDirection: "row" as const, gap: 3 },
     compareCell: { flex: 1, height: IMG_H, overflow: "hidden" as const },
     compareCellLoser: { opacity: 0.5 },
     compareImg: { width: "100%" as const, height: "100%" as const },
     pctOverlay: {
       position: "absolute" as const, bottom: 0, left: 0, right: 0,
-      paddingVertical: 8, paddingHorizontal: 8,
-      backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center" as const,
+      paddingVertical: 10, paddingHorizontal: 10,
+      backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center" as const,
     },
-    pctText: { color: "#ffffff", fontSize: 18, fontWeight: "900" as const },
-    pctLabel: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginTop: 1 },
-    votedBadgeRow: { position: "absolute" as const, top: 10, left: 0, right: 0, alignItems: "center" as const },
-    votedBadge: { backgroundColor: GREEN, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-    votedBadgeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" as const },
-    winnerBadgeRow: { position: "absolute" as const, top: 10, left: 0, right: 0, alignItems: "center" as const },
-    winnerBadge: { backgroundColor: "#f59e0b", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+    pctText: { color: "#ffffff", fontSize: 20, fontWeight: "900" as const, letterSpacing: -0.5 },
+    pctLabel: { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 2, fontWeight: "600" as const },
+    votedBadgeRow: { position: "absolute" as const, top: 12, left: 0, right: 0, alignItems: "center" as const },
+    votedBadge: { backgroundColor: GREEN, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 5 },
+    votedBadgeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" as const, letterSpacing: 0.5 },
+    winnerBadgeRow: { position: "absolute" as const, top: 12, left: 0, right: 0, alignItems: "center" as const },
+    winnerBadge: { backgroundColor: "#f59e0b", borderRadius: 99, paddingHorizontal: 12, paddingVertical: 5 },
     winnerBadgeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" as const },
-    splitBar: { flexDirection: "row" as const, height: 4 },
+    splitBar: { flexDirection: "row" as const, height: 5 },
     splitBarLeft: { backgroundColor: GREEN },
     splitBarRight: { backgroundColor: ORANGE },
-    voteHintRow: { paddingVertical: 8, alignItems: "center" as const },
+    voteHintRow: { paddingVertical: 10, alignItems: "center" as const },
     voteHintText: { fontSize: 12, color: c.subtext },
-    voteHintRecorded: { color: GREEN, fontWeight: "600" as const },
+    voteHintRecorded: { color: GREEN, fontWeight: "700" as const },
     countdownRow: {
       flexDirection: "row" as const, alignItems: "center" as const,
       justifyContent: "space-between" as const, paddingHorizontal: 14, paddingBottom: 10,
     },
     countdownPill: {
-      backgroundColor: c.section, borderRadius: 20,
-      paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: c.border,
+      backgroundColor: c.section, borderRadius: 99,
+      paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: c.border,
     },
-    countdownText: { fontSize: 12, fontWeight: "700" as const, color: c.text },
+    countdownText: { fontSize: 12, fontWeight: "800" as const, color: c.text, letterSpacing: 0.5 },
     seeDetailsBtn: {
-      borderWidth: 1, borderColor: c.subtext, borderRadius: 8,
-      paddingHorizontal: 12, paddingVertical: 5,
+      borderWidth: 1, borderColor: c.border, borderRadius: 99,
+      paddingHorizontal: 14, paddingVertical: 6,
     },
-    seeDetailsBtnText: { fontSize: 11, fontWeight: "700" as const, color: c.text },
+    seeDetailsBtnText: { fontSize: 11, fontWeight: "700" as const, color: c.subtext },
     liveSplit: { paddingHorizontal: 14, paddingBottom: 10 },
     liveSplitHeader: {
       flexDirection: "row" as const, justifyContent: "space-between" as const,
@@ -177,18 +189,19 @@ function makeStyles(c: ColorPalette) {
     actionsScroll: {},
     actionsContent: {
       flexDirection: "row" as const,
-      paddingHorizontal: 12, paddingVertical: 8, gap: 7,
+      paddingHorizontal: 14, paddingVertical: 10, gap: 8,
       alignItems: "center" as const,
     },
     actionChip: {
       flexDirection: "row" as const, alignItems: "center" as const, gap: 5,
-      borderRadius: 999, paddingVertical: 7, paddingHorizontal: 13,
+      borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14,
       borderWidth: 1, borderColor: c.border,
+      backgroundColor: c.section,
     },
-    actionChipHypeActive: { borderColor: "#fb7185", backgroundColor: "rgba(251,113,133,0.12)" },
-    actionChipSaveActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)" },
+    actionChipHypeActive: { borderColor: "#fb7185", backgroundColor: "rgba(251,113,133,0.14)" },
+    actionChipSaveActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.14)" },
     actionChipIcon: { fontSize: 13, lineHeight: 18, color: c.subtext },
-    actionChipLabel: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 0.3, color: c.subtext },
+    actionChipLabel: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 0.4, color: c.subtext },
     // legacy (kept for reference, unused)
     actions: {
       flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: c.border,
@@ -233,6 +246,7 @@ function makeStyles(c: ColorPalette) {
 function FeedPostCardComponent({ post }: Props) {
   const { user, isAuthenticated } = useAuth();
   const { colors } = useTheme();
+  const tickPlayer = useAudioPlayer(require("../assets/vote-tick.wav"));
   const st = useMemo(() => makeStyles(colors), [colors]);
 
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
@@ -399,6 +413,9 @@ function FeedPostCardComponent({ post }: Props) {
   const [extendMut] = useMutation(EXTEND_POST_VOTING);
 
   function triggerVotePop(idx: number) {
+    // Haptic + audio tick
+    tickPlayer.seekTo(0);
+    tickPlayer.play();
     Animated.sequence([
       Animated.timing(cellScale[idx], { toValue: 1.065, duration: 80, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
       Animated.timing(cellScale[idx], { toValue: 0.975, duration: 80, useNativeDriver: true }),

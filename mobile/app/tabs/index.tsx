@@ -116,7 +116,7 @@ function FeedTopBar() {
   );
 }
 
-const TAB_BAR_H = 72;
+const TAB_BAR_H = 64 + 14; // pill height + bottom margin
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -282,32 +282,38 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    // subtle elevation
+    elevation: 4,
+    shadowColor: "#6366f1",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
-  brand: { flexDirection: "row", alignItems: "center", gap: 6 },
-  brandText: { fontSize: 19, fontWeight: "800", letterSpacing: 0.2 },
-  brandLogo: { width: 22, height: 20 },
-  actions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brandText: { fontSize: 20, fontWeight: "800", letterSpacing: 0.3 },
+  brandLogo: { width: 24, height: 22 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 7 },
   circleBtn: {
     width: 36, height: 36, borderRadius: 18,
     justifyContent: "center", alignItems: "center",
   },
-  circleBtnBell: { backgroundColor: "#3b1515" },
-  circleBtnLogout: { backgroundColor: "#7f1d1d" },
-  iconSymbol: { fontSize: 16, color: "#e2e8f0" },
-  bellSymbol: { fontSize: 16 },
-  logoutSymbol: { fontSize: 18, color: "#fca5a5", fontWeight: "700" },
+  circleBtnBell: { backgroundColor: "rgba(239,68,68,0.14)" },
+  circleBtnLogout: { backgroundColor: "rgba(127,29,29,0.5)" },
+  iconSymbol: { fontSize: 15, color: "#e2e8f0" },
+  bellSymbol: { fontSize: 15 },
+  logoutSymbol: { fontSize: 17, color: "#fca5a5", fontWeight: "700" },
   rectBtn: {
-    height: 36, paddingHorizontal: 12, borderRadius: 10,
+    height: 34, paddingHorizontal: 11, borderRadius: 10,
     justifyContent: "center", alignItems: "center",
   },
   rectBtnAdmin: { backgroundColor: "#7c3aed" },
   rectBtnCreate: { backgroundColor: "#4f46e5" },
-  rectBtnSymbol: { fontSize: 16, color: "#ffffff", fontWeight: "700" },
+  rectBtnSymbol: { fontSize: 15, color: "#ffffff", fontWeight: "700" },
   notifBadge: {
-    position: "absolute", top: 0, right: 0,
+    position: "absolute", top: -1, right: -1,
     backgroundColor: "#ef4444", borderRadius: 8,
     minWidth: 16, height: 16,
     justifyContent: "center", alignItems: "center", paddingHorizontal: 3,
