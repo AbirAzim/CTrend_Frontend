@@ -269,8 +269,8 @@ export function AppShell() {
           <IconPlusSquare />
         </NavLink>
         <NavLink
-          to={isAuthenticated ? "/profile?view=keeps#saved-posts" : "/login"}
-          state={!isAuthenticated ? { from: "/profile?view=keeps#saved-posts" } : undefined}
+          to={isAuthenticated ? "/profile?tab=kept" : "/login"}
+          state={!isAuthenticated ? { from: "/profile?tab=kept" } : undefined}
           className={({ isActive }) =>
             `ig-nav-item ig-nav-item--keeps${isActive ? " ig-nav-item--active" : ""}`
           }

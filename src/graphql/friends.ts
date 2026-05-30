@@ -19,8 +19,8 @@ export const MY_FRIENDS = gql`
 `;
 
 export const FRIEND_SUGGESTIONS = gql`
-  query FriendSuggestions($limit: Int) {
-    friendSuggestions(limit: $limit) {
+  query FriendSuggestions($limit: Int, $search: String) {
+    friendSuggestions(limit: $limit, search: $search) {
       id
       username
       displayName
