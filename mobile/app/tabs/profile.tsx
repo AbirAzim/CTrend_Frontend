@@ -402,13 +402,13 @@ export default function ProfileScreen() {
               <Text style={[styles.adminRowLabel, { color: colors.muted }]}>ADMIN</Text>
               <Pressable
                 style={[styles.adminTab, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => Alert.alert("Dashboard", "Open the web app at kejitbe.app/admin for the dashboard.")}
+                onPress={() => router.push("/admin" as `/${string}`)}
               >
-                <Text style={[styles.adminTabText, { color: colors.text }]}>Dashboard ▾</Text>
+                <Text style={[styles.adminTabText, { color: colors.text }]}>Admin Panel ▾</Text>
               </Pressable>
               <Pressable
                 style={[styles.adminTab, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => router.push("/tabs/create" as `/${string}`)}
+                onPress={() => router.push("/profile/scheduled" as `/${string}`)}
               >
                 <Text style={[styles.adminTabText, { color: colors.text }]}>Scheduled ▾</Text>
               </Pressable>
