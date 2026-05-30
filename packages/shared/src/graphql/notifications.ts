@@ -43,6 +43,12 @@ export const SEND_ADMIN_BROADCAST = gql`
   }
 `;
 
+export const REGISTER_PUSH_TOKEN = gql`
+  mutation RegisterPushToken($token: String!, $platform: String) {
+    registerPushToken(token: $token, platform: $platform)
+  }
+`;
+
 export const NEW_NOTIFICATION_SUB = gql`
   subscription NewNotification {
     newNotification {

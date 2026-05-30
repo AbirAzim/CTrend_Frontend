@@ -5,6 +5,7 @@
   "dependencies": {
     "@ctrend/shared": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "12.0.1",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "babel-plugin-module-resolver": "^5.0.3",
     "expo": "~56.0.6",
