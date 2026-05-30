@@ -35,7 +35,7 @@ function formatDate(isoDate: string): string {
 export function ScheduledPostsPage() {
   const { data, loading, error, refetch } = useQuery<{ myScheduledPosts: ScheduledPost[] }>(
     MY_SCHEDULED_POSTS,
-    { fetchPolicy: "network-only", pollInterval: 30_000 },
+    { fetchPolicy: "network-only", pollInterval: 10_000 },
   );
 
   const [cancelPost, { loading: cancelling }] = useMutation(CANCEL_SCHEDULED_POST);

@@ -2,9 +2,10 @@ import { useApolloClient, useLazyQuery, useMutation, useQuery, useSubscription }
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
-import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "../graphql/feed";
+import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "../graphql/feed";
 import {
   ADD_FRIEND,
+  CANCEL_FRIEND_REQUEST,
   FRIEND_REQUESTS,
   FRIEND_SUGGESTIONS,
   MY_FRIENDS,
@@ -30,7 +31,8 @@ type FriendRow = {
 };
 
 function friendName(f: FriendRow): string {
-  return f.displayName?.trim() || f.username?.trim() || "User";
+  // Show display name everywhere; fall back to @username when no display name is set
+  return f.displayName?.trim() || `@${f.username?.trim() || "user"}`;
 }
 
 function friendInitial(f: FriendRow): string {
@@ -86,6 +88,7 @@ export function FeedPage() {
   const { onlineUserIds } = useMessenger();
   const client = useApolloClient();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
+  const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(new Set());
   const [friendError, setFriendError] = useState<string | null>(null);
   const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [activePeopleModal, setActivePeopleModal] = useState<
@@ -103,6 +106,11 @@ export function FeedPage() {
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
+    // 20-second poll fallback so feed stays fresh even when the WS subscription
+    // is suppressed (Safari background tab, network glitch, etc.). Cheap because
+    // Apollo dedupes the network response into the same cache the subscription
+    // updates write to.
+    pollInterval: 20_000,
   });
   const {
     data: friendsData,
@@ -152,6 +160,21 @@ export function FeedPage() {
       ],
     },
   );
+  const [cancelFriendRequest, { loading: cancellingRequest }] = useMutation(
+    CANCEL_FRIEND_REQUEST,
+    {
+      refetchQueries: [
+        { query: FRIEND_REQUESTS },
+        { query: FRIEND_SUGGESTIONS, variables: { limit: 8 } },
+      ],
+    },
+  );
+
+  async function onCancelOutgoingRequest(userId: string) {
+    try {
+      await cancelFriendRequest({ variables: { userId } });
+    } catch { /* silent */ }
+  }
 
   // Lazy query for all suggestions used in the "View all" modal (limit 100)
   const [fetchAllSuggestions, { data: allSuggestionsData, loading: allSuggestionsLoading }] =
@@ -170,8 +193,8 @@ export function FeedPage() {
   // Prepend subscription-delivered posts, excluding any already in the API results
   const knownIds = new Set(basePostsRaw.map((p) => p.id));
   const postsRaw: FeedPostView[] = [
-    ...liveQueue.filter((p) => !knownIds.has(p.id)),
-    ...basePostsRaw,
+    ...liveQueue.filter((p) => !knownIds.has(p.id) && !removedIds.has(p.id)),
+    ...basePostsRaw.filter((p) => !removedIds.has(p.id)),
   ];
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
@@ -243,6 +266,11 @@ export function FeedPage() {
     onData: ({ data }) => {
       const postId = data.data?.newPosts?.postId;
       if (!postId) return;
+      // Refetch the canonical feed so the new post is part of the main query
+      // (handles ordering, pagination cursors, and any visibility filters).
+      void refetchFeed();
+      // Also fetch this specific post into the live queue for instant display
+      // — covers the race between the subscription firing and the refetch landing.
       void client
         .query({ query: GET_POST_BY_ID, variables: { id: postId }, fetchPolicy: "network-only" })
         .then(({ data: postData }) => {
@@ -254,6 +282,24 @@ export function FeedPage() {
           });
         })
         .catch(() => {/* post not visible to viewer — ignore */});
+    },
+  });
+
+  // Realtime delete: when any viewer's post is removed, drop it from this feed.
+  useSubscription<{ postDeleted: { postId: string } }>(POST_DELETED_SUB, {
+    skip: useMockFeed,
+    onData: ({ data }) => {
+      const postId = data.data?.postDeleted?.postId;
+      if (!postId) return;
+      setRemovedIds((prev) => {
+        if (prev.has(postId)) return prev;
+        const next = new Set(prev);
+        next.add(postId);
+        return next;
+      });
+      // Also evict from Apollo cache so a refetch (or other consumers of this
+      // query) don't keep showing the stale row.
+      void refetchFeed();
     },
   });
 
@@ -384,7 +430,6 @@ export function FeedPage() {
               <div className="cx-friend-meta">
                 <Link to={`/profile/${s.id}`} className="cx-friend-profile-link">
                   <strong>{friendName(s)}</strong>
-                  <span>@{s.username ?? "user"}</span>
                 </Link>
               </div>
               <button
@@ -410,9 +455,15 @@ export function FeedPage() {
 
         {showApiError && (
           <div className="ig-feed-banner ig-feed-banner--error" role="alert">
-            <strong>Could not load feed.</strong>{" "}
-            {error?.message ?? "Check that the backend implements the "}
-            <code>feedPosts</code> query (see <code>backend_req.md</code>).
+            <strong>Couldn't reach the feed.</strong>{" "}
+            <span>Check your internet connection and try again.</span>
+            <button
+              type="button"
+              className="ig-feed-banner-retry"
+              onClick={() => void refetchFeed()}
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -487,7 +538,6 @@ export function FeedPage() {
               <div className="cx-friend-meta">
                 <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
                   <strong>{friendName(f)}</strong>
-                  <span>@{f.username ?? "user"}</span>
                 </Link>
               </div>
               <FriendMessageButton userId={f.id} />
@@ -527,7 +577,6 @@ export function FeedPage() {
                 <div className="cx-friend-meta">
                   <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
                     <strong>{friendName(f)}</strong>
-                    <span>@{f.username ?? "user"}</span>
                   </Link>
                 </div>
                 <div className="cx-friend-actions">
@@ -581,10 +630,18 @@ export function FeedPage() {
               <div className="cx-friend-meta">
                 <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
                   <strong>{friendName(f)}</strong>
-                  <span>@{f.username ?? "user"}</span>
                 </Link>
+                <span className="cx-pending-tag">Pending</span>
               </div>
-              <span className="cx-pending-badge">Pending</span>
+              <button
+                type="button"
+                className="cx-cancel-request-btn"
+                disabled={cancellingRequest}
+                onClick={() => void onCancelOutgoingRequest(f.id)}
+                aria-label={`Cancel request to ${friendName(f)}`}
+              >
+                Cancel
+              </button>
             </li>
           ))}
         </ul>
@@ -642,7 +699,6 @@ export function FeedPage() {
                       <div className="cx-friend-meta">
                         <Link to={`/profile/${f.id}`} className="cx-friend-profile-link" onClick={() => setActivePeopleModal(null)}>
                           <strong>{friendName(f)}</strong>
-                          <span>@{f.username ?? "user"}</span>
                         </Link>
                       </div>
                       {activePeopleModal === "friends" ? (
@@ -679,7 +735,17 @@ export function FeedPage() {
                         </div>
                       ) : null}
                       {activePeopleModal === "requestedByMe" ? (
-                        <span className="cx-pending-badge">Pending</span>
+                        <div className="cx-friend-actions">
+                          <span className="cx-pending-tag">Pending</span>
+                          <button
+                            type="button"
+                            className="cx-cancel-request-btn"
+                            disabled={cancellingRequest}
+                            onClick={() => void onCancelOutgoingRequest(f.id)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       ) : null}
                     </li>
                 ))}

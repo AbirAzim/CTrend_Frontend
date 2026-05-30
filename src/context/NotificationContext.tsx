@@ -49,6 +49,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     skip: !isAuthenticated,
     variables: { skip: 0, take: 30 },
     fetchPolicy: "cache-and-network",
+    // 25-second poll fallback so the bell stays fresh on Safari / background
+    // tabs / flaky WS connections. The subscription handler still fires the
+    // chime instantly when the WS path works.
+    pollInterval: 25_000,
     onCompleted(data) {
       // Exclude MESSAGE-type entries — those are surfaced by the messenger
       // FAB badge, not the bell icon.

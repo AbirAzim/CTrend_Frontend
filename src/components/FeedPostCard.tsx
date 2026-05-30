@@ -1192,7 +1192,7 @@ function FeedPostCardComponent({
             </span>
             <div>
               <span className="ig-post-username">
-                {post.authorDisplayName?.trim() || post.authorUsername}
+                {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
             </div>
@@ -1220,7 +1220,7 @@ function FeedPostCardComponent({
             </span>
             <div>
               <span className="ig-post-username">
-                {post.authorDisplayName?.trim() || post.authorUsername}
+                {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
             </div>
