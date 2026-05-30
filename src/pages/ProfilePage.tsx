@@ -5,7 +5,15 @@ import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { useImageUpload } from "../lib/useImageUpload";
-import { MY_FRIENDS } from "../graphql/friends";
+import {
+  MY_FRIENDS,
+  FRIEND_REQUESTS,
+  FRIEND_SUGGESTIONS,
+  ADD_FRIEND,
+  RESPOND_FRIEND_REQUEST,
+  UNFRIEND,
+  CANCEL_FRIEND_REQUEST,
+} from "../graphql/friends";
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
@@ -50,6 +58,7 @@ type FriendRow = {
   id: string;
   username?: string | null;
   displayName?: string | null;
+  email?: string | null;
   profileImageUrl?: string | null;
 };
 
@@ -156,13 +165,27 @@ export function ProfilePage() {
     skip: !userId || useMockFeed,
     fetchPolicy: "network-only",
   });
-  const { data: friendsData, loading: friendsLoading } = useQuery(MY_FRIENDS, {
+  const { data: friendsData, loading: friendsLoading, refetch: refetchFriends } = useQuery(MY_FRIENDS, {
     skip: useMockFeed,
     fetchPolicy: "network-only",
   });
+  const { data: friendRequestsData, loading: friendRequestsLoading, refetch: refetchRequests } = useQuery(FRIEND_REQUESTS, {
+    skip: useMockFeed,
+    fetchPolicy: "network-only",
+  });
+  const { data: suggestionsData, loading: suggestionsLoading, refetch: refetchSuggestions } = useQuery(FRIEND_SUGGESTIONS, {
+    variables: { limit: 10 },
+    skip: useMockFeed,
+    fetchPolicy: "network-only",
+  });
+
+  const [addFriendMut] = useMutation(ADD_FRIEND);
+  const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST);
+  const [unfriendMut] = useMutation(UNFRIEND);
+  const [cancelFriendMut] = useMutation(CANCEL_FRIEND_REQUEST);
   const { data: savedPostsData, loading: savedPostsLoading } = useQuery(MY_SAVED_POSTS, {
     skip: useMockFeed || !user,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
   });
 
   const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
@@ -202,6 +225,79 @@ export function ProfilePage() {
     ? playgroundPosts
     : apiPosts;
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
+  const requestedMe = (friendRequestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
+  const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
+  const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
+  const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
+  const [connectionsTab, setConnectionsTab] = useState<"friends" | "requests" | "suggestions">("friends");
+  const [connectionsSearch, setConnectionsSearch] = useState("");
+
+  function setActionLoading(id: string, on: boolean) {
+    setActionLoadingIds((prev) => {
+      const next = new Set(prev);
+      if (on) { next.add(id); } else { next.delete(id); }
+      return next;
+    });
+  }
+
+  async function handleAddFriend(userId: string) {
+    setActionLoading(userId, true);
+    try {
+      await addFriendMut({ variables: { userId } });
+      void refetchRequests();
+      void refetchSuggestions();
+    } catch { /* silent */ }
+    setActionLoading(userId, false);
+  }
+
+  async function handleAcceptRequest(requesterId: string) {
+    setActionLoading(requesterId, true);
+    try {
+      await respondFriendMut({ variables: { requesterId, accept: true } });
+      void refetchRequests();
+      void refetchFriends();
+    } catch { /* silent */ }
+    setActionLoading(requesterId, false);
+  }
+
+  async function handleRejectRequest(requesterId: string) {
+    setActionLoading(requesterId, true);
+    try {
+      await respondFriendMut({ variables: { requesterId, accept: false } });
+      void refetchRequests();
+    } catch { /* silent */ }
+    setActionLoading(requesterId, false);
+  }
+
+  async function handleUnfriend(userId: string) {
+    setActionLoading(userId, true);
+    try {
+      await unfriendMut({ variables: { userId } });
+      void refetchFriends();
+      void refetchSuggestions();
+    } catch { /* silent */ }
+    setActionLoading(userId, false);
+  }
+
+  async function handleCancelRequest(userId: string) {
+    setActionLoading(userId, true);
+    try {
+      await cancelFriendMut({ variables: { userId } });
+      void refetchRequests();
+      void refetchSuggestions();
+    } catch { /* silent */ }
+    setActionLoading(userId, false);
+  }
+
+  function matchesSearch(u: FriendRow): boolean {
+    const q = connectionsSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (u.displayName?.toLowerCase().includes(q) ?? false) ||
+      (u.username?.toLowerCase().includes(q) ?? false) ||
+      (u.email?.toLowerCase().includes(q) ?? false)
+    );
+  }
   const savedPosts: FeedPostView[] = (savedPostsData?.mySavedPosts ?? []).map(
     mapGqlPostToFeedView,
   );
@@ -501,6 +597,10 @@ export function ProfilePage() {
           <strong>{activeVoting}</strong>
           <span>open</span>
         </div>
+        <div className="cx-profile-stat">
+          <strong>{savedPosts.length}</strong>
+          <span>kept</span>
+        </div>
       </div>
 
       {editing && (
@@ -760,40 +860,267 @@ export function ProfilePage() {
         )}
       </section>
 
-      <section className="cx-profile-friends" aria-label="Your friends">
-        <h2 className="cx-profile-section-title">Friends</h2>
-        {!useMockFeed && friendsLoading ? (
-          <p className="muted small">Loading friends…</p>
-        ) : null}
-        {!useMockFeed && !friendsLoading && friends.length === 0 ? (
-          <p className="muted small">No friends yet.</p>
-        ) : null}
-        {friends.length > 0 ? (
-          <ul className="cx-friend-list">
-            {friends.map((f) => (
-              <li key={f.id} className="cx-friend-item">
-                <div className="cx-friend-avatar-wrap">
-                  <Link to={`/profile/${f.id}`} className="cx-friend-avatar">
-                    {normalizeProfileImageUrl(f.profileImageUrl) ? (
-                      <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
-                    ) : (
-                      friendInitial(f)
-                    )}
-                  </Link>
-                  {onlineUserIds.has(f.id) && <span className="cx-friend-online-dot" aria-hidden />}
+      {/* ── Connections Card (tabbed) ─────────────────────── */}
+      {!useMockFeed ? (
+        <section className="cx-connections-card" aria-label="People">
+          <div className="cx-connections-header">
+            <span className="cx-connections-title">People</span>
+          </div>
+
+          {/* Search input */}
+          <div className="cx-conn-search-wrap">
+            <svg className="cx-conn-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M13 13l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+            <input
+              type="search"
+              className="cx-conn-search"
+              placeholder="Search by name, username or email…"
+              value={connectionsSearch}
+              onChange={(e) => setConnectionsSearch(e.target.value)}
+              aria-label="Search people"
+            />
+            {connectionsSearch && (
+              <button
+                type="button"
+                className="cx-conn-search-clear"
+                onClick={() => setConnectionsSearch("")}
+                aria-label="Clear search"
+              >✕</button>
+            )}
+          </div>
+
+          {/* Tab bar */}
+          <div className="cx-conn-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={connectionsTab === "friends"}
+              className={`cx-conn-tab${connectionsTab === "friends" ? " cx-conn-tab--active" : ""}`}
+              onClick={() => setConnectionsTab("friends")}
+            >
+              Friends
+              {friends.length > 0 && (
+                <span className="cx-conn-tab-badge">{friends.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={connectionsTab === "requests"}
+              className={`cx-conn-tab${connectionsTab === "requests" ? " cx-conn-tab--active" : ""}`}
+              onClick={() => setConnectionsTab("requests")}
+            >
+              Requests
+              {requestedMe.length > 0 && (
+                <span className="cx-conn-tab-badge cx-conn-tab-badge--alert">{requestedMe.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={connectionsTab === "suggestions"}
+              className={`cx-conn-tab${connectionsTab === "suggestions" ? " cx-conn-tab--active" : ""}`}
+              onClick={() => setConnectionsTab("suggestions")}
+            >
+              Suggestions
+            </button>
+          </div>
+
+          {/* ── Friends tab ── */}
+          {connectionsTab === "friends" && (
+            <div className="cx-conn-panel" role="tabpanel">
+              {friendsLoading ? (
+                <p className="cx-conn-empty">Loading…</p>
+              ) : friends.length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">👥</span>
+                  <p>No friends yet. Add people from Suggestions!</p>
                 </div>
-                <div className="cx-friend-meta">
-                  <Link to={`/profile/${f.id}`} className="cx-friend-profile-link">
-                    <strong>{friendName(f)}</strong>
-                    <span>@{f.username ?? "user"}</span>
-                  </Link>
+              ) : friends.filter(matchesSearch).length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">🔍</span>
+                  <p>No friends match "{connectionsSearch}"</p>
                 </div>
-                <MessageButton userId={f.id} />
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+              ) : (
+                <ul className="cx-conn-list">
+                  {friends.filter(matchesSearch).map((f) => (
+                    <li key={f.id} className="cx-conn-row">
+                      <div className="cx-conn-avatar-wrap">
+                        <Link to={`/profile/${f.id}`} className="cx-conn-avatar">
+                          {normalizeProfileImageUrl(f.profileImageUrl) ? (
+                            <img src={normalizeProfileImageUrl(f.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                          ) : <span className="cx-conn-avatar-initial">{friendInitial(f)}</span>}
+                        </Link>
+                        {onlineUserIds.has(f.id) && (
+                          <span className="cx-conn-online-dot" aria-label="Online" />
+                        )}
+                      </div>
+                      <div className="cx-conn-info">
+                        <Link to={`/profile/${f.id}`} className="cx-conn-name-link">
+                          <span className="cx-conn-name">{friendName(f)}</span>
+                          <span className="cx-conn-username">@{f.username ?? "user"}</span>
+                        </Link>
+                      </div>
+                      <div className="cx-conn-actions">
+                        <MessageButton userId={f.id} />
+                        <button
+                          type="button"
+                          className="cx-conn-btn cx-conn-btn--ghost"
+                          disabled={actionLoadingIds.has(f.id)}
+                          onClick={() => void handleUnfriend(f.id)}
+                        >
+                          {actionLoadingIds.has(f.id) ? "…" : "Unfriend"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* ── Requests tab ── */}
+          {connectionsTab === "requests" && (
+            <div className="cx-conn-panel" role="tabpanel">
+              {friendRequestsLoading ? (
+                <p className="cx-conn-empty">Loading…</p>
+              ) : requestedMe.length === 0 && requestedByMe.length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">📭</span>
+                  <p>No pending requests.</p>
+                </div>
+              ) : (
+                <>
+                  {requestedMe.length > 0 && (
+                    <>
+                      <p className="cx-conn-group-label">Incoming</p>
+                      <ul className="cx-conn-list">
+                        {requestedMe.filter(matchesSearch).map((u) => (
+                          <li key={u.id} className="cx-conn-row">
+                            <div className="cx-conn-avatar-wrap">
+                              <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
+                                {normalizeProfileImageUrl(u.profileImageUrl) ? (
+                                  <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                                ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
+                              </Link>
+                            </div>
+                            <div className="cx-conn-info">
+                              <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
+                                <span className="cx-conn-name">{friendName(u)}</span>
+                                <span className="cx-conn-username">@{u.username ?? "user"}</span>
+                              </Link>
+                            </div>
+                            <div className="cx-conn-actions">
+                              <button
+                                type="button"
+                                className="cx-conn-btn cx-conn-btn--accept"
+                                disabled={actionLoadingIds.has(u.id)}
+                                onClick={() => void handleAcceptRequest(u.id)}
+                              >
+                                {actionLoadingIds.has(u.id) ? "…" : "Accept"}
+                              </button>
+                              <button
+                                type="button"
+                                className="cx-conn-btn cx-conn-btn--ghost"
+                                disabled={actionLoadingIds.has(u.id)}
+                                onClick={() => void handleRejectRequest(u.id)}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {requestedByMe.length > 0 && (
+                    <>
+                      <p className="cx-conn-group-label" style={{ marginTop: requestedMe.length > 0 ? "16px" : "0" }}>Sent</p>
+                      <ul className="cx-conn-list">
+                        {requestedByMe.filter(matchesSearch).map((u) => (
+                          <li key={u.id} className="cx-conn-row">
+                            <div className="cx-conn-avatar-wrap">
+                              <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
+                                {normalizeProfileImageUrl(u.profileImageUrl) ? (
+                                  <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                                ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
+                              </Link>
+                            </div>
+                            <div className="cx-conn-info">
+                              <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
+                                <span className="cx-conn-name">{friendName(u)}</span>
+                                <span className="cx-conn-username">@{u.username ?? "user"}</span>
+                              </Link>
+                              <span className="cx-conn-pending-tag">Pending</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="cx-conn-btn cx-conn-btn--ghost"
+                              disabled={actionLoadingIds.has(u.id)}
+                              onClick={() => void handleCancelRequest(u.id)}
+                            >
+                              {actionLoadingIds.has(u.id) ? "…" : "Cancel"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── Suggestions tab ── */}
+          {connectionsTab === "suggestions" && (
+            <div className="cx-conn-panel" role="tabpanel">
+              {suggestionsLoading ? (
+                <p className="cx-conn-empty">Loading…</p>
+              ) : suggestions.length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">🎉</span>
+                  <p>You're connected with everyone!</p>
+                </div>
+              ) : suggestions.filter(matchesSearch).length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">🔍</span>
+                  <p>No suggestions match "{connectionsSearch}"</p>
+                </div>
+              ) : (
+                <ul className="cx-conn-list">
+                  {suggestions.filter(matchesSearch).map((u) => (
+                    <li key={u.id} className="cx-conn-row">
+                      <div className="cx-conn-avatar-wrap">
+                        <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
+                          {normalizeProfileImageUrl(u.profileImageUrl) ? (
+                            <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                          ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
+                        </Link>
+                      </div>
+                      <div className="cx-conn-info">
+                        <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
+                          <span className="cx-conn-name">{friendName(u)}</span>
+                          <span className="cx-conn-username">@{u.username ?? "user"}</span>
+                        </Link>
+                      </div>
+                      <button
+                        type="button"
+                        className="cx-conn-btn cx-conn-btn--add"
+                        disabled={actionLoadingIds.has(u.id)}
+                        onClick={() => void handleAddFriend(u.id)}
+                      >
+                        {actionLoadingIds.has(u.id) ? "…" : "+ Add"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className="cx-profile-friends" aria-label="Saved posts" id="saved-posts">
         <h2 className="cx-profile-section-title">Kept posts</h2>
