@@ -52,7 +52,7 @@ export default function AdminUsersScreen() {
   const [bcastBody, setBcastBody] = useState("");
 
   const { data, loading, refetch } = useQuery<ListUsersData>(LIST_USERS, {
-    variables: { skip, take: PAGE, role: roleFilter ?? undefined },
+    variables: { skip, take: PAGE },
     fetchPolicy: "cache-and-network",
   });
 
@@ -62,12 +62,15 @@ export default function AdminUsersScreen() {
   const [bulkMut, { loading: bulkInviting }] = useMutation(INVITE_USERS_BULK);
   const [broadcastMut, { loading: broadcasting }] = useMutation(BROADCAST);
 
-  const users = (data?.listUsers ?? []).filter((u) =>
-    !search ||
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    (u.username ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (u.displayName ?? "").toLowerCase().includes(search.toLowerCase()),
-  );
+  const users = (data?.listUsers ?? []).filter((u) => {
+    if (roleFilter && (u.role ?? "USER") !== roleFilter) return false;
+    if (!search) return true;
+    return (
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.username ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.displayName ?? "").toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   async function handleRemove(u: User) {
     Alert.alert("Remove user", `Remove ${u.email}? This cannot be undone.`, [
