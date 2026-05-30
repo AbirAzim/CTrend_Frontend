@@ -1,5 +1,6 @@
 import { useMutation } from "@apollo/client/react";
 import { Image } from "expo-image";
+import logoAsset from "../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -129,7 +130,7 @@ export default function VerifyEmailScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={[styles.inner, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-        <Image source={require("../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+        <Image source={logoAsset} style={styles.logo} contentFit="contain" />
 
         <Text style={[styles.title, { color: colors.text }]}>Verify your email</Text>
         <Text style={[styles.sub, { color: colors.subtext }]}>

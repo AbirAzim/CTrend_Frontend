@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
-import { useTheme } from "../context/ThemeContext";
+import worldcupPlayersAsset from "../assets/worldcup-players.png";
 
 const BG = "#5a0a0a";
 
@@ -18,7 +18,6 @@ type Campaign = {
 };
 
 function CampaignCard({ c }: { c: Campaign }) {
-  const { colors } = useTheme();
   return (
     <Pressable
       style={styles.card}
@@ -26,7 +25,7 @@ function CampaignCard({ c }: { c: Campaign }) {
     >
       {/* Right-side image — contain so full figure visible, no head cut */}
       <Image
-        source={c.bannerImageUrl ? { uri: c.bannerImageUrl } : require("../assets/worldcup-players.png")}
+        source={c.bannerImageUrl ? { uri: c.bannerImageUrl } : worldcupPlayersAsset}
         style={styles.rightImage}
         contentFit="contain"
         contentPosition="right center"

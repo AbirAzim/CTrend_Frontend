@@ -62,7 +62,7 @@ export default function ScheduledPostsScreen() {
   });
 
   // Countdown tick
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30000);
     return () => clearInterval(t);

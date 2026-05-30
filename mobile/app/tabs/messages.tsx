@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,

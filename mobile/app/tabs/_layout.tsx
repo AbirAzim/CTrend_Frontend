@@ -1,6 +1,6 @@
 import { useQuery } from "@apollo/client/react";
 import { Tabs, router } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, Dimensions, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
