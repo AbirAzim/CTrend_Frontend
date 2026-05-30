@@ -112,7 +112,7 @@ export function ProfilePage() {
   const { user, patchUser } = useAuth();
   const { onlineUserIds } = useMessenger();
   const location = useLocation();
-  const keepsOnlyView = new URLSearchParams(location.search).get("view") === "keeps";
+  const initialTab = new URLSearchParams(location.search).get("tab");
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const [editing, setEditing] = useState(false);
@@ -177,8 +177,9 @@ export function ProfilePage() {
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
+  const [suggestionsSearchQuery, setSuggestionsSearchQuery] = useState("");
   const { data: suggestionsData, loading: suggestionsLoading, refetch: refetchSuggestions } = useQuery(FRIEND_SUGGESTIONS, {
-    variables: { limit: 10 },
+    variables: { limit: 50, search: suggestionsSearchQuery || null },
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
@@ -237,7 +238,18 @@ export function ProfilePage() {
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
   const [connectionsTab, setConnectionsTab] = useState<"friends" | "requests" | "suggestions">("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
-  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept">("drops");
+  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept">(
+    initialTab === "kept" ? "kept" : "drops",
+  );
+
+  // React to URL changes (e.g. clicking the Keep bottom-nav button while already on profile)
+  useEffect(() => {
+    if (initialTab === "kept") {
+      setProfileContentTab("kept");
+    } else if (initialTab === "drops") {
+      setProfileContentTab("drops");
+    }
+  }, [initialTab]);
   const [editingPost, setEditingPost] = useState<{
     id: string;
     caption?: string | null;
@@ -314,6 +326,20 @@ export function ProfilePage() {
     setSuggestionsPage(0);
   }, [connectionsSearch, connectionsTab]);
 
+  // When on Suggestions tab, debounce the search text into a server-side query
+  // so the user can search across ALL non-friend users (not just the cached page)
+  useEffect(() => {
+    if (connectionsTab !== "suggestions") {
+      // Clear server-side search when leaving the tab so cache stays clean
+      setSuggestionsSearchQuery("");
+      return;
+    }
+    const t = setTimeout(() => {
+      setSuggestionsSearchQuery(connectionsSearch.trim());
+    }, 300);
+    return () => clearTimeout(t);
+  }, [connectionsTab, connectionsSearch]);
+
   function matchesSearch(u: FriendRow): boolean {
     const q = connectionsSearch.trim().toLowerCase();
     if (!q) return true;
@@ -361,20 +387,6 @@ export function ProfilePage() {
     setAvatarLoadFailed(false);
   }, [heroAvatarUrl]);
 
-  useEffect(() => {
-    if (location.hash !== "#saved-posts" && !keepsOnlyView) {
-      return;
-    }
-    // Deep-link from bottom keeps icon should open full kept list.
-    setShowAllSaved(true);
-    window.setTimeout(() => {
-      const target = document.getElementById("saved-posts");
-      if (!target) {
-        return;
-      }
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }, [location.hash, keepsOnlyView, savedPosts.length]);
 
   const [saveProfile, { loading: saving }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: ME }],
@@ -395,42 +407,6 @@ export function ProfilePage() {
     return null;
   }
 
-  if (keepsOnlyView) {
-    return (
-      <div className="cx-profile">
-        <section className="cx-profile-friends" aria-label="Saved posts" id="saved-posts">
-          <h2 className="cx-profile-section-title">Kept posts</h2>
-          {!useMockFeed && savedPostsLoading ? (
-            <p className="muted small">Loading kept posts…</p>
-          ) : null}
-          {!useMockFeed && !savedPostsLoading && savedPosts.length === 0 ? (
-            <p className="muted small">No kept posts yet.</p>
-          ) : null}
-          {savedPosts.length > 0 ? (
-            <ul className="cx-profile-grid cx-profile-grid--rich">
-              {savedPosts.map((post) => (
-                <li key={`saved-${post.id}`}>
-                  <article className="cx-profile-drop-card">
-                    <NavLink to={`/post/${post.id}`} className="cx-profile-drop-link">
-                      <div className="cx-profile-drop-media-grid">
-                        {(post.imageUrls ?? []).map((u, idx) => (
-                          <span
-                            key={`${post.id}-saved-img-${idx}`}
-                            className="cx-profile-grid-cell"
-                            style={{ backgroundImage: `url(${u})` }}
-                          />
-                        ))}
-                      </div>
-                    </NavLink>
-                  </article>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      </div>
-    );
-  }
 
   async function onAvatarFileChange(file: File | undefined) {
     if (!file) return;

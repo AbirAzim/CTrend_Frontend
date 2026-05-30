@@ -9937,6 +9937,71 @@ a.cx-profile-btn-accent {
 .nb-item-time { font-size: 0.72rem; color: var(--ig-muted, #aaa); }
 .nb-unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ig-accent, #0095f6); flex-shrink: 0; margin-top: 6px; }
 
+/* ── Friend-request inline actions ───────────────────────────── */
+.nb-item--friend-req {
+  align-items: flex-start;
+  padding-bottom: 12px;
+}
+
+.nb-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.nb-action-btn {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--ig-border);
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+  color: var(--cx-ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.nb-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nb-action-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.nb-action-btn--accept {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #022c22;
+  border-color: transparent;
+}
+
+.nb-action-btn--accept:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.nb-action-btn--reject:hover:not(:disabled) {
+  background: rgb(var(--cx-rose-rgb) / 0.1);
+  color: var(--cx-rose-soft);
+  border-color: rgb(var(--cx-rose-rgb) / 0.3);
+}
+
+.nb-action-btn--view:hover:not(:disabled) {
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  color: var(--cx-accent-deep);
+  border-color: rgb(var(--cx-accent-rgb) / 0.3);
+}
+
+:root[data-theme="dark"] .nb-action-btn {
+  background: rgb(255 255 255 / 0.06);
+  color: #e2e8f0;
+  border-color: rgb(255 255 255 / 0.1);
+}
+
 /* ═══════════════════════════════════════════════════
    MESSENGER PANEL  (redesigned)
 ═══════════════════════════════════════════════════ */

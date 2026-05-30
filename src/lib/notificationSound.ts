@@ -95,7 +95,9 @@ export function playMessageSound(): void {
 }
 
 /**
- * Two-tone ascending chime — push / bell notification.
+ * Three-tone ascending chime — push / bell notification.
+ * Boosted from a quiet 0.2 peak gain to a more audible 0.4 with a third
+ * tone for a clearer "ping" recognizable above ambient noise.
  */
 export function playNotificationChime(): void {
   void runningCtx().then((ctx) => {
@@ -103,19 +105,21 @@ export function playNotificationChime(): void {
     try {
       const now = ctx.currentTime;
 
+      // Three-note ascending arpeggio: A5 → E6 → A6 (880 → 1320 → 1760 Hz)
       const tones = [
-        { freq: 880,  start: now,        end: now + 0.18 },
-        { freq: 1320, start: now + 0.14, end: now + 0.36 },
+        { freq: 880,  start: now,        end: now + 0.18, peak: 0.38 },
+        { freq: 1320, start: now + 0.12, end: now + 0.32, peak: 0.42 },
+        { freq: 1760, start: now + 0.24, end: now + 0.50, peak: 0.36 },
       ];
 
-      for (const { freq, start, end } of tones) {
+      for (const { freq, start, end, peak } of tones) {
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
 
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, start);
         gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(0.2, start + 0.02);
+        gain.gain.linearRampToValueAtTime(peak, start + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.001, end);
 
         osc.connect(gain);
