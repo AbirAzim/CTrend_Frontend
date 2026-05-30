@@ -142,6 +142,7 @@ export const MY_SAVED_POSTS = gql`
       authorUsername
       authorDisplayName
       authorEmail
+      authorProfileImageUrl
       imageUrls
       caption
       createdAt
@@ -177,6 +178,27 @@ export const MY_SAVED_POSTS = gql`
       options {
         label
       }
+    }
+  }
+`;
+
+export const UPDATE_POST = gql`
+  mutation UpdatePost($postId: ID!, $input: UpdatePostInput!) {
+    updatePost(postId: $postId, input: $input) {
+      id
+      imageUrls
+      caption
+      options {
+        label
+        imageUrl
+      }
+      category {
+        id
+        name
+        slug
+      }
+      isVotingOpen
+      votingEndsAt
     }
   }
 `;
