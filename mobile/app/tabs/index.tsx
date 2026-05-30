@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+
   Animated,
   FlatList,
   ListRenderItem,
@@ -52,7 +52,7 @@ function FeedTopBar() {
   }
 
   function handleAdmin() {
-    Alert.alert("Admin Panel", "Admin management is available on the web app at kejitbe.app/admin");
+    router.push("/admin" as `/${string}`);
   }
 
   return (

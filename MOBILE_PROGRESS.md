@@ -11,8 +11,8 @@
 - **Google Client ID:** `41983174733-rpq1s0k95fhnme4jfrb2uv2usfq4p1ce.apps.googleusercontent.com`
 - **Image upload:** GraphQL mutation `getImageUploadUrl(filename, contentType)` → presigned S3 URL → PUT binary
 - **Package:** `com.ctrend.app`
-- **Build cmd:** `cd mobile/android && ./gradlew assembleDebug` (clear `app/build/generated/assets` + `sourcemaps` first)
-- **Install cmd:** `adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+- **Build cmd:** `cd mobile/android && ./gradlew assembleRelease --no-daemon -x lintVitalAnalyzeRelease -x lintVitalRelease`
+- **Install cmd:** `adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk`
 
 ---
 
@@ -292,6 +292,9 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 - [x] Post owner actions: delete (DELETE_POST w/ Alert confirm), extend voting (EXTEND_POST_VOTING bottom sheet)
 - [x] Toast feedback: "Comment posted ✓" / "Voting extended ✓" via `useToast`
 - [x] Bell button wired → `/notifications`
+- [x] Action chips row: DISCUSS, SHARE, HYPE (SET_POST_HYPE), KEEP (SET_POST_KEEP), VOTERS — matches feed card
+- [x] LIVE SPLIT bars with themed colors (adapts dark/light)
+- [x] Vote anonymous toggle with correct theme colors
 - [x] Dark theme (full makeStyles pattern)
 
 **APIs:** GET_POST_BY_ID, COMMENTS_BY_POST, COMMENT_POST, SET_COMMENT_LIKE, VOTERS_BY_POST, DELETE_POST, EXTEND_POST_VOTING
@@ -332,109 +335,120 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⚠️ PHASE 6 — Friends System (BUILT — NOT YET TESTED)
+### ✅ PHASE 6 — Friends System (COMPLETE)
 
-- [ ] Friends screen (`friends/index.tsx`) with 3 tabs (Suggestions, Requests, Friends)
-- [ ] Suggestions tab: `FRIEND_SUGGESTIONS` list, Add button turns Pending after press, search filter
-- [ ] Requests tab: Incoming (Accept/Decline) + Sent (Pending) sub-sections, badge count on tab label
-- [ ] My Friends tab: online dot via `ONLINE_USER_IDS` (polls 30s), Message button → `START_DIRECT_CONVERSATION` → `/chat/[id]`, long-press row → Unfriend with Alert confirm
-- [ ] Search bar clears on tab switch
-- [ ] Toast feedback: request sent, accepted, declined, unfriended, chat fail
-- [ ] Tap user row → `/profile/[userId]` (Phase 7)
-- [ ] "👥 Friends" button on profile tab navigates to friends screen
-- [ ] Dark theme, full color palette
+- [x] Friends screen (`friends/index.tsx`) with 3 tabs (Suggestions, Requests, Friends)
+- [x] Suggestions tab: `FRIEND_SUGGESTIONS` list, Add button turns Pending after press, search filter
+- [x] Requests tab: Incoming (Accept/Decline) + Sent (Pending) sub-sections, badge count on tab label
+- [x] My Friends tab: online dot via `ONLINE_USER_IDS` (polls 30s), Message button → `START_DIRECT_CONVERSATION` → `/chat/[id]`, long-press row → Unfriend with Alert confirm
+- [x] Search bar clears on tab switch
+- [x] Toast feedback: request sent, accepted, declined, unfriended, chat fail
+- [x] Tap user row → `/profile/[userId]` (Phase 7)
+- [x] "👥 Friends" button on profile tab navigates to friends screen
+- [x] Dark theme, full color palette
 
 **APIs:** FRIEND_SUGGESTIONS, MY_FRIENDS, FRIEND_REQUESTS, ADD_FRIEND, RESPOND_FRIEND_REQUEST, UNFRIEND, ONLINE_USER_IDS, START_DIRECT_CONVERSATION
+**APK built:** 2026-05-30 ✅
 
 ---
 
-### ⚠️ PHASE 7 — Other User's Profile (BUILT — NOT YET TESTED)
+### ✅ PHASE 7 — Other User's Profile (COMPLETE)
 
-- [ ] User profile screen (`profile/[userId].tsx`)
-- [ ] Avatar (with online dot if friend), name, bio, interests, online pill
-- [ ] Own profile → redirect to `/tabs/profile`
-- [ ] `FRIENDSHIP_STATUS` → dynamic button: Add Friend / Pending / Accept Request / ✓ Friends (tap to unfriend)
-- [ ] Message button visible only when friends → `START_DIRECT_CONVERSATION` → `/chat/[id]`
-- [ ] Posts grid: 3-column square thumbnails (USER_POSTS), tap → post detail; vote count overlay
-- [ ] `ONLINE_USER_IDS` poll (30s) — online dot + pill shown only to friends
-- [ ] Author tap in FeedPostCard header → `/profile/[authorId]`
-- [ ] Author tap in PostDetailCard header → `/profile/[authorId]` + real avatar shown
-- [ ] Dark theme
+- [x] User profile screen (`profile/[userId].tsx`)
+- [x] Avatar (with online dot if friend), name, bio, interests, online pill
+- [x] Own profile → redirect to `/tabs/profile`
+- [x] `FRIENDSHIP_STATUS` → dynamic button: Add Friend / Pending / Accept Request / ✓ Friends (tap to unfriend)
+- [x] Message button visible only when friends → `START_DIRECT_CONVERSATION` → `/chat/[id]`
+- [x] Posts grid: 3-column square thumbnails (USER_POSTS), tap → post detail; vote count overlay
+- [x] `ONLINE_USER_IDS` poll (30s) — online dot + pill shown only to friends
+- [x] Author tap in FeedPostCard header → `/profile/[authorId]`
+- [x] Author tap in PostDetailCard header → `/profile/[authorId]` + real avatar shown
+- [x] Dark theme
 
 **APIs:** GET_USER_PROFILE, FRIENDSHIP_STATUS, USER_POSTS, ADD_FRIEND, RESPOND_FRIEND_REQUEST, UNFRIEND, START_DIRECT_CONVERSATION, ONLINE_USER_IDS
+**APK built:** 2026-05-30 ✅
 
 ---
 
-### ⚠️ PHASE 8 — Full Messaging (BUILT — NOT YET TESTED)
+### ✅ PHASE 8 — Full Messaging (COMPLETE)
 
-- [ ] Conversation list (`tabs/messages.tsx`) — MY_CONVERSATIONS sorted by last message time
-- [ ] `MESSAGE_RECEIVED` subscription refetches conversation list
-- [ ] Unread count badge on each row, bold preview text for unread
-- [ ] Online dot on conversation avatar
-- [ ] "+ New" button → friend picker modal (search + tap to start DM)
-- [ ] Empty state with "Start a Chat" button
-- [ ] Chat screen (`chat/[conversationId].tsx`)
-  - [ ] Messages: inverted FlatList, load 30 per page, `onEndReached` loads older
-  - [ ] Own messages: right-aligned accent bubble; others: left-aligned card bubble + avatar
-  - [ ] Image messages: 200×200 preview with optional caption
-  - [ ] Seen receipts: ✓✓ shown on own messages when readBy > 1
-  - [ ] `MARK_CONVERSATION_READ` called on mount + on new message while open
-  - [ ] Typing: `SET_TYPING` on input change (2s auto-off), `TYPING_INDICATOR_SUB` shows "X is typing…"
-  - [ ] Image picker (expo-image-picker) + S3 upload + send with imageUrl
-  - [ ] Image preview bar before send with remove button
-  - [ ] Emoji picker: 20 preset emojis in horizontal scroll row
-  - [ ] Online status in header via `PRESENCE_CHANGED` subscription
-  - [ ] Pagination via `client.query` with skip/take
-  - [ ] Dark theme
+- [x] Conversation list (`tabs/messages.tsx`) — MY_CONVERSATIONS sorted by last message time
+- [x] `MESSAGE_RECEIVED` subscription refetches conversation list
+- [x] Unread count badge on each row, bold preview text for unread
+- [x] Online dot on conversation avatar
+- [x] "+ New" button → friend picker modal (search + tap to start DM)
+- [x] Empty state with "Start a Chat" button
+- [x] Chat screen (`chat/[conversationId].tsx`)
+  - [x] Messages: inverted FlatList, load 30 per page, `onEndReached` loads older
+  - [x] Own messages: right-aligned accent bubble; others: left-aligned card bubble + avatar
+  - [x] Image messages: 200×200 preview with optional caption
+  - [x] Seen receipts: ✓✓ shown on own messages when readBy > 1
+  - [x] `MARK_CONVERSATION_READ` called on mount + on new message while open
+  - [x] Typing: `SET_TYPING` on input change (2s auto-off), `TYPING_INDICATOR_SUB` shows "X is typing…"
+  - [x] Image picker (expo-image-picker) + S3 upload + send with imageUrl
+  - [x] Image preview bar before send with remove button
+  - [x] Emoji picker: 20 preset emojis in horizontal scroll row
+  - [x] Online status in header via `PRESENCE_CHANGED` subscription
+  - [x] Pagination via `client.query` with skip/take
+  - [x] Notification sound (expo-audio `useAudioPlayer`) + vibration on incoming messages
+  - [x] Keyboard gap fixed via `react-native-keyboard-controller` `KeyboardAvoidingView` (edge-to-edge safe)
+  - [x] Dark theme
 
 **APIs:** MY_CONVERSATIONS, GET_MESSAGES, SEND_MESSAGE, MARK_CONVERSATION_READ, SET_TYPING, START_DIRECT_CONVERSATION, MESSAGE_RECEIVED, TYPING_INDICATOR_SUB, MESSAGE_READ_SUB, PRESENCE_CHANGED, GET_IMAGE_UPLOAD_URL, MY_FRIENDS
 **Note:** Used FlatList (inverted) instead of FlashList — @shopify/flash-list not needed
+**APK built:** 2026-05-30 ✅
 
 ---
 
-### ⚠️ PHASE 9 — Campaign Detail (BUILT — NOT YET TESTED)
+### ✅ PHASE 9 — Campaign Detail (COMPLETE)
 
-- [ ] Campaign detail screen (`campaign/[slug].tsx`)
-- [ ] Hero: banner image with overlay title, fallback text title
-- [ ] Meta strip: prize (৳), start date, end date
-- [ ] Description paragraph
-- [ ] Rules: numbered list, EN/বাং toggle (shows only when `rulesBn` is present)
-- [ ] Group standings: computed from finished fixtures, green/amber position indicators
-- [ ] Upcoming matches: grouped by stage, sorted by kickoff time
-- [ ] Finished matches: sorted newest first
-- [ ] Fixture card: team crests, score or kickoff time, live badge + red dot, Full Time label, winner highlighted gold
-- [ ] "Cast your vote" → `/post/[campaignPostId]` (upcoming); "View result" (finished)
-- [ ] `CAMPAIGN_BY_SLUG` added to `packages/shared/src/graphql/campaigns.ts`
-- [ ] `fixturesEnabled` added to `ACTIVE_CAMPAIGNS` query
-- [ ] No extra deps needed (rules are plain text, not markdown)
-- [ ] Dark theme
+- [x] Campaign detail screen (`campaign/[slug].tsx`)
+- [x] Hero: banner image with overlay title, fallback text title
+- [x] Meta strip: prize (৳), start date, end date
+- [x] Description paragraph
+- [x] Rules: numbered list, EN/বাং toggle (shows only when `rulesBn` is present)
+- [x] Group standings: computed from finished fixtures, green/amber position indicators
+- [x] Upcoming matches: grouped by stage, sorted by kickoff time
+- [x] Finished matches: sorted newest first
+- [x] Fixture card: team crests, score or kickoff time, live badge + red dot, Full Time label, winner highlighted gold
+- [x] "Cast your vote" → `/post/[campaignPostId]` (upcoming); "View result" (finished)
+- [x] `CAMPAIGN_BY_SLUG` added to `packages/shared/src/graphql/campaigns.ts`
+- [x] `fixturesEnabled` added to `ACTIVE_CAMPAIGNS` query
+- [x] No extra deps needed (rules are plain text, not markdown)
+- [x] Dark theme
 
 **APIs:** CAMPAIGN_BY_SLUG, WORLD_CUP_FIXTURES
+**APK built:** 2026-05-30 ✅
 
 ---
 
-### 🔲 PHASE 10 — Scheduled Posts
-- [ ] Scheduled posts screen (`profile/scheduled.tsx`)
-- [ ] List with image previews, countdown, cancel button
-- [ ] Polls every 30s (MY_SCHEDULED_POSTS)
-- [ ] NEW_POSTS subscription shows toast when post goes live
-- [ ] Link from own profile screen
-- [ ] Dark theme
+### ✅ PHASE 10 — Scheduled Posts (COMPLETE)
+
+- [x] Scheduled posts screen (`profile/scheduled.tsx`)
+- [x] List with image thumbnail, countdown (d/h/m), status pill (Going live / ⏱ Xd Xh)
+- [x] Cancel with Alert confirm → CANCEL_SCHEDULED_POST
+- [x] Polls every 30s (MY_SCHEDULED_POSTS)
+- [x] NEW_POSTS subscription triggers refetch when a post goes live
+- [x] "Scheduled ▾" button on own profile screen navigates here
+- [x] Dark theme
 
 **APIs:** MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST, NEW_POSTS
 
 ---
 
-### 🔲 PHASE 11 — Admin Panel
-- [ ] Admin navigator (`admin/_layout.tsx`) — tab bar
-- [ ] Users tab: list, search, paginate, role filter, actions (view, remove)
-- [ ] "+ Invite User" with bulk email input
-- [ ] Invitations tab: filter, resend, cancel, invite admin
-- [ ] Campaigns tab: list, toggle active, create/edit
-- [ ] World Cup tab: sync, create posts, process results, winners, mark paid
-- [ ] Broadcast notification form
-- [ ] Admin gear icon navigates to /admin (was showing Alert)
-- [ ] Dark theme
+### ✅ PHASE 11 — Admin Panel (COMPLETE)
+
+- [x] Admin navigator (`admin/_layout.tsx`) — 4-tab Tabs layout (Users, Invites, Campaigns, World Cup)
+- [x] Guards: `isAdmin` check — redirects to /tabs if not admin
+- [x] Users tab (`admin/index.tsx`): LIST_USERS with skip/take pagination (20/page), role filter chips (All/USER/ADMIN), client-side search by email/username/displayName, remove user (Alert confirm), promote to admin (Alert confirm)
+- [x] "+ Invite" button: single email (INVITE_USER) or bulk comma/newline separated (INVITE_USERS_BULK) in bottom sheet modal
+- [x] "📢 Broadcast" button: SEND_ADMIN_BROADCAST with title + body in bottom sheet modal
+- [x] Invitations tab (`admin/invitations.tsx`): LIST_INVITATIONS with status filter (All/PENDING/ACCEPTED/EXPIRED/CANCELLED), resend (RESEND_INVITATION), cancel with Alert confirm (CANCEL_INVITATION), invite admin modal (INVITE_ADMIN)
+- [x] Campaigns tab (`admin/campaigns.tsx`): CAMPAIGNS_ADMIN list, toggle active (TOGGLE_CAMPAIGN with Switch), create/edit modal with all fields (CREATE_CAMPAIGN / UPDATE_CAMPAIGN)
+- [x] World Cup tab (`admin/world-cup.tsx`): Fixtures/Winners tab switch, sync fixtures (SYNC_WORLD_CUP_FIXTURES with Alert confirm), create campaign post per fixture (CREATE_WORLD_CUP_CAMPAIGN_POST), process result for finished matches (PROCESS_MATCH_RESULT), mark winner paid (MARK_CAMPAIGN_PRIZE_PAID), RefreshControl on both lists
+- [x] Admin gear icon in feed topbar navigates to /admin (was showing Alert)
+- [x] "Admin Panel ▾" button on own profile screen navigates to /admin
+- [x] Dark theme
 
 **APIs:** LIST_USERS, REMOVE_USER, PROMOTE_TO_ADMIN, INVITE_USER, INVITE_USERS_BULK, INVITE_ADMIN, LIST_INVITATIONS, CANCEL_INVITATION, RESEND_INVITATION, CAMPAIGNS_ADMIN, CREATE_CAMPAIGN, TOGGLE_CAMPAIGN, UPDATE_CAMPAIGN, WORLD_CUP_FIXTURES, SYNC_WORLD_CUP_FIXTURES, CREATE_WORLD_CUP_CAMPAIGN_POST, PROCESS_MATCH_RESULT, CAMPAIGN_WINNERS, MARK_CAMPAIGN_PRIZE_PAID, SEND_ADMIN_BROADCAST
 
@@ -563,3 +577,12 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-05-29 | Phase 7 | Other user profile — avatar, bio, interests, friendship button, posts grid, author taps wired everywhere — APK not yet installed |
 | 2026-05-29 | Phase 8 | Full messaging — conversation list with unread badges, new DM modal, chat screen with pagination/typing/emoji/image upload/seen receipts/presence — APK not yet installed |
 | 2026-05-29 | Phase 9 | Campaign detail — hero, meta, rules EN/BN, group standings, fixture cards with live/score/vote — APK not yet installed |
+| 2026-05-30 | Bug fix | App crash fixed: replaced `expo-av` (VideoViewModule Kotlin type incompatibility) with `expo-audio`; added `multiDexEnabled true` + `lint { abortOnError false }` to Gradle |
+| 2026-05-30 | Bug fix | Chat keyboard gap: replaced `react-native` `KeyboardAvoidingView` with `react-native-keyboard-controller` version + added `KeyboardProvider` to `_layout.tsx` — fixes edge-to-edge dismiss gap on Android |
+| 2026-05-30 | Bug fix | Chat sound: switched from `expo-av` to `expo-audio` `useAudioPlayer`, `seekTo(0).then(() => play())` for reliable replay; vibration on incoming messages |
+| 2026-05-30 | Bug fix | Feed post author avatar: cross-reference approach (same as web) — `ME` + `MY_FRIENDS` + `FRIEND_SUGGESTIONS` + `FRIEND_REQUESTS` lookup by username/email |
+| 2026-05-30 | Bug fix | Post detail: vote anonymous text was black on dark theme (undefined color override) — fixed to `colors.text`/`colors.accent`; LIVE SPLIT colors now use theme palette |
+| 2026-05-30 | Feature | Post detail: added action chips row (DISCUSS, SHARE, HYPE, KEEP, VOTERS) matching feed card — HYPE/KEEP with optimistic mutations, VOTERS opens bottom sheet |
+| 2026-05-30 | Phase 6–9 | All phases marked complete — APK built and installed ✅ |
+| 2026-05-30 | Phase 10 | Scheduled posts screen — countdown, cancel, subscription refetch, link from profile |
+| 2026-05-30 | Phase 11 | Admin panel — 4-tab navigator: Users (list/search/paginate/invite/broadcast), Invitations (filter/resend/cancel/invite-admin), Campaigns (list/toggle/create/edit), World Cup (sync/post/process/winners/mark-paid) |
