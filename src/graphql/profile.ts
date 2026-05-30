@@ -34,6 +34,8 @@ export const USER_POSTS = gql`
   query UserPosts($userId: ID!) {
     getPostsByUser(userId: $userId) {
       id
+      authorId
+      authorProfileImageUrl
       imageUrls
       caption
       createdAt
