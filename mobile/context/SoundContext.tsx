@@ -37,11 +37,14 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function playTick() {
-    tickPlayer.seekTo(0).then(() => tickPlayer.play()).catch(() => {});
+    try { tickPlayer.play(); } catch { /* ignore */ }
+    // Seek back to start after sound finishes so next call fires instantly
+    setTimeout(() => tickPlayer.seekTo(0).catch(() => {}), 220);
   }
 
   function playNotification() {
-    notifPlayer.seekTo(0).then(() => notifPlayer.play()).catch(() => {});
+    try { notifPlayer.play(); } catch { /* ignore */ }
+    setTimeout(() => notifPlayer.seekTo(0).catch(() => {}), 2500);
   }
 
   return (

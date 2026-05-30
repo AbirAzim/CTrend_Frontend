@@ -13,6 +13,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  Vibration,
   View,
 } from "react-native";
 import {
@@ -414,6 +415,7 @@ function FeedPostCardComponent({ post }: Props) {
 
   function triggerVotePop(idx: number) {
     playTick();
+    Vibration.vibrate(100);
     Animated.sequence([
       Animated.timing(cellScale[idx], { toValue: 1.065, duration: 80, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
       Animated.timing(cellScale[idx], { toValue: 0.975, duration: 80, useNativeDriver: true }),
