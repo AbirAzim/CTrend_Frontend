@@ -1,5 +1,6 @@
 import { useMutation } from "@apollo/client/react";
 import { Image } from "expo-image";
+import logoAsset from "../../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -57,7 +58,7 @@ export default function ResetPasswordScreen() {
   if (done) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-        <Image source={require("../../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+        <Image source={logoAsset} style={styles.logo} contentFit="contain" />
         <Text style={[styles.doneTitle, { color: colors.text }]}>Password updated!</Text>
         <Text style={[styles.doneSub, { color: colors.subtext }]}>
           Your password has been reset. You can now log in with your new password.
@@ -82,7 +83,7 @@ export default function ResetPasswordScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Image source={require("../../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+          <Image source={logoAsset} style={styles.logo} contentFit="contain" />
           <Text style={[styles.title, { color: colors.text }]}>Set new password</Text>
           <Text style={[styles.sub, { color: colors.subtext }]}>Choose a strong password for your account.</Text>
         </View>

@@ -1,5 +1,6 @@
 import { useMutation } from "@apollo/client/react";
 import { Image } from "expo-image";
+import logoAsset from "../../assets/logo.png";
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import {
@@ -53,7 +54,7 @@ export default function SignupScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Image source={require("../../assets/logo.png")} style={styles.logoImg} contentFit="contain" />
+          <Image source={logoAsset} style={styles.logoImg} contentFit="contain" />
           <Text style={[styles.tagline, { color: colors.subtext }]}>Compare · vote · vibe</Text>
         </View>
 

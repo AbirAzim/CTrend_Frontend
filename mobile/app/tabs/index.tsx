@@ -1,5 +1,6 @@
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
+import logoAsset from "../../assets/logo.png";
 import { router } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -61,7 +62,7 @@ function FeedTopBar() {
       <Pressable style={styles.brand} hitSlop={4}>
         <Text style={[styles.brandText, { color: colors.accentLight }]}>Ke Jitbe</Text>
         <Image
-          source={require("../../assets/logo.png")}
+          source={logoAsset}
           style={styles.brandLogo}
           contentFit="contain"
         />
