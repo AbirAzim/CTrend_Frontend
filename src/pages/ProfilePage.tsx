@@ -220,7 +220,9 @@ export function ProfilePage() {
     me?.username ?? user?.username ?? user?.email.split("@")[0] ?? "user";
   const bio = me?.bio ?? user?.bio ?? "";
   const heroAvatarUrl =
-    normalizeProfileImageUrl(me?.profileImageUrl) || gmailAvatarFromEmail(user?.email ?? "");
+    normalizeProfileImageUrl(me?.profileImageUrl) ||
+    normalizeProfileImageUrl(user?.profileImageUrl) ||
+    gmailAvatarFromEmail(user?.email ?? "");
 
   useEffect(() => {
     if (me) {

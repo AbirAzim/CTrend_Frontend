@@ -29,5 +29,15 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       ...(proxy != null ? { proxy } : {}),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom", "react-router-dom"],
+            "vendor-apollo": ["@apollo/client", "graphql", "graphql-ws"],
+          },
+        },
+      },
+    },
   };
 });

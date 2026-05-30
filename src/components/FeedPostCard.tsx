@@ -1,5 +1,5 @@
 import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { COMMENT_POST, COMMENTS_BY_POST } from "../graphql/comments";
@@ -225,7 +225,7 @@ type Props = {
   showPermalinkToolbar?: boolean;
 };
 
-export function FeedPostCard({
+function FeedPostCardComponent({
   post,
   voteMode,
   showPermalinkToolbar = true,
@@ -263,7 +263,6 @@ export function FeedPostCard({
   const [moreOpen, setMoreOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
-
   const isOwner = !!authUser && !!post.authorId && authUser.id === post.authorId;
   const isAdmin = authUser?.role === "admin";
   const canDelete = isOwner || isAdmin;
@@ -350,10 +349,16 @@ export function FeedPostCard({
     };
   }, []);
 
+  const hasActiveCountdown = Boolean(
+    post.votingEndsAt && (post.isVotingOpen ?? true),
+  );
   useEffect(() => {
+    if (!hasActiveCountdown) {
+      return;
+    }
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [hasActiveCountdown]);
 
   useEffect(() => {
     if (!showVoters) {
@@ -428,9 +433,6 @@ export function FeedPostCard({
       await setPostHypeMut({
         variables: { postId: post.id, active: nextActive },
       });
-      await apolloClient.refetchQueries({
-        include: [FEED_POSTS, GET_POST_BY_ID],
-      });
     } catch {
       // Rollback optimistic UI on failure.
       setLiked(!nextActive);
@@ -472,9 +474,6 @@ export function FeedPostCard({
             };
           });
         },
-      });
-      await apolloClient.refetchQueries({
-        include: [FEED_POSTS, GET_POST_BY_ID, MY_SAVED_POSTS],
       });
     } catch {
       setSaved(!nextKeep);
@@ -1163,6 +1162,7 @@ export function FeedPostCard({
               <img
                 src={postAuthorAvatar}
                 alt={`${post.authorUsername} avatar`}
+                decoding="async"
                 onError={() => {
                   setAuthorAvatarAttempt((prev) => {
                     if (prev + 1 < postAuthorAvatarCandidates.length) {
@@ -1317,7 +1317,7 @@ export function FeedPostCard({
                     }
                     onClick={() => handleBinaryCompareTap(side)}
                   >
-                    <img src={url} alt="" width={1080} height={1080} loading="lazy" />
+                    <img src={url} alt="" width={1080} height={1080} loading="lazy" decoding="async" />
                     {/* Permanent "your pick" seal — top-right corner pin */}
                     {picked && !isVotingClosed && (
                       <span className="cx-voted-pin" aria-label="Your choice">
@@ -1371,7 +1371,7 @@ export function FeedPostCard({
                   }
                   onClick={() => void handleMultiCompareTap(i)}
                 >
-                  <img src={url} alt="" width={1080} height={1080} loading="lazy" />
+                  <img src={url} alt="" width={1080} height={1080} loading="lazy" decoding="async" />
                   {picked && !isVotingClosed && (
                     <span className="cx-voted-pin" aria-label="Your choice">
                       <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
@@ -1434,6 +1434,7 @@ export function FeedPostCard({
             width={1080}
             height={1080}
             loading="lazy"
+            decoding="async"
           />
         </div>
       ) : (
@@ -1899,3 +1900,23 @@ export function FeedPostCard({
     </article>
   );
 }
+
+function areFeedPostCardPropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.voteMode === next.voteMode &&
+    prev.showPermalinkToolbar === next.showPermalinkToolbar &&
+    prev.post.id === next.post.id &&
+    prev.post.upvoteCount === next.post.upvoteCount &&
+    prev.post.downvoteCount === next.post.downvoteCount &&
+    prev.post.viewerVote === next.post.viewerVote &&
+    prev.post.commentCount === next.post.commentCount &&
+    prev.post.hypeCount === next.post.hypeCount &&
+    prev.post.saveCount === next.post.saveCount &&
+    prev.post.viewerHasSaved === next.post.viewerHasSaved &&
+    prev.post.mySelectedOptionIndex === next.post.mySelectedOptionIndex &&
+    prev.post.isVotingOpen === next.post.isVotingOpen &&
+    prev.post.votingEndsAt === next.post.votingEndsAt
+  );
+}
+
+export const FeedPostCard = memo(FeedPostCardComponent, areFeedPostCardPropsEqual);
