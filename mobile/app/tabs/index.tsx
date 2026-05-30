@@ -1,7 +1,7 @@
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,8 +19,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "@ctrend/shared/graphql/feed";
+import { MY_FRIENDS, FRIEND_SUGGESTIONS, FRIEND_REQUESTS } from "@ctrend/shared/graphql/friends";
+import { ME } from "@ctrend/shared/graphql/profile";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { CampaignBanner } from "../../components/CampaignBanner";
@@ -119,6 +122,7 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const client = useApolloClient();
   const { colors } = useTheme();
+  const { isAuthenticated } = useAuth();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
@@ -152,9 +156,55 @@ export default function FeedScreen() {
     { fetchPolicy: "cache-and-network", notifyOnNetworkStatusChange: true },
   );
 
-  const apiPosts: FeedPostView[] = (data?.feedPosts ?? []).map(
-    (p) => mapGqlPostToFeedView(p as Parameters<typeof mapGqlPostToFeedView>[0]),
+  type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
+  const { data: meData } = useQuery<{ me: UserRow }>(ME, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-and-network",
+  });
+  const { data: friendsData } = useQuery<{ myFriends: UserRow[] }>(MY_FRIENDS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-and-network",
+  });
+  const { data: suggestionsData } = useQuery<{ friendSuggestions: UserRow[] }>(FRIEND_SUGGESTIONS, {
+    skip: !isAuthenticated,
+    variables: { limit: 30 },
+    fetchPolicy: "cache-and-network",
+  });
+  const { data: requestsData } = useQuery<{ friendRequests: { requestedByMe: UserRow[]; requestedMe: UserRow[] } }>(
+    FRIEND_REQUESTS,
+    { skip: !isAuthenticated, fetchPolicy: "cache-and-network" },
   );
+
+  const apiPosts: FeedPostView[] = useMemo(() => {
+    const raw = (data?.feedPosts ?? []).map(
+      (p) => mapGqlPostToFeedView(p as Parameters<typeof mapGqlPostToFeedView>[0]),
+    );
+
+    const profileByUsername = new Map<string, string>();
+    const profileByEmail = new Map<string, string>();
+    const allKnown: UserRow[] = [
+      meData?.me,
+      ...(friendsData?.myFriends ?? []),
+      ...(suggestionsData?.friendSuggestions ?? []),
+      ...(requestsData?.friendRequests?.requestedByMe ?? []),
+      ...(requestsData?.friendRequests?.requestedMe ?? []),
+    ].filter(Boolean) as UserRow[];
+
+    for (const u of allKnown) {
+      const img = normalizeProfileImageUrl(u.profileImageUrl);
+      if (!img) continue;
+      if (u.username?.trim()) profileByUsername.set(u.username.trim().toLowerCase(), img);
+      if (u.email?.trim()) profileByEmail.set(u.email.trim().toLowerCase(), img);
+    }
+
+    return raw.map((p) => {
+      if (p.authorProfileImageUrl?.trim()) return p;
+      const byUsername = profileByUsername.get(p.authorUsername.trim().toLowerCase());
+      const byEmail = p.authorEmail ? profileByEmail.get(p.authorEmail.trim().toLowerCase()) : undefined;
+      return { ...p, authorProfileImageUrl: byUsername ?? byEmail ?? null };
+    });
+  }, [data, meData, friendsData, suggestionsData, requestsData]);
+
   const knownIds = new Set(apiPosts.map((p) => p.id));
   const posts: FeedPostView[] = [...liveQueue.filter((p) => !knownIds.has(p.id)), ...apiPosts];
 

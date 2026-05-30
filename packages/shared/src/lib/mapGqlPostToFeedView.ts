@@ -80,6 +80,7 @@ export function mapGqlPostToFeedView(p: {
     authorId: p.authorId ?? null,
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,
+
     authorEmail: p.authorEmail ?? null,
     imageUrls,
     caption: p.caption ?? null,
