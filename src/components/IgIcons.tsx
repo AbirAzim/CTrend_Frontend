@@ -78,6 +78,35 @@ export function IconReels({ size = 26 }: IconProps) {
   );
 }
 
+export function IconShield({ size = 26, active }: IconProps) {
+  if (active) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+        <path
+          fill="currentColor"
+          d="M12 2 4 5v6.5c0 5 3.5 9.4 8 10.5 4.5-1.1 8-5.5 8-10.5V5l-8-3zm0 5.2 4.5 4.5-5.6 5.6-3.4-3.4 1.4-1.4 2 2 4.2-4.2-3.1-3.1z"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 3 4.5 5.7v6.3c0 4.4 3.1 8.4 7.5 9.5 4.4-1.1 7.5-5.1 7.5-9.5V5.7L12 3z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
 export function IconUser({ size = 26, active }: IconProps) {
   if (active) {
     return (

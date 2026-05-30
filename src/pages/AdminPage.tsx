@@ -4,12 +4,17 @@ import { NavLink } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import {
   CANCEL_INVITATION,
+  CREATE_CATEGORY,
+  DELETE_CATEGORY,
   LIST_INVITATIONS,
   LIST_USERS,
+  LIST_USERS_COUNT,
   REMOVE_ADMIN,
   REMOVE_USER,
   RESEND_INVITATION,
+  UPDATE_CATEGORY,
 } from "../graphql/admin";
+import { CATEGORIES } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import {
@@ -39,12 +44,6 @@ type UserRow = {
   profileImageUrl?: string | null;
 };
 
-function hasAdminRole(user: UserRow): boolean {
-  if (user.roles?.length) {
-    return user.roles.some((r) => r.toLowerCase() === "admin");
-  }
-  return user.role?.toLowerCase() === "admin";
-}
 
 function avatarUrl(user: UserRow): string | null {
   if (user.profileImageUrl?.trim()) return user.profileImageUrl.trim();
@@ -183,13 +182,19 @@ function UsersTab() {
   const [inviteModal, setInviteModal] = useState(false);
 
   const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
-    variables: { skip, take: PAGE_SIZE },
+    variables: { skip, take: PAGE_SIZE, role: "user" },
     fetchPolicy: "network-only",
   });
 
+  const { data: countData, refetch: refetchCount } = useQuery<{ listUsersCount: number }>(
+    LIST_USERS_COUNT,
+    { variables: { role: "user" }, fetchPolicy: "network-only" },
+  );
+
   const [removeUser, { loading: removing }] = useMutation(REMOVE_USER);
 
-  const allUsers = (data?.listUsers ?? []).filter((u) => !hasAdminRole(u));
+  const allUsers = data?.listUsers ?? [];
+  const totalCount = countData?.listUsersCount ?? 0;
   const filtered = searchTerm.trim()
     ? allUsers.filter(
         (u) =>
@@ -205,6 +210,7 @@ function UsersTab() {
       await removeUser({ variables: { email: user.email } });
       setConfirmTarget(null);
       void refetch();
+      void refetchCount();
     } catch (err: unknown) {
       setRemoveError(getApolloErrorMessage(err));
       setConfirmTarget(null);
@@ -298,12 +304,12 @@ function UsersTab() {
           ← Previous
         </button>
         <span className="muted small">
-          Showing {skip + 1}–{skip + allUsers.length}
+          Showing {totalCount === 0 ? 0 : skip + 1}–{Math.min(skip + allUsers.length, totalCount)} of {totalCount}
         </span>
         <button
           type="button"
           className="btn-ghost"
-          disabled={allUsers.length < PAGE_SIZE || loading}
+          disabled={skip + allUsers.length >= totalCount || loading}
           onClick={() => setSkip((s) => s + PAGE_SIZE)}
         >
           Next →
@@ -345,12 +351,17 @@ function AdminsTab() {
     variables: { skip, take: PAGE_SIZE, role: "admin" },
     fetchPolicy: "network-only",
   });
+  const { data: countData, refetch: refetchCount } = useQuery<{ listUsersCount: number }>(
+    LIST_USERS_COUNT,
+    { variables: { role: "admin" }, fetchPolicy: "network-only" },
+  );
 
   const [removeAdmin, { loading: revokingAdmin }] = useMutation(REMOVE_ADMIN);
   const [removeUser, { loading: deletingUser }] = useMutation(REMOVE_USER);
   const acting = revokingAdmin || deletingUser;
 
   const admins = data?.listUsers ?? [];
+  const totalAdmins = countData?.listUsersCount ?? 0;
   const filtered = searchTerm.trim()
     ? admins.filter(
         (u) =>
@@ -374,6 +385,7 @@ function AdminsTab() {
       }
       setConfirmTarget(null);
       void refetch();
+      void refetchCount();
     } catch (err: unknown) {
       const msg = getApolloErrorMessage(err);
       setRemoveError(
@@ -500,12 +512,12 @@ function AdminsTab() {
           ← Previous
         </button>
         <span className="muted small">
-          Showing {skip + 1}–{skip + admins.length}
+          Showing {totalAdmins === 0 ? 0 : skip + 1}–{Math.min(skip + admins.length, totalAdmins)} of {totalAdmins}
         </span>
         <button
           type="button"
           className="btn-ghost"
-          disabled={admins.length < PAGE_SIZE || loading}
+          disabled={skip + admins.length >= totalAdmins || loading}
           onClick={() => setSkip((s) => s + PAGE_SIZE)}
         >
           Next →
@@ -1363,10 +1375,189 @@ function InvitationsTab() {
   );
 }
 
+// ─── Categories Tab ──────────────────────────────────────────────────────────
+
+type CategoryRow = { id: string; name: string; slug: string };
+
+function CategoriesTab() {
+  const { data, loading, error, refetch } = useQuery(CATEGORIES, {
+    fetchPolicy: "cache-and-network",
+  });
+  const [newName, setNewName] = useState("");
+  const [editing, setEditing] = useState<CategoryRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [createMut, { loading: creating }] = useMutation(CREATE_CATEGORY, {
+    refetchQueries: [{ query: CATEGORIES }],
+  });
+  const [updateMut, { loading: updating }] = useMutation(UPDATE_CATEGORY, {
+    refetchQueries: [{ query: CATEGORIES }],
+  });
+  const [deleteMut] = useMutation(DELETE_CATEGORY, {
+    refetchQueries: [{ query: CATEGORIES }],
+  });
+
+  const categories = (data?.categories ?? []) as CategoryRow[];
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setPageError(null);
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      await createMut({ variables: { name } });
+      setNewName("");
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleUpdate() {
+    if (!editing) return;
+    setPageError(null);
+    const name = editName.trim();
+    if (!name) return;
+    try {
+      await updateMut({ variables: { id: editing.id, name } });
+      setEditing(null);
+      setEditName("");
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleDelete(cat: CategoryRow) {
+    if (!window.confirm(`Delete category "${cat.name}"?`)) return;
+    setPageError(null);
+    setDeletingId(cat.id);
+    try {
+      await deleteMut({ variables: { id: cat.id } });
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+    setDeletingId(null);
+  }
+
+  return (
+    <div>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="admin-section-title">Post Categories</h2>
+          <p className="muted small">Categories users pick when creating compares</p>
+        </div>
+      </div>
+
+      <form className="admin-cat-create" onSubmit={(e) => void handleCreate(e)}>
+        <input
+          type="text"
+          className="ig-input"
+          placeholder="New category name (e.g. Music)"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          maxLength={60}
+        />
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={creating || !newName.trim()}
+        >
+          {creating ? "Adding…" : "+ Add Category"}
+        </button>
+      </form>
+
+      {pageError && <p className="error" role="alert">{pageError}</p>}
+      {loading && !data && <p className="muted small">Loading categories…</p>}
+      {error && <p className="error">Failed to load: {error.message}</p>}
+
+      {categories.length > 0 && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th style={{ width: "1%", textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat) => {
+                const isEditing = editing?.id === cat.id;
+                return (
+                  <tr key={cat.id} className="admin-table-row">
+                    <td>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="ig-input"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          maxLength={60}
+                          autoFocus
+                        />
+                      ) : (
+                        <strong>{cat.name}</strong>
+                      )}
+                    </td>
+                    <td className="admin-table-email">{cat.slug}</td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      {isEditing ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn-primary admin-cat-action"
+                            disabled={updating}
+                            onClick={() => void handleUpdate()}
+                          >
+                            {updating ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost admin-cat-action"
+                            onClick={() => { setEditing(null); setEditName(""); }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="btn-ghost admin-cat-action"
+                            onClick={() => { setEditing(cat); setEditName(cat.name); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-danger admin-cat-action"
+                            disabled={deletingId === cat.id}
+                            onClick={() => void handleDelete(cat)}
+                          >
+                            {deletingId === cat.id ? "…" : "Delete"}
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "admins" | "invitations" | "campaigns" | "worldcup">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "admins" | "invitations" | "campaigns" | "categories" | "worldcup">("users");
 
   return (
     <div className="admin-page">
@@ -1409,6 +1600,13 @@ export function AdminPage() {
         </button>
         <button
           type="button"
+          className={`admin-tab${activeTab === "categories" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("categories")}
+        >
+          Categories
+        </button>
+        <button
+          type="button"
           className={`admin-tab${activeTab === "worldcup" ? " admin-tab--active" : ""}`}
           onClick={() => setActiveTab("worldcup")}
         >
@@ -1421,6 +1619,7 @@ export function AdminPage() {
         {activeTab === "admins" && <AdminsTab />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "campaigns" && <CampaignsTab />}
+        {activeTab === "categories" && <CategoriesTab />}
         {activeTab === "worldcup" && <WorldCupTab />}
       </div>
     </div>

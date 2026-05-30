@@ -1,5 +1,38 @@
 import { gql } from "@apollo/client";
 
+// ── Categories (admin-only mutations) ─────────────────────────
+export const CREATE_CATEGORY = gql`
+  mutation CreateCategory($name: String!) {
+    createCategory(name: $name) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const UPDATE_CATEGORY = gql`
+  mutation UpdateCategory($id: ID!, $name: String!) {
+    updateCategory(id: $id, name: $name) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const DELETE_CATEGORY = gql`
+  mutation DeleteCategory($id: ID!) {
+    deleteCategory(id: $id)
+  }
+`;
+
+export const CATEGORY_POST_COUNT = gql`
+  query CategoryPostCount($categoryId: ID!) {
+    categoryPostCount(categoryId: $categoryId)
+  }
+`;
+
 export const INVITE_USER = gql`
   mutation InviteUser($email: String!) {
     inviteUser(email: $email)
@@ -40,6 +73,12 @@ export const LIST_USERS = gql`
       role
       profileImageUrl
     }
+  }
+`;
+
+export const LIST_USERS_COUNT = gql`
+  query ListUsersCount($role: String) {
+    listUsersCount(role: $role)
   }
 `;
 

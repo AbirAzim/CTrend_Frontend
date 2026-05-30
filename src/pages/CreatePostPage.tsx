@@ -82,7 +82,35 @@ function DateTimePicker({
   }
 
   function updateTime(h12: number, min: number, ap: "AM" | "PM") {
-    if (datePart) onChange(`${datePart}T${toTimeStr(h12, min, ap)}`);
+    // If no date is picked yet, pre-fill with today so the time edit takes effect.
+    const d = datePart || (() => {
+      const t = today;
+      return toDateStr(t.getFullYear(), t.getMonth(), t.getDate());
+    })();
+    onChange(`${d}T${toTimeStr(h12, min, ap)}`);
+  }
+
+  // Local string state for typeable inputs — committed on blur.
+  // Keeps the field freely editable while the user types (no clamping
+  // on every keystroke that would lock them out of multi-digit values).
+  const [hourDraft, setHourDraft] = useState(String(hour12).padStart(2, "0"));
+  const [minDraft, setMinDraft] = useState(String(minute).padStart(2, "0"));
+  // Sync drafts back to props when the picker reopens or the prop changes.
+  useEffect(() => { setHourDraft(String(hour12).padStart(2, "0")); }, [hour12]);
+  useEffect(() => { setMinDraft(String(minute).padStart(2, "0")); }, [minute]);
+
+  function commitHour(raw: string) {
+    const cleaned = raw.replace(/[^0-9]/g, "").slice(0, 2);
+    const n = cleaned ? Math.max(1, Math.min(12, Number(cleaned))) : hour12;
+    updateTime(n, minute, ampm);
+    setHourDraft(String(n).padStart(2, "0"));
+  }
+
+  function commitMinute(raw: string) {
+    const cleaned = raw.replace(/[^0-9]/g, "").slice(0, 2);
+    const n = cleaned ? Math.max(0, Math.min(59, Number(cleaned))) : minute;
+    updateTime(hour12, n, ampm);
+    setMinDraft(String(n).padStart(2, "0"));
   }
 
   // Close on outside click
@@ -195,33 +223,41 @@ function DateTimePicker({
           <div className="ig-dtp-time-row">
             <span className="ig-dtp-time-label">Time</span>
             <div className="ig-dtp-time-selects">
-              <select
-                className="ig-dtp-time-select"
-                value={hour12}
-                onChange={e => updateTime(Number(e.target.value), minute, ampm)}
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
-                ))}
-              </select>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                className="ig-dtp-time-input"
+                value={hourDraft}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setHourDraft(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                onBlur={(e) => commitHour(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                aria-label="Hour"
+              />
               <span className="ig-dtp-time-colon">:</span>
-              <select
-                className="ig-dtp-time-select"
-                value={minute}
-                onChange={e => updateTime(hour12, Number(e.target.value), ampm)}
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                className="ig-dtp-time-input"
+                value={minDraft}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setMinDraft(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                onBlur={(e) => commitMinute(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                aria-label="Minute"
+              />
+              <button
+                type="button"
+                className="ig-dtp-ampm-btn"
+                onClick={() => updateTime(hour12, minute, ampm === "AM" ? "PM" : "AM")}
+                aria-label={`Toggle AM/PM, currently ${ampm}`}
               >
-                {Array.from({ length: 60 }, (_, i) => i).map(m => (
-                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
-                ))}
-              </select>
-              <select
-                className="ig-dtp-time-select ig-dtp-time-select--ampm"
-                value={ampm}
-                onChange={e => updateTime(hour12, minute, e.target.value as "AM" | "PM")}
-              >
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
+                {ampm}
+              </button>
             </div>
           </div>
 
@@ -276,6 +312,7 @@ export function CreatePostPage() {
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState("");
+  const [votingEndEnabled, setVotingEndEnabled] = useState(false);
   const [postType, setPostType] = useState<"regular" | "system">("regular");
   const [items, setItems] = useState<DraftCompareItem[]>([
     { id: "1", imageUrl: "", title: "" },
@@ -344,14 +381,17 @@ export function CreatePostPage() {
 
     const now = Date.now();
     const hasVotingInput = votingEndsAt.trim().length > 0;
-    const votingEndsAtIso = localInputToUtcIso(votingEndsAt);
-    if (hasVotingInput && !votingEndsAtIso) {
-      setError("Please choose a valid deadline.");
-      return;
-    }
-    if (votingEndsAtIso && new Date(votingEndsAtIso).getTime() <= now) {
-      setError("Deadline must be in the future.");
-      return;
+    const votingEndsAtIso = votingEndEnabled ? localInputToUtcIso(votingEndsAt) : null;
+
+    if (votingEndEnabled) {
+      if (!hasVotingInput || !votingEndsAtIso) {
+        setError("Please choose a voting deadline (date + time).");
+        return;
+      }
+      if (new Date(votingEndsAtIso).getTime() <= now) {
+        setError("Deadline must be in the future.");
+        return;
+      }
     }
 
     const normalized = items
@@ -609,27 +649,31 @@ export function CreatePostPage() {
 
         {/* ── Settings card ── */}
         <div className="ig-create-settings-card">
-          <div className="ig-settings-row">
+          <div className="ig-settings-row ig-settings-row--col">
             <label htmlFor="create-category-id" className="ig-settings-label">
               <span className="ig-settings-icon">◈</span> Category
+              <span className="ig-settings-required">required</span>
             </label>
-            <select
-              id="create-category-id"
-              name="categoryId"
-              className="ig-settings-select"
-              value={categoryId}
-              onChange={(ev) => setCategoryId(ev.target.value)}
-              disabled={categoriesLoading}
-            >
-              <option value="">
-                {categoriesLoading ? "Loading…" : "Pick one"}
-              </option>
-              {(categoriesData?.categories ?? []).map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {(cat.name?.trim() || cat.id).toString()}
+            <div className="ig-cat-select-wrap">
+              <select
+                id="create-category-id"
+                name="categoryId"
+                className="ig-cat-select"
+                value={categoryId}
+                onChange={(ev) => setCategoryId(ev.target.value)}
+                disabled={categoriesLoading}
+              >
+                <option value="">
+                  {categoriesLoading ? "Loading categories…" : "Pick a category"}
                 </option>
-              ))}
-            </select>
+                {(categoriesData?.categories ?? []).map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {(cat.name?.trim() || cat.id).toString()}
+                  </option>
+                ))}
+              </select>
+              <span className="ig-cat-select-chevron" aria-hidden>▾</span>
+            </div>
             {categoriesError && (
               <small className="ig-settings-error">Could not load categories.</small>
             )}
@@ -657,15 +701,30 @@ export function CreatePostPage() {
           <div className="ig-settings-divider" />
 
           <div className="ig-settings-row ig-settings-row--col">
-            <label className="ig-settings-label">
-              <span className="ig-settings-icon">⏱</span> Voting ends
-              <span className="ig-settings-optional">optional</span>
+            <label className="ig-voting-toggle">
+              <span className="ig-settings-label" style={{ minWidth: 0, flex: 1 }}>
+                <span className="ig-settings-icon">⏱</span> Set voting deadline
+                <span className="ig-settings-optional">optional</span>
+              </span>
+              <span className="ig-toggle-switch-wrap">
+                <input
+                  type="checkbox"
+                  checked={votingEndEnabled}
+                  onChange={(e) => {
+                    setVotingEndEnabled(e.target.checked);
+                    if (!e.target.checked) setVotingEndsAt("");
+                  }}
+                />
+                <span className="ig-toggle-switch" aria-hidden />
+              </span>
             </label>
-            <DateTimePicker
-              value={votingEndsAt}
-              onChange={setVotingEndsAt}
-              minDate={new Date(Date.now() + 60_000).toISOString()}
-            />
+            {votingEndEnabled && (
+              <DateTimePicker
+                value={votingEndsAt}
+                onChange={setVotingEndsAt}
+                minDate={new Date(Date.now() + 60_000).toISOString()}
+              />
+            )}
           </div>
         </div>
 

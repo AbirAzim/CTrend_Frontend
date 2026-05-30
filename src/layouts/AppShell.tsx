@@ -2,12 +2,13 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { useMutation, useQuery } from "@apollo/client";
-import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconUser } from "../components/IgIcons";
+import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconShield, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { ME } from "../graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
 import { NotificationBell } from "../components/NotificationBell";
+import { GlobalSearch } from "../components/GlobalSearch";
 import { MessengerPanel } from "../components/MessengerPanel";
 
 type ThemeMode = "light" | "dark";
@@ -168,6 +169,7 @@ export function AppShell() {
           </NavLink>
           <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
+        {isAuthenticated && <GlobalSearch />}
         <div className="ig-topbar-actions">
           <button
             type="button"
@@ -191,31 +193,6 @@ export function AppShell() {
               <span className="ig-role-switcher-dot" aria-hidden />
               {switchingRole ? "…" : isAdmin ? "Admin" : "User"}
             </button>
-          )}
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              className="ig-topbar-cta ig-topbar-admin"
-              aria-label="Admin dashboard"
-              title="Admin dashboard"
-            >
-              <span className="ig-topbar-cta-glyph" aria-hidden>
-                ⚙
-              </span>
-              <span className="ig-topbar-cta-label">Admin</span>
-            </NavLink>
-          )}
-          {isAuthenticated && (
-            <NavLink
-              to="/create"
-              className="ig-topbar-cta"
-              title="Start a new compare"
-            >
-              <span className="ig-topbar-cta-glyph" aria-hidden>
-                &#10022;
-              </span>
-              <span className="ig-topbar-cta-label">New compare</span>
-            </NavLink>
           )}
           {isAuthenticated && <NotificationBell />}
           {isAuthenticated ? (
@@ -243,7 +220,7 @@ export function AppShell() {
       <MessengerPanel />
 
       <nav
-        className={`ig-bottom-nav ig-bottom-nav--four${navHidden ? " ig-bottom-nav--hidden" : ""}`}
+        className={`ig-bottom-nav ig-bottom-nav--${isAdmin ? "five" : "four"}${navHidden ? " ig-bottom-nav--hidden" : ""}`}
         aria-label="Main"
       >
         <NavLink
@@ -294,6 +271,18 @@ export function AppShell() {
         >
           {({ isActive }) => <IconUser active={isActive} />}
         </NavLink>
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              `ig-nav-item ig-nav-item--admin${isActive ? " ig-nav-item--active" : ""}`
+            }
+            aria-label="Admin dashboard"
+            title="Admin dashboard"
+          >
+            {({ isActive }) => <IconShield active={isActive} />}
+          </NavLink>
+        )}
       </nav>
     </div>
   );

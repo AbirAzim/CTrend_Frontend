@@ -64,11 +64,11 @@ type FriendRow = {
 };
 
 function friendName(f: FriendRow): string {
-  return f.displayName?.trim() || f.username?.trim() || "User";
+  return f.displayName?.trim() || `@${f.username?.trim() || "user"}`;
 }
 
 function friendInitial(f: FriendRow): string {
-  return friendName(f).slice(0, 1).toUpperCase();
+  return friendName(f).replace(/^@/, "").slice(0, 1).toUpperCase();
 }
 
 function MessageButton({ userId }: { userId: string }) {
@@ -1055,7 +1055,6 @@ export function ProfilePage() {
                       <div className="cx-conn-info">
                         <Link to={`/profile/${f.id}`} className="cx-conn-name-link">
                           <span className="cx-conn-name">{friendName(f)}</span>
-                          <span className="cx-conn-username">@{f.username ?? "user"}</span>
                         </Link>
                       </div>
                       <div className="cx-conn-actions">
@@ -1113,7 +1112,6 @@ export function ProfilePage() {
                             <div className="cx-conn-info">
                               <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
                                 <span className="cx-conn-name">{friendName(u)}</span>
-                                <span className="cx-conn-username">@{u.username ?? "user"}</span>
                               </Link>
                             </div>
                             <div className="cx-conn-actions">
@@ -1155,7 +1153,6 @@ export function ProfilePage() {
                             <div className="cx-conn-info">
                               <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
                                 <span className="cx-conn-name">{friendName(u)}</span>
-                                <span className="cx-conn-username">@{u.username ?? "user"}</span>
                               </Link>
                               <span className="cx-conn-pending-tag">Pending</span>
                             </div>
@@ -1211,7 +1208,6 @@ export function ProfilePage() {
                       <div className="cx-conn-info">
                         <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
                           <span className="cx-conn-name">{friendName(u)}</span>
-                          <span className="cx-conn-username">@{u.username ?? "user"}</span>
                         </Link>
                       </div>
                       <button

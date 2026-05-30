@@ -319,3 +319,11 @@ export const NEW_POSTS = gql`
     }
   }
 `;
+
+export const POST_DELETED_SUB = gql`
+  subscription PostDeleted {
+    postDeleted {
+      postId
+    }
+  }
+`;
