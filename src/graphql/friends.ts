@@ -37,12 +37,14 @@ export const FRIEND_REQUESTS = gql`
         id
         username
         displayName
+        email
         profileImageUrl
       }
       requestedMe {
         id
         username
         displayName
+        email
         profileImageUrl
       }
     }
@@ -52,6 +54,12 @@ export const FRIEND_REQUESTS = gql`
 export const RESPOND_FRIEND_REQUEST = gql`
   mutation RespondFriendRequest($requesterId: ID!, $accept: Boolean!) {
     respondFriendRequest(requesterId: $requesterId, accept: $accept)
+  }
+`;
+
+export const CANCEL_FRIEND_REQUEST = gql`
+  mutation CancelFriendRequest($userId: ID!) {
+    cancelFriendRequest(userId: $userId)
   }
 `;
 

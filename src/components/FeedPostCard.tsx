@@ -235,6 +235,7 @@ function FeedPostCardComponent({
   const location = useLocation();
   const [liked, setLiked] = useState(false);
   const [hypeCountLive, setHypeCountLive] = useState(post.hypeCount ?? 0);
+  const [saveLiveCount, setSaveLiveCount] = useState(post.saveCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
   const [anonymousVote, setAnonymousVote] = useState(false);
   const [showVoters, setShowVoters] = useState(false);
@@ -403,6 +404,7 @@ function FeedPostCardComponent({
     }
     setOptimisticVote(null);
     setHypeCountLive(post.hypeCount ?? 0);
+    setSaveLiveCount(post.saveCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
     setLiked(false);
   }, [
@@ -443,6 +445,7 @@ function FeedPostCardComponent({
   async function handleToggleKeep() {
     const nextKeep = !saved;
     setSaved(nextKeep);
+    setSaveLiveCount((prev) => Math.max(0, prev + (nextKeep ? 1 : -1)));
     if (voteMode !== "api") {
       return;
     }
@@ -477,6 +480,7 @@ function FeedPostCardComponent({
       });
     } catch {
       setSaved(!nextKeep);
+      setSaveLiveCount((prev) => Math.max(0, prev + (nextKeep ? -1 : 1)));
     }
   }
 
@@ -1162,33 +1166,66 @@ function FeedPostCardComponent({
   return (
     <article className="ig-post">
       <header className="ig-post-header">
-        <div className="ig-post-user">
-          <span className="ig-avatar sm">
-            {postAuthorAvatar ? (
-              <img
-                src={postAuthorAvatar}
-                alt={`${post.authorUsername} avatar`}
-                decoding="async"
-                onError={() => {
-                  setAuthorAvatarAttempt((prev) => {
-                    if (prev + 1 < postAuthorAvatarCandidates.length) {
-                      return prev + 1;
-                    }
-                    return postAuthorAvatarCandidates.length;
-                  });
-                }}
-              />
-            ) : (
-              storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
-            )}
-          </span>
-          <div>
-            <span className="ig-post-username">
-              {post.authorDisplayName?.trim() || post.authorUsername}
+        {post.authorId ? (
+          <NavLink
+            to={isOwner ? "/profile" : `/profile/${post.authorId}`}
+            className="ig-post-user ig-post-user--link"
+          >
+            <span className="ig-avatar sm">
+              {postAuthorAvatar ? (
+                <img
+                  src={postAuthorAvatar}
+                  alt={`${post.authorUsername} avatar`}
+                  decoding="async"
+                  onError={() => {
+                    setAuthorAvatarAttempt((prev) => {
+                      if (prev + 1 < postAuthorAvatarCandidates.length) {
+                        return prev + 1;
+                      }
+                      return postAuthorAvatarCandidates.length;
+                    });
+                  }}
+                />
+              ) : (
+                storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
+              )}
             </span>
-            <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
+            <div>
+              <span className="ig-post-username">
+                {post.authorDisplayName?.trim() || post.authorUsername}
+              </span>
+              <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
+            </div>
+          </NavLink>
+        ) : (
+          <div className="ig-post-user">
+            <span className="ig-avatar sm">
+              {postAuthorAvatar ? (
+                <img
+                  src={postAuthorAvatar}
+                  alt={`${post.authorUsername} avatar`}
+                  decoding="async"
+                  onError={() => {
+                    setAuthorAvatarAttempt((prev) => {
+                      if (prev + 1 < postAuthorAvatarCandidates.length) {
+                        return prev + 1;
+                      }
+                      return postAuthorAvatarCandidates.length;
+                    });
+                  }}
+                />
+              ) : (
+                storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
+              )}
+            </span>
+            <div>
+              <span className="ig-post-username">
+                {post.authorDisplayName?.trim() || post.authorUsername}
+              </span>
+              <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
+            </div>
           </div>
-        </div>
+        )}
         <div className="ig-more-wrap" ref={moreRef}>
           <button
             type="button"
@@ -1730,7 +1767,7 @@ function FeedPostCardComponent({
             onClick={() => void handleToggleKeep()}
           >
             <IconBookmark filled={saved} />
-            <span className="cx-action-chip-label">Keep</span>
+            <span className="cx-action-chip-label">Keep{saveLiveCount > 0 ? ` ${saveLiveCount}` : ""}</span>
           </button>
           <button
             type="button"
