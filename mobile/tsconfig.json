@@ -6,8 +6,16 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "paths": {
-      "@ctrend/shared/*": ["../packages/shared/src/*"]
+      "@ctrend/shared/*": [
+        "../packages/shared/src/*"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.d.ts"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.d.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }
