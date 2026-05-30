@@ -6463,6 +6463,32 @@ a.cx-profile-btn-accent {
   padding: 6px 0;
 }
 
+/* Skeleton loading state */
+@keyframes cx-skeleton-pulse {
+  0%   { opacity: 0.55; }
+  50%  { opacity: 1;    }
+  100% { opacity: 0.55; }
+}
+
+.cx-skeleton {
+  background: linear-gradient(90deg,
+    rgb(var(--cx-ink-rgb) / 0.06),
+    rgb(var(--cx-ink-rgb) / 0.12),
+    rgb(var(--cx-ink-rgb) / 0.06));
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: cx-skeleton-pulse 1.2s ease-in-out infinite;
+  display: block;
+}
+
+.cx-skeleton-line {
+  margin-top: 6px;
+}
+
+.cx-drop-list--skeleton .cx-drop-thumb {
+  background-image: none;
+}
+
 .cx-drop-item {
   border-bottom: 1px solid var(--ig-border);
 }
