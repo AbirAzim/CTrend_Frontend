@@ -150,7 +150,8 @@ export function ProfilePage() {
 
   const { data: meData, loading: meLoading, error: meError } = useQuery(ME, {
     skip: !user,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
     errorPolicy: "all",
   });
 
@@ -163,20 +164,24 @@ export function ProfilePage() {
   const { data: postsData, loading: postsLoading, refetch: refetchPosts } = useQuery(USER_POSTS, {
     variables: { userId },
     skip: !userId || useMockFeed,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
   const { data: friendsData, loading: friendsLoading, refetch: refetchFriends } = useQuery(MY_FRIENDS, {
     skip: useMockFeed,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
   const { data: friendRequestsData, loading: friendRequestsLoading, refetch: refetchRequests } = useQuery(FRIEND_REQUESTS, {
     skip: useMockFeed,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
   const { data: suggestionsData, loading: suggestionsLoading, refetch: refetchSuggestions } = useQuery(FRIEND_SUGGESTIONS, {
     variables: { limit: 10 },
     skip: useMockFeed,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
 
   const [addFriendMut] = useMutation(ADD_FRIEND);
@@ -186,6 +191,7 @@ export function ProfilePage() {
   const { data: savedPostsData, loading: savedPostsLoading } = useQuery(MY_SAVED_POSTS, {
     skip: useMockFeed || !user,
     fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
 
   const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
@@ -760,8 +766,23 @@ export function ProfilePage() {
             <strong>Playground:</strong> sample compares — connect the API to see your real posts.
           </p>
         )}
-        {!useMockFeed && postsLoading && (
-          <p className="cx-conn-empty">Loading your compares…</p>
+        {!useMockFeed && postsLoading && gridPosts.length === 0 && (
+          <ul className="cx-drop-list cx-drop-list--skeleton" aria-label="Loading your compares">
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="cx-drop-item">
+                <div className="cx-drop-item-main">
+                  <div className="cx-drop-thumbs">
+                    <span className="cx-drop-thumb cx-skeleton" />
+                    <span className="cx-drop-thumb cx-skeleton" />
+                  </div>
+                  <div className="cx-drop-info">
+                    <span className="cx-skeleton cx-skeleton-line" style={{ width: "70%", height: "14px" }} />
+                    <span className="cx-skeleton cx-skeleton-line" style={{ width: "45%", height: "11px" }} />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
         {!useMockFeed && !postsLoading && gridPosts.length === 0 && (
           <div className="cx-conn-empty">
