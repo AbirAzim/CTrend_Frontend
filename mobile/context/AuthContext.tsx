@@ -15,6 +15,7 @@ import {
   type StoredUser,
 } from "../lib/authStorage";
 import { apolloClient, reconnectWs } from "../lib/apolloClient";
+import { signOutGoogle } from "../lib/googleAuth";
 
 type AuthContextValue = {
   user: StoredUser | null;
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await clearSession();
+    await Promise.all([clearSession(), signOutGoogle()]);
     reconnectWs();
     void apolloClient.clearStore();
     setToken(null);
