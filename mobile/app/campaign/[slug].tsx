@@ -500,25 +500,34 @@ export default function CampaignDetailScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero banner image */}
-          {campaign.bannerImageUrl && (
-            <View style={styles.heroImageWrap}>
-              <Image
-                source={{ uri: campaign.bannerImageUrl }}
-                style={styles.heroImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-              <View style={styles.heroOverlay} />
-              <Text style={styles.heroTitle}>{campaign.name}</Text>
+          {/* Campaign banner card — same style as feed banner */}
+          <View style={styles.bannerCard}>
+            <Image
+              source={campaign.bannerImageUrl ? { uri: campaign.bannerImageUrl } : require("../../assets/worldcup-players.png")}
+              style={styles.bannerRightImage}
+              contentFit="contain"
+              contentPosition="right center"
+              cachePolicy="memory-disk"
+            />
+            <View style={styles.bannerLeftFade} />
+            <View style={styles.bannerContent}>
+              <View style={styles.bannerTopRow}>
+                <View style={styles.bannerBadge}>
+                  <Text style={styles.bannerBadgeText}>CAMPAIGN</Text>
+                </View>
+                <Text style={styles.bannerPrize}>🏆 Win {campaign.prizePerWinner} BDT</Text>
+              </View>
+              <Text style={styles.bannerTitle} numberOfLines={1}>{campaign.name}</Text>
+              <Text style={styles.bannerDesc} numberOfLines={2}>{campaign.bannerText}</Text>
+              {campaign.ctaLabel && (
+                <View style={styles.bannerCta}>
+                  <Text style={styles.bannerCtaText}>{campaign.ctaLabel}</Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
 
           <View style={styles.body}>
-            {/* No image fallback title */}
-            {!campaign.bannerImageUrl && (
-              <Text style={[styles.titleFallback, { color: colors.text }]}>{campaign.name}</Text>
-            )}
 
             {/* Meta row */}
             <View style={[styles.metaRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -567,6 +576,63 @@ export default function CampaignDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+
+  // Banner card (same as CampaignBanner feed card)
+  bannerCard: {
+    height: 130,
+    backgroundColor: "#5a0a0a",
+    overflow: "hidden",
+    marginBottom: 0,
+  },
+  bannerRightImage: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: "55%",
+  },
+  bannerLeftFade: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: "65%",
+    backgroundColor: "#5a0a0a",
+  },
+  bannerContent: {
+    flex: 1,
+    padding: 14,
+    paddingRight: 8,
+    gap: 3,
+    width: "62%",
+  },
+  bannerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
+  bannerBadge: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  bannerBadgeText: { color: "#fff", fontSize: 9, fontWeight: "700", letterSpacing: 0.8 },
+  bannerPrize: { color: "#fbbf24", fontSize: 12, fontWeight: "700" },
+  bannerTitle: { color: "#fff", fontSize: 16, fontWeight: "800", lineHeight: 20 },
+  bannerDesc: { color: "rgba(255,255,255,0.78)", fontSize: 11, lineHeight: 16 },
+  bannerCta: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 4,
+  },
+  bannerCtaText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+
   topbar: {
     flexDirection: "row",
     alignItems: "center",
@@ -581,20 +647,6 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 18, fontWeight: "700" },
   scrollContent: {},
   body: { paddingHorizontal: 16, paddingTop: 16 },
-
-  // Hero
-  heroImageWrap: { position: "relative", height: 200 },
-  heroImage: { width: "100%", height: "100%" },
-  heroOverlay: {
-    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  heroTitle: {
-    position: "absolute",
-    bottom: 16, left: 16, right: 16,
-    color: "#fff", fontSize: 22, fontWeight: "800",
-  },
-  titleFallback: { fontSize: 24, fontWeight: "800", marginBottom: 12 },
 
   // Meta
   metaRow: {
