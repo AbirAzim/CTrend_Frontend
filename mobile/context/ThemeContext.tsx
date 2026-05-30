@@ -18,19 +18,19 @@ export type ColorPalette = {
 };
 
 const DARK: ColorPalette = {
-  bg: "#0a0a0a",
-  card: "#1a1a1a",
-  section: "#242424",
-  border: "#2e2e2e",
-  topbar: "#0f0f1a",
-  text: "#ffffff",
-  subtext: "#9ca3af",
-  muted: "#6b7280",
-  accent: "#818cf8",
-  accentLight: "#c4b5fd",
-  circleBtnBg: "#1e1e2e",
-  tabBg: "#111111",
-  inputBg: "#1e1e1e",
+  bg: "#08080f",
+  card: "#13131f",
+  section: "#1c1c2a",
+  border: "#252535",
+  topbar: "#0d0d1a",
+  text: "#f0f0ff",
+  subtext: "#8b8ba8",
+  muted: "#5c5c78",
+  accent: "#7c72f5",
+  accentLight: "#b8abff",
+  circleBtnBg: "#1c1c2e",
+  tabBg: "#0f0f1c",
+  inputBg: "#1a1a28",
 };
 
 const LIGHT: ColorPalette = {
