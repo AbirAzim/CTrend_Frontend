@@ -779,6 +779,7 @@ function FeedPostCardComponent({
         }
         nextV = "UP";
         setJustVoted(0);
+        setDetailsOpen(true);
         playVoteSound();
       } else if (direction === "DOWN") {
         if (localViewer === "UP") {
@@ -790,6 +791,7 @@ function FeedPostCardComponent({
         }
         nextV = "DOWN";
         setJustVoted(1);
+        setDetailsOpen(true);
         playVoteSound();
       }
 
@@ -844,6 +846,7 @@ function FeedPostCardComponent({
       votingEndsAt:          optimisticVote?.votingEndsAt ?? activeVotingEndsAt,
     });
     setJustVoted(selectedOptionIndex);
+    setDetailsOpen(true);
 
     // Arm the subscription guard so a concurrent broadcast can't overwrite our state.
     voteGuardUntilRef.current = Date.now() + 2000;
@@ -941,6 +944,7 @@ function FeedPostCardComponent({
         votingEndsAt:          optimisticVote?.votingEndsAt  ?? activeVotingEndsAt,
       });
       setJustVoted(index);
+      setDetailsOpen(true);
 
       voteGuardUntilRef.current = Date.now() + 2000;
       if (voteInFlight.current) {
@@ -996,6 +1000,7 @@ function FeedPostCardComponent({
       });
       setMultiPick(index);
       setJustVoted(index);
+      setDetailsOpen(true);
       playVoteSound();
       return;
     }
@@ -1010,6 +1015,7 @@ function FeedPostCardComponent({
     setMultiPick(index);
     setJustUnvoted(j); // exit animation on the cell being left
     setJustVoted(index);
+    setDetailsOpen(true);
     playVoteSound();
   }
 
@@ -1247,9 +1253,13 @@ function FeedPostCardComponent({
         <>
           <div
             className={`ig-post-media-wrap ig-post-media-wrap--compare${
-              compareUrls.length > 2
-                ? " ig-post-media-wrap--compare-swiper"
-                : ""
+              compareUrls.length === 3
+                ? " ig-post-media-wrap--compare-grid ig-post-media-wrap--compare-grid--3"
+                : compareUrls.length === 4
+                  ? " ig-post-media-wrap--compare-grid ig-post-media-wrap--compare-grid--4"
+                  : compareUrls.length >= 5
+                    ? " ig-post-media-wrap--compare-grid ig-post-media-wrap--compare-grid--many"
+                    : ""
             }${isVotingClosed ? " ig-post-media-wrap--voting-closed" : ""}`}
           >
             {isVotingClosed && (
@@ -1263,19 +1273,15 @@ function FeedPostCardComponent({
                 <span className="cx-voting-ended-strip-lock">🔒</span>
               </div>
             )}
-            {/* Floating vote-status chip — overlaid over the voted cell */}
-            {!isVotingClosed && (
+            {/* Floating vote-status chip — binary compare only */}
+            {!isVotingClosed && isBinaryCompare && (
               <span
                 className={`cx-vote-status-chip cx-vote-status-chip--overlay${
                   hasVoted
                     ? " cx-vote-status-chip--voted" +
-                      (isBinaryCompare
-                        ? viewer === "DOWN"
-                          ? " cx-vote-status-chip--side-b cx-vote-status-chip--pos-right"
-                          : " cx-vote-status-chip--pos-left"
-                        : isMultiCompare
-                          ? " cx-vote-status-chip--side-multi"
-                          : "")
+                      (viewer === "DOWN"
+                        ? " cx-vote-status-chip--side-b cx-vote-status-chip--pos-right"
+                        : " cx-vote-status-chip--pos-left")
                     : " cx-vote-status-chip--pending"
                 }`}
                 aria-label={hasVoted ? "You have voted on this post" : "You haven't voted yet"}
@@ -1361,7 +1367,7 @@ function FeedPostCardComponent({
                 <button
                   key={`${post.id}-cmp-${i}`}
                   type="button"
-                  className={`ig-compare-cell ig-compare-cell--multi${picked ? " ig-compare-cell--picked" : ""}${hasVoted && !picked && !isVotingClosed ? " ig-compare-cell--unchosen" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}${justVotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-voted" : ""}${justUnvotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-unvoted" : ""}`}
+                  className={`ig-compare-cell ig-compare-cell--multi ig-compare-cell--multi-${i % 10}${picked ? " ig-compare-cell--picked" : ""}${hasVoted && !picked && !isVotingClosed ? " ig-compare-cell--unchosen" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}${justVotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-voted" : ""}${justUnvotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-unvoted" : ""}`}
                   disabled={voteControlsDisabled}
                   aria-pressed={picked}
                   aria-label={
@@ -1424,6 +1430,20 @@ function FeedPostCardComponent({
               )}
             </div>
           )}
+          {voteMode === "api" && !isVotingClosed && (
+            <div className="cx-anon-toggle-row">
+              <label className="cx-anon-toggle">
+                <span className="cx-anon-toggle-icon" aria-hidden>👻</span>
+                <span className="cx-anon-toggle-text">Vote anonymously</span>
+                <input
+                  type="checkbox"
+                  checked={anonymousVote}
+                  onChange={(e) => setAnonymousVote(e.target.checked)}
+                />
+                <span className="cx-anon-toggle-switch" aria-hidden />
+              </label>
+            </div>
+          )}
         </>
       ) : post.imageUrls[0] ? (
         <div className="ig-post-media-wrap">
@@ -1468,17 +1488,6 @@ function FeedPostCardComponent({
 
         {detailsOpen ? (
           <div className="cx-post-details-panel" id={`post-details-${post.id}`}>
-            {voteMode === "api" ? (
-              <label className="cx-anon-toggle">
-                <input
-                  type="checkbox"
-                  checked={anonymousVote}
-                  onChange={(e) => setAnonymousVote(e.target.checked)}
-                />
-                <span className="cx-anon-toggle-text">Vote anonymously</span>
-              </label>
-            ) : null}
-
             {compareUrls ? (
               <p className="cx-vote-hint-chip">
                 {isVotingClosed
@@ -1501,117 +1510,117 @@ function FeedPostCardComponent({
               </div>
             ) : null}
 
-            {/* Caption now shown above the compare images — not duplicated here */}
+            {isBinaryCompare ? (
+              <div
+                className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
+                aria-live="polite"
+              >
+                <div className="cx-pulse-card-head">
+                  <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
+                    {isVotingClosed ? "Final results" : "Live split"}
+                  </span>
+                  <span className="cx-pulse-card-metric">
+                    {binaryTotal > 0
+                      ? `${binaryTotal.toLocaleString()} votes`
+                      : "Be the first to break the tie"}
+                  </span>
+                </div>
+                {([0, 1] as const).map((side) => {
+                  const count = side === 0 ? up : down;
+                  const pct = side === 0 ? leftPct : rightPct;
+                  const label = compareOptionLabel(post, side);
+                  const isLeader =
+                    !binaryHasTie &&
+                    binaryLeaderPct != null &&
+                    pct != null &&
+                    pct === binaryLeaderPct &&
+                    pct > 0;
+                  const isFinalWinner = isVotingClosed && binaryWinnerSide === side;
+                  return (
+                    <div key={side} className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}${isFinalWinner ? " cx-pulse-row--final-winner" : ""}${isVotingClosed && !isFinalWinner ? " cx-pulse-row--final-loser" : ""}`}>
+                      <div className="cx-pulse-row-top">
+                        <span className="cx-pulse-name">
+                          {isFinalWinner && <span className="cx-pulse-medal" aria-hidden>🥇 </span>}
+                          {label}
+                        </span>
+                        <div className="cx-pulse-row-actions">
+                          <span className="cx-pulse-count">
+                            {count.toLocaleString()}
+                            {pct != null ? ` · ${pct}%` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            className="cx-see-voters-btn"
+                            onClick={() => void openVotersList(side)}
+                          >
+                            See voters
+                          </button>
+                        </div>
+                      </div>
+                      <div className="cx-pulse-track" aria-hidden>
+                        <div
+                          className={`cx-pulse-fill cx-pulse-fill--${side === 0 ? "a" : "b"}${isFinalWinner ? " cx-pulse-fill--winner" : ""}`}
+                          style={{ width: pct != null ? `${pct}%` : "0%" }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : isMultiCompare ? (
+              <div
+                className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
+                aria-live="polite"
+              >
+                <div className="cx-pulse-card-head">
+                  <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
+                    {isVotingClosed ? "Final results" : "Breakdown"}
+                  </span>
+                  <span className="cx-pulse-card-metric">
+                    {multiTotalVotes.toLocaleString()} votes
+                  </span>
+                </div>
+                {compareUrls?.map((_, idx) => {
+                  const pctVal = multiPercents[idx] ?? 0;
+                  const label = compareOptionLabel(post, idx);
+                  const isLeader =
+                    multiLeaderPct != null &&
+                    multiLeaderPct > 0 &&
+                    multiLeaderCount === 1 &&
+                    pctVal === multiLeaderPct;
+                  return (
+                    <div
+                      key={`${post.id}-pulse-${idx}`}
+                      className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}`}
+                    >
+                      <div className="cx-pulse-row-top">
+                        <span className="cx-pulse-name">{label}</span>
+                        <div className="cx-pulse-row-actions">
+                          <span className="cx-pulse-count">{pctVal}%</span>
+                          <button
+                            type="button"
+                            className="cx-see-voters-btn"
+                            onClick={() => void openVotersList(idx)}
+                          >
+                            See voters
+                          </button>
+                        </div>
+                      </div>
+                      <div className="cx-pulse-track" aria-hidden>
+                        <div
+                          className={`cx-pulse-fill cx-pulse-fill--opt-${idx % 10}`}
+                          style={{ width: `${pctVal}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {isBinaryCompare ? (
-          <div
-            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
-            aria-live="polite"
-          >
-            <div className="cx-pulse-card-head">
-              <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
-                {isVotingClosed ? "Final results" : "Live split"}
-              </span>
-              <span className="cx-pulse-card-metric">
-                {binaryTotal > 0
-                  ? `${binaryTotal.toLocaleString()} votes`
-                  : "Be the first to break the tie"}
-              </span>
-            </div>
-            {([0, 1] as const).map((side) => {
-              const count = side === 0 ? up : down;
-              const pct = side === 0 ? leftPct : rightPct;
-              const label = compareOptionLabel(post, side);
-              const isLeader =
-                !binaryHasTie &&
-                binaryLeaderPct != null &&
-                pct != null &&
-                pct === binaryLeaderPct &&
-                pct > 0;
-              const isFinalWinner = isVotingClosed && binaryWinnerSide === side;
-              return (
-                <div key={side} className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}${isFinalWinner ? " cx-pulse-row--final-winner" : ""}${isVotingClosed && !isFinalWinner ? " cx-pulse-row--final-loser" : ""}`}>
-                  <div className="cx-pulse-row-top">
-                    <span className="cx-pulse-name">
-                      {isFinalWinner && <span className="cx-pulse-medal" aria-hidden>🥇 </span>}
-                      {label}
-                    </span>
-                    <div className="cx-pulse-row-actions">
-                      <span className="cx-pulse-count">
-                        {count.toLocaleString()}
-                        {pct != null ? ` · ${pct}%` : ""}
-                      </span>
-                      <button
-                        type="button"
-                        className="cx-see-voters-btn"
-                        onClick={() => void openVotersList(side)}
-                      >
-                        See voters
-                      </button>
-                    </div>
-                  </div>
-                  <div className="cx-pulse-track" aria-hidden>
-                    <div
-                      className={`cx-pulse-fill cx-pulse-fill--${side === 0 ? "a" : "b"}${isFinalWinner ? " cx-pulse-fill--winner" : ""}`}
-                      style={{ width: pct != null ? `${pct}%` : "0%" }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : isMultiCompare ? (
-          <div
-            className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
-            aria-live="polite"
-          >
-            <div className="cx-pulse-card-head">
-              <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
-                {isVotingClosed ? "Final results" : "Breakdown"}
-              </span>
-              <span className="cx-pulse-card-metric">
-                {multiTotalVotes.toLocaleString()} votes
-              </span>
-            </div>
-            {compareUrls?.map((_, idx) => {
-              const pctVal = multiPercents[idx] ?? 0;
-              const label = compareOptionLabel(post, idx);
-              const isLeader =
-                multiLeaderPct != null &&
-                multiLeaderPct > 0 &&
-                multiLeaderCount === 1 &&
-                pctVal === multiLeaderPct;
-              return (
-                <div
-                  key={`${post.id}-pulse-${idx}`}
-                  className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}`}
-                >
-                  <div className="cx-pulse-row-top">
-                    <span className="cx-pulse-name">{label}</span>
-                    <div className="cx-pulse-row-actions">
-                      <span className="cx-pulse-count">{pctVal}%</span>
-                      <button
-                        type="button"
-                        className="cx-see-voters-btn"
-                        onClick={() => void openVotersList(idx)}
-                      >
-                        See voters
-                      </button>
-                    </div>
-                  </div>
-                  <div className="cx-pulse-track" aria-hidden>
-                    <div
-                      className="cx-pulse-fill cx-pulse-fill--multi"
-                      style={{ width: `${pctVal}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : !compareUrls ? (
+        {!compareUrls ? (
           <div
             className={`cx-pulse-card cx-pulse-card--compact${voteFx ? " cx-pulse-card--votefx" : ""}`}
             aria-live="polite"

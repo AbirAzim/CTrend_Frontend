@@ -1506,28 +1506,36 @@ a.cx-friend-avatar:hover {
   box-sizing: border-box;
 }
 
-.ig-post-media-wrap--compare-swiper {
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  gap: 8px;
-  scrollbar-width: thin;
-}
-
-.ig-post-media-wrap--compare-swiper .ig-compare-cell {
-  flex: 0 0 78%;
-  min-width: 78%;
-  width: 78%;
-  scroll-snap-align: center;
-  align-self: stretch;
-  border-radius: var(--cx-radius-lg);
+/* Grid layout for 3+ compare options — no horizontal scroll */
+.ig-post-media-wrap--compare-grid {
+  display: grid;
+  gap: 2px;
   overflow: hidden;
+  aspect-ratio: unset;
 }
 
-.ig-post-media-wrap--compare:not(.ig-post-media-wrap--compare-swiper) .ig-compare-cell {
+.ig-post-media-wrap--compare-grid--3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.ig-post-media-wrap--compare-grid--4 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ig-post-media-wrap--compare-grid--many {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.ig-post-media-wrap--compare-grid .ig-compare-cell {
+  border-radius: 0;
+  overflow: hidden;
+  aspect-ratio: 1;
+  flex: none;
+  min-width: 0;
+}
+
+/* Binary compare (2 items) gets rounded inner edges; grid does not */
+.ig-post-media-wrap--compare:not(.ig-post-media-wrap--compare-grid) .ig-compare-cell {
   border-radius: var(--cx-radius-md);
   overflow: hidden;
 }
@@ -1633,10 +1641,36 @@ a.cx-friend-avatar:hover {
     0 0 36px rgba(251 146 60 / 0.32);
 }
 
-.ig-compare-cell--multi:hover:not(:disabled):not(.ig-compare-cell--picked) {
-  box-shadow:
-    inset 0 0 0 2px rgba(129 140 248 / 0.85),
-    0 0 36px rgba(129 140 248 / 0.3);
+/* Per-option hover glows — 10-color palette, supports up to 10 compare items */
+.ig-compare-cell--multi-0:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(52 211 153 / 0.85), 0 0 36px rgba(52 211 153 / 0.32);
+}
+.ig-compare-cell--multi-1:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(251 146 60 / 0.85), 0 0 36px rgba(251 146 60 / 0.32);
+}
+.ig-compare-cell--multi-2:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(167 139 250 / 0.85), 0 0 36px rgba(167 139 250 / 0.3);
+}
+.ig-compare-cell--multi-3:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(251 113 133 / 0.85), 0 0 36px rgba(251 113 133 / 0.3);
+}
+.ig-compare-cell--multi-4:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(251 191 36 / 0.85), 0 0 36px rgba(251 191 36 / 0.3);
+}
+.ig-compare-cell--multi-5:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(34 211 238 / 0.85), 0 0 36px rgba(34 211 238 / 0.3);
+}
+.ig-compare-cell--multi-6:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(163 230 53 / 0.85), 0 0 36px rgba(163 230 53 / 0.3);
+}
+.ig-compare-cell--multi-7:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(20 184 166 / 0.85), 0 0 36px rgba(20 184 166 / 0.3);
+}
+.ig-compare-cell--multi-8:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(56 189 248 / 0.85), 0 0 36px rgba(56 189 248 / 0.3);
+}
+.ig-compare-cell--multi-9:hover:not(:disabled):not(.ig-compare-cell--picked) {
+  box-shadow: inset 0 0 0 2px rgba(232 121 249 / 0.85), 0 0 36px rgba(232 121 249 / 0.3);
 }
 
 /* Picked cell: subtle zoom only — it's already chosen, no need to shout */
@@ -1673,11 +1707,17 @@ a.cx-friend-avatar:hover {
     0 0 20px rgb(251 146 60 / 0.45);
 }
 
-.ig-compare-cell--multi.ig-compare-cell--picked {
-  box-shadow:
-    inset 0 0 0 3px #818cf8,
-    0 0 20px rgb(129 140 248 / 0.45);
-}
+/* Per-option picked border glow */
+.ig-compare-cell--multi-0.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #34d399, 0 0 20px rgb(52 211 153 / 0.45); }
+.ig-compare-cell--multi-1.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #fb923c, 0 0 20px rgb(251 146 60 / 0.45); }
+.ig-compare-cell--multi-2.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #a78bfa, 0 0 20px rgb(167 139 250 / 0.45); }
+.ig-compare-cell--multi-3.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #fb7185, 0 0 20px rgb(251 113 133 / 0.45); }
+.ig-compare-cell--multi-4.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #fbbf24, 0 0 20px rgb(251 191 36 / 0.45); }
+.ig-compare-cell--multi-5.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #22d3ee, 0 0 20px rgb(34 211 238 / 0.45); }
+.ig-compare-cell--multi-6.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #a3e635, 0 0 20px rgb(163 230 53 / 0.45); }
+.ig-compare-cell--multi-7.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #14b8a6, 0 0 20px rgb(20 184 166 / 0.45); }
+.ig-compare-cell--multi-8.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #38bdf8, 0 0 20px rgb(56 189 248 / 0.45); }
+.ig-compare-cell--multi-9.ig-compare-cell--picked { box-shadow: inset 0 0 0 3px #e879f9, 0 0 20px rgb(232 121 249 / 0.45); }
 
 .ig-compare-pct {
   position: absolute;
@@ -1759,9 +1799,17 @@ a.cx-friend-avatar:hover {
   background: linear-gradient(90deg, #fb923c, #f59e0b);
 }
 
-.ig-compare-cell--multi .ig-compare-meter-fill {
-  background: linear-gradient(90deg, #818cf8, #6366f1);
-}
+/* Per-option meter fill bars */
+.ig-compare-cell--multi-0 .ig-compare-meter-fill { background: linear-gradient(90deg, #34d399, #10b981); }
+.ig-compare-cell--multi-1 .ig-compare-meter-fill { background: linear-gradient(90deg, #fb923c, #f97316); }
+.ig-compare-cell--multi-2 .ig-compare-meter-fill { background: linear-gradient(90deg, #a78bfa, #8b5cf6); }
+.ig-compare-cell--multi-3 .ig-compare-meter-fill { background: linear-gradient(90deg, #fb7185, #f43f5e); }
+.ig-compare-cell--multi-4 .ig-compare-meter-fill { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.ig-compare-cell--multi-5 .ig-compare-meter-fill { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+.ig-compare-cell--multi-6 .ig-compare-meter-fill { background: linear-gradient(90deg, #a3e635, #65a30d); }
+.ig-compare-cell--multi-7 .ig-compare-meter-fill { background: linear-gradient(90deg, #14b8a6, #0d9488); }
+.ig-compare-cell--multi-8 .ig-compare-meter-fill { background: linear-gradient(90deg, #38bdf8, #0284c7); }
+.ig-compare-cell--multi-9 .ig-compare-meter-fill { background: linear-gradient(90deg, #e879f9, #a21caf); }
 
 .cx-post-footer {
   display: flex;
@@ -2091,9 +2139,17 @@ a.cx-friend-avatar:hover {
   background: linear-gradient(90deg, #fb923c, #f97316);
 }
 
-.cx-pulse-fill--multi {
-  background: linear-gradient(90deg, var(--cx-accent-mid), var(--cx-accent-bright));
-}
+/* Per-option breakdown bar fills — matches cell color palette, 10 colors */
+.cx-pulse-fill--opt-0 { background: linear-gradient(90deg, #34d399, #10b981); }
+.cx-pulse-fill--opt-1 { background: linear-gradient(90deg, #fb923c, #f97316); }
+.cx-pulse-fill--opt-2 { background: linear-gradient(90deg, #a78bfa, #8b5cf6); }
+.cx-pulse-fill--opt-3 { background: linear-gradient(90deg, #fb7185, #f43f5e); }
+.cx-pulse-fill--opt-4 { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.cx-pulse-fill--opt-5 { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+.cx-pulse-fill--opt-6 { background: linear-gradient(90deg, #a3e635, #65a30d); }
+.cx-pulse-fill--opt-7 { background: linear-gradient(90deg, #14b8a6, #0d9488); }
+.cx-pulse-fill--opt-8 { background: linear-gradient(90deg, #38bdf8, #0284c7); }
+.cx-pulse-fill--opt-9 { background: linear-gradient(90deg, #e879f9, #a21caf); }
 
 .cx-pulse-row--leader {
   border-color: rgb(var(--cx-accent-rgb) / 0.28);
@@ -2525,14 +2581,17 @@ a.cx-friend-avatar:hover {
     0 0 0 4px rgba(251 146 60 / 0.2);
 }
 
-/* Multi-compare picked: light violet to match the multi vote accent */
-.ig-compare-cell--multi .cx-voted-pin {
-  background: linear-gradient(135deg, #818cf8, #c4b5fd);
-  color: #312e81;
-  box-shadow:
-    0 3px 12px rgba(167 139 250 / 0.5),
-    0 0 0 4px rgba(167 139 250 / 0.2);
-}
+/* Per-option voted-pin colors */
+.ig-compare-cell--multi-0 .cx-voted-pin { background: linear-gradient(135deg, #34d399, #6ee7b7); color: #064e3b; box-shadow: 0 3px 12px rgba(52 211 153 / 0.5), 0 0 0 4px rgba(52 211 153 / 0.2); }
+.ig-compare-cell--multi-1 .cx-voted-pin { background: linear-gradient(135deg, #fb923c, #fed7aa); color: #7c2d12; box-shadow: 0 3px 12px rgba(251 146 60 / 0.5), 0 0 0 4px rgba(251 146 60 / 0.2); }
+.ig-compare-cell--multi-2 .cx-voted-pin { background: linear-gradient(135deg, #a78bfa, #ddd6fe); color: #3b0764; box-shadow: 0 3px 12px rgba(167 139 250 / 0.5), 0 0 0 4px rgba(167 139 250 / 0.2); }
+.ig-compare-cell--multi-3 .cx-voted-pin { background: linear-gradient(135deg, #fb7185, #fecdd3); color: #881337; box-shadow: 0 3px 12px rgba(251 113 133 / 0.5), 0 0 0 4px rgba(251 113 133 / 0.2); }
+.ig-compare-cell--multi-4 .cx-voted-pin { background: linear-gradient(135deg, #fbbf24, #fde68a); color: #78350f; box-shadow: 0 3px 12px rgba(251 191 36 / 0.5), 0 0 0 4px rgba(251 191 36 / 0.2); }
+.ig-compare-cell--multi-5 .cx-voted-pin { background: linear-gradient(135deg, #22d3ee, #a5f3fc); color: #164e63; box-shadow: 0 3px 12px rgba(34 211 238 / 0.5), 0 0 0 4px rgba(34 211 238 / 0.2); }
+.ig-compare-cell--multi-6 .cx-voted-pin { background: linear-gradient(135deg, #a3e635, #d9f99d); color: #1a2e05; box-shadow: 0 3px 12px rgba(163 230 53 / 0.5), 0 0 0 4px rgba(163 230 53 / 0.2); }
+.ig-compare-cell--multi-7 .cx-voted-pin { background: linear-gradient(135deg, #14b8a6, #99f6e4); color: #042f2e; box-shadow: 0 3px 12px rgba(20 184 166 / 0.5), 0 0 0 4px rgba(20 184 166 / 0.2); }
+.ig-compare-cell--multi-8 .cx-voted-pin { background: linear-gradient(135deg, #38bdf8, #bae6fd); color: #082f49; box-shadow: 0 3px 12px rgba(56 189 248 / 0.5), 0 0 0 4px rgba(56 189 248 / 0.2); }
+.ig-compare-cell--multi-9 .cx-voted-pin { background: linear-gradient(135deg, #e879f9, #f5d0fe); color: #4a044e; box-shadow: 0 3px 12px rgba(232 121 249 / 0.5), 0 0 0 4px rgba(232 121 249 / 0.2); }
 
 /* ── 4. Unchosen cells dim when user has voted ───────────────────────── */
 /* Your choice "spotlights" — everything else steps back */
@@ -2841,55 +2900,88 @@ a.cx-friend-avatar:hover {
   text-transform: uppercase;
 }
 
+/* Anon toggle row — always visible below compare images */
+.cx-anon-toggle-row {
+  display: flex;
+  justify-content: center;
+  padding: 6px 16px 8px;
+  background: rgb(0 0 0 / 0.2);
+}
+
 .cx-anon-toggle {
   margin-top: 0;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.24);
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.95), rgb(248 250 252 / 0.9));
-  box-shadow: 0 3px 10px rgb(15 23 42 / 0.07);
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.04);
   cursor: pointer;
   user-select: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.cx-anon-toggle:has(input:checked) {
+  background: rgb(139 92 246 / 0.18);
+  border-color: rgb(139 92 246 / 0.4);
+}
+
+.cx-anon-toggle-icon {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .cx-anon-toggle input[type="checkbox"] {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.45);
-  background: #fff;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
   margin: 0;
+}
+
+/* Toggle switch track */
+.cx-anon-toggle-switch {
   position: relative;
-  box-shadow: inset 0 0 0 1px rgb(var(--cx-accent-rgb) / 0.08);
+  width: 34px;
+  height: 19px;
+  border-radius: 10px;
+  background: rgb(100 116 139 / 0.5);
+  flex-shrink: 0;
+  transition: background 0.2s;
 }
 
-.cx-anon-toggle input[type="checkbox"]:checked {
-  background: linear-gradient(135deg, var(--cx-accent-deep), var(--cx-accent-bright));
-  box-shadow: 0 0 0 1px rgb(var(--cx-accent-rgb) / 0.28);
-}
-
-.cx-anon-toggle input[type="checkbox"]:checked::after {
+/* Toggle switch knob */
+.cx-anon-toggle-switch::after {
   content: "";
   position: absolute;
-  left: 5px;
-  top: 1px;
-  width: 4px;
-  height: 9px;
-  border: solid #fff;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+.cx-anon-toggle:has(input:checked) .cx-anon-toggle-switch {
+  background: #8b5cf6;
+}
+
+.cx-anon-toggle:has(input:checked) .cx-anon-toggle-switch::after {
+  transform: translateX(15px);
 }
 
 .cx-anon-toggle-text {
-  font-family: var(--cx-font-display);
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  color: var(--cx-accent-deep);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgb(203 213 225);
+  letter-spacing: 0.01em;
+}
+
+.cx-anon-toggle:has(input:checked) .cx-anon-toggle-text {
+  color: rgb(196 181 253);
 }
 
 @media (max-width: 620px) {
