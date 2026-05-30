@@ -737,6 +737,7 @@ body.capacitor-android .ig-main-scroll,
 body.capacitor .ig-main-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+  will-change: scroll-position;
 }
 
 /* Big smoothness boost on Android: reduce card paint/animation cost. */
@@ -748,7 +749,8 @@ body.capacitor .ig-feed .ig-post {
   box-shadow: 0 1px 6px rgb(15 23 42 / 0.08);
   contain: layout paint style;
   content-visibility: auto;
-  contain-intrinsic-size: 560px;
+  /* `auto` lets browser remember real size after first paint — kills scroll jitter */
+  contain-intrinsic-size: auto 860px;
 }
 
 body.capacitor-android .ig-post::before,

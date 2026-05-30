@@ -1,0 +1,18 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.tsserver.maxTsServerMemory": 3072,
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "mobile/android": true,
+    "mobile/.expo": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "mobile/android/**": true,
+    "mobile/.expo/**": true
+  },
+  "files.exclude": {}
+}

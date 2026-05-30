@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Ke Jitbe",
+    "slug": "ke-jitbe",
+    "version": "1.0.0",
+    "scheme": "ctrend",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.ctrend.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#312e81",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-splash-screen",
+      "expo-image",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.41983174733-rpq1s0k95fhnme4jfrb2uv2usfq4p1ce"
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#312e81"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
