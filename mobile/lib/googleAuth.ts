@@ -45,6 +45,15 @@ export async function signInWithGoogleIdToken(): Promise<string> {
   return idToken;
 }
 
+export async function signOutGoogle(): Promise<void> {
+  try {
+    ensureConfigured();
+    await GoogleSignin.signOut();
+  } catch {
+    // not signed in via Google — safe to ignore
+  }
+}
+
 export function googleSignInErrorMessage(err: unknown): string {
   if (isErrorWithCode(err)) {
     if (err.code === statusCodes.SIGN_IN_CANCELLED) {
