@@ -3,9 +3,11 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
   Easing,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -18,6 +20,9 @@ import {
   SET_POST_HYPE,
   SET_POST_KEEP,
   POST_VOTE_UPDATED,
+  DELETE_POST,
+  EXTEND_POST_VOTING,
+  FEED_POSTS,
 } from "@ctrend/shared/graphql/feed";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
@@ -239,11 +244,14 @@ function FeedPostCardComponent({ post }: Props) {
   const voteGuardUntil = useRef(0);
   const pendingVote = useRef<{ idx: number } | null>(null);
 
-  // Animation values
-  const cellScale = useRef([new Animated.Value(1), new Animated.Value(1)]).current;
-  const cellOpacity = useRef([new Animated.Value(1), new Animated.Value(1)]).current;
-  const flashOpacity = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
-  const badgeScale = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [extendMenuVisible, setExtendMenuVisible] = useState(false);
+
+  // Animation values — pre-allocated for up to 4 options
+  const cellScale = useRef([0, 1, 2, 3].map(() => new Animated.Value(1))).current;
+  const cellOpacity = useRef([0, 1, 2, 3].map(() => new Animated.Value(1))).current;
+  const flashOpacity = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
+  const badgeScale = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
   const splitLeftAnim = useRef(new Animated.Value(50)).current;
   const splitRightAnim = useRef(new Animated.Value(50)).current;
   const splitAnimMounted = useRef(false);
@@ -252,7 +260,6 @@ function FeedPostCardComponent({ post }: Props) {
   const chipScales = useRef([1, 1, 1, 1, 1, 1].map(() => new Animated.Value(1))).current;
 
   const isOwner = !!user && !!post.authorId && user.id === post.authorId;
-  void isOwner;
 
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
@@ -269,9 +276,6 @@ function FeedPostCardComponent({ post }: Props) {
   const isVotingClosed = activeIsVotingOpen === false;
   const activeMyIdx = optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
   const activeVotingEndsAt = optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
-
-  void activeStats;
-  void activeMyIdx;
 
   const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls : null;
   const isBinary = compareUrls?.length === 2;
@@ -326,6 +330,11 @@ function FeedPostCardComponent({ post }: Props) {
     const v = post.viewerVote;
     if (v === "UP") badgeScale[0].setValue(1);
     else if (v === "DOWN") badgeScale[1].setValue(1);
+    // Multi-option: init badge for pre-voted option
+    const preIdx = post.mySelectedOptionIndex;
+    if (preIdx !== null && preIdx !== undefined && v === null) {
+      badgeScale[preIdx]?.setValue(1);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Badge spring entrance + cell dim when viewer vote changes
@@ -353,6 +362,22 @@ function FeedPostCardComponent({ post }: Props) {
     }
   }, [viewer]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Multi-option: badge + dim when mySelectedOptionIndex changes
+  useEffect(() => {
+    if (isBinary || activeMyIdx === null || activeMyIdx === undefined) return;
+    const n = compareUrls?.length ?? 0;
+    for (let i = 0; i < n; i++) {
+      if (i === activeMyIdx) {
+        badgeScale[i].setValue(0);
+        Animated.spring(badgeScale[i], { toValue: 1, useNativeDriver: true, tension: 220, friction: 8 }).start();
+        Animated.timing(cellOpacity[i], { toValue: 1, duration: 150, useNativeDriver: true }).start();
+      } else {
+        badgeScale[i].setValue(0);
+        Animated.timing(cellOpacity[i], { toValue: 0.55, duration: 280, useNativeDriver: true }).start();
+      }
+    }
+  }, [activeMyIdx, isBinary]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Animated split bar
   useEffect(() => {
     if (!splitAnimMounted.current) {
@@ -370,6 +395,8 @@ function FeedPostCardComponent({ post }: Props) {
   const [voteMut] = useMutation<VotePostData>(VOTE_POST);
   const [setHypeMut] = useMutation(SET_POST_HYPE);
   const [setKeepMut] = useMutation(SET_POST_KEEP);
+  const [deleteMut] = useMutation(DELETE_POST);
+  const [extendMut] = useMutation(EXTEND_POST_VOTING);
 
   function triggerVotePop(idx: number) {
     Animated.sequence([
@@ -395,7 +422,11 @@ function FeedPostCardComponent({ post }: Props) {
     if (isVotingClosed) return;
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     const curVote = optimisticVote?.viewerVote ?? post.viewerVote;
+    // Binary early return
     if ((idx === 0 && curVote === "UP") || (idx === 1 && curVote === "DOWN")) return;
+    // Multi-option early return
+    const curIdx = optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex;
+    if (!isBinary && curIdx !== null && curIdx !== undefined && curIdx === idx) return;
     triggerVotePop(idx);
 
     const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
@@ -472,6 +503,39 @@ function FeedPostCardComponent({ post }: Props) {
     catch { /* cancelled */ }
   }
 
+  function handleMore() {
+    if (!isOwner) return;
+    setMoreMenuVisible(true);
+  }
+
+  function handleDelete() {
+    setMoreMenuVisible(false);
+    Alert.alert("Delete post", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteMut({ variables: { postId: post.id }, refetchQueries: [{ query: FEED_POSTS }] });
+          } catch {
+            Alert.alert("Error", "Could not delete the post.");
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleExtendVoting(hours: number) {
+    setExtendMenuVisible(false);
+    const newDate = new Date(Date.now() + hours * 3_600_000).toISOString();
+    try {
+      await extendMut({ variables: { postId: post.id, newVotingEndsAt: newDate } });
+    } catch {
+      Alert.alert("Error", "Could not extend voting deadline.");
+    }
+  }
+
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
   const authorInitial = authorName.slice(0, 1).toUpperCase();
   const authorAvatarUrl = post.authorProfileImageUrl ?? null;
@@ -496,16 +560,66 @@ function FeedPostCardComponent({ post }: Props) {
             {timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
           </View>
         </Pressable>
-        <Pressable style={st.moreBtn} hitSlop={8}>
-          <Text style={st.moreBtnText}>⋯</Text>
-        </Pressable>
+        {isOwner ? (
+          <Pressable style={st.moreBtn} onPress={handleMore} hitSlop={8}>
+            <Text style={st.moreBtnText}>⋯</Text>
+          </Pressable>
+        ) : (
+          <View style={st.moreBtn} />
+        )}
       </View>
 
       {/* Caption */}
       {post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
 
       {/* Compare images */}
-      {compareUrls ? (
+      {compareUrls && !isBinary ? (
+        /* ── Multi-option grid (3+ options) ── */
+        <View style={styles.multiGrid}>
+          {compareUrls.map((url, i) => {
+            const stat = activeStats?.find((s) => s.index === i);
+            const pct = stat ? Math.round(stat.percentage) : 0;
+            const label = compareLabel(post, i);
+            const isVoted = activeMyIdx === i;
+            const maxCount = Math.max(...(activeStats?.map((s) => s.count) ?? [0]));
+            const isWinner = isVotingClosed && (stat?.count ?? 0) > 0 && stat?.count === maxCount;
+            const isLoser = isVotingClosed && !isWinner;
+            return (
+              <Animated.View
+                key={`${post.id}-multi-${i}`}
+                style={[
+                  styles.multiCell,
+                  isLoser && { opacity: 0.5 },
+                  { transform: [{ scale: cellScale[i] }] },
+                ]}
+              >
+                <Pressable style={styles.fill} onPress={() => void castVote(i)} disabled={isVotingClosed}>
+                  <Image source={{ uri: url }} style={styles.multiImg} contentFit="cover" cachePolicy="memory-disk" />
+                  <View style={st.pctOverlay}>
+                    <Text style={st.pctText}>{pct}%</Text>
+                    <Text style={st.pctLabel} numberOfLines={1}>{label}</Text>
+                  </View>
+                  <Animated.View pointerEvents="none" style={[styles.absoluteFill, { backgroundColor: "rgba(255,255,255,0.8)", opacity: flashOpacity[i] }]} />
+                  {isVoted && !isVotingClosed && (
+                    <Animated.View style={[st.votedBadgeRow, { transform: [{ scale: badgeScale[i] }] }]}>
+                      <View style={st.votedBadge}>
+                        <Text style={st.votedBadgeText}>♥ VOTED</Text>
+                      </View>
+                    </Animated.View>
+                  )}
+                  {isWinner && (
+                    <View style={st.winnerBadgeRow}>
+                      <View style={st.winnerBadge}>
+                        <Text style={st.winnerBadgeText}>👑 WINNER</Text>
+                      </View>
+                    </View>
+                  )}
+                </Pressable>
+              </Animated.View>
+            );
+          })}
+        </View>
+      ) : compareUrls ? (
         <>
           <View style={st.compareWrap}>
             {compareUrls.slice(0, 2).map((url, i) => {
@@ -666,6 +780,50 @@ function FeedPostCardComponent({ post }: Props) {
           </Animated.View>
         ))}
       </ScrollView>
+
+      {/* ── More menu (owner actions) ── */}
+      <Modal visible={moreMenuVisible} transparent animationType="fade" onRequestClose={() => setMoreMenuVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMoreMenuVisible(false)}>
+          <View style={[styles.menuSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.menuHandle, { backgroundColor: colors.border }]} />
+            {activeIsVotingOpen && (
+              <Pressable
+                style={[styles.menuRow, { borderBottomColor: colors.border }]}
+                onPress={() => { setMoreMenuVisible(false); setExtendMenuVisible(true); }}
+              >
+                <Text style={[styles.menuRowText, { color: colors.text }]}>⏱ Extend voting</Text>
+              </Pressable>
+            )}
+            <Pressable style={styles.menuRow} onPress={handleDelete}>
+              <Text style={[styles.menuRowText, { color: "#ef4444" }]}>🗑 Delete post</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ── Extend voting menu ── */}
+      <Modal visible={extendMenuVisible} transparent animationType="fade" onRequestClose={() => setExtendMenuVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setExtendMenuVisible(false)}>
+          <View style={[styles.menuSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.menuHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.menuTitle, { color: colors.text }]}>Extend voting by</Text>
+            {([
+              { label: "+12 hours", hours: 12 },
+              { label: "+1 day", hours: 24 },
+              { label: "+3 days", hours: 72 },
+              { label: "+1 week", hours: 168 },
+            ] as const).map((opt) => (
+              <Pressable
+                key={opt.hours}
+                style={[styles.menuRow, { borderBottomColor: colors.border }]}
+                onPress={() => void handleExtendVoting(opt.hours)}
+              >
+                <Text style={[styles.menuRowText, { color: colors.accent }]}>{opt.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -675,4 +833,26 @@ export const FeedPostCard = memo(FeedPostCardComponent);
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   absoluteFill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  // Multi-option grid (3–4 options)
+  multiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
+  multiCell: { width: (SCREEN_W - 2) / 2, height: (SCREEN_W - 2) / 2 * 0.8, overflow: "hidden" },
+  multiImg: { width: "100%", height: "100%" },
+  // More menu
+  menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  menuSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    paddingTop: 12,
+    paddingBottom: 32,
+    paddingHorizontal: 0,
+  },
+  menuHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  menuTitle: { fontSize: 15, fontWeight: "700", paddingHorizontal: 20, marginBottom: 12 },
+  menuRow: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  menuRowText: { fontSize: 16 },
 });

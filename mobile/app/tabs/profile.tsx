@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ME, USER_POSTS } from "@ctrend/shared/graphql/profile";
+import { SWITCH_ACTIVE_ROLE } from "@ctrend/shared/graphql/auth";
 import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
 import { MY_SAVED_POSTS, EXTEND_POST_VOTING } from "@ctrend/shared/graphql/feed";
 import { START_DIRECT_CONVERSATION, ONLINE_USER_IDS } from "@ctrend/shared/graphql/messages";
@@ -216,10 +217,9 @@ function FriendRow({
 // ─── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const { logout, isAuthenticated, hydrated, user: storedUser } = useAuth();
+  const { logout, isAuthenticated, hydrated, user: storedUser, setSession } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [dmLoading, setDmLoading] = useState<string | null>(null);
 
   const { data: meData, loading: meLoading } = useQuery<MeData>(ME, {
     fetchPolicy: "cache-and-network",
@@ -253,6 +253,9 @@ export default function ProfileScreen() {
 
   const [extendVoting] = useMutation(EXTEND_POST_VOTING);
   const [startDm] = useMutation<{ startDirectConversation: { id: string } }>(START_DIRECT_CONVERSATION);
+  const [switchRole, { loading: roleLoading }] = useMutation<{
+    switchActiveRole: { accessToken: string; user: { id: string; role: string } }
+  }>(SWITCH_ACTIVE_ROLE);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) {
@@ -289,21 +292,33 @@ export default function ProfileScreen() {
   }
 
   async function handleDm(friendId: string) {
-    setDmLoading(friendId);
     try {
       const { data } = await startDm({ variables: { userId: friendId } });
       if (!data?.startDirectConversation) throw new Error();
       router.push(`/chat/${data.startDirectConversation.id}` as `/${string}`);
     } catch {
       Alert.alert("Error", "Could not open conversation.");
-    } finally {
-      setDmLoading(null);
     }
   }
 
   async function handleLogout() {
     await logout();
     router.replace("/auth/login");
+  }
+
+  async function handleSwitchRole(targetRole: string) {
+    try {
+      const { data } = await switchRole({ variables: { role: targetRole } });
+      if (!data?.switchActiveRole) return;
+      await setSession(data.switchActiveRole.accessToken, {
+        ...(storedUser ?? {}),
+        id: data.switchActiveRole.user.id,
+        email: storedUser?.email ?? "",
+        role: data.switchActiveRole.user.role,
+      });
+    } catch {
+      Alert.alert("Error", "Could not switch role.");
+    }
   }
 
   const loading = meLoading && !me;
@@ -412,6 +427,35 @@ export default function ProfileScreen() {
               >
                 <Text style={[styles.adminTabText, { color: colors.text }]}>Scheduled ▾</Text>
               </Pressable>
+            </View>
+          ) : null}
+
+          {/* ── Role switching (admin only) ── */}
+          {isAdmin ? (
+            <View style={styles.roleRow}>
+              <Text style={[styles.adminRowLabel, { color: colors.muted }]}>ACTIVE ROLE</Text>
+              {(["USER", "ADMIN"] as const).map((role) => {
+                const isActive = (me?.role ?? storedUser?.role)?.toUpperCase() === role;
+                return (
+                  <Pressable
+                    key={role}
+                    style={[
+                      styles.roleChip,
+                      {
+                        backgroundColor: isActive ? colors.accent : colors.card,
+                        borderColor: isActive ? colors.accent : colors.border,
+                        opacity: roleLoading ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={() => !isActive && void handleSwitchRole(role)}
+                    disabled={isActive || roleLoading}
+                  >
+                    <Text style={[styles.roleChipText, { color: isActive ? "#fff" : colors.subtext }]}>
+                      {role}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           ) : null}
 
@@ -636,6 +680,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   adminTabText: { fontSize: 13, fontWeight: "600" },
+
+  // Role switching
+  roleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 20,
+  },
+  roleChip: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  roleChipText: { fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
 
   // Section header
   sectionHeader: {

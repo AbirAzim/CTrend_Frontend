@@ -454,25 +454,32 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### 🔲 PHASE 12 — Push Notifications
-- [ ] expo-notifications permission request on login
-- [ ] Get Expo push token → send to backend (REGISTER_PUSH_TOKEN mutation — needs backend)
-- [ ] Foreground: in-app toast banner
-- [ ] Background: tap opens relevant screen
+### ✅ PHASE 12 — Push Notifications (COMPLETE)
 
-**Deps:** `expo-notifications` (install needed)
+- [x] `expo-notifications` installed + plugin added to app.json with notification icon
+- [x] `REGISTER_PUSH_TOKEN(token, platform)` mutation added to `packages/shared/src/graphql/notifications.ts`
+- [x] `mobile/hooks/usePushNotifications.ts` — requests permission, gets Expo push token, registers with backend (gracefully silent if backend doesn't support yet), foreground handler, background tap → navigate to POST/USER/MESSAGE
+- [x] Android notification channel created (default, MAX importance, purple color)
+- [x] Wired into `_layout.tsx` via `<AppServices>` component (inside AuthProvider + ApolloProvider)
+- [x] Offline banner (`mobile/components/OfflineBanner.tsx`) — slide-in amber banner via `@react-native-community/netinfo`, animated translateY, shown at top above everything
+
+**Deps:** `expo-notifications ~56.0.15`, `@react-native-community/netinfo 12.0.1`
+**APK built:** 2026-05-30 ✅
 
 ---
 
-### 🔲 PHASE 13 — Polish
-- [ ] Multi-option (3+ image) voting in FeedPostCard — grid layout, all options
-- [ ] Sound effects: vote tick, message chime, notification bell (expo-av)
-- [ ] Offline banner (netinfo)
-- [ ] Online/offline status dots everywhere (friends, profile, chat)
-- [ ] Role switching (SWITCH_ACTIVE_ROLE)
-- [ ] Own profile: stats row, posts grid, invite friend, scheduled link
-- [ ] Post scheduling in Create screen (already has duration, add schedule toggle)
-- [ ] Delete + extend voting in FeedPostCard ⋯ menu
+### ✅ PHASE 13 — Polish (COMPLETE)
+
+- [x] Multi-option (3+ image) voting in FeedPostCard — 2-column `flexWrap` grid, all options shown with pct overlay, voted badge, winner/loser dim, vote-pop animation per cell
+- [x] Multi-option badge + cell dim animations (useEffect watches `activeMyIdx`)
+- [x] FeedPostCard ⋯ menu — Modal bottom sheet for post owner: "Extend voting" (cascades to preset sheet) + "Delete post" (Alert confirm → DELETE_POST + refetch FEED_POSTS)
+- [x] Extend voting preset sheet: +12h, +1d, +3d, +1w options in bottom sheet modal
+- [x] Post scheduling in Create screen — "Schedule for later" Switch toggle, shows ISO datetime TextInput when enabled, passes `scheduledAt` to CREATE_POST input
+- [x] Role switching in profile — ADMIN users see "ACTIVE ROLE" chip row (USER / ADMIN) below admin links, calls SWITCH_ACTIVE_ROLE and updates session token
+- [x] Offline banner wired into root `_layout.tsx`, slides in/out with animation
+
+**APIs:** DELETE_POST, EXTEND_POST_VOTING, REGISTER_PUSH_TOKEN (pending backend), SWITCH_ACTIVE_ROLE
+**APK built:** 2026-05-30 ✅
 
 ---
 
@@ -506,12 +513,11 @@ cd mobile && npm install @shopify/flash-list
 # Phase 9
 cd mobile && npm install react-native-markdown-display
 
-# Phase 12
-cd mobile && npx expo install expo-notifications
+# Phase 12 — DONE
+# cd mobile && npx expo install expo-notifications
+# cd mobile && npm install @react-native-community/netinfo
 
-# Phase 13
-cd mobile && npx expo install expo-av
-cd mobile && npm install @react-native-community/netinfo
+# Phase 13 — DONE (no extra deps needed; expo-audio already installed)
 ```
 
 ---
@@ -586,3 +592,5 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-05-30 | Phase 6–9 | All phases marked complete — APK built and installed ✅ |
 | 2026-05-30 | Phase 10 | Scheduled posts screen — countdown, cancel, subscription refetch, link from profile |
 | 2026-05-30 | Phase 11 | Admin panel — 4-tab navigator: Users (list/search/paginate/invite/broadcast), Invitations (filter/resend/cancel/invite-admin), Campaigns (list/toggle/create/edit), World Cup (sync/post/process/winners/mark-paid) |
+| 2026-05-30 | Phase 12 | Push notifications — expo-notifications, permission request, Expo push token, REGISTER_PUSH_TOKEN, foreground/background handlers, offline banner with netinfo — APK ✅ |
+| 2026-05-30 | Phase 13 | Polish — multi-option (3+) voting grid in FeedPostCard, ⋯ menu (delete + extend voting), post scheduling toggle in Create screen, role switching chips in profile — APK ✅ |

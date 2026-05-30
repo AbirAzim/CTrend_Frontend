@@ -73,6 +73,11 @@ export default function CreateScreen() {
   const [platformWide, setPlatformWide] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState(() => {
+    const d = new Date(Date.now() + 3_600_000);
+    return d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+  });
 
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
@@ -216,6 +221,12 @@ export default function CreateScreen() {
     const input: Record<string, unknown> = { categoryId, imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
     if (votingPreset !== null) input.votingEndsAt = hoursFromNow(votingPreset);
+    if (scheduleEnabled && scheduledDate) {
+      const scheduledAt = new Date(scheduledDate).toISOString();
+      if (new Date(scheduledAt) > new Date()) {
+        input.scheduledAt = scheduledAt;
+      }
+    }
 
     try {
       const mutFn = isAdmin && platformWide ? createSystemPost : createPost;
@@ -390,7 +401,7 @@ export default function CreateScreen() {
 
           {/* Admin: platform-wide toggle */}
           {isAdmin && (
-            <View style={styles.settingsRow}>
+            <View style={[styles.settingsRow, { borderBottomColor: colors.border }]}>
               <View style={styles.settingsKeyCol}>
                 <Text style={[styles.settingsKey, { color: colors.text }]}>Platform-wide</Text>
                 <Text style={[styles.settingsHint, { color: colors.muted }]}>Visible to all users</Text>
@@ -401,6 +412,35 @@ export default function CreateScreen() {
                 trackColor={{ false: colors.border, true: colors.accent }}
                 thumbColor="#fff"
               />
+            </View>
+          )}
+
+          {/* Schedule post toggle */}
+          <View style={[styles.settingsRow, scheduleEnabled ? { borderBottomColor: colors.border } : {}]}>
+            <View style={styles.settingsKeyCol}>
+              <Text style={[styles.settingsKey, { color: colors.text }]}>Schedule for later</Text>
+              <Text style={[styles.settingsHint, { color: colors.muted }]}>Post goes live at set time</Text>
+            </View>
+            <Switch
+              value={scheduleEnabled}
+              onValueChange={setScheduleEnabled}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor="#fff"
+            />
+          </View>
+          {scheduleEnabled && (
+            <View style={styles.settingsColRow}>
+              <Text style={[styles.settingsKey, { color: colors.text }]}>Publish at</Text>
+              <TextInput
+                style={[styles.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text, minHeight: 0 }]}
+                value={scheduledDate}
+                onChangeText={setScheduledDate}
+                placeholder="YYYY-MM-DDTHH:MM"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                keyboardType="default"
+              />
+              <Text style={[styles.settingsHint, { color: colors.muted }]}>Format: 2026-06-01T14:30</Text>
             </View>
           )}
         </View>
@@ -420,7 +460,11 @@ export default function CreateScreen() {
         >
           {isSubmitting ? <ActivityIndicator color="#fff" /> : (
             <Text style={styles.submitText}>
-              {isAdmin && platformWide ? "Launch platform-wide →" : "Launch it →"}
+              {scheduleEnabled
+                ? "Schedule it →"
+                : isAdmin && platformWide
+                  ? "Launch platform-wide →"
+                  : "Launch it →"}
             </Text>
           )}
         </Pressable>
