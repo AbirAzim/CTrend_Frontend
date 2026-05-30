@@ -1,5 +1,4 @@
 import { useMutation, useSubscription } from "@apollo/client/react";
-import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +29,7 @@ import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
+import { useSounds } from "../context/SoundContext";
 import { postPermalink } from "../lib/postPermalink";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -246,7 +246,7 @@ function makeStyles(c: ColorPalette) {
 function FeedPostCardComponent({ post }: Props) {
   const { user, isAuthenticated } = useAuth();
   const { colors } = useTheme();
-  const tickPlayer = useAudioPlayer(require("../assets/vote-tick.wav"));
+  const { playTick } = useSounds();
   const st = useMemo(() => makeStyles(colors), [colors]);
 
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
@@ -413,9 +413,7 @@ function FeedPostCardComponent({ post }: Props) {
   const [extendMut] = useMutation(EXTEND_POST_VOTING);
 
   function triggerVotePop(idx: number) {
-    // Haptic + audio tick
-    tickPlayer.seekTo(0);
-    tickPlayer.play();
+    playTick();
     Animated.sequence([
       Animated.timing(cellScale[idx], { toValue: 1.065, duration: 80, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
       Animated.timing(cellScale[idx], { toValue: 0.975, duration: 80, useNativeDriver: true }),

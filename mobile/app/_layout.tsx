@@ -8,6 +8,7 @@ import { apolloClient } from "../lib/apolloClient";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import { TabBarProvider } from "../context/TabBarContext";
+import { SoundProvider } from "../context/SoundContext";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 
@@ -29,14 +30,16 @@ export default function RootLayout() {
         <AuthProvider>
           <ThemeProvider>
             <TabBarProvider>
-              <KeyboardProvider>
-                <View style={{ flex: 1 }}>
-                  <AppServices />
-                  <AppStatusBar />
-                  <Stack screenOptions={{ headerShown: false }} />
-                  <OfflineBanner />
-                </View>
-              </KeyboardProvider>
+              <SoundProvider>
+                <KeyboardProvider>
+                  <View style={{ flex: 1 }}>
+                    <AppServices />
+                    <AppStatusBar />
+                    <Stack screenOptions={{ headerShown: false }} />
+                    <OfflineBanner />
+                  </View>
+                </KeyboardProvider>
+              </SoundProvider>
             </TabBarProvider>
           </ThemeProvider>
         </AuthProvider>

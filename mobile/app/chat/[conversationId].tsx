@@ -1,7 +1,6 @@
 import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -35,6 +34,7 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useSounds } from "../../context/SoundContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +161,7 @@ export default function ChatScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { playNotification } = useSounds();
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -176,8 +177,6 @@ export default function ChatScreen() {
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const notifPlayer = useAudioPlayer(require("../../assets/notification.wav"));
 
 
   // ── Fetch conversation metadata for header ──────────────────────────────────
@@ -235,7 +234,7 @@ export default function ChatScreen() {
       });
       // Play sound only for incoming messages (not own)
       if (msg.senderId !== user?.id) {
-        notifPlayer.seekTo(0).then(() => notifPlayer.play()).catch(() => {});
+        playNotification();
         Vibration.vibrate(150);
       }
       // Mark read when new message arrives while screen is open
