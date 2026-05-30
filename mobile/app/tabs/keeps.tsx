@@ -56,10 +56,6 @@ export default function KeepsScreen() {
     }
   }, [hydrated, isAuthenticated]);
 
-  if (!hydrated || !isAuthenticated) {
-    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  }
-
   const posts: FeedPostView[] = useMemo(() => {
     const raw = (data?.mySavedPosts ?? []).map(
       (p) => mapGqlPostToFeedView(p as Parameters<typeof mapGqlPostToFeedView>[0]),
@@ -89,6 +85,10 @@ export default function KeepsScreen() {
       return { ...p, authorProfileImageUrl: byUsername ?? byEmail ?? null };
     });
   }, [data, meData, friendsData, suggestionsData, requestsData]);
+
+  if (!hydrated || !isAuthenticated) {
+    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  }
 
   const renderItem: ListRenderItem<FeedPostView> = ({ item }) => <FeedPostCard post={item} />;
 

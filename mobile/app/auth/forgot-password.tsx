@@ -1,5 +1,6 @@
 import { useMutation } from "@apollo/client/react";
 import { Image } from "expo-image";
+import logoAsset from "../../assets/logo.png";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -44,7 +45,7 @@ export default function ForgotPasswordScreen() {
   if (sent) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-        <Image source={require("../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+        <Image source={logoAsset} style={styles.logo} contentFit="contain" />
         <Text style={[styles.title, { color: colors.text }]}>Check your email</Text>
         <Text style={[styles.sub, { color: colors.subtext }]}>
           If an account exists for{" "}
@@ -72,7 +73,7 @@ export default function ForgotPasswordScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Image source={require("../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+          <Image source={logoAsset} style={styles.logo} contentFit="contain" />
           <Text style={[styles.title, { color: colors.text }]}>Reset password</Text>
           <Text style={[styles.sub, { color: colors.subtext }]}>
             Enter your email and we'll send a reset link.

@@ -1,5 +1,6 @@
 import { useMutation } from "@apollo/client/react";
 import { Image } from "expo-image";
+import logoAsset from "../../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -75,7 +76,7 @@ export default function AcceptInvitationScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Image source={require("../../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+          <Image source={logoAsset} style={styles.logo} contentFit="contain" />
           <Text style={[styles.title, { color: colors.text }]}>You're invited! 🎉</Text>
           <Text style={[styles.sub, { color: colors.subtext }]}>
             Set up your account to join Ke Jitbe.

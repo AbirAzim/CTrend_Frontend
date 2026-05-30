@@ -1,5 +1,6 @@
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
+import worldcupPlayersAsset from "../../assets/worldcup-players.png";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -207,7 +208,6 @@ function FixtureCard({
   fixture: Fixture;
   colors: ReturnType<typeof useTheme>["colors"];
 }) {
-  const now = new Date();
   const kickoff = new Date(fixture.kickoff);
   const isLive = fixture.status === "IN_PLAY" || fixture.status === "PAUSED";
   const isFinished = fixture.status === "FINISHED";
@@ -503,7 +503,7 @@ export default function CampaignDetailScreen() {
           {/* Campaign banner card — same style as feed banner */}
           <View style={styles.bannerCard}>
             <Image
-              source={campaign.bannerImageUrl ? { uri: campaign.bannerImageUrl } : require("../../assets/worldcup-players.png")}
+              source={campaign.bannerImageUrl ? { uri: campaign.bannerImageUrl } : worldcupPlayersAsset}
               style={styles.bannerRightImage}
               contentFit="contain"
               contentPosition="right center"

@@ -1,5 +1,7 @@
 import { useAudioPlayer } from "expo-audio";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
+import tickWav from "../assets/vote-tick.wav";
+import notifWav from "../assets/notification.wav";
 
 type SoundCtx = {
   playTick: () => void;
@@ -12,8 +14,8 @@ const SoundContext = createContext<SoundCtx>({
 });
 
 export function SoundProvider({ children }: { children: ReactNode }) {
-  const tickPlayer = useAudioPlayer(require("../assets/vote-tick.wav"));
-  const notifPlayer = useAudioPlayer(require("../assets/notification.wav"));
+  const tickPlayer = useAudioPlayer(tickWav);
+  const notifPlayer = useAudioPlayer(notifWav);
 
   // Prime both players shortly after mount so first real play works instantly.
   // We start → wait 120ms → pause+rewind. The gap is too short for the user to
