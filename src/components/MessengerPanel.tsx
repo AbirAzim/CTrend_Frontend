@@ -3,12 +3,15 @@ import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
+import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
 import { useImageUpload } from "../lib/useImageUpload";
 import {
   GET_MESSAGES,
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
 import { MY_FRIENDS } from "../graphql/friends";
+
+const MODERATOR_SENDER_ID = "moderator";
 
 // ── Emoji picker ────────────────────────────────────────────────────
 const EMOJI_SET = ["😀","😂","❤️","👍","👎","😭","😍","🔥","🎉","😊","🙏","😎","🤔","😅","🥳","💯","👏","😢","😡","✨"];
@@ -231,11 +234,14 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   }
 
   const otherParticipants = conversation.participants.filter((p) => p.id !== user?.id);
+  const isModeratorConvo = conversation.type?.toLowerCase() === "moderator";
   const windowTitle =
-    conversation.name ||
-    otherParticipants.map((p) => p.displayName).join(", ") ||
-    "Chat";
-  const isOnline = otherParticipants.some((p) => onlineUserIds.has(p.id));
+    isModeratorConvo
+      ? MODERATOR_BRAND_NAME
+      : conversation.name ||
+        otherParticipants.map((p) => p.displayName).join(", ") ||
+        "Chat";
+  const isOnline = !isModeratorConvo && otherParticipants.some((p) => onlineUserIds.has(p.id));
 
   const mySeenBy = messages
     .filter((m) => m.senderId === user?.id)
@@ -245,12 +251,14 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const canSend = (text.trim().length > 0 || pendingImage !== null) && !uploading;
 
   return (
-    <div className={`cw-window${minimized ? " cw-window--min" : ""}`} onPaste={handlePaste}>
+    <div className={`cw-window${minimized ? " cw-window--min" : ""}${isModeratorConvo ? " cw-window--moderator" : ""}`} onPaste={handlePaste}>
       {/* Header */}
       <div className="cw-header" onClick={() => setMinimized((v) => !v)}>
         <div className="cw-header-avatar-wrap">
-          <div className="cw-header-avatar">
-            {otherParticipants[0]?.avatarUrl ? (
+          <div className={`cw-header-avatar${isModeratorConvo ? " cw-header-avatar--official" : ""}`}>
+            {isModeratorConvo ? (
+              <img src="/logo.png" alt="" />
+            ) : otherParticipants[0]?.avatarUrl ? (
               <img src={otherParticipants[0].avatarUrl} alt="" />
             ) : (
               <span>{(otherParticipants[0]?.displayName ?? "?")[0].toUpperCase()}</span>
@@ -260,8 +268,12 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
         </div>
         <div className="cw-header-meta">
           <span className="cw-header-name">{windowTitle}</span>
-          <span className={`cw-header-status${isOnline ? " cw-header-status--online" : ""}`}>
-            {isOnline ? "● Active now" : "○ Offline"}
+          <span className={`cw-header-status${isOnline ? " cw-header-status--online" : ""}${isModeratorConvo ? " cw-header-status--official" : ""}`}>
+            {isModeratorConvo
+              ? `🛡 Official ${MODERATOR_PLATFORM_NAME} team · not a regular user`
+              : isOnline
+                ? "● Active now"
+                : "○ Offline"}
           </span>
         </div>
         <div className="cw-header-actions">
@@ -308,8 +320,18 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
               <p className="cw-no-more">Beginning of conversation</p>
             )}
 
+            {isModeratorConvo && messages.length > 0 ? (
+              <div className="cw-official-banner" role="note">
+                <span className="cw-official-banner-icon" aria-hidden>🛡</span>
+                <span>
+                  <strong>Official admin message</strong> — sent by the {MODERATOR_PLATFORM_NAME} team, not another member.
+                </span>
+              </div>
+            ) : null}
+
             {messages.map((msg, i) => {
-              const isMine = msg.senderId === user?.id;
+              const isModeratorMsg = msg.senderId === MODERATOR_SENDER_ID;
+              const isMine = !isModeratorMsg && msg.senderId === user?.id;
               const prevMsg = messages[i - 1];
               const nextMsg = messages[i + 1];
               const isGroupStart = !prevMsg || prevMsg.senderId !== msg.senderId;
@@ -319,20 +341,21 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
               const showSeen = isLast && isMine && (seenByOther || mySeenBy?.id === msg.id);
               const hasImage = Boolean(msg.imageUrl);
               const hasText = Boolean(msg.text?.trim());
+              const bubbleSide = isMine ? "mine" : isModeratorMsg ? "moderator" : "theirs";
 
               return (
                 <div
                   key={msg.id}
                   className={[
                     "cw-msg",
-                    isMine ? "cw-msg--mine" : "cw-msg--theirs",
+                    isMine ? "cw-msg--mine" : isModeratorMsg ? "cw-msg--moderator" : "cw-msg--theirs",
                     !isGroupStart ? "cw-msg--grouped" : "",
                     isGroupEnd   ? "cw-msg--group-end" : "",
                   ].filter(Boolean).join(" ")}
                 >
-                  {/* Avatar — only on last message of a group (theirs) */}
+                  {/* Avatar — only on last message of a group (theirs / moderator) */}
                   {!isMine && (
-                    <div className={`cw-msg-avatar${!isGroupEnd ? " cw-msg-avatar--hidden" : ""}`}>
+                    <div className={`cw-msg-avatar${!isGroupEnd ? " cw-msg-avatar--hidden" : ""}${isModeratorMsg ? " cw-msg-avatar--official" : ""}`}>
                       {msg.senderAvatar ? (
                         <img src={msg.senderAvatar} alt="" />
                       ) : (
@@ -342,12 +365,15 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
                   )}
 
                   <div className="cw-msg-content">
+                    {isModeratorMsg && isGroupStart ? (
+                      <span className="cw-mod-label">Official · {MODERATOR_BRAND_NAME}</span>
+                    ) : null}
                     {/* Image-only or image+caption bubble */}
                     {hasImage ? (
                       <div className={[
                         "cw-bubble",
                         "cw-bubble--img",
-                        isMine ? "cw-bubble--mine" : "cw-bubble--theirs",
+                        `cw-bubble--${bubbleSide}`,
                         isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
                         isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
                       ].filter(Boolean).join(" ")}>
@@ -360,7 +386,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
                       /* Text-only bubble */
                       <div className={[
                         "cw-bubble",
-                        isMine ? "cw-bubble--mine" : "cw-bubble--theirs",
+                        `cw-bubble--${bubbleSide}`,
                         isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
                         isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
                       ].filter(Boolean).join(" ")}>
@@ -540,6 +566,7 @@ export function MessengerPanel() {
     setPanelOpen,
     refetchConversations,
     startDirectConversation,
+    openChat,
   } = useMessenger();
 
   const [search, setSearch] = useState("");
@@ -556,6 +583,9 @@ export function MessengerPanel() {
   const openConversations = openWindowIds
     .map((id) => conversations.find((c) => c.id === id))
     .filter(Boolean) as Conversation[];
+
+  const moderatorConvo =
+    conversations.find((c) => c.type?.toLowerCase() === "moderator") ?? null;
 
   // Build userId → direct conversation lookup
   const directConvoByUserId = new Map<string, Conversation>();
@@ -591,6 +621,12 @@ export function MessengerPanel() {
         (r.displayName ?? r.username).toLowerCase().includes(search.toLowerCase()),
       )
     : mergedRows;
+
+  const showModeratorRow = Boolean(
+    moderatorConvo &&
+      (!search.trim() || "moderator".includes(search.trim().toLowerCase())),
+  );
+  const panelListEmpty = filteredRows.length === 0 && !showModeratorRow;
 
   async function handleOpen(friendId: string) {
     setStartingId(friendId);
@@ -675,9 +711,9 @@ export function MessengerPanel() {
             </div>
 
             {/* Unified people list */}
-            {friendsLoading && allFriends.length === 0 ? (
+            {friendsLoading && allFriends.length === 0 && !moderatorConvo ? (
               <div className="mp-empty"><p>Loading…</p></div>
-            ) : filteredRows.length === 0 ? (
+            ) : panelListEmpty ? (
               <div className="mp-empty">
                 {search.trim()
                   ? <p>No one matches "<strong>{search}</strong>"</p>
@@ -686,6 +722,46 @@ export function MessengerPanel() {
               </div>
             ) : (
               <ul className="mp-list">
+                {showModeratorRow && moderatorConvo ? (
+                  <li
+                    role="button"
+                    tabIndex={0}
+                    className={`mp-item mp-item--moderator${(moderatorConvo.unreadCount ?? 0) > 0 ? " mp-item--unread" : ""}${openWindowIds.includes(moderatorConvo.id) ? " mp-item--active" : ""}`}
+                    onClick={() => {
+                      openChat(moderatorConvo.id);
+                      setPanelOpen(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        openChat(moderatorConvo.id);
+                        setPanelOpen(false);
+                      }
+                    }}
+                  >
+                    <div className="mp-item-avatar-wrap">
+                      <div className="mp-item-avatar mp-item-avatar--logo">
+                        <img src="/logo.png" alt="" />
+                      </div>
+                    </div>
+                    <div className="mp-item-meta">
+                      <div className="mp-item-row">
+                        <span className="mp-item-name">{MODERATOR_BRAND_NAME}</span>
+                        {moderatorConvo.lastMessageAt ? (
+                          <span className="mp-item-time">
+                            {formatRelativeTime(moderatorConvo.lastMessageAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="mp-item-last">
+                        {moderatorConvo.lastMessageText ?? "Official platform messages"}
+                      </span>
+                      <span className="mp-item-official-tag">Official</span>
+                    </div>
+                    {(moderatorConvo.unreadCount ?? 0) > 0 ? (
+                      <span className="mp-item-badge">{moderatorConvo.unreadCount}</span>
+                    ) : null}
+                  </li>
+                ) : null}
                 {filteredRows.map((row) => {
                   const name = row.displayName?.trim() || row.username;
                   const initial = (name[0] ?? "?").toUpperCase();

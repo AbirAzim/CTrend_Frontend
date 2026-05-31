@@ -62,7 +62,7 @@ function MessageButton({ userId }: { userId: string }) {
 }
 
 function friendName(f: FriendRow): string {
-  return f.displayName?.trim() || f.username?.trim() || "User";
+  return f.displayName?.trim() || `@${f.username?.trim() || "user"}`;
 }
 
 function friendInitial(f: FriendRow): string {
@@ -202,7 +202,6 @@ export function FriendsPage() {
                   <div className="cx-friend-meta">
                     <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
                       <strong>{friendName(u)}</strong>
-                      <span>@{u.username ?? "user"}</span>
                     </NavLink>
                   </div>
                   <button
@@ -246,7 +245,6 @@ export function FriendsPage() {
                     <div className="cx-friend-meta">
                       <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
                         <strong>{friendName(u)}</strong>
-                        <span>@{u.username ?? "user"}</span>
                       </NavLink>
                     </div>
                     <button
@@ -287,7 +285,6 @@ export function FriendsPage() {
                     <div className="cx-friend-meta">
                       <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
                         <strong>{friendName(u)}</strong>
-                        <span>@{u.username ?? "user"}</span>
                       </NavLink>
                     </div>
                     <span className="cx-pending-badge">Pending</span>
@@ -320,7 +317,6 @@ export function FriendsPage() {
                   <div className="cx-friend-meta">
                     <NavLink to={`/profile/${u.id}`} className="cx-friend-profile-link">
                       <strong>{friendName(u)}</strong>
-                      <span>@{u.username ?? "user"}</span>
                     </NavLink>
                     <span
                       className={`cx-friend-status${friendOnline ? " cx-friend-status--online" : " cx-friend-status--offline"}`}

@@ -23,6 +23,10 @@ export type NotificationItem = {
   body: string;
   referenceId?: string | null;
   referenceType?: string | null;
+  postId?: string | null;
+  actorCount?: number | null;
+  latestActorId?: string | null;
+  latestActorName?: string | null;
   read: boolean;
   createdAt: string;
 };
@@ -46,6 +50,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     skip: !isAuthenticated,
     variables: { skip: 0, take: 30 },
     fetchPolicy: "cache-and-network",
+    // 25-second poll fallback so the bell stays fresh on Safari / background
+    // tabs / flaky WS connections. The subscription handler still fires the
+    // chime instantly when the WS path works.
+    pollInterval: 25_000,
     onCompleted(data) {
       // Exclude MESSAGE-type entries — those are surfaced by the messenger
       // FAB badge, not the bell icon.
@@ -63,7 +71,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const n = data.data?.newNotification as NotificationItem | undefined;
       // MESSAGE notifications belong to the messenger FAB, not the bell
       if (!n || n.type === 'MESSAGE') return;
-      setNotifications((prev) => [n, ...prev]);
+      setNotifications((prev) => {
+        // Grouped notifications (POST_HYPE / POST_COMMENT) reuse the same id
+        // when updated — replace the existing entry rather than duplicating
+        const existingIdx = prev.findIndex((p) => p.id === n.id);
+        if (existingIdx >= 0) {
+          const next = [n, ...prev.slice(0, existingIdx), ...prev.slice(existingIdx + 1)];
+          return next;
+        }
+        return [n, ...prev];
+      });
       playNotificationChime();
     },
   });

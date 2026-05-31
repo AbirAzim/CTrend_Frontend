@@ -2,7 +2,7 @@ import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { COMMENT_POST, COMMENTS_BY_POST } from "../graphql/comments";
+import { PostCommentsPanel } from "./PostCommentsPanel";
 import {
   IconBookmark,
   IconChevronDown,
@@ -144,28 +144,6 @@ function formatAbsoluteDateTime(iso: string): string {
   }).format(d);
 }
 
-type LocalCommentRow = {
-  id: string;
-  content: string;
-  authorLabel: string;
-  createdAt: string;
-};
-
-type CommentsByPostQueryData = {
-  commentsByPost: Array<{
-    id: string;
-    content: string;
-    createdAt: string;
-    postId: string;
-    parentId: string | null;
-    author: {
-      id: string;
-      username: string;
-      displayName?: string | null;
-    };
-  }>;
-};
-
 type VotersByPostData = {
   votersByPost: Array<{
     voteId: string;
@@ -197,6 +175,7 @@ type PostVoteUpdatedData = {
     downvoteCount: number;
     viewerVote?: "UP" | "DOWN" | null;
     mySelectedOptionIndex?: number | null;
+    myVoteAnonymous?: boolean | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
     optionStats?: Array<{
@@ -233,16 +212,13 @@ function FeedPostCardComponent({
   const { user: authUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
   const [hypeCountLive, setHypeCountLive] = useState(post.hypeCount ?? 0);
+  const [saveLiveCount, setSaveLiveCount] = useState(post.saveCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
-  const [anonymousVote, setAnonymousVote] = useState(false);
+  const [anonymousVote, setAnonymousVote] = useState(Boolean(post.myVoteAnonymous));
   const [showVoters, setShowVoters] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [showAllComments, setShowAllComments] = useState(false);
-  const [commentDraft, setCommentDraft] = useState("");
-  const [localComments, setLocalComments] = useState<LocalCommentRow[]>([]);
-  const [commentError, setCommentError] = useState<string | null>(null);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
   const [justVotedIndex, setJustVotedIndex] = useState<number | null>(null);
@@ -280,14 +256,9 @@ function FeedPostCardComponent({
     }
   }
 
-  const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
-    useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, { fetchPolicy: "network-only" });
   const [fetchVoters, { data: votersData, loading: votersLoading, error: votersError }] =
     useLazyQuery<VotersByPostData>(VOTERS_BY_POST, { fetchPolicy: "network-only" });
 
-  const [commentMut, { loading: commentPosting }] = useMutation(COMMENT_POST, {
-    refetchQueries: [{ query: COMMENTS_BY_POST, variables: { postId: post.id } }],
-  });
   const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
   const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
 
@@ -324,22 +295,17 @@ function FeedPostCardComponent({
             : next.isVotingOpen,
         votingEndsAt: next.votingEndsAt ?? null,
       });
+      if (next.myVoteAnonymous !== undefined && next.myVoteAnonymous !== null) {
+        setAnonymousVote(next.myVoteAnonymous);
+      }
       setVoteFx(true);
       setTimeout(() => setVoteFx(false), 280);
     },
   });
 
   useEffect(() => {
-    if (commentsOpen && voteMode === "api") {
-      void fetchComments({ variables: { postId: post.id } });
-    }
-  }, [commentsOpen, voteMode, post.id, fetchComments]);
-
-  useEffect(() => {
-    if (!commentsOpen) {
-      setShowAllComments(false);
-    }
-  }, [commentsOpen]);
+    setAnonymousVote(Boolean(post.myVoteAnonymous));
+  }, [post.id, post.myVoteAnonymous]);
 
   useEffect(() => {
     return () => {
@@ -403,8 +369,9 @@ function FeedPostCardComponent({
     }
     setOptimisticVote(null);
     setHypeCountLive(post.hypeCount ?? 0);
+    setSaveLiveCount(post.saveCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
-    setLiked(false);
+    setLiked(Boolean(post.viewerHasHyped));
   }, [
     post.id,
     post.upvoteCount,
@@ -416,6 +383,7 @@ function FeedPostCardComponent({
     post.votingEndsAt,
     post.hypeCount,
     post.viewerHasSaved,
+    post.viewerHasHyped,
     post.saveCount,
   ]);
 
@@ -443,6 +411,7 @@ function FeedPostCardComponent({
   async function handleToggleKeep() {
     const nextKeep = !saved;
     setSaved(nextKeep);
+    setSaveLiveCount((prev) => Math.max(0, prev + (nextKeep ? 1 : -1)));
     if (voteMode !== "api") {
       return;
     }
@@ -477,6 +446,7 @@ function FeedPostCardComponent({
       });
     } catch {
       setSaved(!nextKeep);
+      setSaveLiveCount((prev) => Math.max(0, prev + (nextKeep ? -1 : 1)));
     }
   }
 
@@ -612,8 +582,9 @@ function FeedPostCardComponent({
     ? activeMySelectedOptionIndex
     : multiPick;
 
+  const postTimeIso = post.scheduledAt ?? post.createdAt;
   const timeLabel =
-    formatRelativeTime(post.createdAt) || (voteMode === "local" ? "demo" : "");
+    formatRelativeTime(postTimeIso) || (voteMode === "local" ? "demo" : "");
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
@@ -644,47 +615,48 @@ function FeedPostCardComponent({
     authUser?.email?.split("@")[0] ||
     "You";
 
-  async function onSubmitComment(e: React.FormEvent) {
-    e.preventDefault();
-    setCommentError(null);
-    const text = commentDraft.trim();
-    if (!text) {
-      return;
-    }
-
-    if (voteMode === "local") {
-      setLocalComments((prev) => [
-        {
-          id: `local-${Date.now()}`,
-          content: text,
-          authorLabel: meLabel,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-      setCommentDraft("");
-      return;
-    }
-
-    try {
-      await commentMut({
-        variables: {
-          postId: post.id,
-          input: {
-            content: text,
-          },
-        },
-      });
-      setCommentDraft("");
-    } catch (err: unknown) {
-      setCommentError(getApolloErrorMessage(err));
-    }
-  }
-
   async function refreshPostVotingState() {
     await apolloClient.refetchQueries({
       include: [FEED_POSTS, GET_POST_BY_ID],
     });
+  }
+
+  async function persistAnonymousPreference(nextAnonymous: boolean) {
+    if (voteMode !== "api" || !isAuthenticated || isVotingClosed) {
+      return;
+    }
+    const optionIndex =
+      optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
+    if (optionIndex === null || optionIndex === undefined) {
+      return;
+    }
+    if (voteInFlight.current) {
+      return;
+    }
+    voteInFlight.current = true;
+    try {
+      await voteMut({
+        variables: {
+          postId: post.id,
+          selectedOptionIndex: optionIndex,
+          anonymous: nextAnonymous,
+        },
+      });
+      voteGuardUntilRef.current = Date.now() + 500;
+    } catch (err: unknown) {
+      setAnonymousVote(!nextAnonymous);
+      const message = getApolloErrorMessage(err);
+      if (!/voting period has ended/i.test(message)) {
+        await refreshPostVotingState();
+      }
+    } finally {
+      voteInFlight.current = false;
+    }
+  }
+
+  function handleAnonymousToggle(nextAnonymous: boolean) {
+    setAnonymousVote(nextAnonymous);
+    void persistAnonymousPreference(nextAnonymous);
   }
 
   function setJustVoted(index: number) {
@@ -1021,13 +993,7 @@ function FeedPostCardComponent({
 
   const binaryTotal = up + down;
   const hypeCount = hypeCountLive;
-  const apiComments = commentsData?.commentsByPost ?? [];
-  const displayedApiComments = showAllComments ? apiComments : apiComments.slice(0, 2);
-  const hasMoreApiComments = apiComments.length > 2;
-  const displayedLocalComments = showAllComments ? localComments : localComments.slice(0, 2);
-  const hasMoreLocalComments = localComments.length > 2;
-  const recentPreviewComments = (post.recentComments ?? []).slice(0, 2);
-  const hasMorePreviewComments = (post.commentCount ?? recentPreviewComments.length) > 2;
+  const commentCount = post.commentCount ?? 0;
   const groupedVoters = useMemo(() => {
     const rows = votersData?.votersByPost ?? [];
     const groups = new Map<number, typeof rows>();
@@ -1162,33 +1128,66 @@ function FeedPostCardComponent({
   return (
     <article className="ig-post">
       <header className="ig-post-header">
-        <div className="ig-post-user">
-          <span className="ig-avatar sm">
-            {postAuthorAvatar ? (
-              <img
-                src={postAuthorAvatar}
-                alt={`${post.authorUsername} avatar`}
-                decoding="async"
-                onError={() => {
-                  setAuthorAvatarAttempt((prev) => {
-                    if (prev + 1 < postAuthorAvatarCandidates.length) {
-                      return prev + 1;
-                    }
-                    return postAuthorAvatarCandidates.length;
-                  });
-                }}
-              />
-            ) : (
-              storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
-            )}
-          </span>
-          <div>
-            <span className="ig-post-username">
-              {post.authorDisplayName?.trim() || post.authorUsername}
+        {post.authorId ? (
+          <NavLink
+            to={isOwner ? "/profile" : `/profile/${post.authorId}`}
+            className="ig-post-user ig-post-user--link"
+          >
+            <span className="ig-avatar sm">
+              {postAuthorAvatar ? (
+                <img
+                  src={postAuthorAvatar}
+                  alt={`${post.authorUsername} avatar`}
+                  decoding="async"
+                  onError={() => {
+                    setAuthorAvatarAttempt((prev) => {
+                      if (prev + 1 < postAuthorAvatarCandidates.length) {
+                        return prev + 1;
+                      }
+                      return postAuthorAvatarCandidates.length;
+                    });
+                  }}
+                />
+              ) : (
+                storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
+              )}
             </span>
-            <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
+            <div>
+              <span className="ig-post-username">
+                {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
+              </span>
+              <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
+            </div>
+          </NavLink>
+        ) : (
+          <div className="ig-post-user">
+            <span className="ig-avatar sm">
+              {postAuthorAvatar ? (
+                <img
+                  src={postAuthorAvatar}
+                  alt={`${post.authorUsername} avatar`}
+                  decoding="async"
+                  onError={() => {
+                    setAuthorAvatarAttempt((prev) => {
+                      if (prev + 1 < postAuthorAvatarCandidates.length) {
+                        return prev + 1;
+                      }
+                      return postAuthorAvatarCandidates.length;
+                    });
+                  }}
+                />
+              ) : (
+                storyInitial(post.authorDisplayName?.trim() || post.authorUsername)
+              )}
+            </span>
+            <div>
+              <span className="ig-post-username">
+                {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
+              </span>
+              <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
+            </div>
           </div>
-        </div>
+        )}
         <div className="ig-more-wrap" ref={moreRef}>
           <button
             type="button"
@@ -1438,7 +1437,7 @@ function FeedPostCardComponent({
                 <input
                   type="checkbox"
                   checked={anonymousVote}
-                  onChange={(e) => setAnonymousVote(e.target.checked)}
+                  onChange={(e) => handleAnonymousToggle(e.target.checked)}
                 />
                 <span className="cx-anon-toggle-switch" aria-hidden />
               </label>
@@ -1682,12 +1681,12 @@ function FeedPostCardComponent({
             aria-expanded={commentsOpen}
             onClick={() => {
               setCommentsOpen((v) => !v);
-              setCommentError(null);
-              setShowAllComments(false);
             }}
           >
             <IconComment />
-            <span className="cx-action-chip-label">Discuss</span>
+            <span className="cx-action-chip-label">
+              Discuss{commentCount > 0 ? ` ${commentCount}` : ""}
+            </span>
           </button>
           <button
             type="button"
@@ -1713,7 +1712,7 @@ function FeedPostCardComponent({
           <button
             type="button"
             className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
-            aria-label={liked ? "Unlike" : "Like"}
+            aria-label={liked ? "Unhype" : "Hype"}
             aria-pressed={liked}
             disabled={hypeUpdating}
             onClick={() => void handleToggleHype()}
@@ -1730,7 +1729,7 @@ function FeedPostCardComponent({
             onClick={() => void handleToggleKeep()}
           >
             <IconBookmark filled={saved} />
-            <span className="cx-action-chip-label">Keep</span>
+            <span className="cx-action-chip-label">Keep{saveLiveCount > 0 ? ` ${saveLiveCount}` : ""}</span>
           </button>
           <button
             type="button"
@@ -1742,28 +1741,6 @@ function FeedPostCardComponent({
           </button>
         </div>
 
-        {!commentsOpen && recentPreviewComments.length > 0 ? (
-          <div className="ig-post-comments-preview">
-            {recentPreviewComments.map((c) => (
-              <p key={c.id} className="muted small">
-                <strong>{c.author.displayName?.trim() || c.author.username}</strong>: {c.content}
-              </p>
-            ))}
-            {hasMorePreviewComments ? (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => {
-                  setCommentsOpen(true);
-                  setShowAllComments(true);
-                }}
-              >
-                Show more
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
         {shareHint ? (
           <p className="ig-share-hint" role="status">
             {shareHint}
@@ -1774,91 +1751,12 @@ function FeedPostCardComponent({
       </div>
 
       {commentsOpen ? (
-        <section className="ig-post-comments" aria-label="Comments">
-          <div className="ig-post-comments-head">
-            <h3 className="ig-post-comments-title">Comments</h3>
-            {voteMode === "api" && commentsLoading ? (
-              <span className="ig-post-comments-status">Loading…</span>
-            ) : null}
-          </div>
-          {voteMode === "api" && commentsQueryError ? (
-            <p className="ig-post-comments-error" role="alert">
-              {commentsQueryError.message}
-            </p>
-          ) : null}
-          {commentError ? (
-            <p className="ig-post-comments-error" role="alert">
-              {commentError}
-            </p>
-          ) : null}
-          <ul className="ig-post-comments-list">
-            {voteMode === "api"
-              ? displayedApiComments.map((c) => (
-                  <li key={c.id} className="ig-post-comment">
-                    <span className="ig-post-comment-author">
-                      {c.author.displayName?.trim() || c.author.username}
-                    </span>
-                    <p className="ig-post-comment-body">{c.content}</p>
-                    <time className="ig-post-comment-time" dateTime={c.createdAt}>
-                      {formatRelativeTime(c.createdAt) || ""}
-                    </time>
-                  </li>
-                ))
-              : displayedLocalComments.map((c) => (
-                  <li key={c.id} className="ig-post-comment">
-                    <span className="ig-post-comment-author">{c.authorLabel}</span>
-                    <p className="ig-post-comment-body">{c.content}</p>
-                    <time className="ig-post-comment-time" dateTime={c.createdAt}>
-                      {formatRelativeTime(c.createdAt) || "just now"}
-                    </time>
-                  </li>
-                ))}
-          </ul>
-          {(voteMode === "api" ? hasMoreApiComments : hasMoreLocalComments) ? (
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => setShowAllComments((v) => !v)}
-            >
-              {showAllComments ? "Show less" : "Show more"}
-            </button>
-          ) : null}
-          {(voteMode === "api"
-            ? (commentsData?.commentsByPost?.length ?? 0) === 0 && !commentsLoading
-            : localComments.length === 0) ? (
-            <p className="ig-post-comments-empty muted">
-              No comments yet — say something fun.
-            </p>
-          ) : null}
-          <form
-            className="ig-post-comments-form"
-            onSubmit={(ev) => void onSubmitComment(ev)}
-          >
-            <label className="ig-post-comments-label" htmlFor={`comment-${post.id}`}>
-              Add a comment
-            </label>
-            <textarea
-              id={`comment-${post.id}`}
-              className="ig-post-comments-input"
-              rows={2}
-              maxLength={5000}
-              placeholder="Share your take…"
-              value={commentDraft}
-              onChange={(ev) => setCommentDraft(ev.target.value)}
-              disabled={voteMode === "api" && commentPosting}
-            />
-            <button
-              type="submit"
-              className="ig-post-comments-submit"
-              disabled={
-                commentDraft.trim().length === 0 ||
-                (voteMode === "api" && commentPosting)
-              }
-            >
-              {commentPosting ? "Posting…" : "Post"}
-            </button>
-          </form>
-        </section>
+        <PostCommentsPanel
+          postId={post.id}
+          voteMode={voteMode}
+          isAuthenticated={isAuthenticated}
+          meLabel={meLabel}
+        />
       ) : null}
       {showVoters ? (
         <div
@@ -1922,6 +1820,7 @@ function areFeedPostCardPropsEqual(prev: Props, next: Props): boolean {
     prev.post.hypeCount === next.post.hypeCount &&
     prev.post.saveCount === next.post.saveCount &&
     prev.post.viewerHasSaved === next.post.viewerHasSaved &&
+    prev.post.viewerHasHyped === next.post.viewerHasHyped &&
     prev.post.mySelectedOptionIndex === next.post.mySelectedOptionIndex &&
     prev.post.isVotingOpen === next.post.isVotingOpen &&
     prev.post.votingEndsAt === next.post.votingEndsAt

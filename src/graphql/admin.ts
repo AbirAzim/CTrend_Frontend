@@ -1,5 +1,38 @@
 import { gql } from "@apollo/client";
 
+// ── Categories (admin-only mutations) ─────────────────────────
+export const CREATE_CATEGORY = gql`
+  mutation CreateCategory($name: String!) {
+    createCategory(name: $name) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const UPDATE_CATEGORY = gql`
+  mutation UpdateCategory($id: ID!, $name: String!) {
+    updateCategory(id: $id, name: $name) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const DELETE_CATEGORY = gql`
+  mutation DeleteCategory($id: ID!) {
+    deleteCategory(id: $id)
+  }
+`;
+
+export const CATEGORY_POST_COUNT = gql`
+  query CategoryPostCount($categoryId: ID!) {
+    categoryPostCount(categoryId: $categoryId)
+  }
+`;
+
 export const INVITE_USER = gql`
   mutation InviteUser($email: String!) {
     inviteUser(email: $email)
@@ -31,15 +64,52 @@ export const PROMOTE_TO_ADMIN = gql`
 `;
 
 export const LIST_USERS = gql`
-  query ListUsers($skip: Int, $take: Int, $role: String) {
-    listUsers(skip: $skip, take: $take, role: $role) {
+  query ListUsers(
+    $skip: Int
+    $take: Int
+    $role: String
+    $search: String
+    $searchBy: String
+    $status: String
+    $sortBy: String
+    $sortOrder: String
+  ) {
+    listUsers(
+      skip: $skip
+      take: $take
+      role: $role
+      search: $search
+      searchBy: $searchBy
+      status: $status
+      sortBy: $sortBy
+      sortOrder: $sortOrder
+    ) {
       id
       email
       username
       displayName
       role
+      roles
       profileImageUrl
+      emailVerified
+      createdAt
     }
+  }
+`;
+
+export const LIST_USERS_COUNT = gql`
+  query ListUsersCount(
+    $role: String
+    $search: String
+    $searchBy: String
+    $status: String
+  ) {
+    listUsersCount(
+      role: $role
+      search: $search
+      searchBy: $searchBy
+      status: $status
+    )
   }
 `;
 
@@ -134,6 +204,113 @@ export const CREATE_SYSTEM_POST = gql`
       viewerVote
       votingEndsAt
       isVotingOpen
+    }
+  }
+`;
+
+export const ADMIN_MODERATOR_THREADS = gql`
+  query AdminModeratorThreads($skip: Int, $take: Int, $search: String) {
+    adminModeratorThreads(skip: $skip, take: $take, search: $search) {
+      conversationId
+      recipientUserId
+      recipientName
+      recipientEmail
+      recipientProfileImageUrl
+      lastMessageText
+      lastMessageAt
+      messageCount
+      unreadFromUserCount
+    }
+  }
+`;
+
+export const ADMIN_MODERATOR_MESSAGES = gql`
+  query AdminModeratorMessages($skip: Int, $take: Int, $search: String) {
+    adminModeratorMessages(skip: $skip, take: $take, search: $search) {
+      id
+      conversationId
+      text
+      imageUrl
+      createdAt
+      recipientUserId
+      recipientName
+      recipientEmail
+      sentByAdminId
+      sentByAdminName
+      sentByAdminEmail
+    }
+  }
+`;
+
+export const ADMIN_MODERATOR_MESSAGES_COUNT = gql`
+  query AdminModeratorMessagesCount($search: String) {
+    adminModeratorMessagesCount(search: $search)
+  }
+`;
+
+export const ADMIN_MODERATOR_THREAD_MESSAGES = gql`
+  query AdminModeratorThreadMessages($userId: ID!) {
+    adminModeratorThreadMessages(userId: $userId) {
+      id
+      conversationId
+      senderId
+      senderName
+      senderAvatar
+      sentByAdminId
+      sentByAdminName
+      sentByAdminEmail
+      text
+      imageUrl
+      createdAt
+    }
+  }
+`;
+
+export const SEND_MODERATOR_MESSAGES = gql`
+  mutation SendModeratorMessages($userIds: [ID!]!, $text: String!, $imageUrl: String) {
+    sendModeratorMessages(userIds: $userIds, text: $text, imageUrl: $imageUrl) {
+      id
+      conversationId
+      text
+      imageUrl
+      createdAt
+      recipientUserId
+      recipientName
+      recipientEmail
+      sentByAdminId
+      sentByAdminName
+      sentByAdminEmail
+    }
+  }
+`;
+
+export const MARK_MODERATOR_THREAD_READ = gql`
+  mutation MarkModeratorThreadReadForAdmin($userId: ID!) {
+    markModeratorThreadReadForAdmin(userId: $userId)
+  }
+`;
+
+export const ADMIN_MODERATOR_USER_MESSAGE = gql`
+  subscription AdminModeratorUserMessage {
+    adminModeratorUserMessage {
+      conversationId
+      recipientUserId
+      unreadFromUserCount
+      lastMessageText
+      lastMessageAt
+      message {
+        id
+        conversationId
+        senderId
+        senderName
+        senderAvatar
+        sentByAdminId
+        sentByAdminName
+        sentByAdminEmail
+        text
+        imageUrl
+        createdAt
+      }
     }
   }
 `;

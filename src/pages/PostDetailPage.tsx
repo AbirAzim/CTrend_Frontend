@@ -1,6 +1,6 @@
 import { useQuery } from "@apollo/client";
 import { useMemo } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { GET_POST_BY_ID } from "../graphql/feed";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
@@ -10,6 +10,7 @@ import type { FeedPostView } from "../types/feed";
 
 export function PostDetailPage() {
   const { postId } = useParams<{ postId: string }>();
+  const navigate = useNavigate();
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const mockPost = useMemo((): FeedPostView | null => {
@@ -40,9 +41,14 @@ export function PostDetailPage() {
   return (
     <div className="ig-post-detail">
       <div className="ig-post-detail-bar">
-        <NavLink to="/" className="ig-post-detail-back">
-          ← Feed
-        </NavLink>
+        <button
+          type="button"
+          className="ig-post-detail-back"
+          onClick={() => navigate(-1)}
+          aria-label="Go back"
+        >
+          ← Back
+        </button>
         {postId ? (
           <span className="ig-post-detail-url" title={postPermalink(postId)}>
             {postPermalink(postId)}

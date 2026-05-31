@@ -27,6 +27,7 @@ export type FeedPostView = {
   hypeCount?: number;
   saveCount?: number;
   viewerHasSaved?: boolean;
+  viewerHasHyped?: boolean;
   commentCount?: number;
   recentComments?: Array<{
     id: string;
@@ -45,6 +46,8 @@ export type FeedPostView = {
   viewerVote: ViewerVote;
   /** Server vote choice (0-based option index); use for 3+ options — `viewerVote` is only A/B legacy. */
   mySelectedOptionIndex?: number | null;
+  /** Persisted anonymous flag for the viewer's vote on this post. */
+  myVoteAnonymous?: boolean | null;
   /** Per-option counts/percentages from API when present. */
   optionStats?: VoteOptionStatView[] | null;
   /** Option titles from API `options` (same order as voting indices / compare columns). */

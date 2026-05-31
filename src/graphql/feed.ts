@@ -22,19 +22,9 @@ export const FEED_POSTS = gql`
       hypeCount
       saveCount
       viewerHasSaved
-      recentComments {
-        id
-        content
-        createdAt
-        likeCount
-        viewerHasLiked
-        author {
-          id
-          username
-          displayName
-        }
-      }
+      viewerHasHyped
       mySelectedOptionIndex
+      myVoteAnonymous
       optionStats {
         index
         label
@@ -70,19 +60,9 @@ export const GET_POST_BY_ID = gql`
       hypeCount
       saveCount
       viewerHasSaved
-      recentComments {
-        id
-        content
-        createdAt
-        likeCount
-        viewerHasLiked
-        author {
-          id
-          username
-          displayName
-        }
-      }
+      viewerHasHyped
       mySelectedOptionIndex
+      myVoteAnonymous
       optionStats {
         index
         label
@@ -142,6 +122,7 @@ export const MY_SAVED_POSTS = gql`
       authorUsername
       authorDisplayName
       authorEmail
+      authorProfileImageUrl
       imageUrls
       caption
       createdAt
@@ -155,19 +136,9 @@ export const MY_SAVED_POSTS = gql`
       hypeCount
       saveCount
       viewerHasSaved
-      recentComments {
-        id
-        content
-        createdAt
-        likeCount
-        viewerHasLiked
-        author {
-          id
-          username
-          displayName
-        }
-      }
+      viewerHasHyped
       mySelectedOptionIndex
+      myVoteAnonymous
       optionStats {
         index
         label
@@ -177,6 +148,27 @@ export const MY_SAVED_POSTS = gql`
       options {
         label
       }
+    }
+  }
+`;
+
+export const UPDATE_POST = gql`
+  mutation UpdatePost($postId: ID!, $input: UpdatePostInput!) {
+    updatePost(postId: $postId, input: $input) {
+      id
+      imageUrls
+      caption
+      options {
+        label
+        imageUrl
+      }
+      category {
+        id
+        name
+        slug
+      }
+      isVotingOpen
+      votingEndsAt
     }
   }
 `;
@@ -272,6 +264,7 @@ export const POST_VOTE_UPDATED = gql`
       downvoteCount
       viewerVote
       mySelectedOptionIndex
+      myVoteAnonymous
       votingEndsAt
       isVotingOpen
       optionStats {
@@ -293,6 +286,14 @@ export const DELETE_POST = gql`
 export const NEW_POSTS = gql`
   subscription NewPosts {
     newPosts {
+      postId
+    }
+  }
+`;
+
+export const POST_DELETED_SUB = gql`
+  subscription PostDeleted {
+    postDeleted {
       postId
     }
   }

@@ -90,6 +90,6 @@ export async function initApolloCache(): Promise<void> {
   await persistCache({
     cache,
     storage: new LocalStorageWrapper(window.localStorage),
-    maxSize: 1_048_576, // 1 MB cap
+    maxSize: 5_242_880, // 5 MB cap — bumped from 1 MB so drops/saved posts don't get evicted
   });
 }
