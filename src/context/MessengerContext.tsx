@@ -22,6 +22,34 @@ import {
 } from "../graphql/messages";
 import { useAuth } from "./AuthContext";
 import { playMessageSound } from "../lib/notificationSound";
+import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
+
+const MODERATOR_SENDER_ID = "moderator";
+
+function conversationStubFromMessage(
+  msg: Message,
+  openWindowIds: string[],
+): Conversation {
+  const isModerator = msg.senderId === MODERATOR_SENDER_ID;
+  return {
+    id: msg.conversationId,
+    type: isModerator ? "moderator" : "direct",
+    name: isModerator ? MODERATOR_BRAND_NAME : msg.senderName || "Chat",
+    participantIds: [],
+    participants: [
+      {
+        id: msg.senderId,
+        displayName: msg.senderName || (isModerator ? MODERATOR_BRAND_NAME : "User"),
+        avatarUrl: msg.senderAvatar ?? (isModerator ? "/logo.png" : null),
+        online: false,
+      },
+    ],
+    lastMessageText: msg.text || "📷 Image",
+    lastMessageAt: msg.createdAt,
+    unreadCount: openWindowIds.includes(msg.conversationId) ? 0 : 1,
+    createdAt: msg.createdAt,
+  };
+}
 
 export type Participant = {
   id: string;
@@ -152,8 +180,13 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
         if (existing.some((m) => m.id === msg.id)) return prev;
         return { ...prev, [msg.conversationId]: [...existing, msg] };
       });
-      setConversations((prev) =>
-        prev.map((c) =>
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === msg.conversationId);
+        if (!exists) {
+          void refetchConversations();
+          return [conversationStubFromMessage(msg, openWindowIds), ...prev];
+        }
+        return prev.map((c) =>
           c.id === msg.conversationId
             ? {
                 ...c,
@@ -162,8 +195,8 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
                 unreadCount: openWindowIds.includes(c.id) ? 0 : c.unreadCount + 1,
               }
             : c,
-        ),
-      );
+        );
+      });
       // Play a soft ping for messages from other users
       if (msg.senderId !== authUser?.id) {
         playMessageSound();

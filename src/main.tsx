@@ -5,6 +5,7 @@ import { ApolloProvider } from "@apollo/client";
 import { BrowserRouter } from "react-router-dom";
 import { apolloClient, initApolloCache } from "./lib/apolloClient";
 import { AuthProvider } from "./context/AuthContext";
+import { SoundPreferencesProvider } from "./context/SoundPreferencesContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { MessengerProvider } from "./context/MessengerContext";
 import App from "./App";
@@ -16,11 +17,13 @@ const shell = (
   <BrowserRouter>
     <ApolloProvider client={apolloClient}>
       <AuthProvider>
-        <NotificationProvider>
-          <MessengerProvider>
-            <App />
-          </MessengerProvider>
-        </NotificationProvider>
+        <SoundPreferencesProvider>
+          <NotificationProvider>
+            <MessengerProvider>
+              <App />
+            </MessengerProvider>
+          </NotificationProvider>
+        </SoundPreferencesProvider>
       </AuthProvider>
     </ApolloProvider>
   </BrowserRouter>

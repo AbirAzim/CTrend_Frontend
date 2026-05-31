@@ -1,17 +1,24 @@
 import { useMutation, useQuery } from "@apollo/client";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
+import { AdminMessagesTab } from "./AdminMessagesTab";
 import {
   CANCEL_INVITATION,
+  CREATE_CATEGORY,
+  DELETE_CATEGORY,
   LIST_INVITATIONS,
   LIST_USERS,
+  LIST_USERS_COUNT,
   REMOVE_ADMIN,
   REMOVE_USER,
   RESEND_INVITATION,
+  UPDATE_CATEGORY,
 } from "../graphql/admin";
+import { CATEGORIES } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { formatRelativeTime } from "../lib/formatRelativeTime";
 import {
   CAMPAIGN_WINNERS,
   CREATE_WORLD_CUP_CAMPAIGN_POST,
@@ -37,14 +44,235 @@ type UserRow = {
   role?: string | null;
   roles?: string[] | null;
   profileImageUrl?: string | null;
+  emailVerified?: boolean | null;
+  createdAt?: string | null;
 };
 
-function hasAdminRole(user: UserRow): boolean {
-  if (user.roles?.length) {
-    return user.roles.some((r) => r.toLowerCase() === "admin");
-  }
-  return user.role?.toLowerCase() === "admin";
+type UserSearchBy = "all" | "email" | "name" | "username";
+type UserStatusFilter = "all" | "verified" | "unverified";
+type UserSortBy = "joined" | "name";
+type UserSortOrder = "asc" | "desc";
+
+function formatJoinedAt(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
+
+function UserStatusBadge({ user }: { user: UserRow }) {
+  const verified = Boolean(user.emailVerified);
+  return (
+    <span className={`admin-user-status admin-user-status--${verified ? "verified" : "unverified"}`}>
+      {verified ? "Verified" : "Unverified"}
+    </span>
+  );
+}
+
+function MessageIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+      aria-hidden="true"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function AdminSearchInput({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  className?: string;
+}) {
+  return (
+    <div className={`admin-toolbar-search-wrap${className ? ` ${className}` : ""}`}>
+      <span className="admin-toolbar-search-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+        </svg>
+      </span>
+      <input
+        type="search"
+        className="admin-toolbar-input admin-toolbar-search"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function AdminToolbarSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="admin-toolbar-field">
+      <span className="admin-toolbar-label">{label}</span>
+      <select
+        className="admin-toolbar-select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function AdminSectionHead({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="admin-section-head">
+      <div>
+        <h2 className="admin-section-title">{title}</h2>
+        <p className="muted small">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function AdminCtaButton({
+  children,
+  onClick,
+  disabled,
+  variant = "default",
+  icon = "+",
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: "default" | "admin";
+  icon?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`admin-btn-cta${variant === "admin" ? " admin-btn-cta--admin" : ""}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <span className="admin-btn-cta-icon" aria-hidden>{icon}</span>
+      {children}
+    </button>
+  );
+}
+
+function AdminActionsCell({
+  message,
+  children,
+}: {
+  message?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <td className="admin-table-actions">
+      <div className="admin-action-stack">
+        {message ? <div className="admin-action-msg-row">{message}</div> : null}
+        <div className="admin-action-links-row">{children}</div>
+      </div>
+    </td>
+  );
+}
+
+function AdminPaginationBar({
+  skip,
+  total,
+  shown,
+  loading,
+  onPrev,
+  onNext,
+}: {
+  skip: number;
+  total: number;
+  shown: number;
+  loading?: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="admin-pagination">
+      <button
+        type="button"
+        className="admin-page-btn"
+        disabled={skip === 0 || loading}
+        onClick={onPrev}
+      >
+        ← Previous
+      </button>
+      <span className="admin-pagination-meta">
+        Showing {total === 0 ? 0 : skip + 1}–{Math.min(skip + shown, total)} of {total}
+      </span>
+      <button
+        type="button"
+        className="admin-page-btn"
+        disabled={skip + shown >= total || loading}
+        onClick={onNext}
+      >
+        Next →
+      </button>
+    </div>
+  );
+}
+
+function AdminUserMessageButton({
+  userId,
+  userLabel,
+  onCompose,
+}: {
+  userId: string;
+  userLabel: string;
+  onCompose: (userId: string) => void;
+}) {
+  return (
+    <div className="admin-msg-wrap">
+      <button
+        type="button"
+        className="admin-icon-btn admin-icon-btn--message"
+        title={`Send moderator message to ${userLabel}`}
+        aria-label={`Send moderator message to ${userLabel}`}
+        onClick={() => onCompose(userId)}
+      >
+        <MessageIcon size={16} />
+      </button>
+    </div>
+  );
+}
+
 
 function avatarUrl(user: UserRow): string | null {
   if (user.profileImageUrl?.trim()) return user.profileImageUrl.trim();
@@ -175,29 +403,59 @@ function UserStats({ userId }: { userId: string }) {
 
 // ─── Users Tab ───────────────────────────────────────────────────────────────
 
-function UsersTab() {
+function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => void }) {
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchBy, setSearchBy] = useState<UserSearchBy>("all");
+  const [status, setStatus] = useState<UserStatusFilter>("all");
+  const [sortBy, setSortBy] = useState<UserSortBy>("joined");
+  const [sortOrder, setSortOrder] = useState<UserSortOrder>("desc");
   const [confirmTarget, setConfirmTarget] = useState<UserRow | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [inviteModal, setInviteModal] = useState(false);
 
+  const listVariables = useMemo(
+    () => ({
+      skip,
+      take: PAGE_SIZE,
+      role: "user",
+      search: searchTerm.trim() || undefined,
+      searchBy: searchBy === "all" ? undefined : searchBy,
+      status: status === "all" ? undefined : status,
+      sortBy,
+      sortOrder,
+    }),
+    [skip, searchTerm, searchBy, status, sortBy, sortOrder],
+  );
+
+  const countVariables = useMemo(
+    () => ({
+      role: "user",
+      search: searchTerm.trim() || undefined,
+      searchBy: searchBy === "all" ? undefined : searchBy,
+      status: status === "all" ? undefined : status,
+    }),
+    [searchTerm, searchBy, status],
+  );
+
+  useEffect(() => {
+    setSkip(0);
+  }, [searchTerm, searchBy, status, sortBy, sortOrder]);
+
   const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
-    variables: { skip, take: PAGE_SIZE },
+    variables: listVariables,
     fetchPolicy: "network-only",
   });
 
+  const { data: countData, refetch: refetchCount } = useQuery<{ listUsersCount: number }>(
+    LIST_USERS_COUNT,
+    { variables: countVariables, fetchPolicy: "network-only" },
+  );
+
   const [removeUser, { loading: removing }] = useMutation(REMOVE_USER);
 
-  const allUsers = (data?.listUsers ?? []).filter((u) => !hasAdminRole(u));
-  const filtered = searchTerm.trim()
-    ? allUsers.filter(
-        (u) =>
-          u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.displayName ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.username ?? "").toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    : allUsers;
+  const users = data?.listUsers ?? [];
+  const totalCount = countData?.listUsersCount ?? 0;
 
   async function handleRemove(user: UserRow) {
     setRemoveError(null);
@@ -205,6 +463,7 @@ function UsersTab() {
       await removeUser({ variables: { email: user.email } });
       setConfirmTarget(null);
       void refetch();
+      void refetchCount();
     } catch (err: unknown) {
       setRemoveError(getApolloErrorMessage(err));
       setConfirmTarget(null);
@@ -213,74 +472,123 @@ function UsersTab() {
 
   return (
     <div>
-      <div className="admin-section-head">
-        <div>
-          <h2 className="admin-section-title">All Users</h2>
-          <p className="muted small">Regular users on the platform</p>
-        </div>
-        <button type="button" className="btn-primary" onClick={() => setInviteModal(true)}>
-          + Invite User
-        </button>
-      </div>
-
-      <input
-        type="search"
-        className="ig-input admin-search"
-        placeholder="Search by name, email, or username…"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+      <AdminSectionHead
+        title="All Users"
+        subtitle="Regular users on the platform"
+        action={<AdminCtaButton onClick={() => setInviteModal(true)}>Invite User</AdminCtaButton>}
       />
+
+      <div className="admin-toolbar">
+        <AdminSearchInput
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search users…"
+        />
+        <div className="admin-toolbar-controls">
+          <AdminToolbarSelect label="Search in" value={searchBy} onChange={(v) => setSearchBy(v as UserSearchBy)}>
+            <option value="all">All fields</option>
+            <option value="name">Display name</option>
+            <option value="email">Email</option>
+            <option value="username">Username</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Status" value={status} onChange={(v) => setStatus(v as UserStatusFilter)}>
+            <option value="all">All statuses</option>
+            <option value="verified">Verified</option>
+            <option value="unverified">Unverified</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Sort by" value={sortBy} onChange={(v) => setSortBy(v as UserSortBy)}>
+            <option value="joined">Joined date</option>
+            <option value="name">Name</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Order" value={sortOrder} onChange={(v) => setSortOrder(v as UserSortOrder)}>
+            <option value="desc">{sortBy === "name" ? "Z → A" : "Newest first"}</option>
+            <option value="asc">{sortBy === "name" ? "A → Z" : "Oldest first"}</option>
+          </AdminToolbarSelect>
+          {(searchTerm || searchBy !== "all" || status !== "all" || sortBy !== "joined" || sortOrder !== "desc") ? (
+            <button
+              type="button"
+              className="admin-toolbar-reset"
+              onClick={() => {
+                setSearchTerm("");
+                setSearchBy("all");
+                setStatus("all");
+                setSortBy("joined");
+                setSortOrder("desc");
+              }}
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       {removeError && <p className="error" role="alert">{removeError}</p>}
       {loading && <p className="muted small">Loading users…</p>}
       {error && <p className="error">Failed to load users: {error.message}</p>}
 
-      {!loading && filtered.length === 0 && !error && (
+      {!loading && users.length === 0 && !error && (
         <p className="muted small">No users found.</p>
       )}
 
-      {filtered.length > 0 && (
+      {users.length > 0 && (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Status</th>
+                <th>Joined</th>
                 <th>Roles</th>
                 <th>Engagement</th>
-                <th>Actions</th>
+                <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id} className="admin-table-row">
                   <td>
                     <div className="admin-user-cell">
                       <AdminAvatar user={user} />
-                      <span>{user.displayName || <span className="muted">No name</span>}</span>
+                      <span>{user.displayName || user.username || <span className="muted">No name</span>}</span>
                     </div>
                   </td>
                   <td className="admin-table-email">{user.email}</td>
+                  <td><UserStatusBadge user={user} /></td>
+                  <td className="admin-table-joined">
+                    <span title={user.createdAt ?? undefined}>{formatJoinedAt(user.createdAt)}</span>
+                    {user.createdAt ? (
+                      <span className="muted small admin-joined-relative">
+                        {formatRelativeTime(user.createdAt)}
+                      </span>
+                    ) : null}
+                  </td>
                   <td><RoleBadges user={user} /></td>
                   <td><UserStats userId={user.id} /></td>
-                  <td>
-                    <div className="admin-action-btns">
-                      <NavLink
-                        to={`/profile/${user.id}`}
-                        className="btn-ghost"
-                      >
-                        View Profile
-                      </NavLink>
-                      <button
-                        type="button"
-                        className="btn-ghost admin-remove-btn"
-                        disabled={removing}
-                        onClick={() => { setRemoveError(null); setConfirmTarget(user); }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </td>
+                  <AdminActionsCell
+                    message={
+                      <AdminUserMessageButton
+                        userId={user.id}
+                        userLabel={user.displayName || user.username || user.email}
+                        onCompose={onComposeMessage}
+                      />
+                    }
+                  >
+                    <NavLink
+                      to={`/profile/${user.id}`}
+                      className="admin-action-link"
+                    >
+                      View Profile
+                    </NavLink>
+                    <button
+                      type="button"
+                      className="admin-action-link admin-action-link--danger"
+                      disabled={removing}
+                      onClick={() => { setRemoveError(null); setConfirmTarget(user); }}
+                    >
+                      Remove
+                    </button>
+                  </AdminActionsCell>
                 </tr>
               ))}
             </tbody>
@@ -288,27 +596,14 @@ function UsersTab() {
         </div>
       )}
 
-      <div className="admin-pagination">
-        <button
-          type="button"
-          className="btn-ghost"
-          disabled={skip === 0 || loading}
-          onClick={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
-        >
-          ← Previous
-        </button>
-        <span className="muted small">
-          Showing {skip + 1}–{skip + allUsers.length}
-        </span>
-        <button
-          type="button"
-          className="btn-ghost"
-          disabled={allUsers.length < PAGE_SIZE || loading}
-          onClick={() => setSkip((s) => s + PAGE_SIZE)}
-        >
-          Next →
-        </button>
-      </div>
+      <AdminPaginationBar
+        skip={skip}
+        total={totalCount}
+        shown={users.length}
+        loading={loading}
+        onPrev={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
+        onNext={() => setSkip((s) => s + PAGE_SIZE)}
+      />
 
       {inviteModal && (
         <BulkInviteModal
@@ -334,31 +629,60 @@ function UsersTab() {
 type AdminAction = "revoke" | "remove-account";
 type AdminConfirmTarget = { user: UserRow; action: AdminAction };
 
-function AdminsTab() {
+function AdminsTab({ onComposeMessage }: { onComposeMessage: (userId: string) => void }) {
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchBy, setSearchBy] = useState<UserSearchBy>("all");
+  const [status, setStatus] = useState<UserStatusFilter>("all");
+  const [sortBy, setSortBy] = useState<UserSortBy>("joined");
+  const [sortOrder, setSortOrder] = useState<UserSortOrder>("desc");
   const [confirmTarget, setConfirmTarget] = useState<AdminConfirmTarget | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [inviteModal, setInviteModal] = useState(false);
 
+  const listVariables = useMemo(
+    () => ({
+      skip,
+      take: PAGE_SIZE,
+      role: "admin",
+      search: searchTerm.trim() || undefined,
+      searchBy: searchBy === "all" ? undefined : searchBy,
+      status: status === "all" ? undefined : status,
+      sortBy,
+      sortOrder,
+    }),
+    [skip, searchTerm, searchBy, status, sortBy, sortOrder],
+  );
+
+  const countVariables = useMemo(
+    () => ({
+      role: "admin",
+      search: searchTerm.trim() || undefined,
+      searchBy: searchBy === "all" ? undefined : searchBy,
+      status: status === "all" ? undefined : status,
+    }),
+    [searchTerm, searchBy, status],
+  );
+
+  useEffect(() => {
+    setSkip(0);
+  }, [searchTerm, searchBy, status, sortBy, sortOrder]);
+
   const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
-    variables: { skip, take: PAGE_SIZE, role: "admin" },
+    variables: listVariables,
     fetchPolicy: "network-only",
   });
+  const { data: countData, refetch: refetchCount } = useQuery<{ listUsersCount: number }>(
+    LIST_USERS_COUNT,
+    { variables: countVariables, fetchPolicy: "network-only" },
+  );
 
   const [removeAdmin, { loading: revokingAdmin }] = useMutation(REMOVE_ADMIN);
   const [removeUser, { loading: deletingUser }] = useMutation(REMOVE_USER);
   const acting = revokingAdmin || deletingUser;
 
   const admins = data?.listUsers ?? [];
-  const filtered = searchTerm.trim()
-    ? admins.filter(
-        (u) =>
-          u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.displayName ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.username ?? "").toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    : admins;
+  const totalAdmins = countData?.listUsersCount ?? 0;
 
   async function handleConfirm() {
     if (!confirmTarget) return;
@@ -374,6 +698,7 @@ function AdminsTab() {
       }
       setConfirmTarget(null);
       void refetch();
+      void refetchCount();
     } catch (err: unknown) {
       const msg = getApolloErrorMessage(err);
       setRemoveError(
@@ -393,49 +718,83 @@ function AdminsTab() {
 
   return (
     <div>
-      <div className="admin-section-head">
-        <div>
-          <h2 className="admin-section-title">Admin Management</h2>
-          <p className="muted small">Manage who has admin access to Ke Jitbe</p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary admin-btn-admin"
-          onClick={() => setInviteModal(true)}
-        >
-          + Invite / Promote Admin
-        </button>
-      </div>
-
-      <input
-        type="search"
-        className="ig-input admin-search"
-        placeholder="Search admins…"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+      <AdminSectionHead
+        title="Admin Management"
+        subtitle="Manage who has admin access to Ke Jitbe"
+        action={
+          <AdminCtaButton variant="admin" onClick={() => setInviteModal(true)}>
+            Invite / Promote Admin
+          </AdminCtaButton>
+        }
       />
+
+      <div className="admin-toolbar">
+        <AdminSearchInput
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search admins…"
+        />
+        <div className="admin-toolbar-controls">
+          <AdminToolbarSelect label="Search in" value={searchBy} onChange={(v) => setSearchBy(v as UserSearchBy)}>
+            <option value="all">All fields</option>
+            <option value="name">Display name</option>
+            <option value="email">Email</option>
+            <option value="username">Username</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Status" value={status} onChange={(v) => setStatus(v as UserStatusFilter)}>
+            <option value="all">All statuses</option>
+            <option value="verified">Verified</option>
+            <option value="unverified">Unverified</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Sort by" value={sortBy} onChange={(v) => setSortBy(v as UserSortBy)}>
+            <option value="joined">Joined date</option>
+            <option value="name">Name</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Order" value={sortOrder} onChange={(v) => setSortOrder(v as UserSortOrder)}>
+            <option value="desc">{sortBy === "name" ? "Z → A" : "Newest first"}</option>
+            <option value="asc">{sortBy === "name" ? "A → Z" : "Oldest first"}</option>
+          </AdminToolbarSelect>
+          {(searchTerm || searchBy !== "all" || status !== "all" || sortBy !== "joined" || sortOrder !== "desc") ? (
+            <button
+              type="button"
+              className="admin-toolbar-reset"
+              onClick={() => {
+                setSearchTerm("");
+                setSearchBy("all");
+                setStatus("all");
+                setSortBy("joined");
+                setSortOrder("desc");
+              }}
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       {removeError && <p className="error" role="alert">{removeError}</p>}
       {loading && <p className="muted small">Loading admins…</p>}
       {error && <p className="error">Failed to load admins: {error.message}</p>}
-      {!loading && filtered.length === 0 && !error && (
+      {!loading && admins.length === 0 && !error && (
         <p className="muted small">No admins found.</p>
       )}
 
-      {filtered.length > 0 && (
+      {admins.length > 0 && (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Status</th>
+                <th>Joined</th>
                 <th>Roles</th>
                 <th>Engagement</th>
-                <th>Actions</th>
+                <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((user) => {
+              {admins.map((user) => {
                 const isSystemAdmin = user.email === SYSTEM_ADMIN_EMAIL;
                 return (
                   <tr key={user.id} className="admin-table-row">
@@ -446,42 +805,54 @@ function AdminsTab() {
                       </div>
                     </td>
                     <td className="admin-table-email">{user.email}</td>
+                    <td><UserStatusBadge user={user} /></td>
+                    <td className="admin-table-joined">
+                      <span title={user.createdAt ?? undefined}>{formatJoinedAt(user.createdAt)}</span>
+                      {user.createdAt ? (
+                        <span className="muted small admin-joined-relative">
+                          {formatRelativeTime(user.createdAt)}
+                        </span>
+                      ) : null}
+                    </td>
                     <td><RoleBadges user={user} /></td>
                     <td><UserStats userId={user.id} /></td>
-                    <td>
-                      <div className="admin-action-btns">
-                        <NavLink
-                          to={`/profile/${user.id}`}
-                          className="btn-ghost"
-                        >
-                          View Profile
-                        </NavLink>
-                        <button
-                          type="button"
-                          className="btn-ghost admin-remove-btn"
-                          disabled={isSystemAdmin || acting}
-                          title={isSystemAdmin ? "System admin cannot be modified" : "Revoke admin role (keeps account)"}
-                          onClick={() => {
-                            setRemoveError(null);
-                            setConfirmTarget({ user, action: "revoke" });
-                          }}
-                        >
-                          Revoke Admin
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-ghost admin-remove-btn admin-remove-btn--danger"
-                          disabled={isSystemAdmin || acting}
-                          title={isSystemAdmin ? "System admin cannot be modified" : "Remove account entirely"}
-                          onClick={() => {
-                            setRemoveError(null);
-                            setConfirmTarget({ user, action: "remove-account" });
-                          }}
-                        >
-                          Remove Account
-                        </button>
-                      </div>
-                    </td>
+                    <AdminActionsCell
+                      message={
+                        <AdminUserMessageButton
+                          userId={user.id}
+                          userLabel={user.displayName || user.username || user.email}
+                          onCompose={onComposeMessage}
+                        />
+                      }
+                    >
+                      <NavLink to={`/profile/${user.id}`} className="admin-action-link">
+                        View Profile
+                      </NavLink>
+                      <button
+                        type="button"
+                        className="admin-action-link admin-action-link--warn"
+                        disabled={isSystemAdmin || acting}
+                        title={isSystemAdmin ? "System admin cannot be modified" : "Revoke admin role (keeps account)"}
+                        onClick={() => {
+                          setRemoveError(null);
+                          setConfirmTarget({ user, action: "revoke" });
+                        }}
+                      >
+                        Revoke Admin
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-action-link admin-action-link--danger"
+                        disabled={isSystemAdmin || acting}
+                        title={isSystemAdmin ? "System admin cannot be modified" : "Remove account entirely"}
+                        onClick={() => {
+                          setRemoveError(null);
+                          setConfirmTarget({ user, action: "remove-account" });
+                        }}
+                      >
+                        Remove Account
+                      </button>
+                    </AdminActionsCell>
                   </tr>
                 );
               })}
@@ -490,27 +861,14 @@ function AdminsTab() {
         </div>
       )}
 
-      <div className="admin-pagination">
-        <button
-          type="button"
-          className="btn-ghost"
-          disabled={skip === 0 || loading}
-          onClick={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
-        >
-          ← Previous
-        </button>
-        <span className="muted small">
-          Showing {skip + 1}–{skip + admins.length}
-        </span>
-        <button
-          type="button"
-          className="btn-ghost"
-          disabled={admins.length < PAGE_SIZE || loading}
-          onClick={() => setSkip((s) => s + PAGE_SIZE)}
-        >
-          Next →
-        </button>
-      </div>
+      <AdminPaginationBar
+        skip={skip}
+        total={totalAdmins}
+        shown={admins.length}
+        loading={loading}
+        onPrev={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
+        onNext={() => setSkip((s) => s + PAGE_SIZE)}
+      />
 
       {inviteModal && (
         <BulkInviteModal
@@ -601,26 +959,19 @@ function CampaignsTab() {
 
   return (
     <div>
-      <div className="admin-section-head">
-        <div>
-          <h2 className="admin-section-title">Campaigns</h2>
-          <p className="muted small">Promotional campaigns shown as feed banners to all users</p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setShowCreate((v) => !v)}
-        >
-          {showCreate ? "Cancel" : "+ New Campaign"}
-        </button>
-      </div>
+      <AdminSectionHead
+        title="Campaigns"
+        subtitle="Promotional campaigns shown as feed banners to all users"
+        action={
+          <AdminCtaButton onClick={() => setShowCreate((v) => !v)} icon={showCreate ? "×" : "+"}>
+            {showCreate ? "Cancel" : "New Campaign"}
+          </AdminCtaButton>
+        }
+      />
 
       {showCreate && (
-        <form
-          onSubmit={(e) => void handleCreate(e)}
-          style={{ background: "var(--ig-border)", borderRadius: 12, padding: 16, marginBottom: 20 }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <form className="admin-form-panel" onSubmit={(e) => void handleCreate(e)}>
+          <div className="admin-form-grid">
             <label className="field">
               <span>Campaign name</span>
               <input
@@ -676,9 +1027,9 @@ function CampaignsTab() {
               />
             </label>
           </div>
-          {createError && <p className="error" role="alert" style={{ marginTop: 8 }}>{createError}</p>}
-          <div style={{ marginTop: 12 }}>
-            <button type="submit" className="btn-primary" disabled={creating}>
+          {createError && <p className="error" role="alert">{createError}</p>}
+          <div className="admin-form-actions">
+            <button type="submit" className="admin-btn-cta" disabled={creating}>
               {creating ? "Creating…" : "Create Campaign"}
             </button>
           </div>
@@ -698,7 +1049,7 @@ function CampaignsTab() {
                 <th>CTA</th>
                 <th>Prize</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -713,16 +1064,15 @@ function CampaignsTab() {
                       {c.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td>
+                  <AdminActionsCell>
                     <button
                       type="button"
-                      className={c.isActive ? "btn-danger" : "btn-primary"}
-                      style={{ fontSize: 13 }}
+                      className={`admin-action-link${c.isActive ? " admin-action-link--danger" : " admin-action-link--success"}`}
                       onClick={() => void handleToggle(c.id, c.isActive)}
                     >
                       {c.isActive ? "Deactivate" : "Activate"}
                     </button>
-                  </td>
+                  </AdminActionsCell>
                 </tr>
               ))}
             </tbody>
@@ -827,20 +1177,15 @@ function WorldCupTab() {
 
   return (
     <div>
-      <div className="admin-section-head">
-        <div>
-          <h2 className="admin-section-title">World Cup 2026 Fixtures</h2>
-          <p className="muted small">Sync fixtures, create campaign posts, and process results</p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => void handleSync()}
-          disabled={syncing}
-        >
-          {syncing ? "Syncing…" : "Sync Fixtures"}
-        </button>
-      </div>
+      <AdminSectionHead
+        title="World Cup 2026 Fixtures"
+        subtitle="Sync fixtures, create campaign posts, and process results"
+        action={
+          <AdminCtaButton onClick={() => void handleSync()} disabled={syncing} icon="↻">
+            {syncing ? "Syncing…" : "Sync Fixtures"}
+          </AdminCtaButton>
+        }
+      />
 
       {syncMsg && (
         <p className={`muted small${syncMsg.startsWith("Sync failed") ? " error" : ""}`} style={{ marginBottom: 12 }}>
@@ -926,11 +1271,10 @@ function WorldCupTab() {
                         {f.campaignPostId ? (
                           <span className="wc-admin-chip wc-admin-chip--done">✓ Created</span>
                         ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div className="admin-action-links">
                             <button
                               type="button"
-                              className="btn-ghost"
-                              style={{ fontSize: 12, padding: "3px 10px" }}
+                              className="admin-action-link"
                               onClick={() => void handleCreatePost(f.id)}
                               disabled={creatingPost}
                             >
@@ -950,11 +1294,10 @@ function WorldCupTab() {
                             </span>
                           </div>
                         ) : isPast && f.campaignPostId ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div className="admin-action-links">
                             <button
                               type="button"
-                              className="btn-ghost"
-                              style={{ fontSize: 12, padding: "3px 10px" }}
+                              className="admin-action-link admin-action-link--success"
                               onClick={() => void handleProcessResult(f.id)}
                               disabled={processingResult}
                             >
@@ -990,7 +1333,7 @@ function WorldCupTab() {
                   <th>Prize</th>
                   <th>Note</th>
                   <th>Date</th>
-                  <th>Paid</th>
+                  <th className="admin-table-actions">Paid</th>
                 </tr>
               </thead>
               <tbody>
@@ -1015,20 +1358,19 @@ function WorldCupTab() {
                     <td className="muted small">
                       {new Date(w.createdAt).toLocaleDateString()}
                     </td>
-                    <td>
+                    <AdminActionsCell>
                       {w.paid ? (
                         <span className="admin-stat-chip admin-stat-chip--active">Paid</span>
                       ) : (
                         <button
                           type="button"
-                          className="btn-ghost"
-                          style={{ fontSize: 13 }}
+                          className="admin-action-link admin-action-link--success"
                           onClick={() => void handleMarkPaid(w.id)}
                         >
                           Mark Paid
                         </button>
                       )}
-                    </td>
+                    </AdminActionsCell>
                   </tr>
                 ))}
               </tbody>
@@ -1233,42 +1575,39 @@ function InvitationsTab() {
 
   return (
     <div>
-      <div className="admin-section-head">
-        <div>
-          <h2 className="admin-section-title">Invitations</h2>
-          <p className="muted small">All sent invitations and their status</p>
-        </div>
-        {hasFilters && (
-          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={clearFilters}>
-            Clear filters
-          </button>
-        )}
-      </div>
+      <AdminSectionHead
+        title="Invitations"
+        subtitle="All sent invitations and their status"
+        action={
+          hasFilters ? (
+            <button type="button" className="admin-toolbar-reset" onClick={clearFilters}>
+              Clear filters
+            </button>
+          ) : undefined
+        }
+      />
 
-      {/* Filter bar */}
-      <div className="inv-filter-bar">
-        <div className="inv-filter-row">
-          <input
-            type="search"
-            className="ig-input inv-filter-input"
-            placeholder="Search email…"
+      <div className="admin-toolbar">
+        <div className="admin-toolbar-controls admin-toolbar-controls--wide">
+          <AdminSearchInput
             value={emailSearch}
-            onChange={(e) => setEmailSearch(e.target.value)}
+            onChange={setEmailSearch}
+            placeholder="Search email…"
+            className="admin-toolbar-search--half"
           />
-          <input
-            type="search"
-            className="ig-input inv-filter-input"
-            placeholder="Search invited by…"
+          <AdminSearchInput
             value={inviterSearch}
-            onChange={(e) => setInviterSearch(e.target.value)}
+            onChange={setInviterSearch}
+            placeholder="Search invited by…"
+            className="admin-toolbar-search--half"
           />
         </div>
-        <div className="inv-filter-row inv-filter-row--chips">
-          <span className="inv-filter-label">Role:</span>
+        <div className="admin-toolbar-controls admin-toolbar-controls--chips">
+          <span className="admin-toolbar-label admin-toolbar-label--inline">Role</span>
           <MultiChip label="User" active={roleFilter.has("user")} onClick={() => setRoleFilter((s) => toggleSet(s, "user"))} />
           <MultiChip label="Admin" active={roleFilter.has("admin")} onClick={() => setRoleFilter((s) => toggleSet(s, "admin"))} variant="admin" />
-          <span className="inv-filter-sep" />
-          <span className="inv-filter-label">Status:</span>
+          <span className="admin-toolbar-sep" aria-hidden />
+          <span className="admin-toolbar-label admin-toolbar-label--inline">Status</span>
           <MultiChip label="Pending" active={statusFilter.has("pending")} onClick={() => setStatusFilter((s) => toggleSet(s, "pending"))} />
           <MultiChip label="Accepted" active={statusFilter.has("accepted")} onClick={() => setStatusFilter((s) => toggleSet(s, "accepted"))} variant="admin" />
           <MultiChip label="Expired" active={statusFilter.has("expired")} onClick={() => setStatusFilter((s) => toggleSet(s, "expired"))} variant="warn" />
@@ -1293,7 +1632,7 @@ function InvitationsTab() {
                 <th>Sent</th>
                 <th>Expires</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1325,33 +1664,212 @@ function InvitationsTab() {
                         {isAccepted ? "Accepted" : expired ? "Expired" : "Pending"}
                       </span>
                     </td>
+                    <AdminActionsCell>
+                      {isPending && (
+                        <button
+                          type="button"
+                          className="admin-action-link"
+                          disabled={acting}
+                          onClick={() => void resendInv({ variables: { id: inv.id } })}
+                        >
+                          Resend
+                        </button>
+                      )}
+                      {isPending && (
+                        <button
+                          type="button"
+                          className="admin-action-link admin-action-link--danger"
+                          disabled={acting}
+                          onClick={() => void cancelInv({ variables: { id: inv.id } })}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      {(isAccepted || expired) && (
+                        <span className="muted small">—</span>
+                      )}
+                    </AdminActionsCell>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Categories Tab ──────────────────────────────────────────────────────────
+
+type CategoryRow = { id: string; name: string; slug: string };
+
+function CategoriesTab() {
+  const { data, loading, error, refetch } = useQuery(CATEGORIES, {
+    fetchPolicy: "cache-and-network",
+  });
+  const [newName, setNewName] = useState("");
+  const [editing, setEditing] = useState<CategoryRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [createMut, { loading: creating }] = useMutation(CREATE_CATEGORY, {
+    refetchQueries: [{ query: CATEGORIES }],
+  });
+  const [updateMut, { loading: updating }] = useMutation(UPDATE_CATEGORY, {
+    refetchQueries: [{ query: CATEGORIES }],
+  });
+  const [deleteMut] = useMutation(DELETE_CATEGORY, {
+    refetchQueries: [{ query: CATEGORIES }],
+  });
+
+  const categories = (data?.categories ?? []) as CategoryRow[];
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setPageError(null);
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      await createMut({ variables: { name } });
+      setNewName("");
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleUpdate() {
+    if (!editing) return;
+    setPageError(null);
+    const name = editName.trim();
+    if (!name) return;
+    try {
+      await updateMut({ variables: { id: editing.id, name } });
+      setEditing(null);
+      setEditName("");
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleDelete(cat: CategoryRow) {
+    if (!window.confirm(`Delete category "${cat.name}"?`)) return;
+    setPageError(null);
+    setDeletingId(cat.id);
+    try {
+      await deleteMut({ variables: { id: cat.id } });
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+    setDeletingId(null);
+  }
+
+  return (
+    <div>
+      <AdminSectionHead
+        title="Post Categories"
+        subtitle="Categories users pick when creating compares"
+      />
+
+      <form className="admin-toolbar admin-toolbar--inline" onSubmit={(e) => void handleCreate(e)}>
+        <div className="admin-toolbar-search-wrap admin-toolbar-search--grow">
+          <span className="admin-toolbar-search-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            className="admin-toolbar-input admin-toolbar-search"
+            placeholder="New category name (e.g. Music)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            maxLength={60}
+          />
+        </div>
+        <button type="submit" className="admin-btn-cta" disabled={creating || !newName.trim()}>
+          <span className="admin-btn-cta-icon" aria-hidden>+</span>
+          {creating ? "Adding…" : "Add Category"}
+        </button>
+      </form>
+
+      {pageError && <p className="error" role="alert">{pageError}</p>}
+      {loading && !data && <p className="muted small">Loading categories…</p>}
+      {error && <p className="error">Failed to load: {error.message}</p>}
+
+      {categories.length > 0 && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th className="admin-table-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat) => {
+                const isEditing = editing?.id === cat.id;
+                return (
+                  <tr key={cat.id} className="admin-table-row">
                     <td>
-                      <div className="admin-action-btns">
-                        {isPending && (
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="admin-toolbar-input admin-toolbar-input--plain"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          maxLength={60}
+                          autoFocus
+                        />
+                      ) : (
+                        <strong>{cat.name}</strong>
+                      )}
+                    </td>
+                    <td className="admin-table-email">{cat.slug}</td>
+                    <AdminActionsCell>
+                      {isEditing ? (
+                        <>
                           <button
                             type="button"
-                            className="btn-ghost"
-                            disabled={acting}
-                            onClick={() => void resendInv({ variables: { id: inv.id } })}
+                            className="admin-action-link admin-action-link--success"
+                            disabled={updating}
+                            onClick={() => void handleUpdate()}
                           >
-                            Resend
+                            {updating ? "Saving…" : "Save"}
                           </button>
-                        )}
-                        {isPending && (
                           <button
                             type="button"
-                            className="btn-ghost admin-remove-btn"
-                            disabled={acting}
-                            onClick={() => void cancelInv({ variables: { id: inv.id } })}
+                            className="admin-action-link"
+                            onClick={() => { setEditing(null); setEditName(""); }}
                           >
                             Cancel
                           </button>
-                        )}
-                        {(isAccepted || expired) && (
-                          <span className="muted small">—</span>
-                        )}
-                      </div>
-                    </td>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="admin-action-link"
+                            onClick={() => { setEditing(cat); setEditName(cat.name); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-action-link admin-action-link--danger"
+                            disabled={deletingId === cat.id}
+                            onClick={() => void handleDelete(cat)}
+                          >
+                            {deletingId === cat.id ? "…" : "Delete"}
+                          </button>
+                        </>
+                      )}
+                    </AdminActionsCell>
                   </tr>
                 );
               })}
@@ -1366,7 +1884,19 @@ function InvitationsTab() {
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "admins" | "invitations" | "campaigns" | "worldcup">("users");
+  const [activeTab, setActiveTab] = useState<
+    "users" | "admins" | "invitations" | "campaigns" | "categories" | "worldcup" | "admin-messages"
+  >("users");
+  const [messagesTargetUserId, setMessagesTargetUserId] = useState<string | null>(null);
+
+  function openAdminMessagesForUser(userId: string) {
+    setMessagesTargetUserId(userId);
+    setActiveTab("admin-messages");
+  }
+
+  function clearMessagesTargetUser() {
+    setMessagesTargetUserId(null);
+  }
 
   return (
     <div className="admin-page">
@@ -1409,6 +1939,20 @@ export function AdminPage() {
         </button>
         <button
           type="button"
+          className={`admin-tab${activeTab === "categories" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("categories")}
+        >
+          Categories
+        </button>
+        <button
+          type="button"
+          className={`admin-tab${activeTab === "admin-messages" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("admin-messages")}
+        >
+          Admin Messages
+        </button>
+        <button
+          type="button"
           className={`admin-tab${activeTab === "worldcup" ? " admin-tab--active" : ""}`}
           onClick={() => setActiveTab("worldcup")}
         >
@@ -1417,11 +1961,18 @@ export function AdminPage() {
       </div>
 
       <div className="admin-section">
-        {activeTab === "users" && <UsersTab />}
-        {activeTab === "admins" && <AdminsTab />}
+        {activeTab === "users" && <UsersTab onComposeMessage={openAdminMessagesForUser} />}
+        {activeTab === "admins" && <AdminsTab onComposeMessage={openAdminMessagesForUser} />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "campaigns" && <CampaignsTab />}
+        {activeTab === "categories" && <CategoriesTab />}
         {activeTab === "worldcup" && <WorldCupTab />}
+        {activeTab === "admin-messages" && (
+          <AdminMessagesTab
+            initialUserId={messagesTargetUserId}
+            onInitialUserConsumed={clearMessagesTargetUser}
+          />
+        )}
       </div>
     </div>
   );
