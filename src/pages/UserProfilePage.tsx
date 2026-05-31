@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
@@ -207,9 +207,15 @@ export function UserProfilePage() {
 
   const isOwnProfile = Boolean(user && userId === user.id);
 
+  useEffect(() => {
+    if (isOwnProfile) {
+      navigate("/profile", { replace: true });
+    }
+  }, [isOwnProfile, navigate]);
+
   const { data: profileData, loading: profileLoading, error: profileError } = useQuery(
     GET_USER_PROFILE,
-    { variables: { userId }, skip: !userId || isOwnProfile },
+    { variables: { userId }, skip: !userId || isOwnProfile, fetchPolicy: "network-only" },
   );
 
   const { data: statusData, refetch: refetchStatus } = useQuery(FRIENDSHIP_STATUS, {
@@ -225,7 +231,6 @@ export function UserProfilePage() {
   });
 
   if (isOwnProfile) {
-    navigate("/profile", { replace: true });
     return null;
   }
 

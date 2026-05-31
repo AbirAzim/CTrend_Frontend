@@ -175,6 +175,7 @@ type PostVoteUpdatedData = {
     downvoteCount: number;
     viewerVote?: "UP" | "DOWN" | null;
     mySelectedOptionIndex?: number | null;
+    myVoteAnonymous?: boolean | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
     optionStats?: Array<{
@@ -215,7 +216,7 @@ function FeedPostCardComponent({
   const [hypeCountLive, setHypeCountLive] = useState(post.hypeCount ?? 0);
   const [saveLiveCount, setSaveLiveCount] = useState(post.saveCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
-  const [anonymousVote, setAnonymousVote] = useState(false);
+  const [anonymousVote, setAnonymousVote] = useState(Boolean(post.myVoteAnonymous));
   const [showVoters, setShowVoters] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
@@ -294,10 +295,17 @@ function FeedPostCardComponent({
             : next.isVotingOpen,
         votingEndsAt: next.votingEndsAt ?? null,
       });
+      if (next.myVoteAnonymous !== undefined && next.myVoteAnonymous !== null) {
+        setAnonymousVote(next.myVoteAnonymous);
+      }
       setVoteFx(true);
       setTimeout(() => setVoteFx(false), 280);
     },
   });
+
+  useEffect(() => {
+    setAnonymousVote(Boolean(post.myVoteAnonymous));
+  }, [post.id, post.myVoteAnonymous]);
 
   useEffect(() => {
     return () => {
@@ -611,6 +619,44 @@ function FeedPostCardComponent({
     await apolloClient.refetchQueries({
       include: [FEED_POSTS, GET_POST_BY_ID],
     });
+  }
+
+  async function persistAnonymousPreference(nextAnonymous: boolean) {
+    if (voteMode !== "api" || !isAuthenticated || isVotingClosed) {
+      return;
+    }
+    const optionIndex =
+      optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
+    if (optionIndex === null || optionIndex === undefined) {
+      return;
+    }
+    if (voteInFlight.current) {
+      return;
+    }
+    voteInFlight.current = true;
+    try {
+      await voteMut({
+        variables: {
+          postId: post.id,
+          selectedOptionIndex: optionIndex,
+          anonymous: nextAnonymous,
+        },
+      });
+      voteGuardUntilRef.current = Date.now() + 500;
+    } catch (err: unknown) {
+      setAnonymousVote(!nextAnonymous);
+      const message = getApolloErrorMessage(err);
+      if (!/voting period has ended/i.test(message)) {
+        await refreshPostVotingState();
+      }
+    } finally {
+      voteInFlight.current = false;
+    }
+  }
+
+  function handleAnonymousToggle(nextAnonymous: boolean) {
+    setAnonymousVote(nextAnonymous);
+    void persistAnonymousPreference(nextAnonymous);
   }
 
   function setJustVoted(index: number) {
@@ -947,8 +993,7 @@ function FeedPostCardComponent({
 
   const binaryTotal = up + down;
   const hypeCount = hypeCountLive;
-  const recentPreviewComments = (post.recentComments ?? []).slice(0, 2);
-  const hasMorePreviewComments = (post.commentCount ?? recentPreviewComments.length) > 2;
+  const commentCount = post.commentCount ?? 0;
   const groupedVoters = useMemo(() => {
     const rows = votersData?.votersByPost ?? [];
     const groups = new Map<number, typeof rows>();
@@ -1392,7 +1437,7 @@ function FeedPostCardComponent({
                 <input
                   type="checkbox"
                   checked={anonymousVote}
-                  onChange={(e) => setAnonymousVote(e.target.checked)}
+                  onChange={(e) => handleAnonymousToggle(e.target.checked)}
                 />
                 <span className="cx-anon-toggle-switch" aria-hidden />
               </label>
@@ -1639,7 +1684,9 @@ function FeedPostCardComponent({
             }}
           >
             <IconComment />
-            <span className="cx-action-chip-label">Discuss</span>
+            <span className="cx-action-chip-label">
+              Discuss{commentCount > 0 ? ` ${commentCount}` : ""}
+            </span>
           </button>
           <button
             type="button"
@@ -1693,27 +1740,6 @@ function FeedPostCardComponent({
             <span className="cx-action-chip-label">Voters</span>
           </button>
         </div>
-
-        {!commentsOpen && recentPreviewComments.length > 0 ? (
-          <div className="ig-post-comments-preview">
-            {recentPreviewComments.map((c) => (
-              <p key={c.id} className="muted small">
-                <strong>{c.author.displayName?.trim() || c.author.username}</strong>: {c.content}
-              </p>
-            ))}
-            {hasMorePreviewComments ? (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => {
-                  setCommentsOpen(true);
-                }}
-              >
-                Show more
-              </button>
-            ) : null}
-          </div>
-        ) : null}
 
         {shareHint ? (
           <p className="ig-share-hint" role="status">

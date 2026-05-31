@@ -4,6 +4,7 @@ import { useMutation } from "@apollo/client";
 import { useNotifications, type NotificationItem } from "../context/NotificationContext";
 import { useMessenger } from "../context/MessengerContext";
 import { RESPOND_FRIEND_REQUEST, FRIEND_REQUESTS, MY_FRIENDS } from "../graphql/friends";
+import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -15,7 +16,8 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function typeIcon(type: string): string {
+function typeIcon(type: string, referenceType?: string | null): string {
+  if (type === "MESSAGE" && referenceType === "moderator_conversation") return "🛡️";
   switch (type) {
     case "MESSAGE":          return "💬";
     case "ANNOUNCEMENT":     return "📢";
@@ -27,6 +29,15 @@ function typeIcon(type: string): string {
     case "COMMENT_REACTION": return "😊";
     default:                 return "🔔";
   }
+}
+
+function isOfficialAdminMessage(n: NotificationItem): boolean {
+  return n.type === "MESSAGE" && n.referenceType === "moderator_conversation";
+}
+
+function notificationTitle(n: NotificationItem): string {
+  if (isOfficialAdminMessage(n)) return "Official admin message";
+  return n.title;
 }
 
 export function NotificationBell() {
@@ -66,12 +77,12 @@ export function NotificationBell() {
       ensureConversation({
         id: n.referenceId,
         type: "moderator",
-        name: "Moderator",
+        name: MODERATOR_BRAND_NAME,
         participantIds: [],
         participants: [
           {
             id: "moderator",
-            displayName: "Moderator",
+            displayName: MODERATOR_BRAND_NAME,
             avatarUrl: "/logo.png",
             online: false,
           },
@@ -176,18 +187,27 @@ export function NotificationBell() {
             <ul className="nb-list">
               {notifications.map((n) => {
                 const isFriendReq = n.type === "FRIEND_REQUEST";
+                const isAdminMsg = isOfficialAdminMessage(n);
                 const isLoading = actionLoadingIds.has(n.id);
                 return (
                   <li
                     key={n.id}
-                    className={`nb-item${n.read ? "" : " nb-item--unread"}${isFriendReq ? " nb-item--friend-req" : ""}`}
+                    className={`nb-item${n.read ? "" : " nb-item--unread"}${isFriendReq ? " nb-item--friend-req" : ""}${isAdminMsg ? " nb-item--admin-msg" : ""}`}
                     role="menuitem"
                     onClick={() => handleClick(n)}
                   >
-                    <span className="nb-item-icon" aria-hidden>{typeIcon(n.type)}</span>
+                    <span className="nb-item-icon" aria-hidden>{typeIcon(n.type, n.referenceType)}</span>
                     <div className="nb-item-body">
-                      <p className="nb-item-title">{n.title}</p>
-                      <p className="nb-item-desc">{n.body}</p>
+                      <p className="nb-item-title">
+                        {notificationTitle(n)}
+                        {isAdminMsg ? (
+                          <span className="nb-admin-chip">Important</span>
+                        ) : null}
+                      </p>
+                      <p className="nb-item-desc">
+                        {isAdminMsg ? `From ${MODERATOR_BRAND_NAME} · ` : ""}
+                        {n.body}
+                      </p>
                       <span className="nb-item-time">{timeAgo(n.createdAt)}</span>
 
                       {isFriendReq && (
