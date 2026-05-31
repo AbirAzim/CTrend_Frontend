@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@apollo/client";
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
-import { useMessenger } from "../context/MessengerContext";
+import { AdminMessagesTab } from "./AdminMessagesTab";
 import {
   CANCEL_INVITATION,
   CREATE_CATEGORY,
@@ -16,7 +16,6 @@ import {
   UPDATE_CATEGORY,
 } from "../graphql/admin";
 import { CATEGORIES } from "../graphql/feed";
-import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -255,45 +254,23 @@ function AdminPaginationBar({
 function AdminUserMessageButton({
   userId,
   userLabel,
+  onCompose,
 }: {
   userId: string;
   userLabel: string;
+  onCompose: (userId: string) => void;
 }) {
-  const { openChat, ensureConversation } = useMessenger();
-  const [startDirect, { loading }] = useMutation(START_DIRECT_CONVERSATION);
-  const [msgError, setMsgError] = useState<string | null>(null);
-
-  async function handleMessage() {
-    setMsgError(null);
-    try {
-      const { data } = await startDirect({ variables: { userId } });
-      const convo = data?.startDirectConversation;
-      if (convo) {
-        ensureConversation(convo);
-        openChat(convo.id);
-      }
-    } catch (err: unknown) {
-      setMsgError(getApolloErrorMessage(err));
-    }
-  }
-
   return (
     <div className="admin-msg-wrap">
       <button
         type="button"
         className="admin-icon-btn admin-icon-btn--message"
-        title={msgError ?? `Message ${userLabel}`}
-        disabled={loading}
-        aria-label={`Message ${userLabel}`}
-        onClick={() => void handleMessage()}
+        title={`Send moderator message to ${userLabel}`}
+        aria-label={`Send moderator message to ${userLabel}`}
+        onClick={() => onCompose(userId)}
       >
-        {loading ? <span className="admin-icon-btn-loading">…</span> : <MessageIcon size={16} />}
+        <MessageIcon size={16} />
       </button>
-      {msgError ? (
-        <span className="admin-msg-error" role="alert" title={msgError}>
-          !
-        </span>
-      ) : null}
     </div>
   );
 }
@@ -428,7 +405,7 @@ function UserStats({ userId }: { userId: string }) {
 
 // ─── Users Tab ───────────────────────────────────────────────────────────────
 
-function UsersTab() {
+function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => void }) {
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchBy, setSearchBy] = useState<UserSearchBy>("all");
@@ -595,6 +572,7 @@ function UsersTab() {
                       <AdminUserMessageButton
                         userId={user.id}
                         userLabel={user.displayName || user.username || user.email}
+                        onCompose={onComposeMessage}
                       />
                     }
                   >
@@ -654,20 +632,52 @@ function UsersTab() {
 type AdminAction = "revoke" | "remove-account";
 type AdminConfirmTarget = { user: UserRow; action: AdminAction };
 
-function AdminsTab() {
+function AdminsTab({ onComposeMessage }: { onComposeMessage: (userId: string) => void }) {
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchBy, setSearchBy] = useState<UserSearchBy>("all");
+  const [status, setStatus] = useState<UserStatusFilter>("all");
+  const [sortBy, setSortBy] = useState<UserSortBy>("joined");
+  const [sortOrder, setSortOrder] = useState<UserSortOrder>("desc");
   const [confirmTarget, setConfirmTarget] = useState<AdminConfirmTarget | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [inviteModal, setInviteModal] = useState(false);
 
+  const listVariables = useMemo(
+    () => ({
+      skip,
+      take: PAGE_SIZE,
+      role: "admin",
+      search: searchTerm.trim() || undefined,
+      searchBy: searchBy === "all" ? undefined : searchBy,
+      status: status === "all" ? undefined : status,
+      sortBy,
+      sortOrder,
+    }),
+    [skip, searchTerm, searchBy, status, sortBy, sortOrder],
+  );
+
+  const countVariables = useMemo(
+    () => ({
+      role: "admin",
+      search: searchTerm.trim() || undefined,
+      searchBy: searchBy === "all" ? undefined : searchBy,
+      status: status === "all" ? undefined : status,
+    }),
+    [searchTerm, searchBy, status],
+  );
+
+  useEffect(() => {
+    setSkip(0);
+  }, [searchTerm, searchBy, status, sortBy, sortOrder]);
+
   const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
-    variables: { skip, take: PAGE_SIZE, role: "admin" },
+    variables: listVariables,
     fetchPolicy: "network-only",
   });
   const { data: countData, refetch: refetchCount } = useQuery<{ listUsersCount: number }>(
     LIST_USERS_COUNT,
-    { variables: { role: "admin" }, fetchPolicy: "network-only" },
+    { variables: countVariables, fetchPolicy: "network-only" },
   );
 
   const [removeAdmin, { loading: revokingAdmin }] = useMutation(REMOVE_ADMIN);
@@ -676,14 +686,6 @@ function AdminsTab() {
 
   const admins = data?.listUsers ?? [];
   const totalAdmins = countData?.listUsersCount ?? 0;
-  const filtered = searchTerm.trim()
-    ? admins.filter(
-        (u) =>
-          u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.displayName ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (u.username ?? "").toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    : admins;
 
   async function handleConfirm() {
     if (!confirmTarget) return;
@@ -735,29 +737,67 @@ function AdminsTab() {
           onChange={setSearchTerm}
           placeholder="Search admins…"
         />
+        <div className="admin-toolbar-controls">
+          <AdminToolbarSelect label="Search in" value={searchBy} onChange={(v) => setSearchBy(v as UserSearchBy)}>
+            <option value="all">All fields</option>
+            <option value="name">Display name</option>
+            <option value="email">Email</option>
+            <option value="username">Username</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Status" value={status} onChange={(v) => setStatus(v as UserStatusFilter)}>
+            <option value="all">All statuses</option>
+            <option value="verified">Verified</option>
+            <option value="unverified">Unverified</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Sort by" value={sortBy} onChange={(v) => setSortBy(v as UserSortBy)}>
+            <option value="joined">Joined date</option>
+            <option value="name">Name</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect label="Order" value={sortOrder} onChange={(v) => setSortOrder(v as UserSortOrder)}>
+            <option value="desc">{sortBy === "name" ? "Z → A" : "Newest first"}</option>
+            <option value="asc">{sortBy === "name" ? "A → Z" : "Oldest first"}</option>
+          </AdminToolbarSelect>
+          {(searchTerm || searchBy !== "all" || status !== "all" || sortBy !== "joined" || sortOrder !== "desc") ? (
+            <button
+              type="button"
+              className="admin-toolbar-reset"
+              onClick={() => {
+                setSearchTerm("");
+                setSearchBy("all");
+                setStatus("all");
+                setSortBy("joined");
+                setSortOrder("desc");
+              }}
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {removeError && <p className="error" role="alert">{removeError}</p>}
       {loading && <p className="muted small">Loading admins…</p>}
       {error && <p className="error">Failed to load admins: {error.message}</p>}
-      {!loading && filtered.length === 0 && !error && (
+      {!loading && admins.length === 0 && !error && (
         <p className="muted small">No admins found.</p>
       )}
 
-      {filtered.length > 0 && (
+      {admins.length > 0 && (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Status</th>
+                <th>Joined</th>
                 <th>Roles</th>
                 <th>Engagement</th>
                 <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((user) => {
+              {admins.map((user) => {
                 const isSystemAdmin = user.email === SYSTEM_ADMIN_EMAIL;
                 return (
                   <tr key={user.id} className="admin-table-row">
@@ -768,6 +808,15 @@ function AdminsTab() {
                       </div>
                     </td>
                     <td className="admin-table-email">{user.email}</td>
+                    <td><UserStatusBadge user={user} /></td>
+                    <td className="admin-table-joined">
+                      <span title={user.createdAt ?? undefined}>{formatJoinedAt(user.createdAt)}</span>
+                      {user.createdAt ? (
+                        <span className="muted small admin-joined-relative">
+                          {formatRelativeTime(user.createdAt)}
+                        </span>
+                      ) : null}
+                    </td>
                     <td><RoleBadges user={user} /></td>
                     <td><UserStats userId={user.id} /></td>
                     <AdminActionsCell
@@ -775,6 +824,7 @@ function AdminsTab() {
                         <AdminUserMessageButton
                           userId={user.id}
                           userLabel={user.displayName || user.username || user.email}
+                          onCompose={onComposeMessage}
                         />
                       }
                     >
@@ -1838,7 +1888,19 @@ function CategoriesTab() {
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "admins" | "invitations" | "campaigns" | "categories" | "worldcup">("users");
+  const [activeTab, setActiveTab] = useState<
+    "users" | "admins" | "invitations" | "campaigns" | "categories" | "worldcup" | "admin-messages"
+  >("users");
+  const [messagesTargetUserId, setMessagesTargetUserId] = useState<string | null>(null);
+
+  function openAdminMessagesForUser(userId: string) {
+    setMessagesTargetUserId(userId);
+    setActiveTab("admin-messages");
+  }
+
+  function clearMessagesTargetUser() {
+    setMessagesTargetUserId(null);
+  }
 
   return (
     <div className="admin-page">
@@ -1888,6 +1950,13 @@ export function AdminPage() {
         </button>
         <button
           type="button"
+          className={`admin-tab${activeTab === "admin-messages" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("admin-messages")}
+        >
+          Admin Messages
+        </button>
+        <button
+          type="button"
           className={`admin-tab${activeTab === "worldcup" ? " admin-tab--active" : ""}`}
           onClick={() => setActiveTab("worldcup")}
         >
@@ -1896,12 +1965,18 @@ export function AdminPage() {
       </div>
 
       <div className="admin-section">
-        {activeTab === "users" && <UsersTab />}
-        {activeTab === "admins" && <AdminsTab />}
+        {activeTab === "users" && <UsersTab onComposeMessage={openAdminMessagesForUser} />}
+        {activeTab === "admins" && <AdminsTab onComposeMessage={openAdminMessagesForUser} />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "campaigns" && <CampaignsTab />}
         {activeTab === "categories" && <CategoriesTab />}
         {activeTab === "worldcup" && <WorldCupTab />}
+        {activeTab === "admin-messages" && (
+          <AdminMessagesTab
+            initialUserId={messagesTargetUserId}
+            onInitialUserConsumed={clearMessagesTargetUser}
+          />
+        )}
       </div>
     </div>
   );
