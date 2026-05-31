@@ -605,7 +605,6 @@ notificationSoundId
 messageSoundId
 ```
 Add to `UPDATE_PROFILE` mutation input variables.
-
 #### 11.2 Sound presets catalog
 Mirror the web preset IDs. Minimum required sets:
 - **Vote sounds:** `buzz-in`, `tick-pop-thump`, (+ others from `notificationSound.ts`)

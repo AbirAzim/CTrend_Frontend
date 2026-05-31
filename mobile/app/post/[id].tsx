@@ -40,6 +40,7 @@ import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
 import { postPermalink } from "../../lib/postPermalink";
@@ -701,6 +702,7 @@ type PostDetailCardProps = {
 
 function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const { isAuthenticated } = useAuth();
+  const { adjustSavedCount } = useTabBar();
   const [voteMut] = useMutation(VOTE_POST);
   const [hypeMut] = useMutation(SET_POST_HYPE);
   const [keepMut] = useMutation(SET_POST_KEEP);
@@ -781,8 +783,9 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     const next = !kept;
     setKept(next);
+    adjustSavedCount(next ? 1 : -1);
     try { await keepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setKept(!next); }
+    catch { setKept(!next); adjustSavedCount(next ? -1 : 1); }
   }
 
   async function handleShare() {

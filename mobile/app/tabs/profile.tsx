@@ -176,7 +176,7 @@ function DropRow({ post, colors, onExtend }: {
       <View style={st.dropActions}>
         <Pressable
           hitSlop={8}
-          onPress={(e) => { e.stopPropagation?.(); router.push(`/post/${post.id}` as `/${string}`); }}
+          onPress={(e) => { e.stopPropagation?.(); router.push(`/edit-post?postId=${post.id}` as `/${string}`); }}
         >
           <Text style={[st.dropActionIcon, { color: colors.subtext }]}>✏️</Text>
         </Pressable>

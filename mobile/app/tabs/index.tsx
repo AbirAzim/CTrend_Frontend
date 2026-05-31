@@ -60,7 +60,7 @@ function FeedTopBar() {
     <View style={[styles.topBar, { paddingTop: insets.top, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
       {/* Brand */}
       <Pressable style={styles.brand} hitSlop={4}>
-        <Text style={[styles.brandText, { color: colors.accentLight }]}>Ke Jitbe</Text>
+        <Text style={[styles.brandText, { color: colors.accentLight }]} numberOfLines={1}>Ke Jitbe</Text>
         <Image
           source={logoAsset}
           style={styles.brandLogo}
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
   },
-  brand: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   brandText: { fontSize: 20, fontWeight: "800", letterSpacing: 0.3 },
   brandLogo: { width: 24, height: 22 },
   actions: { flexDirection: "row", alignItems: "center", gap: 7 },

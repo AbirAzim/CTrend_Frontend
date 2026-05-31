@@ -50,7 +50,7 @@ export default function ScheduledPostsScreen() {
 
   const { data, loading, refetch } = useQuery<ScheduledData>(MY_SCHEDULED_POSTS, {
     fetchPolicy: "cache-and-network",
-    pollInterval: 30000,
+    pollInterval: 10000,
   });
 
   const [cancelMut, { loading: cancelling }] = useMutation(CANCEL_SCHEDULED_POST);
@@ -130,41 +130,62 @@ export default function ScheduledPostsScreen() {
           keyExtractor={(p) => p.id}
           contentContainerStyle={st.list}
           renderItem={({ item: p }) => {
-            const thumb = p.imageUrls?.[0] ?? p.options?.[0]?.imageUrl ?? null;
+            const img0 = p.imageUrls?.[0] ?? p.options?.[0]?.imageUrl ?? null;
+            const img1 = p.imageUrls?.[1] ?? p.options?.[1]?.imageUrl ?? null;
             const isCancelling = cancellingId === p.id && cancelling;
             const timeLabel = countdown(p.scheduledAt);
             const isGoingLive = p.status === "PUBLISHED" || timeLabel === "Going live…";
+            const goesLiveAt = p.scheduledAt ? new Date(p.scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
+            const optionChips = (p.options ?? []).slice(0, 4).filter((o) => o.label);
 
             return (
               <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {/* Thumbnail */}
-                {thumb ? (
-                  <Image source={{ uri: thumb }} style={st.thumb} contentFit="cover" cachePolicy="memory-disk" />
-                ) : (
-                  <View style={[st.thumb, st.thumbPlaceholder, { backgroundColor: colors.section }]}>
-                    <Text style={{ fontSize: 28 }}>🖼</Text>
-                  </View>
-                )}
+                {/* Thumbnail strip — show both images side by side */}
+                <View style={[st.thumbStrip, { backgroundColor: colors.section }]}>
+                  {img0 ? (
+                    <Image source={{ uri: img0 }} style={[st.thumb, img1 ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : {}]} contentFit="cover" cachePolicy="memory-disk" />
+                  ) : (
+                    <View style={[st.thumb, { alignItems: "center", justifyContent: "center" }]}>
+                      <Text style={{ fontSize: 24 }}>🖼</Text>
+                    </View>
+                  )}
+                  {img1 ? (
+                    <Image source={{ uri: img1 }} style={[st.thumb, { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]} contentFit="cover" cachePolicy="memory-disk" />
+                  ) : null}
+                </View>
 
                 {/* Info */}
                 <View style={st.info}>
                   {p.contentText ? (
-                    <Text style={[st.caption, { color: colors.text }]} numberOfLines={2}>{p.contentText}</Text>
+                    <Text style={[st.caption, { color: colors.text }]} numberOfLines={1}>{p.contentText}</Text>
                   ) : null}
+
+                  {/* Option chips */}
+                  {optionChips.length > 0 && (
+                    <View style={st.chipRow}>
+                      {optionChips.map((o, i) => (
+                        <View key={i} style={[st.chip, { backgroundColor: colors.section, borderColor: colors.border }]}>
+                          <Text style={[st.chipText, { color: colors.subtext }]} numberOfLines={1}>{o.label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Status + countdown */}
                   <View style={st.metaRow}>
                     <View style={[st.statusPill, { backgroundColor: isGoingLive ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
                       <Text style={[st.statusText, { color: isGoingLive ? "#22c55e" : "#f59e0b" }]}>
-                        {isGoingLive ? "🟢 Going live" : `⏱ ${timeLabel}`}
+                        {isGoingLive ? "🟢 Going live" : `⏱ in ${timeLabel}`}
                       </Text>
                     </View>
                     {p.category ? (
                       <Text style={[st.category, { color: colors.muted }]}>{p.category.name}</Text>
                     ) : null}
                   </View>
-                  {p.scheduledAt ? (
-                    <Text style={[st.date, { color: colors.muted }]}>
-                      {new Date(p.scheduledAt).toLocaleString()}
-                    </Text>
+
+                  {/* Absolute "Goes live at" date */}
+                  {goesLiveAt && !isGoingLive ? (
+                    <Text style={[st.date, { color: colors.muted }]}>Goes live at {goesLiveAt}</Text>
                   ) : null}
                 </View>
 
@@ -196,28 +217,35 @@ function styles(c: ReturnType<typeof useTheme>["colors"]) {
     emptyText: { fontSize: 15, fontWeight: "600" },
     createBtn: { marginTop: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
     createBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-    list: { padding: 14, gap: 12 },
+    list: { padding: 14, gap: 14 },
     card: {
-      flexDirection: "row",
       borderRadius: 14,
       borderWidth: 1,
       overflow: "hidden",
-      alignItems: "center",
     },
-    thumb: { width: 80, height: 80 },
-    thumbPlaceholder: { alignItems: "center", justifyContent: "center" },
-    info: { flex: 1, padding: 10, gap: 4 },
+    thumbStrip: { flexDirection: "row", height: 90 },
+    thumb: { flex: 1, height: 90, borderTopLeftRadius: 13, borderTopRightRadius: 13 },
+    info: { padding: 10, gap: 5 },
     caption: { fontSize: 13, fontWeight: "600", lineHeight: 18 },
+    chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+    chip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2 },
+    chipText: { fontSize: 11 },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
     statusPill: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
     statusText: { fontSize: 11, fontWeight: "700" },
     category: { fontSize: 11 },
-    date: { fontSize: 11, marginTop: 2 },
+    date: { fontSize: 11 },
     cancelBtn: {
-      width: 36, height: 36, borderRadius: 18,
-      borderWidth: 1.5, alignItems: "center", justifyContent: "center",
-      marginRight: 10,
+      alignSelf: "flex-end",
+      margin: 10,
+      marginTop: 0,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      alignItems: "center",
+      justifyContent: "center",
     },
-    cancelText: { color: "#f87171", fontSize: 14, fontWeight: "700" },
+    cancelText: { color: "#f87171", fontSize: 12, fontWeight: "700" },
   });
 }

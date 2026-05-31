@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = (SCREEN_W - 48) / 2; // 2 cols with 16px margins + 16px gap
@@ -113,6 +114,7 @@ const st = StyleSheet.create({
 export default function KeepsScreen() {
   const { isAuthenticated, hydrated } = useAuth();
   const { colors } = useTheme();
+  const { setSavedCount } = useTabBar();
   const insets = useSafeAreaInsets();
 
   const { data, loading, error, refetch } = useQuery<SavedData>(MY_SAVED_POSTS, {
@@ -124,6 +126,10 @@ export default function KeepsScreen() {
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.replace("/auth/login" as never);
   }, [hydrated, isAuthenticated]);
+
+  useEffect(() => {
+    if (data?.mySavedPosts) setSavedCount(data.mySavedPosts.length);
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hydrated || !isAuthenticated) {
     return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
