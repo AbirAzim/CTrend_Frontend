@@ -155,7 +155,7 @@ export default function FeedScreen() {
 
   const { data, loading, error, refetch, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
-    { fetchPolicy: "cache-and-network", notifyOnNetworkStatusChange: true },
+    { fetchPolicy: "cache-and-network", notifyOnNetworkStatusChange: true, pollInterval: 20000 },
   );
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };

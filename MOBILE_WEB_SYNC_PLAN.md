@@ -22,6 +22,19 @@ adb shell pm enable com.ctrend.app
 
 ---
 
+## Status
+
+| Phase | Status |
+|-------|--------|
+| Phase 1 — Feed Card Foundation | ✅ Complete |
+| Phase 2 — Multi-Compare Grid & Vote UX | ✅ Complete |
+| Phase 3 — Comment System Upgrade | ✅ Complete |
+| Phase 4 — Notification System Upgrade | ⚠️ Built — untested |
+| Phase 5 — Profile Core | 🔄 In progress |
+| Phase 6–11 | ⏳ Pending |
+
+---
+
 ## Phase 1 — Feed Card Foundation Fixes
 
 **Goal:** Fix the most visible issues in the existing feed card — display names, comment count, hype toggle, anonymous vote, and realtime delete. All backend fields already exist; this is pure mobile wiring.
