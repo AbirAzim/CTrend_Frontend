@@ -22,6 +22,7 @@ export const FEED_POSTS = gql`
       hypeCount
       saveCount
       viewerHasSaved
+      viewerHasHyped
       recentComments {
         id
         content
@@ -71,6 +72,7 @@ export const GET_POST_BY_ID = gql`
       hypeCount
       saveCount
       viewerHasSaved
+      viewerHasHyped
       recentComments {
         id
         content
@@ -156,6 +158,7 @@ export const MY_SAVED_POSTS = gql`
       hypeCount
       saveCount
       viewerHasSaved
+      viewerHasHyped
       recentComments {
         id
         content

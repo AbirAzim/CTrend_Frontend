@@ -37,6 +37,7 @@ export function mapGqlPostToFeedView(p: {
   hypeCount?: number;
   saveCount?: number;
   viewerHasSaved?: boolean;
+  viewerHasHyped?: boolean;
   commentCount?: number;
   recentComments?: Array<{
     id: string;
@@ -94,6 +95,7 @@ export function mapGqlPostToFeedView(p: {
     hypeCount: p.hypeCount ?? 0,
     saveCount: p.saveCount ?? 0,
     viewerHasSaved: p.viewerHasSaved ?? false,
+    viewerHasHyped: p.viewerHasHyped ?? false,
     commentCount: p.commentCount ?? 0,
     recentComments: p.recentComments ?? [],
     status: (p.status as PostStatus | null) ?? null,

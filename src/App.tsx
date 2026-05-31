@@ -17,6 +17,7 @@ import { CampaignDetailPage } from "./pages/CampaignDetailPage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { SignupPage } from "./pages/SignupPage";
+import { SoundPreferencesPage } from "./pages/SoundPreferencesPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 
 export default function App() {
@@ -57,6 +58,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ScheduledPostsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile/sounds"
+          element={
+            <ProtectedRoute>
+              <SoundPreferencesPage />
             </ProtectedRoute>
           }
         />

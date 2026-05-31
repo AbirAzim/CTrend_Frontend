@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client";
-import { CATEGORIES, UPDATE_POST } from "../graphql/feed";
+import { CATEGORIES, EXTEND_POST_VOTING, UPDATE_POST } from "../graphql/feed";
+import { DateTimePicker } from "./DateTimePicker";
 import { useImageUpload } from "../lib/useImageUpload";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
@@ -12,6 +13,8 @@ type EditablePost = {
   imageUrls: string[];
   options?: Array<{ label?: string | null }> | null;
   category?: { id: string; name?: string | null } | null;
+  votingEndsAt?: string | null;
+  isVotingOpen?: boolean | null;
 };
 
 type Props = {
@@ -19,6 +22,32 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
+
+const EXTEND_PRESETS: { label: string; ms: number | null }[] = [
+  { label: "+12h", ms: 12 * 3_600_000 },
+  { label: "+1d", ms: 24 * 3_600_000 },
+  { label: "+3d", ms: 3 * 24 * 3_600_000 },
+  { label: "+1w", ms: 7 * 24 * 3_600_000 },
+  { label: "Custom", ms: null },
+];
+
+function toLocalDateTimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDeadline(iso?: string | null): string {
+  if (!iso) return "No deadline set";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "No deadline set";
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export function EditPostModal({ post, onClose, onSaved }: Props) {
   const initialItems: CompareItem[] = post.imageUrls.map((url, i) => ({
@@ -30,14 +59,23 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const [items, setItems] = useState<CompareItem[]>(initialItems);
   const [categoryId, setCategoryId] = useState(post.category?.id ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [extendError, setExtendError] = useState<string | null>(null);
+  const [extendPreset, setExtendPreset] = useState("");
+  const [extendDraft, setExtendDraft] = useState("");
+  const [votingEndsAt, setVotingEndsAt] = useState(post.votingEndsAt ?? null);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { uploadImage } = useImageUpload();
+
+  const votingOpen = post.isVotingOpen !== false && votingEndsAt
+    ? new Date(votingEndsAt).getTime() > Date.now()
+    : post.isVotingOpen !== false;
 
   const { data: catsData } = useQuery(CATEGORIES);
   const categories: Array<{ id: string; name: string }> = catsData?.categories ?? [];
 
   const [updatePostMut, { loading }] = useMutation(UPDATE_POST);
+  const [extendVotingMut, { loading: extending }] = useMutation(EXTEND_POST_VOTING);
 
   function setItemField(idx: number, field: keyof CompareItem, value: string) {
     setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
@@ -62,6 +100,46 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
       setError("Image upload failed. Try pasting a URL instead.");
     }
     setUploadingIdx(null);
+  }
+
+  async function handleExtendDeadline() {
+    setExtendError(null);
+    const raw = extendDraft.trim();
+    if (!raw) {
+      setExtendError("Pick a new date-time.");
+      return;
+    }
+    const next = new Date(raw);
+    if (Number.isNaN(next.getTime())) {
+      setExtendError("Invalid datetime.");
+      return;
+    }
+    if (next.getTime() <= Date.now()) {
+      setExtendError("New deadline must be in the future.");
+      return;
+    }
+    if (votingEndsAt) {
+      const cur = new Date(votingEndsAt).getTime();
+      if (!Number.isNaN(cur) && next.getTime() <= cur) {
+        setExtendError("New deadline should be after the current end time.");
+        return;
+      }
+    }
+    try {
+      const { data } = await extendVotingMut({
+        variables: {
+          postId: post.id,
+          newVotingEndsAt: next.toISOString(),
+        },
+      });
+      const updated = data?.extendPostVoting?.votingEndsAt ?? next.toISOString();
+      setVotingEndsAt(updated);
+      setExtendDraft("");
+      setExtendPreset("");
+      onSaved();
+    } catch (err: unknown) {
+      setExtendError(getApolloErrorMessage(err));
+    }
   }
 
   async function handleSave() {
@@ -128,6 +206,67 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                 ))}
               </select>
             </label>
+          )}
+
+          {post.isVotingOpen !== false && (
+            <div className="cx-extend-section cx-edit-extend-section">
+              <p className="cx-extend-label">
+                Voting deadline
+                <span className="cx-edit-deadline-current muted small">
+                  Current: {formatDeadline(votingEndsAt)}
+                  {!votingOpen ? " · Closed" : ""}
+                </span>
+              </p>
+              <div className="cx-extend-presets">
+                {EXTEND_PRESETS.map(({ label, ms }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className={`cx-extend-chip${extendPreset === label ? " cx-extend-chip--active" : ""}`}
+                    onClick={() => {
+                      setExtendPreset(label);
+                      setExtendError(null);
+                      if (ms !== null) {
+                        const base = votingEndsAt && new Date(votingEndsAt).getTime() > Date.now()
+                          ? new Date(votingEndsAt)
+                          : new Date();
+                        setExtendDraft(toLocalDateTimeInputValue(new Date(base.getTime() + ms)));
+                      } else {
+                        setExtendDraft("");
+                      }
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {(extendPreset === "Custom" || extendDraft) && (
+                <DateTimePicker
+                  id="edit-extend-deadline"
+                  label="New voting deadline"
+                  value={extendDraft}
+                  minDate={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+                  onChange={(v) => {
+                    setExtendDraft(v);
+                    setExtendError(null);
+                    if (v) setExtendPreset("Custom");
+                  }}
+                />
+              )}
+              <div className="cx-extend-footer">
+                <button
+                  type="button"
+                  className="cx-extend-submit"
+                  disabled={extending || !extendDraft.trim()}
+                  onClick={() => void handleExtendDeadline()}
+                >
+                  {extending ? "Updating…" : "Apply new deadline"}
+                </button>
+                {extendError ? (
+                  <small className="cx-extend-error" role="alert">{extendError}</small>
+                ) : null}
+              </div>
+            </div>
           )}
 
           <p className="cx-edit-section-label">
