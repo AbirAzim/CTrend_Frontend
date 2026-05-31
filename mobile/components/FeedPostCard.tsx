@@ -310,6 +310,11 @@ function FeedPostCardComponent({ post }: Props) {
     ? up > down ? 0 : down > up ? 1 : null : null;
   const hasVoted = viewer !== null || (optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex) !== null;
 
+  // Multi-compare grid sizing — 3 cols for 3/5+ items, 2×2 for exactly 4 items
+  const numCols = !isBinary && compareUrls && compareUrls.length === 4 ? 2 : 3;
+  const multiCellWidth = numCols === 2 ? (SCREEN_W - 2) / 2 : (SCREEN_W - 4) / 3;
+  const multiTotal = activeStats?.reduce((sum, s) => sum + s.count, 0) ?? 0;
+
   useEffect(() => {
     if (!activeVotingEndsAt || isVotingClosed) return;
     const timer = setInterval(() => {
@@ -457,25 +462,56 @@ function FeedPostCardComponent({ post }: Props) {
     if (!isBinary && curIdx !== null && curIdx !== undefined && curIdx === idx) return;
     triggerVotePop(idx);
 
-    const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
-    const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
-    let newUp = curUp; let newDown = curDown;
-    if (idx === 0) { newUp += 1; if (curVote === "DOWN") newDown = Math.max(0, newDown - 1); }
-    else { newDown += 1; if (curVote === "UP") newUp = Math.max(0, newUp - 1); }
-    const total = newUp + newDown;
     const curStats = optimisticVote?.optionStats ?? post.optionStats ?? null;
-    const newStats = curStats?.map((s) => {
-      const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
-      return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
-    }) ?? null;
-    setOptimisticVote({
-      upvoteCount: newUp, downvoteCount: newDown,
-      viewerVote: idx === 0 ? "UP" : "DOWN",
-      mySelectedOptionIndex: idx,
-      optionStats: newStats,
-      isVotingOpen: activeIsVotingOpen,
-      votingEndsAt: activeVotingEndsAt,
-    });
+    let newOptimistic: VoteLiveState;
+
+    if (isBinary) {
+      const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
+      const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
+      let newUp = curUp; let newDown = curDown;
+      if (idx === 0) { newUp += 1; if (curVote === "DOWN") newDown = Math.max(0, newDown - 1); }
+      else { newDown += 1; if (curVote === "UP") newUp = Math.max(0, newUp - 1); }
+      const total = newUp + newDown;
+      const newStats = curStats?.map((s) => {
+        const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
+        return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
+      }) ?? null;
+      newOptimistic = {
+        upvoteCount: newUp, downvoteCount: newDown,
+        viewerVote: idx === 0 ? "UP" : "DOWN",
+        mySelectedOptionIndex: idx,
+        optionStats: newStats,
+        isVotingOpen: activeIsVotingOpen,
+        votingEndsAt: activeVotingEndsAt,
+      };
+    } else {
+      // Multi-compare: increment selected option, decrement previous selection
+      const prevIdx = curIdx;
+      const rawCounts = (curStats ?? []).map((s) => {
+        let c = s.count;
+        if (s.index === idx) c += 1;
+        if (prevIdx !== null && prevIdx !== undefined && s.index === prevIdx && prevIdx !== idx)
+          c = Math.max(0, c - 1);
+        return { ...s, count: c };
+      });
+      const newMultiTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
+      const newStats = rawCounts.map((s) => ({
+        ...s,
+        percentage: newMultiTotal > 0 ? (s.count / newMultiTotal) * 100 : 0,
+      }));
+      newOptimistic = {
+        upvoteCount: optimisticVote?.upvoteCount ?? post.upvoteCount,
+        downvoteCount: optimisticVote?.downvoteCount ?? post.downvoteCount,
+        viewerVote: null,
+        mySelectedOptionIndex: idx,
+        optionStats: newStats,
+        isVotingOpen: activeIsVotingOpen,
+        votingEndsAt: activeVotingEndsAt,
+      };
+    }
+
+    setOptimisticVote(newOptimistic);
+    setDetailsExpanded(true);
     voteGuardUntil.current = Date.now() + 2000;
 
     if (voteInFlight.current) { pendingVote.current = { idx }; return; }
@@ -626,6 +662,7 @@ function FeedPostCardComponent({ post }: Props) {
                 key={`${post.id}-multi-${i}`}
                 style={[
                   styles.multiCell,
+                  { width: multiCellWidth, height: multiCellWidth },
                   isLoser && { opacity: 0.5 },
                   { transform: [{ scale: cellScale[i] }] },
                 ]}
@@ -734,12 +771,14 @@ function FeedPostCardComponent({ post }: Props) {
         </View>
       ) : null}
 
-      {/* Countdown */}
-      {countdownStr && !isVotingClosed ? (
+      {/* Countdown + SEE DETAILS (shown whenever compare has votes or is closed) */}
+      {compareUrls && (countdownStr || binaryTotal > 0 || multiTotal > 0 || isVotingClosed) ? (
         <View style={st.countdownRow}>
-          <View style={st.countdownPill}>
-            <Text style={st.countdownText}>{countdownStr} LEFT</Text>
-          </View>
+          {countdownStr && !isVotingClosed ? (
+            <View style={st.countdownPill}>
+              <Text style={st.countdownText}>{countdownStr} LEFT</Text>
+            </View>
+          ) : <View />}
           <Pressable style={st.seeDetailsBtn} onPress={() => setDetailsExpanded(v => !v)}>
             <Text style={st.seeDetailsBtnText}>{detailsExpanded ? "HIDE DETAILS" : "SEE DETAILS"}</Text>
           </Pressable>
@@ -772,6 +811,31 @@ function FeedPostCardComponent({ post }: Props) {
                 <View style={st.optionBarTrack}>
                   <View style={[st.optionBarFill, { flex: pct, backgroundColor: barColor }]} />
                   <View style={[st.optionBarEmpty, { flex: 100 - pct }]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {/* Multi-compare Live Split — only shown when expanded */}
+      {detailsExpanded && !isBinary && multiTotal > 0 ? (
+        <View style={st.liveSplit}>
+          <View style={st.liveSplitHeader}>
+            <Text style={st.liveSplitTitle}>LIVE SPLIT</Text>
+            <Text style={st.liveSplitTotal}>{multiTotal} votes</Text>
+          </View>
+          {(activeStats ?? []).map((stat) => {
+            const pct = Math.round(stat.percentage);
+            return (
+              <View key={stat.index} style={st.splitOptionRow}>
+                <View style={st.splitOptionMeta}>
+                  <Text style={st.splitOptionLabel} numberOfLines={1}>{stat.label}</Text>
+                  <Text style={st.splitOptionCount}>{stat.count} · {pct}%</Text>
+                </View>
+                <View style={st.optionBarTrack}>
+                  <View style={[st.optionBarFill, { flex: pct || 1, backgroundColor: "#8b5cf6" }]} />
+                  <View style={[st.optionBarEmpty, { flex: (100 - pct) || 1 }]} />
                 </View>
               </View>
             );
@@ -886,7 +950,7 @@ const styles = StyleSheet.create({
   absoluteFill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   // Multi-option grid (3–4 options)
   multiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
-  multiCell: { width: (SCREEN_W - 2) / 2, height: (SCREEN_W - 2) / 2 * 0.8, overflow: "hidden" },
+  multiCell: { overflow: "hidden" },
   multiImg: { width: "100%", height: "100%" },
   // More menu
   menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
