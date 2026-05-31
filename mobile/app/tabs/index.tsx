@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
-import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "@ctrend/shared/graphql/feed";
+import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "@ctrend/shared/graphql/feed";
 import { MY_FRIENDS, FRIEND_SUGGESTIONS, FRIEND_REQUESTS } from "@ctrend/shared/graphql/friends";
 import { ME } from "@ctrend/shared/graphql/profile";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
@@ -125,6 +125,7 @@ export default function FeedScreen() {
   const { colors } = useTheme();
   const { isAuthenticated } = useAuth();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
@@ -207,12 +208,14 @@ export default function FeedScreen() {
   }, [data, meData, friendsData, suggestionsData, requestsData]);
 
   const knownIds = new Set(apiPosts.map((p) => p.id));
-  const posts: FeedPostView[] = [...liveQueue.filter((p) => !knownIds.has(p.id)), ...apiPosts];
+  const allPosts: FeedPostView[] = [...liveQueue.filter((p) => !knownIds.has(p.id)), ...apiPosts];
+  const posts = allPosts.filter((p) => !removedIds.has(p.id));
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     onData: ({ data: sub }) => {
       const postId = sub.data?.newPosts?.postId;
       if (!postId) return;
+      void refetch();
       void client
         .query({ query: GET_POST_BY_ID, variables: { id: postId }, fetchPolicy: "network-only" })
         .then(({ data: d }) => {
@@ -224,6 +227,15 @@ export default function FeedScreen() {
           });
         })
         .catch(() => {});
+    },
+  });
+
+  useSubscription<{ postDeleted: { postId: string } }>(POST_DELETED_SUB, {
+    onData: ({ data: sub }) => {
+      const postId = sub.data?.postDeleted?.postId;
+      if (!postId) return;
+      setRemovedIds((prev) => new Set([...prev, postId]));
+      void refetch();
     },
   });
 
@@ -257,7 +269,7 @@ export default function FeedScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={() => { setLiveQueue([]); void refetch(); }}
+              onRefresh={() => { setLiveQueue([]); setRemovedIds(new Set()); void refetch(); }}
               colors={[colors.accent]}
               tintColor={colors.accent}
             />
