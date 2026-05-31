@@ -70,6 +70,11 @@ function FeedTopBar() {
 
       {/* Action icons */}
       <View style={styles.actions}>
+        {/* Search */}
+        <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
+          <Text style={styles.iconSymbol}>🔍</Text>
+        </Pressable>
+
         {/* Theme toggle */}
         <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
           <Text style={styles.iconSymbol}>{isDark ? "✶" : "🌙"}</Text>
