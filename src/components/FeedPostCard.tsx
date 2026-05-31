@@ -2,7 +2,7 @@ import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { COMMENT_POST, COMMENTS_BY_POST } from "../graphql/comments";
+import { PostCommentsPanel } from "./PostCommentsPanel";
 import {
   IconBookmark,
   IconChevronDown,
@@ -144,28 +144,6 @@ function formatAbsoluteDateTime(iso: string): string {
   }).format(d);
 }
 
-type LocalCommentRow = {
-  id: string;
-  content: string;
-  authorLabel: string;
-  createdAt: string;
-};
-
-type CommentsByPostQueryData = {
-  commentsByPost: Array<{
-    id: string;
-    content: string;
-    createdAt: string;
-    postId: string;
-    parentId: string | null;
-    author: {
-      id: string;
-      username: string;
-      displayName?: string | null;
-    };
-  }>;
-};
-
 type VotersByPostData = {
   votersByPost: Array<{
     voteId: string;
@@ -240,10 +218,6 @@ function FeedPostCardComponent({
   const [anonymousVote, setAnonymousVote] = useState(false);
   const [showVoters, setShowVoters] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [showAllComments, setShowAllComments] = useState(false);
-  const [commentDraft, setCommentDraft] = useState("");
-  const [localComments, setLocalComments] = useState<LocalCommentRow[]>([]);
-  const [commentError, setCommentError] = useState<string | null>(null);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
   const [justVotedIndex, setJustVotedIndex] = useState<number | null>(null);
@@ -281,14 +255,9 @@ function FeedPostCardComponent({
     }
   }
 
-  const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
-    useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, { fetchPolicy: "network-only" });
   const [fetchVoters, { data: votersData, loading: votersLoading, error: votersError }] =
     useLazyQuery<VotersByPostData>(VOTERS_BY_POST, { fetchPolicy: "network-only" });
 
-  const [commentMut, { loading: commentPosting }] = useMutation(COMMENT_POST, {
-    refetchQueries: [{ query: COMMENTS_BY_POST, variables: { postId: post.id } }],
-  });
   const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
   const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
 
@@ -329,18 +298,6 @@ function FeedPostCardComponent({
       setTimeout(() => setVoteFx(false), 280);
     },
   });
-
-  useEffect(() => {
-    if (commentsOpen && voteMode === "api") {
-      void fetchComments({ variables: { postId: post.id } });
-    }
-  }, [commentsOpen, voteMode, post.id, fetchComments]);
-
-  useEffect(() => {
-    if (!commentsOpen) {
-      setShowAllComments(false);
-    }
-  }, [commentsOpen]);
 
   useEffect(() => {
     return () => {
@@ -649,43 +606,6 @@ function FeedPostCardComponent({
     authUser?.displayName?.trim() ||
     authUser?.email?.split("@")[0] ||
     "You";
-
-  async function onSubmitComment(e: React.FormEvent) {
-    e.preventDefault();
-    setCommentError(null);
-    const text = commentDraft.trim();
-    if (!text) {
-      return;
-    }
-
-    if (voteMode === "local") {
-      setLocalComments((prev) => [
-        {
-          id: `local-${Date.now()}`,
-          content: text,
-          authorLabel: meLabel,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-      setCommentDraft("");
-      return;
-    }
-
-    try {
-      await commentMut({
-        variables: {
-          postId: post.id,
-          input: {
-            content: text,
-          },
-        },
-      });
-      setCommentDraft("");
-    } catch (err: unknown) {
-      setCommentError(getApolloErrorMessage(err));
-    }
-  }
 
   async function refreshPostVotingState() {
     await apolloClient.refetchQueries({
@@ -1027,11 +947,6 @@ function FeedPostCardComponent({
 
   const binaryTotal = up + down;
   const hypeCount = hypeCountLive;
-  const apiComments = commentsData?.commentsByPost ?? [];
-  const displayedApiComments = showAllComments ? apiComments : apiComments.slice(0, 2);
-  const hasMoreApiComments = apiComments.length > 2;
-  const displayedLocalComments = showAllComments ? localComments : localComments.slice(0, 2);
-  const hasMoreLocalComments = localComments.length > 2;
   const recentPreviewComments = (post.recentComments ?? []).slice(0, 2);
   const hasMorePreviewComments = (post.commentCount ?? recentPreviewComments.length) > 2;
   const groupedVoters = useMemo(() => {
@@ -1721,8 +1636,6 @@ function FeedPostCardComponent({
             aria-expanded={commentsOpen}
             onClick={() => {
               setCommentsOpen((v) => !v);
-              setCommentError(null);
-              setShowAllComments(false);
             }}
           >
             <IconComment />
@@ -1794,7 +1707,6 @@ function FeedPostCardComponent({
                 className="btn-ghost"
                 onClick={() => {
                   setCommentsOpen(true);
-                  setShowAllComments(true);
                 }}
               >
                 Show more
@@ -1813,91 +1725,12 @@ function FeedPostCardComponent({
       </div>
 
       {commentsOpen ? (
-        <section className="ig-post-comments" aria-label="Comments">
-          <div className="ig-post-comments-head">
-            <h3 className="ig-post-comments-title">Comments</h3>
-            {voteMode === "api" && commentsLoading ? (
-              <span className="ig-post-comments-status">Loading…</span>
-            ) : null}
-          </div>
-          {voteMode === "api" && commentsQueryError ? (
-            <p className="ig-post-comments-error" role="alert">
-              {commentsQueryError.message}
-            </p>
-          ) : null}
-          {commentError ? (
-            <p className="ig-post-comments-error" role="alert">
-              {commentError}
-            </p>
-          ) : null}
-          <ul className="ig-post-comments-list">
-            {voteMode === "api"
-              ? displayedApiComments.map((c) => (
-                  <li key={c.id} className="ig-post-comment">
-                    <span className="ig-post-comment-author">
-                      {c.author.displayName?.trim() || c.author.username}
-                    </span>
-                    <p className="ig-post-comment-body">{c.content}</p>
-                    <time className="ig-post-comment-time" dateTime={c.createdAt}>
-                      {formatRelativeTime(c.createdAt) || ""}
-                    </time>
-                  </li>
-                ))
-              : displayedLocalComments.map((c) => (
-                  <li key={c.id} className="ig-post-comment">
-                    <span className="ig-post-comment-author">{c.authorLabel}</span>
-                    <p className="ig-post-comment-body">{c.content}</p>
-                    <time className="ig-post-comment-time" dateTime={c.createdAt}>
-                      {formatRelativeTime(c.createdAt) || "just now"}
-                    </time>
-                  </li>
-                ))}
-          </ul>
-          {(voteMode === "api" ? hasMoreApiComments : hasMoreLocalComments) ? (
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => setShowAllComments((v) => !v)}
-            >
-              {showAllComments ? "Show less" : "Show more"}
-            </button>
-          ) : null}
-          {(voteMode === "api"
-            ? (commentsData?.commentsByPost?.length ?? 0) === 0 && !commentsLoading
-            : localComments.length === 0) ? (
-            <p className="ig-post-comments-empty muted">
-              No comments yet — say something fun.
-            </p>
-          ) : null}
-          <form
-            className="ig-post-comments-form"
-            onSubmit={(ev) => void onSubmitComment(ev)}
-          >
-            <label className="ig-post-comments-label" htmlFor={`comment-${post.id}`}>
-              Add a comment
-            </label>
-            <textarea
-              id={`comment-${post.id}`}
-              className="ig-post-comments-input"
-              rows={2}
-              maxLength={5000}
-              placeholder="Share your take…"
-              value={commentDraft}
-              onChange={(ev) => setCommentDraft(ev.target.value)}
-              disabled={voteMode === "api" && commentPosting}
-            />
-            <button
-              type="submit"
-              className="ig-post-comments-submit"
-              disabled={
-                commentDraft.trim().length === 0 ||
-                (voteMode === "api" && commentPosting)
-              }
-            >
-              {commentPosting ? "Posting…" : "Post"}
-            </button>
-          </form>
-        </section>
+        <PostCommentsPanel
+          postId={post.id}
+          voteMode={voteMode}
+          isAuthenticated={isAuthenticated}
+          meLabel={meLabel}
+        />
       ) : null}
       {showVoters ? (
         <div

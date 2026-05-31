@@ -22,6 +22,8 @@ function typeIcon(type: string): string {
     case "NEW_POST_FRIEND":  return "✨";
     case "POST_HYPE":        return "❤️";
     case "POST_COMMENT":     return "💭";
+    case "COMMENT_REPLY":    return "↩️";
+    case "COMMENT_REACTION": return "😊";
     default:                 return "🔔";
   }
 }
@@ -61,6 +63,11 @@ export function NotificationBell() {
     // FRIEND_REQUEST: inline buttons handle the action; clicking row → profile
     if (n.type === "FRIEND_REQUEST" && n.referenceId) {
       navigate(`/profile/${n.referenceId}`);
+      return;
+    }
+    // Comment notifications deep-link to the post (postId preferred)
+    if (n.postId) {
+      navigate(`/post/${n.postId}`);
       return;
     }
     // Anything referencing a Post jumps to the post detail page

@@ -23,6 +23,7 @@ export type NotificationItem = {
   body: string;
   referenceId?: string | null;
   referenceType?: string | null;
+  postId?: string | null;
   actorCount?: number | null;
   latestActorId?: string | null;
   latestActorName?: string | null;

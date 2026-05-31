@@ -10,6 +10,7 @@ export const MY_NOTIFICATIONS = gql`
         body
         referenceId
         referenceType
+        postId
         actorCount
         latestActorId
         latestActorName
@@ -55,6 +56,7 @@ export const NEW_NOTIFICATION_SUB = gql`
       body
       referenceId
       referenceType
+      postId
       read
       createdAt
     }

@@ -64,21 +64,52 @@ export const PROMOTE_TO_ADMIN = gql`
 `;
 
 export const LIST_USERS = gql`
-  query ListUsers($skip: Int, $take: Int, $role: String) {
-    listUsers(skip: $skip, take: $take, role: $role) {
+  query ListUsers(
+    $skip: Int
+    $take: Int
+    $role: String
+    $search: String
+    $searchBy: String
+    $status: String
+    $sortBy: String
+    $sortOrder: String
+  ) {
+    listUsers(
+      skip: $skip
+      take: $take
+      role: $role
+      search: $search
+      searchBy: $searchBy
+      status: $status
+      sortBy: $sortBy
+      sortOrder: $sortOrder
+    ) {
       id
       email
       username
       displayName
       role
+      roles
       profileImageUrl
+      emailVerified
+      createdAt
     }
   }
 `;
 
 export const LIST_USERS_COUNT = gql`
-  query ListUsersCount($role: String) {
-    listUsersCount(role: $role)
+  query ListUsersCount(
+    $role: String
+    $search: String
+    $searchBy: String
+    $status: String
+  ) {
+    listUsersCount(
+      role: $role
+      search: $search
+      searchBy: $searchBy
+      status: $status
+    )
   }
 `;
 
