@@ -276,3 +276,15 @@ export const POST_DELETED_SUB = gql`
     }
   }
 `;
+
+export const UPDATE_POST = gql`
+  mutation UpdatePost($postId: ID!, $input: UpdatePostInput!) {
+    updatePost(postId: $postId, input: $input) {
+      id
+      caption
+      imageUrls
+      options { label imageUrl }
+      category { id name }
+    }
+  }
+`;

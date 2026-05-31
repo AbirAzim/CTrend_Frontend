@@ -32,6 +32,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 import { useSounds } from "../context/SoundContext";
+import { useTabBar } from "../context/TabBarContext";
 import { postPermalink } from "../lib/postPermalink";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -256,6 +257,7 @@ function FeedPostCardComponent({ post }: Props) {
   const { user, isAuthenticated } = useAuth();
   const { colors } = useTheme();
   const { playTick } = useSounds();
+  const { adjustSavedCount } = useTabBar();
   const st = useMemo(() => makeStyles(colors), [colors]);
 
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
@@ -566,9 +568,11 @@ function FeedPostCardComponent({ post }: Props) {
   }
 
   async function handleSave() {
-    const next = !saved; setSaved(next);
+    const next = !saved;
+    setSaved(next);
+    adjustSavedCount(next ? 1 : -1);
     try { await setKeepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setSaved(!next); }
+    catch { setSaved(!next); adjustSavedCount(next ? -1 : 1); }
   }
 
   async function handleShare() {
@@ -612,7 +616,7 @@ function FeedPostCardComponent({ post }: Props) {
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
   const authorInitial = authorName.slice(0, 1).toUpperCase();
   const authorAvatarUrl = post.authorProfileImageUrl ?? null;
-  const timeLabel = formatRelativeTime(post.createdAt);
+  const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 
   return (
     <View style={st.card}>
