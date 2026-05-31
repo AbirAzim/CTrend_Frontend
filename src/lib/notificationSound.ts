@@ -36,23 +36,31 @@ async function runningCtx(): Promise<AudioContext | null> {
   return current?.state === "running" ? current : null;
 }
 
-let _unlocked = false;
+/** Unlock output in the current user-gesture stack (Safari requires sync start). */
+function unlockCtxInGesture(ctx: AudioContext): void {
+  if (ctx.state === "running") return;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.01);
+  } catch {
+    /* ignore */
+  }
+  try {
+    void ctx.resume();
+  } catch {
+    /* ignore */
+  }
+}
+
 function warmUp() {
   const ctx = getAudioCtx();
   if (!ctx) return;
-  if (!_unlocked) {
-    try {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.01);
-      _unlocked = true;
-    } catch { /* ignore */ }
-  }
-  if (ctx.state === "suspended") void ctx.resume();
+  unlockCtxInGesture(ctx);
 }
 
 if (typeof document !== "undefined") {
@@ -69,12 +77,37 @@ if (typeof document !== "undefined") {
 
 type SoundPlayer = (ctx: AudioContext, now: number) => void;
 
+/** Play immediately in the current call stack — required for Safari vote/preview taps. */
+function playSoundInUserGesture(id: string): void {
+  const player = SOUND_PLAYERS[id];
+  if (!player) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  unlockCtxInGesture(ctx);
+  try {
+    player(ctx, ctx.currentTime);
+  } catch {
+    /* ignore */
+  }
+}
+
 function withCtx(player: SoundPlayer): void {
-  void runningCtx().then((ctx) => {
-    if (!ctx) return;
+  const ctx = getAudioCtx();
+  if (ctx?.state === "running") {
     try {
       player(ctx, ctx.currentTime);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  void runningCtx().then((running) => {
+    if (!running) return;
+    try {
+      player(running, running.currentTime);
+    } catch {
+      /* ignore */
+    }
   });
 }
 
@@ -463,19 +496,19 @@ export function playSoundById(id: string): void {
 }
 
 export function playVoteSoundPreview(id: VoteSoundId): void {
-  playSoundById(id);
+  playSoundInUserGesture(id);
 }
 
 export function playNotificationSoundPreview(id: NotificationSoundId): void {
-  playSoundById(id);
+  playSoundInUserGesture(id);
 }
 
 export function playMessageSoundPreview(id: MessageSoundId): void {
-  playSoundById(id);
+  playSoundInUserGesture(id);
 }
 
 export function playVoteSound(): void {
-  playSoundById(activePrefs.voteSoundId);
+  playSoundInUserGesture(activePrefs.voteSoundId);
 }
 
 export function playNotificationChime(): void {
