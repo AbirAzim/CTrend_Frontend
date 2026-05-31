@@ -211,7 +211,6 @@ function AdminActionsCell({
 
 function AdminPaginationBar({
   skip,
-  pageSize: _pageSize,
   total,
   shown,
   loading,
@@ -219,7 +218,6 @@ function AdminPaginationBar({
   onNext,
 }: {
   skip: number;
-  pageSize: number;
   total: number;
   shown: number;
   loading?: boolean;
@@ -600,7 +598,6 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
 
       <AdminPaginationBar
         skip={skip}
-        pageSize={PAGE_SIZE}
         total={totalCount}
         shown={users.length}
         loading={loading}
@@ -866,7 +863,6 @@ function AdminsTab({ onComposeMessage }: { onComposeMessage: (userId: string) =>
 
       <AdminPaginationBar
         skip={skip}
-        pageSize={PAGE_SIZE}
         total={totalAdmins}
         shown={admins.length}
         loading={loading}
