@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@apollo/client";
 import { useNotifications, type NotificationItem } from "../context/NotificationContext";
+import { useMessenger } from "../context/MessengerContext";
 import { RESPOND_FRIEND_REQUEST, FRIEND_REQUESTS, MY_FRIENDS } from "../graphql/friends";
 
 function timeAgo(iso: string): string {
@@ -30,6 +31,7 @@ function typeIcon(type: string): string {
 
 export function NotificationBell() {
   const { notifications, unreadCount, markRead, markAllRead, refetch } = useNotifications();
+  const { openChat, refetchConversations, ensureConversation } = useMessenger();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
@@ -59,6 +61,30 @@ export function NotificationBell() {
   function handleClick(n: NotificationItem) {
     if (!n.read) markRead(n.id);
     setOpen(false);
+
+    if (n.type === "MESSAGE" && n.referenceType === "moderator_conversation" && n.referenceId) {
+      ensureConversation({
+        id: n.referenceId,
+        type: "moderator",
+        name: "Moderator",
+        participantIds: [],
+        participants: [
+          {
+            id: "moderator",
+            displayName: "Moderator",
+            avatarUrl: "/logo.png",
+            online: false,
+          },
+        ],
+        lastMessageText: n.body ?? null,
+        lastMessageAt: n.createdAt,
+        unreadCount: n.read ? 0 : 1,
+        createdAt: n.createdAt,
+      });
+      void refetchConversations();
+      openChat(n.referenceId);
+      return;
+    }
 
     // FRIEND_REQUEST: inline buttons handle the action; clicking row → profile
     if (n.type === "FRIEND_REQUEST" && n.referenceId) {

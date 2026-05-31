@@ -540,6 +540,7 @@ export function MessengerPanel() {
     setPanelOpen,
     refetchConversations,
     startDirectConversation,
+    openChat,
   } = useMessenger();
 
   const [search, setSearch] = useState("");
@@ -556,6 +557,9 @@ export function MessengerPanel() {
   const openConversations = openWindowIds
     .map((id) => conversations.find((c) => c.id === id))
     .filter(Boolean) as Conversation[];
+
+  const moderatorConvo =
+    conversations.find((c) => c.type?.toLowerCase() === "moderator") ?? null;
 
   // Build userId → direct conversation lookup
   const directConvoByUserId = new Map<string, Conversation>();
@@ -591,6 +595,12 @@ export function MessengerPanel() {
         (r.displayName ?? r.username).toLowerCase().includes(search.toLowerCase()),
       )
     : mergedRows;
+
+  const showModeratorRow = Boolean(
+    moderatorConvo &&
+      (!search.trim() || "moderator".includes(search.trim().toLowerCase())),
+  );
+  const panelListEmpty = filteredRows.length === 0 && !showModeratorRow;
 
   async function handleOpen(friendId: string) {
     setStartingId(friendId);
@@ -675,9 +685,9 @@ export function MessengerPanel() {
             </div>
 
             {/* Unified people list */}
-            {friendsLoading && allFriends.length === 0 ? (
+            {friendsLoading && allFriends.length === 0 && !moderatorConvo ? (
               <div className="mp-empty"><p>Loading…</p></div>
-            ) : filteredRows.length === 0 ? (
+            ) : panelListEmpty ? (
               <div className="mp-empty">
                 {search.trim()
                   ? <p>No one matches "<strong>{search}</strong>"</p>
@@ -686,6 +696,45 @@ export function MessengerPanel() {
               </div>
             ) : (
               <ul className="mp-list">
+                {showModeratorRow && moderatorConvo ? (
+                  <li
+                    role="button"
+                    tabIndex={0}
+                    className={`mp-item mp-item--moderator${(moderatorConvo.unreadCount ?? 0) > 0 ? " mp-item--unread" : ""}${openWindowIds.includes(moderatorConvo.id) ? " mp-item--active" : ""}`}
+                    onClick={() => {
+                      openChat(moderatorConvo.id);
+                      setPanelOpen(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        openChat(moderatorConvo.id);
+                        setPanelOpen(false);
+                      }
+                    }}
+                  >
+                    <div className="mp-item-avatar-wrap">
+                      <div className="mp-item-avatar mp-item-avatar--logo">
+                        <img src="/logo.png" alt="" />
+                      </div>
+                    </div>
+                    <div className="mp-item-meta">
+                      <div className="mp-item-row">
+                        <span className="mp-item-name">Moderator</span>
+                        {moderatorConvo.lastMessageAt ? (
+                          <span className="mp-item-time">
+                            {formatRelativeTime(moderatorConvo.lastMessageAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="mp-item-last">
+                        {moderatorConvo.lastMessageText ?? "Official platform messages"}
+                      </span>
+                    </div>
+                    {(moderatorConvo.unreadCount ?? 0) > 0 ? (
+                      <span className="mp-item-badge">{moderatorConvo.unreadCount}</span>
+                    ) : null}
+                  </li>
+                ) : null}
                 {filteredRows.map((row) => {
                   const name = row.displayName?.trim() || row.username;
                   const initial = (name[0] ?? "?").toUpperCase();
