@@ -12,6 +12,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   Vibration,
   View,
@@ -187,6 +188,13 @@ function makeStyles(c: ColorPalette) {
     optionBarFill: { borderRadius: 2 },
     optionBarEmpty: { backgroundColor: c.border },
     singleImg: { width: "100%" as const, height: 280 },
+    anonRow: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      paddingHorizontal: 14, paddingVertical: 8, gap: 8,
+      backgroundColor: c.section,
+    },
+    anonIcon: { fontSize: 13 },
+    anonLabel: { flex: 1, fontSize: 12, color: c.subtext, fontWeight: "500" as const },
     actionsScroll: {},
     actionsContent: {
       flexDirection: "row" as const,
@@ -251,7 +259,8 @@ function FeedPostCardComponent({ post }: Props) {
   const st = useMemo(() => makeStyles(colors), [colors]);
 
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
+  const [anon, setAnon] = useState(Boolean(post.myVoteAnonymous));
   const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
   const [countdownStr, setCountdownStr] = useState(() => calcCountdown(post.votingEndsAt));
@@ -334,9 +343,11 @@ function FeedPostCardComponent({ post }: Props) {
     setOptimisticVote(null);
     setHypeCount(post.hypeCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
+    setLiked(Boolean(post.viewerHasHyped));
+    setAnon(Boolean(post.myVoteAnonymous));
   }, [post.id, post.upvoteCount, post.downvoteCount, post.viewerVote,
     post.mySelectedOptionIndex, post.isVotingOpen, post.votingEndsAt,
-    post.hypeCount, post.viewerHasSaved]);
+    post.hypeCount, post.viewerHasSaved, post.viewerHasHyped, post.myVoteAnonymous]);
 
   // Set initial badge scale for pre-voted cards (no animation)
   useEffect(() => {
@@ -472,7 +483,7 @@ function FeedPostCardComponent({ post }: Props) {
     let currentIdx = idx;
     while (true) {
       try {
-        const result = await voteMut({ variables: { postId: post.id, selectedOptionIndex: currentIdx, anonymous: false } });
+        const result = await voteMut({ variables: { postId: post.id, selectedOptionIndex: currentIdx, anonymous: anon } });
         const payload = result.data?.votePost;
         if (payload?.countsPerOption && payload.countsPerOption.length >= 2) {
           const counts = payload.countsPerOption.map((n) => Math.max(0, Math.round(n)));
@@ -507,6 +518,15 @@ function FeedPostCardComponent({ post }: Props) {
     setLiked(next); setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
     try { await setHypeMut({ variables: { postId: post.id, active: next } }); }
     catch { setLiked(!next); setHypeCount((n) => Math.max(0, n + (next ? -1 : 1))); }
+  }
+
+  async function handleAnonymousToggle(val: boolean) {
+    setAnon(val);
+    const curIdx = optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex;
+    if (hasVoted && curIdx != null) {
+      try { await voteMut({ variables: { postId: post.id, selectedOptionIndex: curIdx, anonymous: val } }); }
+      catch { setAnon(!val); }
+    }
   }
 
   async function handleSave() {
@@ -691,6 +711,20 @@ function FeedPostCardComponent({ post }: Props) {
         <Image source={{ uri: post.imageUrls[0] }} style={st.singleImg} contentFit="cover" cachePolicy="memory-disk" />
       ) : null}
 
+      {/* Anonymous vote toggle — always visible while voting is open */}
+      {compareUrls && !isVotingClosed && isAuthenticated && (
+        <View style={st.anonRow}>
+          <Text style={st.anonIcon}>👻</Text>
+          <Text style={st.anonLabel}>Vote anonymously</Text>
+          <Switch
+            value={anon}
+            onValueChange={(val) => void handleAnonymousToggle(val)}
+            trackColor={{ false: colors.border, true: "#8b5cf6" }}
+            thumbColor="#ffffff"
+          />
+        </View>
+      )}
+
       {/* Vote hint */}
       {compareUrls && !isVotingClosed ? (
         <View style={st.voteHintRow}>
@@ -753,12 +787,12 @@ function FeedPostCardComponent({ post }: Props) {
         contentContainerStyle={st.actionsContent}
       >
         {(([
-          { i: 0, label: "DISCUSS", icon: "💬", onPress: goToPost },
+          { i: 0, label: `DISCUSS${(post.commentCount ?? 0) > 0 ? " " + String(post.commentCount) : ""}`, icon: "💬", onPress: goToPost },
           { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
           { i: 2, label: "FULL PAGE", icon: "⛶", onPress: goToPost },
           {
             i: 3,
-            label: `HYPE${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
+            label: `${liked ? "UNHYPE" : "HYPE"}${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
             icon: liked ? "♥" : "♡",
             onPress: () => void handleHype(),
             active: liked,

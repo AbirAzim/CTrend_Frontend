@@ -23,18 +23,7 @@ export const FEED_POSTS = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
-      recentComments {
-        id
-        content
-        createdAt
-        likeCount
-        viewerHasLiked
-        author {
-          id
-          username
-          displayName
-        }
-      }
+      myVoteAnonymous
       mySelectedOptionIndex
       optionStats {
         index
@@ -73,18 +62,7 @@ export const GET_POST_BY_ID = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
-      recentComments {
-        id
-        content
-        createdAt
-        likeCount
-        viewerHasLiked
-        author {
-          id
-          username
-          displayName
-        }
-      }
+      myVoteAnonymous
       mySelectedOptionIndex
       optionStats {
         index
@@ -159,18 +137,7 @@ export const MY_SAVED_POSTS = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
-      recentComments {
-        id
-        content
-        createdAt
-        likeCount
-        viewerHasLiked
-        author {
-          id
-          username
-          displayName
-        }
-      }
+      myVoteAnonymous
       mySelectedOptionIndex
       optionStats {
         index
@@ -297,6 +264,14 @@ export const DELETE_POST = gql`
 export const NEW_POSTS = gql`
   subscription NewPosts {
     newPosts {
+      postId
+    }
+  }
+`;
+
+export const POST_DELETED_SUB = gql`
+  subscription PostDeleted {
+    postDeleted {
       postId
     }
   }
