@@ -22,6 +22,7 @@ import {
 } from "../graphql/messages";
 import { useAuth } from "./AuthContext";
 import { playMessageSound } from "../lib/notificationSound";
+import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
 
 const MODERATOR_SENDER_ID = "moderator";
 
@@ -33,12 +34,12 @@ function conversationStubFromMessage(
   return {
     id: msg.conversationId,
     type: isModerator ? "moderator" : "direct",
-    name: isModerator ? "Moderator" : msg.senderName || "Chat",
+    name: isModerator ? MODERATOR_BRAND_NAME : msg.senderName || "Chat",
     participantIds: [],
     participants: [
       {
         id: msg.senderId,
-        displayName: msg.senderName || (isModerator ? "Moderator" : "User"),
+        displayName: msg.senderName || (isModerator ? MODERATOR_BRAND_NAME : "User"),
         avatarUrl: msg.senderAvatar ?? (isModerator ? "/logo.png" : null),
         online: false,
       },

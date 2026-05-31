@@ -53,6 +53,7 @@ export function mapGqlPostToFeedView(p: {
   }> | null;
   viewerVote?: string | null;
   mySelectedOptionIndex?: number | null;
+  myVoteAnonymous?: boolean | null;
   optionStats?: Array<{
     index: number;
     label: string;
@@ -97,7 +98,7 @@ export function mapGqlPostToFeedView(p: {
     viewerHasSaved: p.viewerHasSaved ?? false,
     viewerHasHyped: p.viewerHasHyped ?? false,
     commentCount: p.commentCount ?? 0,
-    recentComments: p.recentComments ?? [],
+    recentComments: [],
     status: (p.status as PostStatus | null) ?? null,
     scheduledAt: p.scheduledAt ?? null,
     viewerVote: mapViewerVote(p.viewerVote, p.mySelectedOptionIndex),
@@ -105,6 +106,7 @@ export function mapGqlPostToFeedView(p: {
       p.mySelectedOptionIndex === undefined || p.mySelectedOptionIndex === null
         ? null
         : p.mySelectedOptionIndex,
+    myVoteAnonymous: p.myVoteAnonymous ?? null,
     optionStats,
     postOptions,
     compareOptionLabels: null,

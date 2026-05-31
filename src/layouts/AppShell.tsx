@@ -214,7 +214,7 @@ export function AppShell() {
       </header>
 
       <main className="ig-main-scroll">
-        <Outlet />
+        <Outlet key={location.pathname} />
       </main>
 
       <MessengerPanel />

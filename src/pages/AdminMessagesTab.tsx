@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ADMIN_MODERATOR_MESSAGES,
   ADMIN_MODERATOR_MESSAGES_COUNT,
@@ -14,6 +15,7 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { playMessageSound } from "../lib/notificationSound";
 import { useImageUpload } from "../lib/useImageUpload";
+import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
 
 const PAGE_SIZE = 25;
 
@@ -86,6 +88,10 @@ function AdminAvatar({
   );
 }
 
+function isValidMongoObjectId(id: string | null | undefined): id is string {
+  return typeof id === "string" && /^[a-f0-9]{24}$/i.test(id);
+}
+
 function AdminSearchInput({
   value,
   onChange,
@@ -135,12 +141,22 @@ export function AdminMessagesTab({
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const threadUserIdRef = useRef<string | null>(null);
+  const navigate = useNavigate();
   const { uploadImage } = useImageUpload();
 
+  function openAdminSenderProfile(adminId: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/profile/${adminId}`);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }
+
   useEffect(() => {
-    if (initialUserId) {
+    if (initialUserId && isValidMongoObjectId(initialUserId)) {
       setThreadUserId(initialUserId);
       setRecipientIds([initialUserId]);
+      onInitialUserConsumed();
+    } else if (initialUserId) {
       onInitialUserConsumed();
     }
   }, [initialUserId, onInitialUserConsumed]);
@@ -157,16 +173,16 @@ export function AdminMessagesTab({
     adminModeratorThreadMessages: ThreadMessageRow[];
   }>(ADMIN_MODERATOR_THREAD_MESSAGES, {
     variables: { userId: threadUserId ?? "" },
-    skip: !threadUserId,
+    skip: !isValidMongoObjectId(threadUserId),
     fetchPolicy: "network-only",
-    pollInterval: threadUserId ? 10000 : 0,
+    pollInterval: isValidMongoObjectId(threadUserId) ? 10000 : 0,
   });
 
   const userListVariables = useMemo(
     () => ({
       skip: 0,
-      take: 15,
-      role: "user",
+      take: 50,
+      role: "member",
       search: userSearch.trim() || undefined,
     }),
     [userSearch],
@@ -266,6 +282,7 @@ export function AdminMessagesTab({
   }
 
   function openThread(userId: string) {
+    if (!isValidMongoObjectId(userId)) return;
     setThreadUserId(userId);
     if (!recipientIds.includes(userId)) {
       setRecipientIds((prev) => [...prev, userId]);
@@ -341,7 +358,7 @@ export function AdminMessagesTab({
         <div>
           <h2 className="admin-section-title">Admin Messages</h2>
           <p className="muted small">
-            Chat as <strong>Moderator</strong> — users see the app logo. Hover moderator messages to see which admin sent them.
+            Chat as <strong>{MODERATOR_BRAND_NAME}</strong> — users see the app logo. Hover moderator messages to see which admin sent them.
           </p>
         </div>
         <button
@@ -408,6 +425,9 @@ export function AdminMessagesTab({
 
           <div className="admin-mod-sidebar-section">
             <span className="admin-toolbar-label">Add recipients</span>
+            <p className="muted small admin-mod-recipient-hint">
+              All accounts with user role — regular users and admin+user dual-role members.
+            </p>
             <AdminSearchInput
               value={userSearch}
               onChange={setUserSearch}
@@ -476,13 +496,13 @@ export function AdminMessagesTab({
             )}
             <div>
               <strong className="admin-mod-brand">
-                {activeThread ? activeThread.recipientName : "Moderator"}
+                {activeThread ? activeThread.recipientName : MODERATOR_BRAND_NAME}
               </strong>
               <p className="muted small">
                 {recipientIds.length > 1
                   ? `Sending to ${recipientIds.length} users`
                   : activeThread
-                    ? "User conversation · you reply as Moderator"
+                    ? `User conversation · you reply as ${MODERATOR_BRAND_NAME}`
                     : threadUserId
                       ? "Loading thread…"
                       : "Select a thread or add recipients"}
@@ -527,9 +547,23 @@ export function AdminMessagesTab({
                         {isModerator ? (
                           <>
                             <img src="/logo.png" alt="" width={18} height={18} className="admin-mod-thread-avatar" />
-                            <strong>Moderator</strong>
+                            <strong>{MODERATOR_BRAND_NAME}</strong>
                             {msg.sentByAdminName ? (
-                              <span className="admin-mod-sent-by">via {msg.sentByAdminName}</span>
+                              <span className="admin-mod-sent-by">
+                                via{" "}
+                                {msg.sentByAdminId ? (
+                                  <button
+                                    type="button"
+                                    className="admin-mod-sent-by-link"
+                                    title={msg.sentByAdminEmail ?? undefined}
+                                    onClick={(e) => openAdminSenderProfile(msg.sentByAdminId!, e)}
+                                  >
+                                    {msg.sentByAdminName}
+                                  </button>
+                                ) : (
+                                  msg.sentByAdminName
+                                )}
+                              </span>
                             ) : null}
                           </>
                         ) : (
@@ -650,12 +684,17 @@ export function AdminMessagesTab({
                       </td>
                       <td className="muted small">{formatRelativeTime(msg.createdAt)}</td>
                       <td>
-                        <span
-                          className="admin-mod-admin-chip"
+                        <button
+                          type="button"
+                          className="admin-mod-admin-chip admin-mod-admin-chip--link"
                           title={`${msg.sentByAdminName}\n${msg.sentByAdminEmail}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAdminSenderProfile(msg.sentByAdminId, e);
+                          }}
                         >
                           {msg.sentByAdminName}
-                        </span>
+                        </button>
                       </td>
                     </tr>
                   ))}
