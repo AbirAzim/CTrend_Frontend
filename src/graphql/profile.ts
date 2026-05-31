@@ -11,6 +11,9 @@ export const ME = gql`
       interests
       profileImageUrl
       role
+      voteSoundId
+      notificationSoundId
+      messageSoundId
     }
   }
 `;
@@ -25,6 +28,9 @@ export const UPDATE_PROFILE = gql`
       bio
       interests
       profileImageUrl
+      voteSoundId
+      notificationSoundId
+      messageSoundId
     }
   }
 `;

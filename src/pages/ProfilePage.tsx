@@ -17,7 +17,7 @@ import {
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
-import { EXTEND_POST_VOTING, MY_SAVED_POSTS } from "../graphql/feed";
+import { MY_SAVED_POSTS } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
@@ -40,11 +40,6 @@ function rel(iso?: string | null): string {
   const m = absMin % 60;
   if (h > 0) return `${h}h ${m}m left`;
   return `${Math.max(1, m)}m left`;
-}
-
-function toLocalDateTimeInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function gmailAvatarFromEmail(email: string): string | null {
@@ -122,13 +117,6 @@ export function ProfilePage() {
   const [formBio, setFormBio] = useState("");
   const [formInterests, setFormInterests] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const [extendDraftByPost, setExtendDraftByPost] = useState<Record<string, string>>(
-    {},
-  );
-  const [extendPresetByPost, setExtendPresetByPost] = useState<Record<string, string>>({});
-  const [extendErrorByPost, setExtendErrorByPost] = useState<Record<string, string>>(
-    {},
-  );
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -256,8 +244,9 @@ export function ProfilePage() {
     imageUrls: string[];
     options?: Array<{ label?: string | null }> | null;
     category?: { id: string; name?: string | null } | null;
+    votingEndsAt?: string | null;
+    isVotingOpen?: boolean | null;
   } | null>(null);
-  const [extendOpen, setExtendOpen] = useState<Record<string, boolean>>({});
   const [friendsPage, setFriendsPage] = useState(0);
   const [requestsPage, setRequestsPage] = useState(0);
   const [suggestionsPage, setSuggestionsPage] = useState(0);
@@ -391,12 +380,6 @@ export function ProfilePage() {
   const [saveProfile, { loading: saving }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: ME }],
   });
-  const [extendVotingMut, { loading: extendingVoting }] = useMutation(
-    EXTEND_POST_VOTING,
-    {
-      refetchQueries: [{ query: USER_POSTS, variables: { userId } }],
-    },
-  );
 
   function openInviteModal(type: "user" | "admin") {
     setInviteType(type);
@@ -457,57 +440,6 @@ export function ProfilePage() {
       setEditing(false);
     } catch (err: unknown) {
       setFormError(getApolloErrorMessage(err));
-    }
-  }
-
-  async function onExtendVoting(postId: string, currentEnd?: string | null) {
-    const raw = (extendDraftByPost[postId] ?? "").trim();
-    setExtendErrorByPost((prev) => ({ ...prev, [postId]: "" }));
-    if (!raw) {
-      setExtendErrorByPost((prev) => ({
-        ...prev,
-        [postId]: "Pick a new date-time.",
-      }));
-      return;
-    }
-    const next = new Date(raw);
-    if (Number.isNaN(next.getTime())) {
-      setExtendErrorByPost((prev) => ({
-        ...prev,
-        [postId]: "Invalid datetime.",
-      }));
-      return;
-    }
-    if (next.getTime() <= Date.now()) {
-      setExtendErrorByPost((prev) => ({
-        ...prev,
-        [postId]: "New deadline must be in the future.",
-      }));
-      return;
-    }
-    if (currentEnd) {
-      const cur = new Date(currentEnd).getTime();
-      if (!Number.isNaN(cur) && next.getTime() <= cur) {
-        setExtendErrorByPost((prev) => ({
-          ...prev,
-          [postId]: "New deadline should be after current end time.",
-        }));
-        return;
-      }
-    }
-    try {
-      await extendVotingMut({
-        variables: {
-          postId,
-          newVotingEndsAt: next.toISOString(),
-        },
-      });
-      setExtendDraftByPost((prev) => ({ ...prev, [postId]: "" }));
-    } catch (err: unknown) {
-      setExtendErrorByPost((prev) => ({
-        ...prev,
-        [postId]: getApolloErrorMessage(err),
-      }));
     }
   }
 
@@ -685,6 +617,15 @@ export function ProfilePage() {
         )}
       </div>
 
+      <NavLink to="/profile/sounds" className="cx-profile-quick-link">
+        <span className="cx-profile-quick-link-icon" aria-hidden>🔊</span>
+        <span className="cx-profile-quick-link-text">
+          <strong>App sounds</strong>
+          <span className="muted small">Vote, bell &amp; message tones</span>
+        </span>
+        <span className="cx-profile-quick-link-arrow" aria-hidden>→</span>
+      </NavLink>
+
       {isAdmin && (
         <div className="cx-admin-card">
           <span className="cx-admin-card-label">Admin</span>
@@ -773,7 +714,6 @@ export function ProfilePage() {
           <ul className="cx-drop-list">
             {gridPosts.map((post) => {
               const ended = post.isVotingOpen === false || rel(post.votingEndsAt) === "ended";
-              const isExtendOpen = !!extendOpen[post.id];
               return (
                 <li key={post.id} className="cx-drop-item">
                   <div className="cx-drop-item-main">
@@ -823,76 +763,9 @@ export function ProfilePage() {
                         <NavLink to={`/post/${post.id}`} className="cx-drop-action-btn" title="View post">
                           👁
                         </NavLink>
-                        <button
-                          type="button"
-                          className={`cx-drop-action-btn${isExtendOpen ? " cx-drop-action-btn--active" : ""}`}
-                          title="Extend deadline"
-                          onClick={() => setExtendOpen((prev) => ({ ...prev, [post.id]: !prev[post.id] }))}
-                        >
-                          ⏱
-                        </button>
                       </div>
                     )}
                   </div>
-
-                  {/* Collapsible extend deadline */}
-                  {!useMockFeed && isExtendOpen && (
-                    <div className="cx-drop-extend">
-                      <div className="cx-extend-presets">
-                        {(
-                          [
-                            { label: "+12h", ms: 12 * 3_600_000 },
-                            { label: "+1d",  ms: 24 * 3_600_000 },
-                            { label: "+3d",  ms: 3 * 24 * 3_600_000 },
-                            { label: "+1w",  ms: 7 * 24 * 3_600_000 },
-                            { label: "Custom", ms: null },
-                          ] as { label: string; ms: number | null }[]
-                        ).map(({ label, ms }) => (
-                          <button
-                            key={label}
-                            type="button"
-                            className={`cx-extend-chip${extendPresetByPost[post.id] === label ? " cx-extend-chip--active" : ""}`}
-                            onClick={() => {
-                              setExtendPresetByPost((prev) => ({ ...prev, [post.id]: label }));
-                              if (ms !== null) {
-                                setExtendDraftByPost((prev) => ({
-                                  ...prev,
-                                  [post.id]: toLocalDateTimeInputValue(new Date(Date.now() + ms)),
-                                }));
-                              } else {
-                                setExtendDraftByPost((prev) => ({ ...prev, [post.id]: "" }));
-                              }
-                              setExtendErrorByPost((prev) => ({ ...prev, [post.id]: "" }));
-                            }}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                      {extendPresetByPost[post.id] === "Custom" && (
-                        <input
-                          type="datetime-local"
-                          className="cx-extend-date-input"
-                          value={extendDraftByPost[post.id] ?? ""}
-                          onChange={(e) => setExtendDraftByPost((prev) => ({ ...prev, [post.id]: e.target.value }))}
-                          min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
-                        />
-                      )}
-                      <div className="cx-extend-footer">
-                        <button
-                          type="button"
-                          className="cx-extend-submit"
-                          disabled={extendingVoting || !extendDraftByPost[post.id]}
-                          onClick={() => void onExtendVoting(post.id, post.votingEndsAt)}
-                        >
-                          {extendingVoting ? "Updating…" : "Apply"}
-                        </button>
-                        {extendErrorByPost[post.id] ? (
-                          <small className="cx-extend-error" role="alert">{extendErrorByPost[post.id]}</small>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
                 </li>
               );
             })}

@@ -233,7 +233,7 @@ function FeedPostCardComponent({
   const { user: authUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
   const [hypeCountLive, setHypeCountLive] = useState(post.hypeCount ?? 0);
   const [saveLiveCount, setSaveLiveCount] = useState(post.saveCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
@@ -406,7 +406,7 @@ function FeedPostCardComponent({
     setHypeCountLive(post.hypeCount ?? 0);
     setSaveLiveCount(post.saveCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
-    setLiked(false);
+    setLiked(Boolean(post.viewerHasHyped));
   }, [
     post.id,
     post.upvoteCount,
@@ -418,6 +418,7 @@ function FeedPostCardComponent({
     post.votingEndsAt,
     post.hypeCount,
     post.viewerHasSaved,
+    post.viewerHasHyped,
     post.saveCount,
   ]);
 
@@ -616,8 +617,9 @@ function FeedPostCardComponent({
     ? activeMySelectedOptionIndex
     : multiPick;
 
+  const postTimeIso = post.scheduledAt ?? post.createdAt;
   const timeLabel =
-    formatRelativeTime(post.createdAt) || (voteMode === "local" ? "demo" : "");
+    formatRelativeTime(postTimeIso) || (voteMode === "local" ? "demo" : "");
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
@@ -1194,7 +1196,7 @@ function FeedPostCardComponent({
               <span className="ig-post-username">
                 {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
               </span>
-              <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
+              <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>
           </NavLink>
         ) : (
@@ -1222,7 +1224,7 @@ function FeedPostCardComponent({
               <span className="ig-post-username">
                 {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
               </span>
-              <span className="ig-post-meta">{formatRelativeTime(post.createdAt)}</span>
+              <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>
           </div>
         )}
@@ -1750,7 +1752,7 @@ function FeedPostCardComponent({
           <button
             type="button"
             className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
-            aria-label={liked ? "Unlike" : "Like"}
+            aria-label={liked ? "Unhype" : "Hype"}
             aria-pressed={liked}
             disabled={hypeUpdating}
             onClick={() => void handleToggleHype()}
@@ -1959,6 +1961,7 @@ function areFeedPostCardPropsEqual(prev: Props, next: Props): boolean {
     prev.post.hypeCount === next.post.hypeCount &&
     prev.post.saveCount === next.post.saveCount &&
     prev.post.viewerHasSaved === next.post.viewerHasSaved &&
+    prev.post.viewerHasHyped === next.post.viewerHasHyped &&
     prev.post.mySelectedOptionIndex === next.post.mySelectedOptionIndex &&
     prev.post.isVotingOpen === next.post.isVotingOpen &&
     prev.post.votingEndsAt === next.post.votingEndsAt
