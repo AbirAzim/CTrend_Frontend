@@ -31,7 +31,9 @@ adb shell pm enable com.ctrend.app
 | Phase 3 — Comment System Upgrade | ✅ Complete |
 | Phase 4 — Notification System Upgrade | ⚠️ Built — untested |
 | Phase 5 — Profile Core | 🔄 In progress |
-| Phase 6–11 | ⏳ Pending |
+| Phase 6–9 | ⏳ Pending |
+| Phase 10 — Admin Features | ⚠️ Built — untested |
+| Phase 11 — Sound Preferences | ⏳ Pending |
 
 ---
 
