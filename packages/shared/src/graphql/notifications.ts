@@ -10,6 +10,10 @@ export const MY_NOTIFICATIONS = gql`
         body
         referenceId
         referenceType
+        postId
+        actorCount
+        latestActorId
+        latestActorName
         read
         createdAt
       }
