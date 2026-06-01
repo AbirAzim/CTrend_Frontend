@@ -37,6 +37,8 @@ import {
 } from "@ctrend/shared/graphql/feed";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
+import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import logoAsset from "../../assets/logo.png";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -794,9 +796,12 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     } catch { /* ignore */ }
   }
 
-  const authorName = post.authorDisplayName?.trim() || post.authorUsername;
+  const isPlatformPost = post.postType === "system";
+  const authorName = isPlatformPost
+    ? MODERATOR_PLATFORM_NAME
+    : post.authorDisplayName?.trim() || post.authorUsername;
   const initial = authorName.slice(0, 1).toUpperCase();
-  const authorAvatarUrl = post.authorProfileImageUrl ?? null;
+  const authorAvatarUrl = isPlatformPost ? null : post.authorProfileImageUrl ?? null;
   const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls.slice(0, 2) : null;
   const hasVoted = viewerVote !== null;
 
@@ -804,17 +809,34 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     <View style={st.postCard}>
       <Pressable
         style={st.postHeader}
-        onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
+        onPress={() =>
+          !isPlatformPost &&
+          post.authorId &&
+          router.push(`/profile/${post.authorId}` as `/${string}`)
+        }
+        disabled={isPlatformPost}
       >
         <View style={[st.postAvatar, { overflow: "hidden" }]}>
-          {authorAvatarUrl
-            ? <Image source={{ uri: authorAvatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-            : <Text style={st.postAvatarText}>{initial}</Text>
-          }
+          {isPlatformPost ? (
+            <Image
+              source={logoAsset}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : authorAvatarUrl ? (
+            <Image source={{ uri: authorAvatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+          ) : (
+            <Text style={st.postAvatarText}>{initial}</Text>
+          )}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={st.postAuthor}>{authorName}</Text>
-          <Text style={st.postTime}>{formatRelativeTime(post.createdAt)}</Text>
+          <Text style={st.postTime}>
+            {isPlatformPost
+              ? `Platform poll · ${formatRelativeTime(post.createdAt)}`
+              : formatRelativeTime(post.createdAt)}
+          </Text>
         </View>
       </Pressable>
 

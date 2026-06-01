@@ -14,7 +14,10 @@ export const MY_NOTIFICATIONS = gql`
         actorCount
         latestActorId
         latestActorName
+        latestActorAvatar
+        commentId
         read
+        archived
         createdAt
       }
       totalCount
@@ -41,6 +44,12 @@ export const MARK_ALL_NOTIFICATIONS_READ = gql`
   }
 `;
 
+export const ARCHIVE_NOTIFICATION = gql`
+  mutation ArchiveNotification($id: ID!) {
+    archiveNotification(id: $id)
+  }
+`;
+
 export const SEND_ADMIN_BROADCAST = gql`
   mutation SendAdminBroadcast($title: String!, $body: String!) {
     sendAdminBroadcast(title: $title, body: $body)
@@ -57,7 +66,13 @@ export const NEW_NOTIFICATION_SUB = gql`
       referenceId
       referenceType
       postId
+      commentId
+      actorCount
+      latestActorId
+      latestActorName
+      latestActorAvatar
       read
+      archived
       createdAt
     }
   }

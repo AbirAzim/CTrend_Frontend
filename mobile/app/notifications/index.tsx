@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import { Feather } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,12 +14,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  ARCHIVE_NOTIFICATION,
   MARK_ALL_NOTIFICATIONS_READ,
   MARK_NOTIFICATION_READ,
   MY_NOTIFICATIONS,
   NEW_NOTIFICATION_SUB,
 } from "@ctrend/shared/graphql/notifications";
-import { RESPOND_FRIEND_REQUEST } from "@ctrend/shared/graphql/friends";
+import {
+  FRIEND_SOCIAL_REFETCH_QUERIES,
+  RESPOND_FRIEND_REQUEST,
+} from "@ctrend/shared/graphql/friends";
+import {
+  friendRequestAcceptedPatch,
+  friendRequestAlreadyFriendsPatch,
+  friendRequestRejectedPatch,
+  isPendingFriendRequestNotification,
+} from "@ctrend/shared/lib/friendRequestNotification";
+import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
@@ -37,6 +49,7 @@ type GqlNotification = {
   latestActorId: string | null;
   latestActorName: string | null;
   read: boolean;
+  archived?: boolean;
   createdAt: string;
 };
 
@@ -147,6 +160,24 @@ function makeStyles(c: ColorPalette) {
       borderTopWidth: 1, borderTopColor: c.border,
     },
     loadMoreText: { fontSize: 13, color: c.accent, fontWeight: "700" },
+
+    toolRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 8,
+      marginLeft: 52,
+    },
+    toolBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.card,
+      alignItems: "center",
+      justifyContent: "center",
+    },
   });
 }
 
@@ -155,15 +186,35 @@ function makeStyles(c: ColorPalette) {
 type RowProps = {
   notif: GqlNotification;
   st: ReturnType<typeof makeStyles>;
+  colors: ColorPalette;
   actionLoadingIds: Set<string>;
+  friendIdSet: Set<string>;
   onPress: (n: GqlNotification) => void;
+  onMarkRead: (notif: GqlNotification) => void;
+  onArchive: (notif: GqlNotification) => void;
   onAccept: (notif: GqlNotification) => void;
   onReject: (notif: GqlNotification) => void;
 };
 
-function NotifRow({ notif, st, actionLoadingIds, onPress, onAccept, onReject }: RowProps) {
+function NotifRow({
+  notif,
+  st,
+  colors,
+  actionLoadingIds,
+  friendIdSet,
+  onPress,
+  onMarkRead,
+  onArchive,
+  onAccept,
+  onReject,
+}: RowProps) {
   const isLoading = actionLoadingIds.has(notif.id);
-  const showFriendActions = notif.type === "FRIEND_REQUEST" && !!notif.referenceId && !notif.read;
+  const alreadyFriends =
+    notif.type === "FRIEND_REQUEST" &&
+    !!notif.referenceId &&
+    friendIdSet.has(notif.referenceId);
+  const showFriendActions =
+    isPendingFriendRequestNotification(notif) && !!notif.referenceId && !alreadyFriends;
 
   return (
     <Pressable style={[st.row, !notif.read && st.rowUnread]} onPress={() => onPress(notif)}>
@@ -179,6 +230,33 @@ function NotifRow({ notif, st, actionLoadingIds, onPress, onAccept, onReject }: 
             <Text style={st.timeText}>{formatRelativeTime(notif.createdAt)}</Text>
           </View>
         </View>
+      </View>
+
+      <View style={st.toolRow}>
+        {!notif.read ? (
+          <Pressable
+            style={st.toolBtn}
+            accessibilityLabel="Mark as read"
+            accessibilityRole="button"
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onMarkRead(notif);
+            }}
+          >
+            <Feather name="check" size={16} color={colors.subtext} />
+          </Pressable>
+        ) : null}
+        <Pressable
+          style={st.toolBtn}
+          accessibilityLabel="Archive"
+          accessibilityRole="button"
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onArchive(notif);
+          }}
+        >
+          <Feather name="archive" size={16} color={colors.subtext} />
+        </Pressable>
       </View>
 
       {showFriendActions && (
@@ -231,27 +309,54 @@ export default function NotificationsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
 
+  const { data: friendsData } = useQuery<{ myFriends: Array<{ id: string }> }>(MY_FRIENDS, {
+    fetchPolicy: "cache-and-network",
+  });
+
+  const friendIdSet = useMemo(
+    () => new Set((friendsData?.myFriends ?? []).map((f) => f.id)),
+    [friendsData],
+  );
+
   const { loading, refetch } = useQuery<NotifData>(MY_NOTIFICATIONS, {
     variables: { skip: 0, take: PAGE_SIZE },
     fetchPolicy: "network-only",
     pollInterval: 25000,
     onCompleted: (data) => {
-      const fetched = data.myNotifications.items;
+      const fetched = data.myNotifications.items.filter((n) => !n.archived);
       setItems(fetched);
       setSkip(fetched.length);
       setHasMore(fetched.length < data.myNotifications.totalCount);
     },
   });
 
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((n) => {
+        if (
+          !isPendingFriendRequestNotification(n) ||
+          !n.referenceId ||
+          !friendIdSet.has(n.referenceId)
+        ) {
+          return n;
+        }
+        return { ...n, ...friendRequestAlreadyFriendsPatch(n) };
+      }),
+    );
+  }, [friendIdSet]);
+
   const [markRead] = useMutation(MARK_NOTIFICATION_READ);
+  const [archiveNotif] = useMutation(ARCHIVE_NOTIFICATION);
   const [markAll, { loading: markingAll }] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
-  const [respondMut] = useMutation(RESPOND_FRIEND_REQUEST);
+  const [respondMut] = useMutation(RESPOND_FRIEND_REQUEST, {
+    refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
+  });
 
   // Sound is played by the global subscription in _layout.tsx — only update list here.
   useSubscription(NEW_NOTIFICATION_SUB, {
     onData: ({ data }) => {
       const n = data.data?.newNotification as GqlNotification | null;
-      if (!n) return;
+      if (!n || n.archived) return;
       setItems((prev) => {
         const exists = prev.some((x) => x.id === n.id);
         if (exists) {
@@ -273,24 +378,55 @@ export default function NotificationsScreen() {
     [markRead],
   );
 
+  const handleMarkRead = useCallback(
+    (notif: GqlNotification) => {
+      if (notif.read) return;
+      setItems((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
+      void markRead({ variables: { id: notif.id } });
+    },
+    [markRead],
+  );
+
+  const handleArchive = useCallback(
+    (notif: GqlNotification) => {
+      setItems((prev) => prev.filter((n) => n.id !== notif.id));
+      void archiveNotif({ variables: { id: notif.id } });
+    },
+    [archiveNotif],
+  );
+
   const handleAccept = useCallback(async (notif: GqlNotification) => {
     if (!notif.referenceId) return;
+    const rollback = { title: notif.title, body: notif.body, read: notif.read };
+    setItems((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, ...friendRequestAcceptedPatch(n) } : n)),
+    );
     setActionLoadingIds((prev) => new Set([...prev, notif.id]));
     try {
       await respondMut({ variables: { requesterId: notif.referenceId, accept: true } });
-      setItems((prev) => prev.map((n) => n.id === notif.id ? { ...n, read: true } : n));
-    } catch { /* silent */ } finally {
+    } catch {
+      setItems((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, ...rollback } : n)),
+      );
+    } finally {
       setActionLoadingIds((prev) => { const s = new Set(prev); s.delete(notif.id); return s; });
     }
   }, [respondMut]);
 
   const handleReject = useCallback(async (notif: GqlNotification) => {
     if (!notif.referenceId) return;
+    const rollback = { title: notif.title, body: notif.body, read: notif.read };
+    setItems((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, ...friendRequestRejectedPatch(n) } : n)),
+    );
     setActionLoadingIds((prev) => new Set([...prev, notif.id]));
     try {
       await respondMut({ variables: { requesterId: notif.referenceId, accept: false } });
-      setItems((prev) => prev.map((n) => n.id === notif.id ? { ...n, read: true } : n));
-    } catch { /* silent */ } finally {
+    } catch {
+      setItems((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, ...rollback } : n)),
+      );
+    } finally {
       setActionLoadingIds((prev) => { const s = new Set(prev); s.delete(notif.id); return s; });
     }
   }, [respondMut]);
@@ -354,8 +490,12 @@ export default function NotificationsScreen() {
             <NotifRow
               notif={item}
               st={st}
+              colors={colors}
               actionLoadingIds={actionLoadingIds}
+              friendIdSet={friendIdSet}
               onPress={handlePress}
+              onMarkRead={handleMarkRead}
+              onArchive={handleArchive}
               onAccept={handleAccept}
               onReject={handleReject}
             />

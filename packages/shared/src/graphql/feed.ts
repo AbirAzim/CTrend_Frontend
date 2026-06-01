@@ -5,6 +5,7 @@ export const FEED_POSTS = gql`
   query FeedPosts {
     feedPosts {
       id
+      type
       authorId
       authorUsername
       authorDisplayName
@@ -43,6 +44,7 @@ export const GET_POST_BY_ID = gql`
   query GetPostById($id: ID!) {
     getPostById(id: $id) {
       id
+      type
       authorId
       authorUsername
       authorDisplayName

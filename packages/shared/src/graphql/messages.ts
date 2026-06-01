@@ -1,5 +1,8 @@
 import { gql } from "@apollo/client";
 
+/** Same set as backend `MESSAGE_REACTION_EMOJIS`. */
+export const MESSAGE_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+
 export const MY_CONVERSATIONS = gql`
   query MyConversations {
     myConversations {
@@ -35,6 +38,11 @@ export const GET_MESSAGES = gql`
         userId
         readAt
       }
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       createdAt
     }
   }
@@ -102,7 +110,26 @@ export const SEND_MESSAGE = gql`
         userId
         readAt
       }
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       createdAt
+    }
+  }
+`;
+
+export const REACT_MESSAGE = gql`
+  mutation ReactMessage($messageId: ID!, $emoji: String) {
+    reactMessage(messageId: $messageId, emoji: $emoji) {
+      id
+      conversationId
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
     }
   }
 `;
@@ -133,7 +160,27 @@ export const MESSAGE_RECEIVED = gql`
         userId
         readAt
       }
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       createdAt
+    }
+  }
+`;
+
+export const MESSAGE_REACTION_CHANGED = gql`
+  subscription MessageReactionChanged {
+    messageReactionChanged {
+      messageId
+      conversationId
+      reactions {
+        emoji
+        count
+      }
+      actorUserId
+      actorEmoji
     }
   }
 `;

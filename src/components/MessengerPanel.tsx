@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,7 @@ import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME } from "../lib/moderatorB
 import { useImageUpload } from "../lib/useImageUpload";
 import {
   GET_MESSAGES,
+  MESSAGE_REACTION_EMOJIS,
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
 import { MY_FRIENDS } from "../graphql/friends";
@@ -55,6 +56,117 @@ function ImageBubble({ src, caption }: { src: string; caption?: string }) {
         </div>
       )}
     </>
+  );
+}
+
+// ── Message bubble + reactions ───────────────────────────────────────
+function MessageBubble({
+  msg,
+  conversationId,
+  bubbleClassName,
+  children,
+}: {
+  msg: Message;
+  conversationId: string;
+  bubbleClassName: string;
+  children: ReactNode;
+}) {
+  const { reactMessage } = useMessenger();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [hoverQuick, setHoverQuick] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showQuickBar = pickerOpen || hoverQuick;
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onDocPointer(e: PointerEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onDocPointer);
+    return () => document.removeEventListener("pointerdown", onDocPointer);
+  }, [pickerOpen]);
+
+  function clearLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  function pickReaction(emoji: string) {
+    const next = msg.viewerReaction === emoji ? null : emoji;
+    void reactMessage(msg.id, conversationId, next);
+    setPickerOpen(false);
+    setHoverQuick(false);
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      className="cw-bubble-wrap"
+      onMouseEnter={() => setHoverQuick(true)}
+      onMouseLeave={() => {
+        if (!pickerOpen) setHoverQuick(false);
+      }}
+    >
+      {showQuickBar ? (
+        <div
+          className="cw-bubble-quick-react"
+          role="toolbar"
+          aria-label="React to message"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {MESSAGE_REACTION_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className={`cw-bubble-quick-react-btn${msg.viewerReaction === emoji ? " cw-bubble-quick-react-btn--active" : ""}`}
+              aria-label={`React ${emoji}`}
+              onClick={() => pickReaction(emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div
+        className={bubbleClassName}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setPickerOpen(true);
+        }}
+        onPointerDown={() => {
+          clearLongPress();
+          longPressTimer.current = setTimeout(() => setPickerOpen(true), 480);
+        }}
+        onPointerUp={clearLongPress}
+        onPointerCancel={clearLongPress}
+        onPointerLeave={clearLongPress}
+      >
+        {children}
+      </div>
+
+      {msg.reactions.length > 0 ? (
+        <div className="cw-bubble-reactions" aria-label="Message reactions">
+          {msg.reactions.map((r) => (
+            <button
+              key={r.emoji}
+              type="button"
+              className={`cw-bubble-reaction-chip${msg.viewerReaction === r.emoji ? " cw-bubble-reaction-chip--mine" : ""}`}
+              onClick={() => pickReaction(r.emoji)}
+            >
+              <span aria-hidden>{r.emoji}</span>
+              {r.count > 1 ? <span className="cw-bubble-reaction-count">{r.count}</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -370,31 +482,38 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
                     ) : null}
                     {/* Image-only or image+caption bubble */}
                     {hasImage ? (
-                      <div className={[
-                        "cw-bubble",
-                        "cw-bubble--img",
-                        `cw-bubble--${bubbleSide}`,
-                        isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
-                        isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
-                      ].filter(Boolean).join(" ")}>
+                      <MessageBubble
+                        msg={msg}
+                        conversationId={conversation.id}
+                        bubbleClassName={[
+                          "cw-bubble",
+                          "cw-bubble--img",
+                          `cw-bubble--${bubbleSide}`,
+                          isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
+                          isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
+                        ].filter(Boolean).join(" ")}
+                      >
                         <ImageBubble src={msg.imageUrl!} caption={hasText ? msg.text : undefined} />
                         <span className="cw-bubble-time">
                           {formatRelativeTime(msg.createdAt)}
                         </span>
-                      </div>
+                      </MessageBubble>
                     ) : (
-                      /* Text-only bubble */
-                      <div className={[
-                        "cw-bubble",
-                        `cw-bubble--${bubbleSide}`,
-                        isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
-                        isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
-                      ].filter(Boolean).join(" ")}>
+                      <MessageBubble
+                        msg={msg}
+                        conversationId={conversation.id}
+                        bubbleClassName={[
+                          "cw-bubble",
+                          `cw-bubble--${bubbleSide}`,
+                          isGroupStart && !isMine ? "cw-bubble--tail-left"  : "",
+                          isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
+                        ].filter(Boolean).join(" ")}
+                      >
                         {msg.text}
                         <span className="cw-bubble-time">
                           {formatRelativeTime(msg.createdAt)}
                         </span>
-                      </div>
+                      </MessageBubble>
                     )}
 
                     {showSeen && (

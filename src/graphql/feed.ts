@@ -5,6 +5,7 @@ export const FEED_POSTS = gql`
   query FeedPosts {
     feedPosts {
       id
+      type
       authorId
       authorUsername
       authorDisplayName
@@ -43,6 +44,7 @@ export const GET_POST_BY_ID = gql`
   query GetPostById($id: ID!) {
     getPostById(id: $id) {
       id
+      type
       authorId
       authorUsername
       authorDisplayName
@@ -88,6 +90,17 @@ export const VOTE_POST = gql`
       selectedOptionIndex: $selectedOptionIndex
       anonymous: $anonymous
     ) {
+      postId
+      totalVotes
+      countsPerOption
+      percentages
+    }
+  }
+`;
+
+export const REMOVE_VOTE = gql`
+  mutation RemoveVote($postId: ID!) {
+    removeVote(postId: $postId) {
       postId
       totalVotes
       countsPerOption
@@ -174,8 +187,8 @@ export const UPDATE_POST = gql`
 `;
 
 export const VOTERS_BY_POST = gql`
-  query VotersByPost($postId: ID!, $optionIndex: Int) {
-    votersByPost(postId: $postId, optionIndex: $optionIndex) {
+  query VotersByPost($postId: ID!, $optionIndex: Int, $search: String, $skip: Int, $take: Int) {
+    votersByPost(postId: $postId, optionIndex: $optionIndex, search: $search, skip: $skip, take: $take) {
       voteId
       selectedOptionIndex
       anonymous
@@ -184,6 +197,7 @@ export const VOTERS_BY_POST = gql`
         id
         username
         displayName
+        profileImageUrl
       }
     }
   }

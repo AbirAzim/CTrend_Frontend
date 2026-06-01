@@ -2,6 +2,7 @@ import { useLazyQuery } from "@apollo/client";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GLOBAL_SEARCH } from "../graphql/search";
+import { SearchPostThumbs } from "./SearchPostThumbs";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 
 type SearchUser = {
@@ -192,7 +193,6 @@ export function GlobalSearch() {
                     );
                   }
                   const p = row.data;
-                  const thumb = (p.imageUrls ?? [])[0];
                   return (
                     <li key={`p-${p.id}-${idx}`}>
                       <button
@@ -201,11 +201,7 @@ export function GlobalSearch() {
                         onClick={() => goToPost(p.id)}
                         role="option"
                       >
-                        <span className="cx-gsearch-thumb">
-                          {thumb ? (
-                            <img src={thumb} alt="" referrerPolicy="no-referrer" />
-                          ) : <span className="cx-gsearch-thumb-fallback">📷</span>}
-                        </span>
+                        <SearchPostThumbs imageUrls={p.imageUrls} />
                         <span className="cx-gsearch-row-meta">
                           <span className="cx-gsearch-row-name">
                             {p.caption?.trim() || "Untitled compare"}
@@ -320,7 +316,6 @@ export function GlobalSearch() {
                     );
                   }
                   const p = row.data;
-                  const thumb = (p.imageUrls ?? [])[0];
                   return (
                     <li key={`p-${p.id}-${idx}`}>
                       <button
@@ -328,11 +323,7 @@ export function GlobalSearch() {
                         className="cx-gsearch-row cx-gsearch-row--post"
                         onClick={() => goToPost(p.id)}
                       >
-                        <span className="cx-gsearch-thumb">
-                          {thumb ? (
-                            <img src={thumb} alt="" referrerPolicy="no-referrer" />
-                          ) : <span className="cx-gsearch-thumb-fallback">📷</span>}
-                        </span>
+                        <SearchPostThumbs imageUrls={p.imageUrls} />
                         <span className="cx-gsearch-row-meta">
                           <span className="cx-gsearch-row-name">
                             {p.caption?.trim() || "Untitled compare"}

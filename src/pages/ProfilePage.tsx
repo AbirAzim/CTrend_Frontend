@@ -10,16 +10,18 @@ import {
   FRIEND_REQUESTS,
   FRIEND_SUGGESTIONS,
   ADD_FRIEND,
+  FRIEND_SOCIAL_REFETCH_QUERIES,
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
   CANCEL_FRIEND_REQUEST,
 } from "../graphql/friends";
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
-import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
+import { ME, UPDATE_PROFILE, USER_POSTS, MY_VOTED_POSTS } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
+import { ProfileCompareCard } from "../components/ProfileCompareCard";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import type { FeedPostView } from "../types/feed";
@@ -27,19 +29,6 @@ import type { FeedPostView } from "../types/feed";
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
   return s ? s[0]!.toUpperCase() : "?";
-}
-
-function rel(iso?: string | null): string {
-  if (!iso) return "";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return "";
-  const d = t - Date.now();
-  const absMin = Math.floor(Math.abs(d) / 60000);
-  if (d <= 0) return "ended";
-  const h = Math.floor(absMin / 60);
-  const m = absMin % 60;
-  if (h > 0) return `${h}h ${m}m left`;
-  return `${Math.max(1, m)}m left`;
 }
 
 function gmailAvatarFromEmail(email: string): string | null {
@@ -174,10 +163,19 @@ export function ProfilePage() {
   });
 
   const [addFriendMut] = useMutation(ADD_FRIEND);
-  const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST);
+  const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST, {
+    refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
+  });
   const [unfriendMut] = useMutation(UNFRIEND);
   const [cancelFriendMut] = useMutation(CANCEL_FRIEND_REQUEST);
   const { data: savedPostsData, loading: savedPostsLoading } = useQuery(MY_SAVED_POSTS, {
+    skip: useMockFeed || !user,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
+  });
+  const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
+  const { data: votedPostsData, loading: votedPostsLoading } = useQuery(MY_VOTED_POSTS, {
+    variables: { anonymousOnly: votedFilter === "anonymous" },
     skip: useMockFeed || !user,
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
@@ -191,6 +189,9 @@ export function ProfilePage() {
     totalVotes?: number | null;
     upvoteCount?: number | null;
     downvoteCount?: number | null;
+    commentCount?: number | null;
+    hypeCount?: number | null;
+    saveCount?: number | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
     options?: Array<{ label?: string | null }> | null;
@@ -212,6 +213,9 @@ export function ProfilePage() {
     totalVotes?: number | null;
     upvoteCount?: number | null;
     downvoteCount?: number | null;
+    commentCount?: number | null;
+    hypeCount?: number | null;
+    saveCount?: number | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
     options?: Array<{ label?: string | null }> | null;
@@ -219,6 +223,7 @@ export function ProfilePage() {
   }> = useMockFeed
     ? playgroundPosts
     : apiPosts;
+  const votedPosts = (votedPostsData?.myVotedPosts ?? []) as typeof gridPosts;
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const requestedMe = (friendRequestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
@@ -226,7 +231,7 @@ export function ProfilePage() {
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
   const [connectionsTab, setConnectionsTab] = useState<"friends" | "requests" | "suggestions">("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
-  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept">(
+  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept" | "voted">(
     initialTab === "kept" ? "kept" : "drops",
   );
 
@@ -670,6 +675,16 @@ export function ProfilePage() {
             🔖 Kept
             {savedPosts.length > 0 && <span className="cx-conn-tab-badge">{savedPosts.length}</span>}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={profileContentTab === "voted"}
+            className={`cx-conn-tab${profileContentTab === "voted" ? " cx-conn-tab--active" : ""}`}
+            onClick={() => setProfileContentTab("voted")}
+          >
+            🗳️ Voted
+            {votedPosts.length > 0 && <span className="cx-conn-tab-badge">{votedPosts.length}</span>}
+          </button>
         </div>
 
         {profileContentTab === "drops" && (
@@ -684,22 +699,20 @@ export function ProfilePage() {
           </p>
         )}
         {!useMockFeed && postsLoading && gridPosts.length === 0 && (
-          <ul className="cx-drop-list cx-drop-list--skeleton" aria-label="Loading your compares">
+          <div className="cx-kept-grid" aria-label="Loading your compares">
             {[0, 1, 2].map((i) => (
-              <li key={i} className="cx-drop-item">
-                <div className="cx-drop-item-main">
-                  <div className="cx-drop-thumbs">
-                    <span className="cx-drop-thumb cx-skeleton" />
-                    <span className="cx-drop-thumb cx-skeleton" />
-                  </div>
-                  <div className="cx-drop-info">
-                    <span className="cx-skeleton cx-skeleton-line" style={{ width: "70%", height: "14px" }} />
-                    <span className="cx-skeleton cx-skeleton-line" style={{ width: "45%", height: "11px" }} />
-                  </div>
+              <div key={i} className="cx-kept-card cx-profile-card cx-profile-card--skeleton">
+                <div className="cx-kept-card-media">
+                  <span className="cx-kept-card-thumb cx-skeleton" />
+                  <span className="cx-kept-card-thumb cx-skeleton" />
                 </div>
-              </li>
+                <div className="cx-kept-card-info">
+                  <span className="cx-skeleton cx-skeleton-line" style={{ width: "80%", height: "12px" }} />
+                  <span className="cx-skeleton cx-skeleton-line" style={{ width: "50%", height: "10px" }} />
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
         {!useMockFeed && !postsLoading && gridPosts.length === 0 && (
           <div className="cx-conn-empty">
@@ -711,65 +724,16 @@ export function ProfilePage() {
           </div>
         )}
         {gridPosts.length > 0 && (
-          <ul className="cx-drop-list">
-            {gridPosts.map((post) => {
-              const ended = post.isVotingOpen === false || rel(post.votingEndsAt) === "ended";
-              return (
-                <li key={post.id} className="cx-drop-item">
-                  <div className="cx-drop-item-main">
-                    {/* Thumbnail strip */}
-                    <NavLink to={`/post/${post.id}`} className="cx-drop-thumbs" aria-label="View post">
-                      {post.imageUrls.slice(0, 3).map((u, idx) => (
-                        <span
-                          key={idx}
-                          className="cx-drop-thumb"
-                          style={{ backgroundImage: `url(${u})` }}
-                        />
-                      ))}
-                      {post.imageUrls.length > 3 && (
-                        <span className="cx-drop-thumb cx-drop-thumb--more">+{post.imageUrls.length - 3}</span>
-                      )}
-                    </NavLink>
-
-                    {/* Info */}
-                    <div className="cx-drop-info">
-                      <p className="cx-drop-title">{post.caption?.trim() || "Untitled compare"}</p>
-                      <p className="cx-drop-meta">
-                        {post.category?.name ?? "General"}
-                        <span className="cx-drop-meta-sep">·</span>
-                        {(post.totalVotes ?? 0).toLocaleString()} votes
-                      </p>
-                      <div className="cx-drop-option-chips">
-                        {(post.options ?? []).map((o, i) => o.label?.trim() ? (
-                          <span key={i} className="cx-drop-chip">{o.label}</span>
-                        ) : null)}
-                      </div>
-                      <span className={`cx-drop-status${ended ? " cx-drop-status--closed" : " cx-drop-status--open"}`}>
-                        {ended ? "🔒 Closed" : "🔴 Open"}
-                      </span>
-                    </div>
-
-                    {/* Action buttons */}
-                    {!useMockFeed && (
-                      <div className="cx-drop-actions">
-                        <button
-                          type="button"
-                          className="cx-drop-action-btn"
-                          title="Edit post"
-                          onClick={() => setEditingPost(post)}
-                        >
-                          ✏️
-                        </button>
-                        <NavLink to={`/post/${post.id}`} className="cx-drop-action-btn" title="View post">
-                          👁
-                        </NavLink>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="cx-kept-grid">
+            {gridPosts.map((post) => (
+              <ProfileCompareCard
+                key={post.id}
+                post={post}
+                variant="drops"
+                onEdit={!useMockFeed ? () => setEditingPost(post) : undefined}
+              />
+            ))}
+          </div>
         )}
       </section>
           </div>
@@ -786,37 +750,50 @@ export function ProfilePage() {
               </div>
             ) : (
               <div className="cx-kept-grid">
-                {savedPosts.map((post) => {
-                  const totalVotes = (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0);
-                  const isOpen = post.isVotingOpen !== false;
-                  return (
-                    <NavLink key={`kept-${post.id}`} to={`/post/${post.id}`} className="cx-kept-card">
-                      <div className="cx-kept-card-media">
-                        {post.imageUrls.slice(0, 2).map((url, idx) => (
-                          <span
-                            key={idx}
-                            className="cx-kept-card-thumb"
-                            style={{ backgroundImage: `url(${url})` }}
-                          />
-                        ))}
-                        {post.imageUrls.length > 2 && (
-                          <span className="cx-kept-card-more">+{post.imageUrls.length - 2}</span>
-                        )}
-                      </div>
-                      <div className="cx-kept-card-info">
-                        <p className="cx-kept-card-title">
-                          {post.caption?.trim() || "Untitled compare"}
-                        </p>
-                        <p className="cx-kept-card-meta">
-                          {totalVotes.toLocaleString()} votes
-                          <span className={`cx-kept-card-status${isOpen ? "" : " cx-kept-card-status--closed"}`}>
-                            {isOpen ? "Open" : "Closed"}
-                          </span>
-                        </p>
-                      </div>
-                    </NavLink>
-                  );
-                })}
+                {savedPosts.map((post) => (
+                  <ProfileCompareCard key={`kept-${post.id}`} post={post} variant="kept" />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {profileContentTab === "voted" && (
+          <div className="cx-profile-content-panel" role="tabpanel">
+            <div className="cx-voted-filter" role="group" aria-label="Filter voted posts">
+              <button
+                type="button"
+                className={`cx-voted-filter-btn${votedFilter === "all" ? " cx-voted-filter-btn--active" : ""}`}
+                aria-pressed={votedFilter === "all"}
+                onClick={() => setVotedFilter("all")}
+              >
+                All votes
+              </button>
+              <button
+                type="button"
+                className={`cx-voted-filter-btn${votedFilter === "anonymous" ? " cx-voted-filter-btn--active" : ""}`}
+                aria-pressed={votedFilter === "anonymous"}
+                onClick={() => setVotedFilter("anonymous")}
+              >
+                👻 Anonymous
+              </button>
+            </div>
+            {!useMockFeed && votedPostsLoading && votedPosts.length === 0 ? (
+              <p className="cx-conn-empty">Loading voted posts…</p>
+            ) : votedPosts.length === 0 ? (
+              <div className="cx-conn-empty">
+                <span className="cx-conn-empty-icon">🗳️</span>
+                <p>
+                  {votedFilter === "anonymous"
+                    ? "You haven't voted anonymously on any posts yet."
+                    : "You haven't voted on any posts yet."}
+                </p>
+              </div>
+            ) : (
+              <div className="cx-kept-grid">
+                {votedPosts.map((post) => (
+                  <ProfileCompareCard key={`voted-${post.id}`} post={post} variant="voted" />
+                ))}
               </div>
             )}
           </div>
