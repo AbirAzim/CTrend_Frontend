@@ -78,15 +78,20 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
 
 ---
 
-## Phase 3 — Mobile zoom / UX (frontend) ☐
+## Phase 3 — Mobile zoom / UX (frontend) ☑ (2026-06-01)
 
-- ☐ **#3 Mobile browser zooms in (esp. message input), hard to use** — root cause is
-  iOS Safari auto-zoom when focusing inputs with font-size < 16px. Set all
-  text inputs/textareas to ≥16px on mobile (chat input `.cw-input`, comment
-  `.ig-post-comments-input`, search inputs, auth fields). Audit other mobile UX
-  rough edges flagged while testing.
+- ☑ **#3 Mobile browser zoom on focus (Safari + Chrome mobile)** — all text fields,
+  textareas, and selects use **≥16px** on viewports ≤768px and on coarse-pointer
+  touch devices (`.cw-input`, comments, search, auth, create/edit, admin, voters).
+  Pinch-zoom unchanged (no `maximum-scale=1`).
+- ☑ **Mobile web layout polish** — `interactive-widget=resizes-content` on viewport
+  (keyboard resizes layout); `100dvh` on body; `text-size-adjust: 100%`; messenger
+  composer 16px inside ≤640px sheet; modal/comment panel `dvh` caps; safe-area on
+  global-search overlay; `touch-action: manipulation` on nav/icon taps;
+  `overscroll-behavior` on modals where applicable.
 
-**Files:** `src/index.css`, `index.html` (viewport already has `viewport-fit=cover`)
+**Files:** `src/index.css`, `index.html`
+**Mobile doc:** _(web-only polish — not added to `react_change_2/` per product choice)_
 
 ---
 
@@ -142,6 +147,9 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
   newest-on-top, vote-bar/status layout (status in the anonymous row), and
   single-tap unvote with a unified vote/unvote engine. Backend gained the
   `removeVote` mutation. Mobile-porting docs written in `react_change_2/`.
+- **2026-06-01** — Phase 3 **done** (web). Mobile Safari + Chrome: 16px form controls,
+  viewport `interactive-widget=resizes-content`, messenger/comment/search/auth inputs,
+  dvh modal heights, safe-area overlays, touch-action on chrome controls.
 - **2026-06-01** — Interstitial (pre-Phase-3) profile/post-view polish: two-zone
   action bar redesign, per-drop stats, new **Voted** tab + anonymous filter
   (backend `myVotedPosts`), and a compact single-post view. Mobile docs:

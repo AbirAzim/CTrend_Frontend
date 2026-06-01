@@ -109,14 +109,22 @@
   --cx-shadow-accent-lg: 0 14px 38px rgb(129 140 248 / 0.4);
 }
 
+html {
+  /* Stable text sizing in mobile Safari / Chrome (no auto inflation) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--ig-bg);
   color: var(--ig-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overflow-x: clip;
 }
 
 .app {
@@ -14568,6 +14576,13 @@ a.cx-profile-btn-accent {
     padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
 
+  /* Composer: 16px avoids focus zoom when keyboard opens */
+  .cw-input {
+    font-size: 16px;
+    line-height: 1.45;
+    padding: 10px 14px;
+  }
+
   /* Image preview bar: same safe-area padding */
   .cw-img-preview-bar {
     padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
@@ -14599,6 +14614,92 @@ a.cx-profile-btn-accent {
     max-height: 88dvh;
     max-height: 88vh;
     border-radius: 8px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 3 — Mobile browser UX (Safari + Chrome, ≤768px / touch)
+   Prevent focus zoom on inputs <16px; polish layout for mobile web.
+   Pinch-zoom stays enabled (no maximum-scale=1).
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px), ((hover: none) and (pointer: coarse)) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input:not([type]),
+  textarea,
+  select,
+  .cw-input,
+  .ig-input,
+  .ig-input-textarea,
+  .ig-post-comments-input,
+  .cx-comment-reply-input,
+  .cx-modal-search-input,
+  .cx-gsearch-input,
+  .cx-voters-search-input,
+  .cx-conn-search,
+  .cx-edit-input,
+  .cx-edit-textarea,
+  .cx-edit-select,
+  .auth-form .field input,
+  .ig-compare-url-input,
+  .ig-compare-title-input,
+  .ig-settings-textarea,
+  .ig-settings-select,
+  .ig-cat-select,
+  .ig-dtp-time-input,
+  .ig-dtp-time-select,
+  .admin-toolbar-input,
+  .admin-cat-create .ig-input {
+    font-size: 16px;
+  }
+
+  /* Slightly taller tap targets on primary actions (not inputs) */
+  .ig-bottom-nav-item,
+  .ig-topbar-icon-btn,
+  .cx-gsearch-mobile-btn,
+  .cw-emoji-toggle,
+  .cw-send-btn,
+  .cw-img-btn,
+  .ig-post-comments-submit {
+    touch-action: manipulation;
+  }
+
+  /* Modals / sheets: contain overscroll; use dynamic viewport height */
+  .ig-modal-overlay,
+  .ig-modal-card,
+  .cx-voters-card,
+  .cx-gsearch-overlay {
+    max-height: 100dvh;
+  }
+
+  .ig-modal-card {
+    max-height: min(82dvh, calc(100dvh - 24px));
+  }
+
+  .ig-post-comments {
+    max-height: min(70dvh, calc(100dvh - 120px));
+  }
+
+  /* Global search mobile overlay: safe area + keyboard-friendly header */
+  .cx-gsearch-overlay-head {
+    padding-top: max(10px, env(safe-area-inset-top, 10px));
+  }
+
+  .cx-gsearch-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Auth pages: comfortable input height on small screens */
+  .auth-form .field input {
+    min-height: 44px;
+    padding: 0.65rem 0.75rem;
   }
 }
 
