@@ -65,9 +65,11 @@ async listVotedPostIds(userId, anonymousOnly = false) {
 - `MY_VOTED_POSTS` query (same field selection as `USER_POSTS`).
 - `votedFilter` state (`"all" | "anonymous"`) drives `variables.anonymousOnly`; the
   query refetches when the toggle flips (cache-and-network).
-- Rows reuse the **same `.cx-drop-*` row markup** (thumbs, title, category, option
-  chips, the stats line, open/closed status) but with a **view-only** action (no Edit,
-  since voted posts may be other people's).
+- Rows now use **`ProfileCompareCard`** in the Kept-style grid — see
+  **`2026-06-01_profile-drops-grid-and-search-thumbs.md`** for the complete card
+  design (grid, media strip, footer stats, **Live under icons bottom-left**, status
+  pills, edit placement). Voted tab: same stats + status, **no Edit** (posts may be
+  other users).
 - Empty states differentiate: "You haven't voted anonymously on any posts yet." vs
   "You haven't voted on any posts yet."
 
