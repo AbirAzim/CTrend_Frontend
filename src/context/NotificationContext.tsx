@@ -11,6 +11,7 @@ import {
   MY_NOTIFICATIONS,
   MARK_NOTIFICATION_READ,
   MARK_ALL_NOTIFICATIONS_READ,
+  ARCHIVE_NOTIFICATION,
   NEW_NOTIFICATION_SUB,
 } from "../graphql/notifications";
 import { useAuth } from "./AuthContext";
@@ -30,6 +31,7 @@ export type NotificationItem = {
   latestActorAvatar?: string | null;
   commentId?: string | null;
   read: boolean;
+  archived?: boolean;
   createdAt: string;
 };
 
@@ -39,6 +41,8 @@ type NotificationContextValue = {
   loading: boolean;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  archiveNotification: (id: string) => void;
+  updateNotification: (id: string, patch: Partial<NotificationItem>) => void;
   refetch: () => void;
 };
 
@@ -60,30 +64,35 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // Exclude MESSAGE-type entries — those are surfaced by the messenger
       // FAB badge, not the bell icon.
       const items: NotificationItem[] = data?.myNotifications?.items ?? [];
-      setNotifications(items.filter((n) => n.type !== 'MESSAGE'));
+      setNotifications(
+        items.filter((n) => n.type !== "MESSAGE" && !n.archived),
+      );
     },
   });
 
   const [markReadMut] = useMutation(MARK_NOTIFICATION_READ);
   const [markAllReadMut] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
+  const [archiveMut] = useMutation(ARCHIVE_NOTIFICATION);
 
   useSubscription(NEW_NOTIFICATION_SUB, {
     skip: !isAuthenticated,
     onData({ data }) {
       const n = data.data?.newNotification as NotificationItem | undefined;
       // MESSAGE notifications belong to the messenger FAB, not the bell
-      if (!n || n.type === 'MESSAGE') return;
+      if (!n || n.type === "MESSAGE" || n.archived) return;
+      let skipChime = false;
       setNotifications((prev) => {
         // Grouped notifications (POST_HYPE / POST_COMMENT) reuse the same id
         // when updated — replace the existing entry rather than duplicating
         const existingIdx = prev.findIndex((p) => p.id === n.id);
         if (existingIdx >= 0) {
+          if (n.type === 'FRIEND_REQUEST') skipChime = true;
           const merged = { ...prev[existingIdx], ...n, read: n.read ?? false };
           return [merged, ...prev.slice(0, existingIdx), ...prev.slice(existingIdx + 1)];
         }
         return [n, ...prev];
       });
-      playNotificationChime();
+      if (!skipChime) playNotificationChime();
     },
   });
 
@@ -107,9 +116,48 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     void markAllReadMut();
   }, [markAllReadMut]);
 
+  const archiveNotification = useCallback(
+    (id: string) => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      void archiveMut({ variables: { id } });
+    },
+    [archiveMut],
+  );
+
+  const updateNotification = useCallback(
+    (id: string, patch: Partial<NotificationItem>) => {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+      );
+    },
+    [],
+  );
+
+  const refetchNotifications = useCallback(() => {
+    void refetch({ fetchPolicy: "network-only" });
+  }, [refetch]);
+
   const value = useMemo<NotificationContextValue>(
-    () => ({ notifications, unreadCount, loading, markRead, markAllRead, refetch }),
-    [notifications, unreadCount, loading, markRead, markAllRead, refetch],
+    () => ({
+      notifications,
+      unreadCount,
+      loading,
+      markRead,
+      markAllRead,
+      archiveNotification,
+      updateNotification,
+      refetch: refetchNotifications,
+    }),
+    [
+      notifications,
+      unreadCount,
+      loading,
+      markRead,
+      markAllRead,
+      archiveNotification,
+      updateNotification,
+      refetchNotifications,
+    ],
   );
 
   return (

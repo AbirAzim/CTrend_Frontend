@@ -34,6 +34,7 @@ import type { ColorPalette } from "../context/ThemeContext";
 import { useSounds } from "../context/SoundContext";
 import { useTabBar } from "../context/TabBarContext";
 import { postPermalink } from "../lib/postPermalink";
+import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -118,7 +119,26 @@ function makeStyles(c: ColorPalette) {
     avatarFallback: { backgroundColor: "#312e81", justifyContent: "center" as const, alignItems: "center" as const },
     avatarText: { color: "#ffffff", fontSize: 16, fontWeight: "700" as const },
     authorMeta: { flex: 1 },
+    authorNameRow: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, gap: 6 },
     authorName: { fontSize: 14, fontWeight: "800" as const, color: c.text, letterSpacing: 0.1 },
+    platformBadge: {
+      fontSize: 9,
+      fontWeight: "700" as const,
+      letterSpacing: 0.6,
+      textTransform: "uppercase" as const,
+      color: c.accent,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: c.accentLight,
+      overflow: "hidden" as const,
+    },
+    platformCard: {
+      borderColor: c.accentLight,
+      borderWidth: 1.5,
+      backgroundColor: c.accent + "14",
+    },
     timeLabel: { fontSize: 11, color: c.muted, marginTop: 2 },
     moreBtn: { padding: 8 },
     moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
@@ -613,9 +633,12 @@ function FeedPostCardComponent({ post }: Props) {
     }
   }
 
-  const authorName = post.authorDisplayName?.trim() || post.authorUsername;
+  const isPlatformPost = post.postType === "system";
+  const authorName = isPlatformPost
+    ? MODERATOR_PLATFORM_NAME
+    : post.authorDisplayName?.trim() || post.authorUsername;
   const authorInitial = authorName.slice(0, 1).toUpperCase();
-  const authorAvatarUrl = post.authorProfileImageUrl ?? null;
+  const authorAvatarUrl = isPlatformPost ? null : post.authorProfileImageUrl ?? null;
   const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 
   return (
@@ -624,16 +647,32 @@ function FeedPostCardComponent({ post }: Props) {
       <View style={st.header}>
         <Pressable
           style={st.authorRow}
-          onPress={() => post.authorId && router.push(`/profile/${post.authorId}` as `/${string}`)}
+          onPress={() =>
+            !isPlatformPost &&
+            post.authorId &&
+            router.push(`/profile/${post.authorId}` as `/${string}`)
+          }
+          disabled={isPlatformPost}
         >
-          <View style={[st.avatarWrap, !authorAvatarUrl && st.avatarFallback]}>
-            {authorAvatarUrl
-              ? <Image source={{ uri: authorAvatarUrl }} style={st.avatar} contentFit="cover" cachePolicy="memory-disk" />
-              : <Text style={st.avatarText}>{authorInitial}</Text>
-            }
+          <View style={[st.avatarWrap, !authorAvatarUrl && !isPlatformPost && st.avatarFallback]}>
+            {isPlatformPost ? (
+              <Image
+                source={require("../assets/logo.png")}
+                style={st.avatar}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+            ) : authorAvatarUrl ? (
+              <Image source={{ uri: authorAvatarUrl }} style={st.avatar} contentFit="cover" cachePolicy="memory-disk" />
+            ) : (
+              <Text style={st.avatarText}>{authorInitial}</Text>
+            )}
           </View>
           <View style={st.authorMeta}>
-            <Text style={st.authorName}>{authorName}</Text>
+            <View style={st.authorNameRow}>
+              <Text style={st.authorName}>{authorName}</Text>
+              {isPlatformPost ? <Text style={st.platformBadge}>Platform</Text> : null}
+            </View>
             {timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
           </View>
         </Pressable>

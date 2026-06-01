@@ -4,6 +4,8 @@
 **Web files changed:**
 - `src/components/PostCommentsPanel.tsx`
 
+**Related (same panel, more UI):** [discuss-panel-ux-overhaul.md](./2026-06-01_discuss-panel-ux-overhaul.md), [discuss-panel-index-css.md](./2026-06-01_discuss-panel-index-css.md)
+
 ## What changed on web (confirmed)
 
 1. **Enter posts a comment (#4).** The top-level comment box and the reply box are

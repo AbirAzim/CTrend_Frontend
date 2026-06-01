@@ -2,8 +2,12 @@ export type ViewerVote = "UP" | "DOWN" | null;
 
 export type PostStatus = "published" | "scheduled";
 
+export type FeedPostType = "user" | "system" | "org";
+
 export type FeedPostView = {
   id: string;
+  /** API post type — `system` = platform-wide Ke Jitbe polls. */
+  postType?: FeedPostType | null;
   authorId?: string | null;
   authorUsername: string;
   authorDisplayName: string | null;
