@@ -141,21 +141,20 @@ reactions). All porting notes live in `react_change_2/` — start at
 
 ---
 
-## Phase 5 — Message reactions like Messenger (frontend + backend) ☐
+## Phase 5 — Message reactions like Messenger (frontend + backend) ☑ (2026-06-01)
 
-**Do this later** — after the interstitial web work above is ported / stable.
+- ☑ **#8 React to a message** — hover quick-react bar (desktop), long-press /
+  right-click on bubble; 6 emojis (👍 ❤️ 😂 😮 😢 🔥); toggle same emoji to remove;
+  reaction strip under bubble; live sync via `messageReactionChanged` subscription.
+  - Backend: `MessageReaction` collection, `reactMessage` mutation, batch counts on
+    `messages` query, `messageReactionChanged` pubsub.
+  - Frontend: `MessageBubble` in `MessengerPanel`, optimistic `reactMessage` in
+    `MessengerContext`, GraphQL in `src/graphql/messages.ts` + `packages/shared`.
 
-- ☐ **#8 React to a message** — long-press / hover a message bubble → emoji picker
-  → reaction shows on the bubble (Messenger-style), persisted and pushed live to
-  the other participant.
-  - Backend: add `reactions` to Message model + `reactMessage(messageId, emoji)`
-    mutation + broadcast over `messageReceived`/a new `messageReactionChanged` sub.
-  - Frontend: reaction UI on `cw-bubble`, optimistic update in
-    `MessengerContext`, wire the new mutation + subscription.
-
-**Files (frontend):** `src/graphql/messages.ts`, `src/context/MessengerContext.tsx`,
-`src/components/MessengerPanel.tsx`, `src/index.css`
-**Files (backend):** messages schema/resolvers + subscription in `~/documents/code/CTrend`
+**Files (frontend):** `src/graphql/messages.ts`, `packages/shared/src/graphql/messages.ts`,
+`src/context/MessengerContext.tsx`, `src/components/MessengerPanel.tsx`, `src/index.css`
+**Files (backend):** `CTrend/src/messages/*` (`message-reaction.schema.ts`, service, resolver)
+**Mobile doc:** `react_change_2/2026-06-01_phase5-message-reactions.md`
 
 ---
 
@@ -185,4 +184,4 @@ reactions). All porting notes live in `react_change_2/` — start at
 - **2026-06-01** — **Interstitial** platform posts, discuss performance, vote
   notifications, and admin post management (web + backend). Docs:
   `react_change_2/2026-06-01_web-session-porting-guide.md` (+ audit checklist).
-  **Phase 5 (message reactions) not started.**
+  **Phase 5 (message reactions) done** — `react_change_2/2026-06-01_phase5-message-reactions.md`.
