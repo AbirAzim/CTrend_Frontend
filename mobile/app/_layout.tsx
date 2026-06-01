@@ -55,8 +55,6 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   }
 });
 
-// Use the "default" channel (importance=MAX, created by usePushNotifications) for
-// all system notifications — it is verified to exist on every install.
 const BELL_CHANNEL_ID = "default";
 
 async function postSystemNotification(
@@ -132,12 +130,16 @@ function GlobalNotificationSubscription() {
         postId: (n as unknown as Record<string, unknown>).postId as string | null ?? null,
       });
 
-      // System notification — use body as title fallback so it's never the app name
-      void postSystemNotification(n.title || n.body || "Notification", n.body || "", {
-        referenceType: n.referenceType ?? "",
-        referenceId: n.referenceId ?? "",
-        postId: (n as unknown as Record<string, unknown>).postId ?? "",
-      });
+      const raw = n as unknown as Record<string, unknown>;
+      void postSystemNotification(
+        n.title || n.body || "Notification",
+        n.body || "",
+        {
+          referenceType: n.referenceType ?? "",
+          referenceId: n.referenceId ?? "",
+          postId: raw.postId ?? "",
+        },
+      );
 
       // Refresh bell badge count
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
