@@ -491,6 +491,16 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
+          {/* ── Sound preferences link ── */}
+          <View style={[st.editRow, { marginTop: -8 }]}>
+            <Pressable
+              style={[st.editBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push("/profile/sounds" as `/${string}`)}
+            >
+              <Text style={[st.editBtnText, { color: colors.subtext }]}>🔊  Sound preferences</Text>
+            </Pressable>
+          </View>
+
           {/* ── Stats row ── */}
           <View style={[st.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {[
