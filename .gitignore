@@ -52,6 +52,11 @@ mobile/.expo/
 mobile/dist/
 mobile/.metro-health-check*
 
+# Firebase config — contains API keys, never commit
+firebase/
+mobile/android/app/google-services.json
+mobile/ios/**/GoogleService-Info.plist
+
 # Android build artifacts
 mobile/android/.gradle/
 mobile/android/local.properties
