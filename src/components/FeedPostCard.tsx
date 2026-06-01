@@ -1,5 +1,5 @@
 import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { PostCommentsPanel } from "./PostCommentsPanel";
@@ -12,6 +12,7 @@ import {
   IconMore,
   IconOpenPost,
   IconShare,
+  IconUsers,
 } from "./IgIcons";
 import {
   DELETE_POST,
@@ -27,6 +28,7 @@ import {
 import { apolloClient } from "../lib/apolloClient";
 import { postPermalink } from "../lib/postPermalink";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { playVoteSound } from "../lib/notificationSound";
 import type { FeedPostView, VoteDirectionGql } from "../types/feed";
@@ -154,9 +156,29 @@ type VotersByPostData = {
       id: string;
       username?: string | null;
       displayName?: string | null;
+      profileImageUrl?: string | null;
     } | null;
   }>;
 };
+
+type VoterRow = VotersByPostData["votersByPost"][number];
+
+const VOTERS_PAGE_SIZE = 10;
+
+function voterDisplayName(v: VoterRow): string {
+  if (v.anonymous || !v.user) return "Anonymous voter";
+  return v.user.displayName?.trim() || v.user.username?.trim() || "Voter";
+}
+
+function voterInitial(v: VoterRow): string {
+  if (v.anonymous || !v.user) return "?";
+  return voterDisplayName(v).replace(/^@/, "").slice(0, 1).toUpperCase();
+}
+
+function voterAvatarSrc(v: VoterRow): string | null {
+  if (v.anonymous || !v.user) return null;
+  return normalizeProfileImageUrl(v.user.profileImageUrl);
+}
 
 type VoteLiveState = {
   upvoteCount: number;
@@ -218,6 +240,9 @@ function FeedPostCardComponent({
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
   const [anonymousVote, setAnonymousVote] = useState(Boolean(post.myVoteAnonymous));
   const [showVoters, setShowVoters] = useState(false);
+  const [voterSearch, setVoterSearch] = useState("");
+  /** Which option group the modal is scoped to (undefined = all voters). */
+  const [voterOptionIndex, setVoterOptionIndex] = useState<number | undefined>(undefined);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
@@ -256,8 +281,18 @@ function FeedPostCardComponent({
     }
   }
 
-  const [fetchVoters, { data: votersData, loading: votersLoading, error: votersError }] =
-    useLazyQuery<VotersByPostData>(VOTERS_BY_POST, { fetchPolicy: "network-only" });
+  const [fetchVoters] = useLazyQuery<VotersByPostData>(VOTERS_BY_POST, {
+    fetchPolicy: "network-only",
+  });
+  // Paginated voter list (infinite scroll). We accumulate rows ourselves rather
+  // than reading the lazy-query cache so we can append pages.
+  const [voters, setVoters] = useState<VoterRow[]>([]);
+  const [votersHasMore, setVotersHasMore] = useState(false);
+  const [votersInitialLoading, setVotersInitialLoading] = useState(false);
+  const [votersLoadingMore, setVotersLoadingMore] = useState(false);
+  const [votersError, setVotersError] = useState<string | null>(null);
+  /** Monotonic id to ignore out-of-order / stale page responses. */
+  const votersReqId = useRef(0);
 
   const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
   const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
@@ -331,33 +366,95 @@ function FeedPostCardComponent({
       return;
     }
 
-    function handleOutsidePointerDown(event: MouseEvent | TouchEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-      if (votersModalCardRef.current?.contains(target)) {
-        return;
-      }
-      setShowVoters(false);
-    }
-
+    // The panel floats centered; the page behind stays scrollable (no body
+    // lock). Close on Escape or a click outside the card. We use `click` (not
+    // mousedown/touchstart) so a scroll/drag gesture never dismisses it, and
+    // defer attaching it one tick so the opening click doesn't close it.
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setShowVoters(false);
       }
     }
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Node && votersModalCardRef.current?.contains(target)) {
+        return;
+      }
+      setShowVoters(false);
+    }
 
-    document.addEventListener("mousedown", handleOutsidePointerDown);
-    document.addEventListener("touchstart", handleOutsidePointerDown);
     document.addEventListener("keydown", handleEscape);
+    const attachId = setTimeout(() => {
+      document.addEventListener("click", handleOutsideClick);
+    }, 0);
 
     return () => {
-      document.removeEventListener("mousedown", handleOutsidePointerDown);
-      document.removeEventListener("touchstart", handleOutsidePointerDown);
+      clearTimeout(attachId);
       document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("click", handleOutsideClick);
     };
   }, [showVoters]);
+
+  // Fetch (or re-fetch) the first page of voters: on open, and whenever the
+  // search term changes. Empty term loads immediately; typing is debounced.
+  const fetchVotersPage = useCallback(
+    async (skip: number, append: boolean, term: string, optionIndex: number | undefined) => {
+      const reqId = ++votersReqId.current;
+      if (append) {
+        setVotersLoadingMore(true);
+      } else {
+        setVotersInitialLoading(true);
+        setVotersError(null);
+      }
+      try {
+        const { data } = await fetchVoters({
+          variables: {
+            postId: post.id,
+            optionIndex,
+            search: term || null,
+            skip,
+            take: VOTERS_PAGE_SIZE,
+          },
+        });
+        if (reqId !== votersReqId.current) return; // a newer request superseded us
+        const rows = data?.votersByPost ?? [];
+        setVoters((prev) => (append ? [...prev, ...rows] : rows));
+        setVotersHasMore(rows.length === VOTERS_PAGE_SIZE);
+      } catch (err: unknown) {
+        if (reqId !== votersReqId.current) return;
+        if (!append) setVoters([]);
+        setVotersError(getApolloErrorMessage(err));
+      } finally {
+        if (reqId === votersReqId.current) {
+          setVotersInitialLoading(false);
+          setVotersLoadingMore(false);
+        }
+      }
+    },
+    [fetchVoters, post.id],
+  );
+
+  useEffect(() => {
+    if (!showVoters || voteMode !== "api") {
+      return;
+    }
+    const term = voterSearch.trim();
+    const run = () => void fetchVotersPage(0, false, term, voterOptionIndex);
+    if (!term) {
+      run();
+      return;
+    }
+    const handle = setTimeout(run, 300);
+    return () => clearTimeout(handle);
+  }, [showVoters, voterSearch, voterOptionIndex, voteMode, fetchVotersPage]);
+
+  function handleVotersScroll(e: React.UIEvent<HTMLDivElement>) {
+    if (votersLoadingMore || votersInitialLoading || !votersHasMore) return;
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 140) {
+      void fetchVotersPage(voters.length, true, voterSearch.trim(), voterOptionIndex);
+    }
+  }
 
   useEffect(() => {
     // When Apollo writes subscription data to the cache, post props change and
@@ -450,12 +547,11 @@ function FeedPostCardComponent({
     }
   }
 
-  async function openVotersList(optionIndex?: number) {
+  function openVotersList(optionIndex?: number) {
+    setVoterSearch("");
+    setVoterOptionIndex(optionIndex);
     setShowVoters(true);
-    if (voteMode !== "api") {
-      return;
-    }
-    await fetchVoters({ variables: { postId: post.id, optionIndex } });
+    // The fetch (initial + on search change) is handled by the effect below.
   }
 
   async function handleSharePostLink() {
@@ -992,18 +1088,15 @@ function FeedPostCardComponent({
   }
 
   const binaryTotal = up + down;
+  /** Total votes cast on this post (binary or multi) — shown on the Voters chip. */
+  const totalVoteCount = isMultiCompare ? multiTotalVotes : binaryTotal;
   const hypeCount = hypeCountLive;
   const commentCount = post.commentCount ?? 0;
-  const groupedVoters = useMemo(() => {
-    const rows = votersData?.votersByPost ?? [];
-    const groups = new Map<number, typeof rows>();
-    for (const row of rows) {
-      const existing = groups.get(row.selectedOptionIndex) ?? [];
-      existing.push(row);
-      groups.set(row.selectedOptionIndex, existing);
-    }
-    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
-  }, [votersData]);
+  // Flat, chronologically-sorted list (newest first, as returned by the server).
+  // A flat list keeps infinite-scroll stable — appending a page never reflows
+  // rows above the viewport the way regrouping would.
+  const showVoterOptionTag = voterOptionIndex === undefined;
+  const loadedVotersCount = voters.length;
   const leftPct =
     binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : null;
   const rightPct =
@@ -1678,15 +1771,16 @@ function FeedPostCardComponent({
             type="button"
             className={`cx-action-chip${commentsOpen ? " cx-action-chip--pressed" : ""}`}
             aria-label={commentsOpen ? "Hide comments" : "Show comments"}
+            title="Comments"
             aria-expanded={commentsOpen}
             onClick={() => {
               setCommentsOpen((v) => !v);
             }}
           >
             <IconComment />
-            <span className="cx-action-chip-label">
-              Discuss{commentCount > 0 ? ` ${commentCount}` : ""}
-            </span>
+            {commentCount > 0 ? (
+              <span className="cx-action-chip-count">{commentCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -1696,7 +1790,6 @@ function FeedPostCardComponent({
             onClick={() => void handleSharePostLink()}
           >
             <IconShare />
-            <span className="cx-action-chip-label">Share</span>
           </button>
           {showPermalinkToolbar ? (
             <NavLink
@@ -1706,38 +1799,47 @@ function FeedPostCardComponent({
               title="Open post on its own page"
             >
               <IconOpenPost />
-              <span className="cx-action-chip-label">Full page</span>
             </NavLink>
           ) : null}
           <button
             type="button"
             className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
             aria-label={liked ? "Unhype" : "Hype"}
+            title={liked ? "Unhype" : "Hype"}
             aria-pressed={liked}
             disabled={hypeUpdating}
             onClick={() => void handleToggleHype()}
           >
             <IconHeart filled={liked} />
-            <span className="cx-action-chip-label">Hype {hypeCount}</span>
+            {hypeCount > 0 ? (
+              <span className="cx-action-chip-count">{hypeCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
             className={`cx-action-chip${saved ? " cx-action-chip--saved" : ""}`}
             aria-label={saved ? "Unsave" : "Save"}
+            title={saved ? "Unsave" : "Keep"}
             aria-pressed={saved}
             disabled={keepUpdating}
             onClick={() => void handleToggleKeep()}
           >
             <IconBookmark filled={saved} />
-            <span className="cx-action-chip-label">Keep{saveLiveCount > 0 ? ` ${saveLiveCount}` : ""}</span>
+            {saveLiveCount > 0 ? (
+              <span className="cx-action-chip-count">{saveLiveCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
             className="cx-action-chip"
             aria-label="See who voted"
+            title="Voters"
             onClick={() => void openVotersList()}
           >
-            <span className="cx-action-chip-label">Voters</span>
+            <IconUsers />
+            {totalVoteCount > 0 ? (
+              <span className="cx-action-chip-count">{totalVoteCount}</span>
+            ) : null}
           </button>
         </div>
 
@@ -1760,47 +1862,127 @@ function FeedPostCardComponent({
       ) : null}
       {showVoters ? (
         <div
-          className="ig-modal-overlay"
+          className="ig-modal-overlay cx-voters-overlay"
           role="dialog"
           aria-modal="true"
           aria-label="Voter list"
         >
-          <section ref={votersModalCardRef} className="ig-modal-card">
-            <div className="ig-post-comments-head">
-              <h3 className="ig-post-comments-title">Voted by</h3>
-            <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
+          <section ref={votersModalCardRef} className="ig-modal-card cx-voters-card">
+            <div className="ig-post-comments-head cx-voters-head">
+              <div className="cx-voters-head-titles">
+                <h3 className="ig-post-comments-title">Voted by</h3>
+                {!votersInitialLoading && !votersError ? (
+                  <span className="cx-voters-total">
+                    {loadedVotersCount}
+                    {votersHasMore ? "+" : ""}{" "}
+                    {loadedVotersCount === 1 && !votersHasMore ? "voter" : "voters"}
+                  </span>
+                ) : null}
+              </div>
+              <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
                 Close
               </button>
             </div>
-            {votersLoading ? <p className="muted small">Loading voters…</p> : null}
+            {voteMode === "api" ? (
+              <div className="cx-voters-search">
+                <svg className="cx-voters-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="15" height="15" aria-hidden>
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="search"
+                  className="cx-voters-search-input"
+                  placeholder="Search voters by name…"
+                  value={voterSearch}
+                  onChange={(e) => setVoterSearch(e.target.value)}
+                  aria-label="Search voters"
+                />
+                {voterSearch ? (
+                  <button
+                    type="button"
+                    className="cx-voters-search-clear"
+                    aria-label="Clear search"
+                    onClick={() => setVoterSearch("")}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {votersInitialLoading ? (
+              <div className="cx-voters-loading">
+                <span className="cx-voters-spinner" aria-hidden />
+                <span className="muted small">Loading voters…</span>
+              </div>
+            ) : null}
             {votersError ? (
               <p className="ig-post-comments-error" role="alert">
-                {votersError.message}
+                {votersError}
               </p>
             ) : null}
-            <div className="ig-voter-list-scroll">
-              {groupedVoters.map(([optionIndex, voters]) => (
-                <div key={`option-group-${optionIndex}`} className="ig-voter-group">
-                  <div className="ig-voter-group-head">
-                    <span>Chose {compareOptionLabel(post, optionIndex)}</span>
-                  </div>
-                  <ul className="ig-post-comments-list">
-                    {voters.map((v) => (
-                      <li key={v.voteId} className="ig-post-comment">
-                        <span className="ig-post-comment-author">
-                          {v.anonymous || !v.user
-                            ? "Anonymous voter"
-                            : v.user.displayName?.trim() || v.user.username || "Voter"}
+            {!votersInitialLoading && !votersError && loadedVotersCount === 0 ? (
+              <p className="cx-voters-empty muted small">
+                {voterSearch.trim()
+                  ? `No voters match “${voterSearch.trim()}”.`
+                  : "No votes yet — be the first."}
+              </p>
+            ) : null}
+            {!votersInitialLoading && loadedVotersCount > 0 ? (
+              <div
+                className="cx-voters-scroll"
+                onScroll={handleVotersScroll}
+              >
+                <ul className="cx-voter-list">
+                  {voters.map((v) => {
+                    const src = voterAvatarSrc(v);
+                    const name = voterDisplayName(v);
+                    const isAnon = v.anonymous || !v.user;
+                    const RowInner = (
+                      <>
+                        <span className={`cx-voter-avatar${isAnon ? " cx-voter-avatar--anon" : ""}`}>
+                          {src ? (
+                            <img src={src} alt="" referrerPolicy="no-referrer" loading="lazy" />
+                          ) : (
+                            <span className="cx-voter-avatar-initial">{voterInitial(v)}</span>
+                          )}
                         </span>
-                        <time className="ig-post-comment-time" dateTime={v.createdAt}>
-                          {formatRelativeTime(v.createdAt) || ""}
-                        </time>
+                        <span className="cx-voter-meta">
+                          <span className="cx-voter-name">{name}</span>
+                          <span className="cx-voter-sub">
+                            {showVoterOptionTag ? (
+                              <span className={`cx-voter-tag cx-voter-tag--c${v.selectedOptionIndex % 4}`}>
+                                {compareOptionLabel(post, v.selectedOptionIndex)}
+                              </span>
+                            ) : null}
+                            <time className="cx-voter-time" dateTime={v.createdAt}>
+                              {formatRelativeTime(v.createdAt) || "just now"}
+                            </time>
+                          </span>
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={v.voteId} className="cx-voter-row">
+                        {isAnon ? (
+                          <span className="cx-voter-rowlink cx-voter-rowlink--anon">{RowInner}</span>
+                        ) : (
+                          <NavLink to={`/profile/${v.user!.id}`} className="cx-voter-rowlink">
+                            {RowInner}
+                          </NavLink>
+                        )}
                       </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                    );
+                  })}
+                </ul>
+                {votersLoadingMore ? (
+                  <div className="cx-voters-more">
+                    <span className="cx-voters-spinner cx-voters-spinner--sm" aria-hidden />
+                  </div>
+                ) : null}
+                {!votersHasMore && loadedVotersCount > VOTERS_PAGE_SIZE ? (
+                  <p className="cx-voters-end">That’s everyone</p>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}

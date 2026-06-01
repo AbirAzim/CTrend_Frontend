@@ -2840,17 +2840,15 @@ a.cx-friend-avatar:hover {
 
 .cx-action-rail {
   display: flex;
-  flex-wrap: nowrap;
+  /* Wrap to multiple rows so every action stays visible — no sideways scroll */
+  flex-wrap: wrap;
   align-items: stretch;
+  justify-content: center;
   gap: 8px;
   background: rgb(255 255 255 / 0.7);
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.14);
   border-radius: 14px;
   padding: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
 }
 
 .cx-action-rail::-webkit-scrollbar {
@@ -2864,9 +2862,9 @@ a.cx-friend-avatar:hover {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   min-width: max-content;
-  padding: 8px 12px;
+  padding: 9px 13px;
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.18);
   border-radius: 999px;
   background: rgb(255 255 255 / 0.9);
@@ -2883,8 +2881,8 @@ a.cx-friend-avatar:hover {
 }
 
 .cx-action-chip svg {
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
   flex-shrink: 0;
 }
 
@@ -2906,6 +2904,41 @@ a.cx-friend-avatar:hover {
   color: var(--cx-accent-deep);
   line-height: 1.1;
   white-space: nowrap;
+}
+
+/* Count badge — a small pill so the number reads as a counter, not part of the
+   label. Inherits each chip's accent (indigo default, rose for hype, amber for
+   keep) via the variant overrides below. */
+.cx-action-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.14);
+  color: var(--cx-accent-deep);
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cx-action-chip--heart .cx-action-chip-count {
+  background: rgb(var(--cx-rose-rgb) / 0.16);
+  color: var(--cx-rose-soft);
+}
+
+.cx-action-chip--saved .cx-action-chip-count {
+  background: rgb(245 158 11 / 0.18);
+  color: #b45309;
+}
+
+.cx-action-chip--pressed .cx-action-chip-count {
+  background: rgb(var(--cx-accent-rgb) / 0.2);
 }
 
 .cx-action-chip--pressed {
@@ -3528,29 +3561,361 @@ a.cx-friend-avatar:hover {
   padding: 8px 2px 2px 0;
 }
 
-.ig-voter-group {
-  margin-bottom: 12px;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
-  border-radius: 14px;
-  padding: 8px 9px 6px;
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(248 250 252 / 0.9));
+/* ── Voters modal (redesigned) ─────────────────────────────────────── */
+/* Floating, centered panel with NO dim and NO scroll lock — the page behind
+   stays scrollable. The overlay doesn't capture pointer events; only the card
+   does. Outside-click closing is handled by a deferred document listener (JS).
+   The card is fully opaque so the feed never bleeds through it. */
+.cx-voters-overlay {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+  /* Sit just below the top/bottom nav (z-index 50) so the nav chrome stays
+     visible and hoverable while this floating panel is open. */
+  z-index: 49;
 }
 
-.ig-voter-group:last-child {
-  margin-bottom: 0;
+.cx-voters-overlay .cx-voters-card {
+  pointer-events: auto;
 }
 
-.ig-voter-group-head {
-  margin: 0 0 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgb(var(--cx-accent-rgb) / 0.08);
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.15);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.cx-voters-card {
+  width: min(440px, 100%);
+  position: relative;
+  background: var(--ig-card);
+  box-shadow:
+    0 28px 80px rgb(2 6 23 / 0.5),
+    0 10px 30px rgb(var(--cx-accent-rgb) / 0.18);
+  animation: cx-voters-pop 0.26s var(--cx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+@keyframes cx-voters-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.cx-voters-head {
+  justify-content: space-between;
+}
+
+.cx-voters-head-titles {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+
+.cx-voters-total {
+  font-size: 0.72rem;
+  font-weight: 700;
   color: var(--cx-accent-deep);
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cx-voters-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px 4px;
+  flex-shrink: 0;
+}
+
+.cx-voters-search-icon {
+  position: absolute;
+  left: 26px;
+  color: var(--ig-muted);
+  pointer-events: none;
+}
+
+.cx-voters-search-input {
+  width: 100%;
+  padding: 9px 34px 9px 38px;
+  border-radius: 12px;
+  border: 1px solid var(--ig-border);
+  background: rgb(var(--cx-ink-rgb) / 0.03);
+  color: var(--cx-ink);
+  font: inherit;
+  font-size: 16px; /* ≥16px so iOS doesn't auto-zoom on focus */
+  outline: none;
+  transition: border-color 0.18s var(--cx-ease-out), box-shadow 0.18s var(--cx-ease-out);
+}
+
+.cx-voters-search-input:focus {
+  border-color: rgb(var(--cx-accent-rgb) / 0.5);
+  box-shadow: 0 0 0 3px rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.cx-voters-search-input::placeholder {
+  color: var(--ig-muted);
+  opacity: 1;
+}
+
+/* Hide the native search clear so our own button is the only one */
+.cx-voters-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cx-voters-search-clear {
+  position: absolute;
+  right: 24px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgb(var(--cx-ink-rgb) / 0.08);
+  color: var(--ig-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cx-voters-search-clear:hover {
+  background: rgb(var(--cx-ink-rgb) / 0.16);
+  color: var(--cx-ink);
+}
+
+.cx-voters-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px;
+}
+
+.cx-voters-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--cx-accent-rgb) / 0.25);
+  border-top-color: var(--cx-accent);
+  animation: cx-voters-spin 0.7s linear infinite;
+}
+
+@keyframes cx-voters-spin {
+  to { transform: rotate(360deg); }
+}
+
+.cx-voters-empty {
+  padding: 26px 18px;
+  text-align: center;
+}
+
+.cx-voters-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* When the list reaches its top/bottom, let the scroll flow to the page
+     behind (no `overscroll-behavior: contain`) so scrolling is never blocked. */
+  -webkit-overflow-scrolling: touch;
+}
+
+.cx-voter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cx-voter-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.16);
+  color: var(--cx-accent-deep);
+}
+
+.cx-voter-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-voter-group-count {
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+  background: var(--cx-accent-mid);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+/* Per-option accent tints so each side reads distinctly */
+.cx-voter-group-head--c1 {
+  background: rgb(34 211 238 / 0.1);
+  border-color: rgb(34 211 238 / 0.28);
+  color: #0e7490;
+}
+.cx-voter-group-head--c1 .cx-voter-group-count { background: #06b6d4; }
+.cx-voter-group-head--c2 {
+  background: rgb(244 63 94 / 0.1);
+  border-color: rgb(244 63 94 / 0.26);
+  color: #be123c;
+}
+.cx-voter-group-head--c2 .cx-voter-group-count { background: #f43f5e; }
+.cx-voter-group-head--c3 {
+  background: rgb(245 158 11 / 0.12);
+  border-color: rgb(245 158 11 / 0.3);
+  color: #b45309;
+}
+.cx-voter-group-head--c3 .cx-voter-group-count { background: #f59e0b; }
+
+.cx-voter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cx-voter-rowlink {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 8px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s var(--cx-ease-out);
+}
+
+.cx-voter-rowlink:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  text-decoration: none;
+}
+
+.cx-voter-rowlink--anon {
+  cursor: default;
+}
+
+.cx-voter-rowlink--anon:hover {
+  background: transparent;
+}
+
+.cx-voter-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--cx-accent-mid), var(--cx-accent-2));
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 0 0 1px rgb(var(--cx-accent-rgb) / 0.22);
+}
+
+.cx-voter-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cx-voter-avatar--anon {
+  background: rgb(148 163 184 / 0.22);
+  color: var(--ig-muted);
+  box-shadow: 0 0 0 1px rgb(148 163 184 / 0.3);
+}
+
+.cx-voter-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.cx-voter-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ig-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-voter-sub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cx-voter-time {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Inline "chose X" tag on each voter row (only in the all-voters view) */
+.cx-voter-tag {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.12);
+  color: var(--cx-accent-deep);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-voter-tag--c1 { background: rgb(34 211 238 / 0.14); color: #0e7490; }
+.cx-voter-tag--c2 { background: rgb(244 63 94 / 0.14); color: #be123c; }
+.cx-voter-tag--c3 { background: rgb(245 158 11 / 0.16); color: #b45309; }
+
+/* Infinite-scroll footer states */
+.cx-voters-more {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+
+.cx-voters-spinner--sm {
+  width: 15px;
+  height: 15px;
+  border-width: 2px;
+}
+
+.cx-voters-end {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+  padding: 8px 0 2px;
+  margin: 0;
+}
+
+/* Mobile: keep the voters modal centered, just use the full width */
+@media (max-width: 560px) {
+  .cx-voters-card {
+    width: 100%;
+    max-height: 84dvh;
+  }
 }
 
 .ig-feed-status {
@@ -5774,13 +6139,8 @@ a.cx-action-chip {
 }
 
 @media (max-width: 360px) {
-  .cx-action-chip-label {
-    font-size: 0.58rem;
-  }
-
   .cx-action-chip {
-    min-width: 56px;
-    padding: 8px 8px 6px;
+    padding: 8px 10px;
   }
 }
 
@@ -6168,6 +6528,21 @@ a.cx-action-chip {
   color: #d3def8;
 }
 
+:root[data-theme="dark"] .cx-action-chip-count {
+  background: rgb(129 140 248 / 0.2);
+  color: #c7d0ff;
+}
+
+:root[data-theme="dark"] .cx-action-chip--heart .cx-action-chip-count {
+  background: rgb(251 113 133 / 0.22);
+  color: #fda4af;
+}
+
+:root[data-theme="dark"] .cx-action-chip--saved .cx-action-chip-count {
+  background: rgb(245 158 11 / 0.22);
+  color: #fcd34d;
+}
+
 :root[data-theme="dark"] .cx-action-chip:hover {
   background: rgb(129 140 248 / 0.2);
 }
@@ -6305,6 +6680,68 @@ a.cx-action-chip {
 
 :root[data-theme="dark"] .cx-modal-search-input::placeholder {
   color: #94a3b8;
+}
+
+/* Voters modal (redesigned) — dark theme */
+:root[data-theme="dark"] .cx-voter-group-head {
+  background: rgb(129 140 248 / 0.16);
+  border-color: rgb(129 140 248 / 0.28);
+  color: var(--cx-accent);
+}
+:root[data-theme="dark"] .cx-voter-group-head--c1 {
+  background: rgb(34 211 238 / 0.15);
+  border-color: rgb(34 211 238 / 0.32);
+  color: #67e8f9;
+}
+:root[data-theme="dark"] .cx-voter-group-head--c2 {
+  background: rgb(244 63 94 / 0.16);
+  border-color: rgb(244 63 94 / 0.32);
+  color: #fda4af;
+}
+:root[data-theme="dark"] .cx-voter-group-head--c3 {
+  background: rgb(245 158 11 / 0.16);
+  border-color: rgb(245 158 11 / 0.34);
+  color: #fcd34d;
+}
+:root[data-theme="dark"] .cx-voter-rowlink:hover {
+  background: rgb(255 255 255 / 0.05);
+}
+:root[data-theme="dark"] .cx-voter-tag {
+  background: rgb(129 140 248 / 0.18);
+  color: var(--cx-accent);
+}
+:root[data-theme="dark"] .cx-voter-tag--c1 { background: rgb(34 211 238 / 0.16); color: #67e8f9; }
+:root[data-theme="dark"] .cx-voter-tag--c2 { background: rgb(244 63 94 / 0.18); color: #fda4af; }
+:root[data-theme="dark"] .cx-voter-tag--c3 { background: rgb(245 158 11 / 0.18); color: #fcd34d; }
+:root[data-theme="dark"] .cx-voter-avatar--anon {
+  background: rgb(148 163 184 / 0.16);
+  box-shadow: 0 0 0 1px rgb(148 163 184 / 0.25);
+}
+:root[data-theme="dark"] .cx-voters-card {
+  background: #111a2e;
+}
+:root[data-theme="dark"] .cx-voters-card .cx-voters-head {
+  background: #111a2e;
+}
+:root[data-theme="dark"] .cx-voters-total {
+  color: var(--cx-accent);
+  background: rgb(129 140 248 / 0.16);
+}
+:root[data-theme="dark"] .cx-voters-search-input {
+  background: rgb(255 255 255 / 0.06);
+  border-color: rgb(148 163 184 / 0.28);
+  color: #e6edff;
+}
+:root[data-theme="dark"] .cx-voters-search-input:focus {
+  border-color: rgb(165 180 252 / 0.55);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.18);
+}
+:root[data-theme="dark"] .cx-voters-search-clear {
+  background: rgb(255 255 255 / 0.1);
+}
+:root[data-theme="dark"] .cx-voters-search-clear:hover {
+  background: rgb(255 255 255 / 0.18);
+  color: #e6edff;
 }
 
 :root[data-theme="dark"] .ig-topbar-logout {
@@ -12366,6 +12803,7 @@ a.cx-profile-btn-accent {
   color: var(--ig-text);
 }
 .nb-btn:hover { background: var(--ig-surface-2, rgba(0,0,0,.08)); }
+[data-theme="dark"] .nb-btn:hover { background: rgba(255,255,255,.08); }
 
 .nb-badge {
   position: absolute;
@@ -12421,6 +12859,10 @@ a.cx-profile-btn-accent {
 }
 .nb-item:last-child { border-bottom: none; }
 .nb-item:hover { background: var(--ig-surface-2, #f7f7f7); }
+/* --ig-surface-2 is undefined, so the hover fell back to a light grey even in
+   dark mode. Give the dropdown rows a theme-aware hover. */
+[data-theme="dark"] .nb-item:hover { background: rgba(255,255,255,.06); }
+[data-theme="dark"] .nb-item--unread:hover { background: rgba(0,149,246,.18); }
 .nb-item--unread { background: var(--ig-accent-soft, #e8f4fe); }
 [data-theme="dark"] .nb-item--unread { background: rgba(0,149,246,.12); }
 
