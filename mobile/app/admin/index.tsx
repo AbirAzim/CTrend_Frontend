@@ -42,7 +42,7 @@ type User = {
 type ListUsersData = { listUsers: User[] };
 type CountData = { listUsersCount: number };
 
-function UserAvatar({ user, size = 40, colors }: { user: User; size?: number; colors: ReturnType<typeof useTheme>["colors"] }) {
+function UserAvatar({ user, size = 40 }: { user: User; size?: number; colors?: ReturnType<typeof useTheme>["colors"] }) {
   const initials = (user.displayName ?? user.username ?? user.email)[0]!.toUpperCase();
   if (user.profileImageUrl) {
     return <Image source={{ uri: user.profileImageUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;

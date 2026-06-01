@@ -1,13 +1,12 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
-  FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -300,7 +299,7 @@ export default function ProfileScreen() {
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
 
   const setLoading = (id: string, on: boolean) =>
-    setActionLoadingIds((prev) => { const s = new Set(prev); on ? s.add(id) : s.delete(id); return s; });
+    setActionLoadingIds((prev) => { const s = new Set(prev); if (on) s.add(id); else s.delete(id); return s; });
 
   const { data: meData, loading: meLoading } = useQuery<MeData>(ME, {
     fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated,
