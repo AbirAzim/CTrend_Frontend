@@ -134,6 +134,27 @@ export function IconUser({ size = 26, active }: IconProps) {
   );
 }
 
+export function IconUsers({ size = 26 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="9" cy="8" r="3.4" />
+      <path d="M3.5 19.5v-.8c0-2.6 2.5-4.2 5.5-4.2s5.5 1.6 5.5 4.2v.8" />
+      <path d="M16 5.2a3.4 3.4 0 0 1 0 6.4" />
+      <path d="M17.5 14.4c2 .5 3.5 1.8 3.5 3.9v1.2" />
+    </svg>
+  );
+}
+
 export function IconHeart({ size = 26, filled }: IconProps & { filled?: boolean }) {
   if (filled) {
     return (
