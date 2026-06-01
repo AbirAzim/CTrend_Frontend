@@ -1,31 +1,45 @@
-/**
- * Messenger-style message notifications using @notifee/react-native.
- * Falls back to plain Notifee / Expo if MessagingStyle or remote avatars fail.
- */
-import notifee, {
-  AndroidImportance,
-  AndroidStyle,
-  AuthorizationStatus,
-  EventType,
-} from "@notifee/react-native";
+import notifee, { AndroidImportance, AuthorizationStatus, EventType } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { NativeModules } from "react-native";
 import { router } from "expo-router";
+import { apolloClient } from "./apolloClient";
+import { SEND_MESSAGE, MARK_CONVERSATION_READ } from "@ctrend/shared/graphql/messages";
 import { setPendingChatNavigation } from "./activeConversation";
 
-export const CHANNEL_ID = "ctrend_messages";
+export const REPLY_ACTION_ID = "reply";
+export const MARK_READ_ACTION_ID = "mark_read";
+export const CHANNEL_ID = "default"; // MAX importance channel created by usePushNotifications
+
+const _iconCache = new Map<string, string>();
+
+function isHttpsUrl(url: string | null | undefined): url is string {
+  return typeof url === "string" && url.startsWith("https://");
+}
+
+async function composedIcon(avatarUrl: string | null): Promise<string | null> {
+  if (!isHttpsUrl(avatarUrl)) return null;
+  if (_iconCache.has(avatarUrl)) return _iconCache.get(avatarUrl)!;
+  const composer = NativeModules.NotificationIconComposer as { compose: (url: string) => Promise<string> } | undefined;
+  if (!composer) return null;
+  try {
+    const result = await composer.compose(avatarUrl);
+    if (result) _iconCache.set(avatarUrl, result);
+    return result ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const MAX_STYLE_MESSAGES = 12;
 
 type ConvState = {
   senderName: string;
   senderAvatar: string | null;
   messages: Array<{ text: string; timestamp: number }>;
+  notifIds: string[];
 };
 export const convNotifState = new Map<string, ConvState>();
-
-function isHttpsUrl(url: string | null | undefined): url is string {
-  return typeof url === "string" && url.startsWith("https://");
-}
 
 function notificationsAuthorized(status: AuthorizationStatus): boolean {
   return (
@@ -34,12 +48,10 @@ function notificationsAuthorized(status: AuthorizationStatus): boolean {
   );
 }
 
-/** Android 13+ and iOS — request/check before displaying notifications. */
 export async function ensureNotifeePermissions(): Promise<boolean> {
   try {
     const current = await notifee.getNotificationSettings();
     if (notificationsAuthorized(current.authorizationStatus)) return true;
-
     const requested = await notifee.requestPermission();
     return notificationsAuthorized(requested.authorizationStatus);
   } catch (e) {
@@ -48,129 +60,16 @@ export async function ensureNotifeePermissions(): Promise<boolean> {
   }
 }
 
-let channelsReady = false;
-
-/** Create channels early so Android 13+ permission prompt can appear. */
 export async function initMessageNotifications(): Promise<void> {
-  if (channelsReady) return;
-
-  const granted = await ensureNotifeePermissions();
-  if (!granted) {
-    console.warn("[notifee] notification permission not granted");
-  }
-
-  if (Platform.OS === "android") {
-    try {
-      await notifee.createChannel({
-        id: CHANNEL_ID,
-        name: "Messages",
-        importance: AndroidImportance.HIGH,
-        vibration: true,
-        vibrationPattern: [250, 250, 250, 250],
-        lights: true,
-        lightColor: "#6366f1",
-        sound: "default",
-      });
-    } catch (e) {
-      console.warn("[notifee] createChannel failed:", e);
-    }
-
-    try {
-      await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-        name: "Messages",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#6366f1",
-        sound: "default",
-        showBadge: true,
-      });
-    } catch (e) {
-      console.warn("[notifee] expo channel failed:", e);
-    }
-  }
-
-  channelsReady = true;
-  console.warn("[notifee] message channels ready");
+  // Channel is created by usePushNotifications with importance MAX.
+  // Just ensure permission is requested early.
+  await ensureNotifeePermissions();
 }
 
-async function postViaExpo(
-  conversationId: string,
-  senderName: string,
-  messageText: string,
-) {
-  await Notifications.scheduleNotificationAsync({
-    identifier: `msg_${conversationId}`,
-    content: {
-      title: senderName,
-      body: messageText,
-      data: { type: "MESSAGE", conversationId: String(conversationId) },
-      sound: true,
-      vibrate: [250, 250, 250, 250],
-      color: "#6366f1",
-    },
-    trigger: { channelId: CHANNEL_ID },
-  });
-}
-
-async function postViaNotifeeSimple(
-  conversationId: string,
-  senderName: string,
-  messageText: string,
-) {
-  await notifee.displayNotification({
-    id: `msg_${conversationId}`,
-    title: senderName,
-    body: messageText,
-    data: { type: "MESSAGE", conversationId: String(conversationId) },
-    android: {
-      channelId: CHANNEL_ID,
-      importance: AndroidImportance.HIGH,
-      smallIcon: "ic_launcher",
-      pressAction: { id: "default" },
-      autoCancel: true,
-      showTimestamp: true,
-    },
-    ios: { sound: "default" },
-  });
-}
-
-async function postViaNotifeeMessaging(
-  conversationId: string,
-  senderName: string,
-  senderAvatar: string | null,
-  messageText: string,
-  messages: ConvState["messages"],
-) {
-  const person = {
-    name: senderName,
-    ...(isHttpsUrl(senderAvatar) ? { icon: senderAvatar } : {}),
-  };
-
-  await notifee.displayNotification({
-    id: `msg_${conversationId}`,
-    title: senderName,
-    body: messageText,
-    data: { type: "MESSAGE", conversationId: String(conversationId) },
-    android: {
-      channelId: CHANNEL_ID,
-      importance: AndroidImportance.HIGH,
-      smallIcon: "ic_launcher",
-      style: {
-        type: AndroidStyle.MESSAGING,
-        person,
-        messages: messages.map((m) => ({
-          text: m.text,
-          timestamp: m.timestamp,
-          person,
-        })),
-        group: false,
-      },
-      pressAction: { id: "default" },
-      autoCancel: true,
-      showTimestamp: true,
-    },
-    ios: { sound: "default" },
-  });
+let _notifSeq = 0;
+function makeNotifId(conversationId: string) {
+  // Counter ensures uniqueness even for messages arriving in the same millisecond.
+  return `msg_${conversationId}_${Date.now()}_${++_notifSeq}`;
 }
 
 export async function postOrUpdateMessageNotification(
@@ -179,59 +78,95 @@ export async function postOrUpdateMessageNotification(
   senderAvatar: string | null,
   messageText: string,
 ) {
-  const granted = await ensureNotifeePermissions();
-  if (!granted) {
-    console.warn("[notifee] skipping notification — permission denied");
-    return;
-  }
-
-  if (Platform.OS === "android") {
-    await notifee.createChannel({
-      id: CHANNEL_ID,
-      name: "Messages",
-      importance: AndroidImportance.HIGH,
-      sound: "default",
-    });
-  }
-
   const existing = convNotifState.get(conversationId);
-  const nextMessages: ConvState["messages"] = existing
-    ? [...existing.messages, { text: messageText, timestamp: Date.now() }]
-    : [{ text: messageText, timestamp: Date.now() }];
-  const messages = nextMessages.slice(-MAX_STYLE_MESSAGES);
-  convNotifState.set(conversationId, { senderName, senderAvatar, messages });
+  const messages = [
+    ...(existing?.messages ?? []),
+    { text: messageText, timestamp: Date.now() },
+  ].slice(-MAX_STYLE_MESSAGES);
 
+  const notifId = makeNotifId(conversationId);
+  const notifIds = [...(existing?.notifIds ?? []), notifId];
+  convNotifState.set(conversationId, { senderName, senderAvatar, messages, notifIds });
+
+  // Try Notifee first — it supports sender avatar (largeIcon).
+  // Counter-based unique ID prevents the silent-update collision that affected earlier builds.
+  const icon = await composedIcon(senderAvatar);
   try {
-    await postViaNotifeeMessaging(
-      conversationId,
-      senderName,
-      senderAvatar,
-      messageText,
-      messages,
-    );
+    await notifee.displayNotification({
+      id: notifId,
+      title: senderName,
+      body: messageText,
+      data: { type: "MESSAGE", conversationId: String(conversationId) },
+      android: {
+        channelId: CHANNEL_ID,
+        importance: AndroidImportance.HIGH,
+        smallIcon: "ic_launcher_monochrome",
+        ...(icon
+          ? { largeIcon: icon }
+          : isHttpsUrl(senderAvatar)
+          ? { largeIcon: senderAvatar, circularLargeIcon: true }
+          : {}),
+        pressAction: { id: "default" },
+        autoCancel: true,
+        showTimestamp: true,
+      },
+      ios: { sound: "default" },
+    });
+    console.warn("[msg] posted via notifee:", notifId);
     return;
   } catch (e) {
-    console.warn("[notifee] MessagingStyle failed, trying simple:", e);
+    console.warn("[msg] notifee failed, trying expo:", e);
   }
 
+  // Expo fallback
   try {
-    await postViaNotifeeSimple(conversationId, senderName, messageText);
-    return;
+    await Notifications.scheduleNotificationAsync({
+      identifier: notifId,
+      content: {
+        title: senderName,
+        body: messageText,
+        data: { type: "MESSAGE", conversationId: String(conversationId) },
+        sound: true,
+      },
+      trigger: Platform.OS === "android" ? { channelId: CHANNEL_ID } : null,
+    });
+    console.warn("[msg] posted via expo:", notifId);
   } catch (e) {
-    console.warn("[notifee] simple display failed, trying expo:", e);
+    console.warn("[msg] expo fallback failed:", e);
   }
+}
 
+export async function handleInlineReply(conversationId: string, text: string): Promise<void> {
   try {
-    await postViaExpo(conversationId, senderName, messageText);
+    await apolloClient.mutate({
+      mutation: SEND_MESSAGE,
+      variables: { conversationId, text },
+    });
+    clearConversationNotification(conversationId);
   } catch (e) {
-    console.warn("[notifee] expo fallback failed:", e);
+    console.warn("[notifee] inline reply failed:", e);
+  }
+}
+
+export async function handleMarkReadAction(conversationId: string): Promise<void> {
+  try {
+    await apolloClient.mutate({
+      mutation: MARK_CONVERSATION_READ,
+      variables: { conversationId },
+    });
+    clearConversationNotification(conversationId);
+  } catch (e) {
+    console.warn("[notifee] mark read failed:", e);
   }
 }
 
 export function clearConversationNotification(conversationId: string) {
+  const state = convNotifState.get(conversationId);
   convNotifState.delete(conversationId);
-  void notifee.cancelNotification(`msg_${conversationId}`).catch(() => {});
-  void Notifications.cancelScheduledNotificationAsync(`msg_${conversationId}`).catch(() => {});
+  for (const id of state?.notifIds ?? []) {
+    void Notifications.dismissNotificationAsync(id).catch(() => {});
+    void Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  }
 }
 
 let _foregroundHandlerRegistered = false;
@@ -245,11 +180,13 @@ export function registerNotifeeHandlers() {
   if (_foregroundHandlerRegistered) return;
   _foregroundHandlerRegistered = true;
 
+  // Notifee foreground handler — kept for any Notifee-posted notifications.
   notifee.onForegroundEvent(({ type, detail }) => {
-    if (type !== EventType.PRESS) return;
     const data = detail.notification?.data as { type?: string; conversationId?: string } | undefined;
-    if (data?.type === "MESSAGE" && data.conversationId) {
-      navigateToChat(data.conversationId);
+    if (data?.type !== "MESSAGE" || !data.conversationId) return;
+    const conversationId = data.conversationId;
+    if (type === EventType.PRESS) {
+      navigateToChat(conversationId);
     }
   });
 }

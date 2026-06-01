@@ -8,11 +8,10 @@ import { REGISTER_PUSH_TOKEN } from "@ctrend/shared/graphql/notifications";
 // Show system banner/sound/badge for push notifications arriving while app is open.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
     shouldShowBanner: true,
     shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
   }),
 });
 
