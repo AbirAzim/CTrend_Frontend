@@ -35,6 +35,7 @@ import { useSounds } from "../context/SoundContext";
 import { useTabBar } from "../context/TabBarContext";
 import { postPermalink } from "../lib/postPermalink";
 import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import logoAsset from "../assets/logo.png";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -657,7 +658,7 @@ function FeedPostCardComponent({ post }: Props) {
           <View style={[st.avatarWrap, !authorAvatarUrl && !isPlatformPost && st.avatarFallback]}>
             {isPlatformPost ? (
               <Image
-                source={require("../assets/logo.png")}
+                source={logoAsset}
                 style={st.avatar}
                 contentFit="cover"
                 cachePolicy="memory-disk"

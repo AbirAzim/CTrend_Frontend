@@ -38,6 +38,7 @@ import {
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import logoAsset from "../../assets/logo.png";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -818,7 +819,7 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
         <View style={[st.postAvatar, { overflow: "hidden" }]}>
           {isPlatformPost ? (
             <Image
-              source={require("../../assets/logo.png")}
+              source={logoAsset}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
               cachePolicy="memory-disk"
