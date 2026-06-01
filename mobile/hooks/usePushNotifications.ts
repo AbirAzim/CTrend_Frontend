@@ -1,42 +1,44 @@
 import { useMutation } from "@apollo/client/react";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { router } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Platform } from "react-native";
 import { REGISTER_PUSH_TOKEN } from "@ctrend/shared/graphql/notifications";
 
+// Show system banner/sound/badge for push notifications arriving while app is open.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
     shouldShowBanner: true,
     shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
   }),
 });
 
-function navigateFromNotification(notification: Notifications.Notification) {
-  const data = notification.request.content.data as Record<string, unknown> | undefined;
-  if (!data) return;
-  const { referenceType, referenceId } = data as { referenceType?: string; referenceId?: string };
-  if (!referenceType || !referenceId) return;
-  if (referenceType === "POST") {
-    router.push(`/post/${referenceId}` as `/${string}`);
-  } else if (referenceType === "USER") {
-    router.push(`/profile/${referenceId}` as `/${string}`);
-  } else if (referenceType === "MESSAGE") {
-    router.push(`/chat/${referenceId}` as `/${string}`);
+async function getPushToken(): Promise<{ token: string; type: "expo" | "device" } | null> {
+  try {
+    const projectId =
+      (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.eas?.projectId as string | undefined ??
+      Constants.easConfig?.projectId;
+    if (projectId) {
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      return { token: tokenData.data, type: "expo" };
+    }
+  } catch { /* no project ID */ }
+
+  try {
+    const tokenData = await Notifications.getDevicePushTokenAsync();
+    return { token: tokenData.data as string, type: "device" };
+  } catch {
+    return null;
   }
 }
 
 export function usePushNotifications(isAuthenticated: boolean) {
   const [registerToken] = useMutation(REGISTER_PUSH_TOKEN);
-  const listenerRef = useRef<Notifications.EventSubscription | null>(null);
-  const responseListenerRef = useRef<Notifications.EventSubscription | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     let cancelled = false;
 
     async function setup() {
@@ -50,39 +52,24 @@ export function usePushNotifications(isAuthenticated: boolean) {
 
       if (Platform.OS === "android") {
         await Notifications.setNotificationChannelAsync("default", {
-          name: "Default",
+          name: "Ke Jitbe",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#6366f1",
+          sound: "default",
+          showBadge: true,
         });
       }
 
-      try {
-        const tokenData = await Notifications.getExpoPushTokenAsync();
-        await registerToken({
-          variables: { token: tokenData.data, platform: Platform.OS },
-        });
-      } catch {
-        // Backend may not support this yet — ignore silently
+      const result = await getPushToken();
+      if (result && !cancelled) {
+        try {
+          await registerToken({ variables: { token: result.token, platform: Platform.OS } });
+        } catch { /* ignore */ }
       }
     }
 
     void setup();
-
-    // Foreground handler — show system banner (handled by setNotificationHandler)
-    listenerRef.current = Notifications.addNotificationReceivedListener(() => {
-      // System banner shown automatically
-    });
-
-    // Background tap handler — navigate to referenced screen
-    responseListenerRef.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      navigateFromNotification(response.notification);
-    });
-
-    return () => {
-      cancelled = true;
-      listenerRef.current?.remove();
-      responseListenerRef.current?.remove();
-    };
+    return () => { cancelled = true; };
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 }

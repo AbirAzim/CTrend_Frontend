@@ -1,9 +1,10 @@
 import { useQuery } from "@apollo/client/react";
 import { Tabs, router } from "expo-router";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, Dimensions, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
+import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
@@ -24,15 +25,25 @@ function FloatingTabBar(props: {
   navigation: { emit: (e: { type: string; target: string; canPreventDefault: boolean }) => { defaultPrevented: boolean }; navigate: (name: string) => void };
 }) {
   const { colors, isDark } = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { translateY } = useTabBar();
+  const { translateY, savedCount, setSavedCount } = useTabBar();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const { data: convData } = useQuery<{ myConversations: Array<{ unreadCount: number }> }>(
     MY_CONVERSATIONS,
     { fetchPolicy: "cache-and-network", skip: !isAuthenticated, pollInterval: 15000 },
   );
   const totalUnread = (convData?.myConversations ?? []).reduce((s, c) => s + (c.unreadCount > 0 ? 1 : 0), 0);
+
+  // Initialize saved count from server on startup
+  const { data: savedData } = useQuery<{ mySavedPosts: unknown[] }>(MY_SAVED_POSTS, {
+    fetchPolicy: "cache-and-network",
+    skip: !isAuthenticated,
+  });
+  useEffect(() => {
+    if (savedData?.mySavedPosts) setSavedCount(savedData.mySavedPosts.length);
+  }, [savedData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pillBg = isDark ? "rgba(18,18,26,0.96)" : "rgba(255,255,255,0.96)";
   const pillBorder = isDark ? "rgba(100,100,180,0.18)" : "rgba(0,0,0,0.08)";
@@ -132,6 +143,11 @@ function FloatingTabBar(props: {
                       <Text style={styles.badgeText}>{totalUnread > 9 ? "9+" : totalUnread}</Text>
                     </View>
                   )}
+                  {route.name === "keeps" && savedCount > 0 && (
+                    <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+                      <Text style={styles.badgeText}>{savedCount > 99 ? "99+" : String(savedCount)}</Text>
+                    </View>
+                  )}
                 </View>
                 <Text
                   style={[
@@ -147,6 +163,25 @@ function FloatingTabBar(props: {
             </Animated.View>
           );
         })}
+
+        {/* ── Admin shield tab (admin users only) ── */}
+        {isAdmin && (
+          <Animated.View style={[styles.tabWrap, { transform: [{ scale: tabScales[tabScales.length - 1] ?? new Animated.Value(1) }] }]}>
+            <Pressable
+              style={styles.tabBtn}
+              onPress={() => router.push("/admin" as `/${string}`)}
+            >
+              <View style={styles.iconWrap}>
+                <ShieldIcon color={isDark ? "#a5b4fc" : colors.accent} size={24} />
+                {/* Accent dot */}
+                <View style={[styles.adminDot, { backgroundColor: colors.accent }]} />
+              </View>
+              <Text style={[styles.tabLabel, { color: isDark ? "#a5b4fc" : colors.accent }, styles.tabLabelActive]} numberOfLines={1}>
+                Admin
+              </Text>
+            </Pressable>
+          </Animated.View>
+        )}
       </View>
     </Animated.View>
   );
@@ -202,6 +237,22 @@ export default function TabsLayout() {
 }
 
 // ─── SVG-like icons (pure View) ───────────────────────────────────────────────
+
+function ShieldIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
+  const s = size;
+  const c = color as string;
+  return (
+    <View style={{ width: s, height: s, alignItems: "center", justifyContent: "center" }}>
+      {/* Shield body */}
+      <View style={{ width: s * 0.72, height: s * 0.84, borderRadius: s * 0.18, backgroundColor: c, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+        {/* Bottom point */}
+        <View style={{ position: "absolute", bottom: -s * 0.16, width: s * 0.72, height: s * 0.36, backgroundColor: c, borderBottomLeftRadius: s * 0.36, borderBottomRightRadius: s * 0.36, transform: [{ scaleY: 1.2 }] }} />
+        {/* Checkmark */}
+        <View style={{ width: s * 0.28, height: s * 0.14, borderBottomWidth: 2, borderLeftWidth: 2, borderColor: "#fff", transform: [{ rotate: "-45deg" }, { translateY: -s * 0.02 }] }} />
+      </View>
+    </View>
+  );
+}
 
 function HomeIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   const s = size;
@@ -333,6 +384,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+  adminDot: {
+    position: "absolute", top: -3, right: -3,
+    width: 7, height: 7, borderRadius: 4,
+  },
 
   // Create FAB
   fabWrap: {

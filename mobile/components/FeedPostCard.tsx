@@ -12,6 +12,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   Vibration,
   View,
@@ -31,6 +32,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 import { useSounds } from "../context/SoundContext";
+import { useTabBar } from "../context/TabBarContext";
 import { postPermalink } from "../lib/postPermalink";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -187,6 +189,13 @@ function makeStyles(c: ColorPalette) {
     optionBarFill: { borderRadius: 2 },
     optionBarEmpty: { backgroundColor: c.border },
     singleImg: { width: "100%" as const, height: 280 },
+    anonRow: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      paddingHorizontal: 14, paddingVertical: 8, gap: 8,
+      backgroundColor: c.section,
+    },
+    anonIcon: { fontSize: 13 },
+    anonLabel: { flex: 1, fontSize: 12, color: c.subtext, fontWeight: "500" as const },
     actionsScroll: {},
     actionsContent: {
       flexDirection: "row" as const,
@@ -248,10 +257,12 @@ function FeedPostCardComponent({ post }: Props) {
   const { user, isAuthenticated } = useAuth();
   const { colors } = useTheme();
   const { playTick } = useSounds();
+  const { adjustSavedCount } = useTabBar();
   const st = useMemo(() => makeStyles(colors), [colors]);
 
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
+  const [anon, setAnon] = useState(Boolean(post.myVoteAnonymous));
   const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
   const [countdownStr, setCountdownStr] = useState(() => calcCountdown(post.votingEndsAt));
@@ -301,6 +312,11 @@ function FeedPostCardComponent({ post }: Props) {
     ? up > down ? 0 : down > up ? 1 : null : null;
   const hasVoted = viewer !== null || (optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex) !== null;
 
+  // Multi-compare grid sizing — 3 cols for 3/5+ items, 2×2 for exactly 4 items
+  const numCols = !isBinary && compareUrls && compareUrls.length === 4 ? 2 : 3;
+  const multiCellWidth = numCols === 2 ? (SCREEN_W - 2) / 2 : (SCREEN_W - 4) / 3;
+  const multiTotal = activeStats?.reduce((sum, s) => sum + s.count, 0) ?? 0;
+
   useEffect(() => {
     if (!activeVotingEndsAt || isVotingClosed) return;
     const timer = setInterval(() => {
@@ -334,9 +350,11 @@ function FeedPostCardComponent({ post }: Props) {
     setOptimisticVote(null);
     setHypeCount(post.hypeCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
+    setLiked(Boolean(post.viewerHasHyped));
+    setAnon(Boolean(post.myVoteAnonymous));
   }, [post.id, post.upvoteCount, post.downvoteCount, post.viewerVote,
     post.mySelectedOptionIndex, post.isVotingOpen, post.votingEndsAt,
-    post.hypeCount, post.viewerHasSaved]);
+    post.hypeCount, post.viewerHasSaved, post.viewerHasHyped, post.myVoteAnonymous]);
 
   // Set initial badge scale for pre-voted cards (no animation)
   useEffect(() => {
@@ -446,25 +464,56 @@ function FeedPostCardComponent({ post }: Props) {
     if (!isBinary && curIdx !== null && curIdx !== undefined && curIdx === idx) return;
     triggerVotePop(idx);
 
-    const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
-    const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
-    let newUp = curUp; let newDown = curDown;
-    if (idx === 0) { newUp += 1; if (curVote === "DOWN") newDown = Math.max(0, newDown - 1); }
-    else { newDown += 1; if (curVote === "UP") newUp = Math.max(0, newUp - 1); }
-    const total = newUp + newDown;
     const curStats = optimisticVote?.optionStats ?? post.optionStats ?? null;
-    const newStats = curStats?.map((s) => {
-      const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
-      return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
-    }) ?? null;
-    setOptimisticVote({
-      upvoteCount: newUp, downvoteCount: newDown,
-      viewerVote: idx === 0 ? "UP" : "DOWN",
-      mySelectedOptionIndex: idx,
-      optionStats: newStats,
-      isVotingOpen: activeIsVotingOpen,
-      votingEndsAt: activeVotingEndsAt,
-    });
+    let newOptimistic: VoteLiveState;
+
+    if (isBinary) {
+      const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
+      const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
+      let newUp = curUp; let newDown = curDown;
+      if (idx === 0) { newUp += 1; if (curVote === "DOWN") newDown = Math.max(0, newDown - 1); }
+      else { newDown += 1; if (curVote === "UP") newUp = Math.max(0, newUp - 1); }
+      const total = newUp + newDown;
+      const newStats = curStats?.map((s) => {
+        const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
+        return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
+      }) ?? null;
+      newOptimistic = {
+        upvoteCount: newUp, downvoteCount: newDown,
+        viewerVote: idx === 0 ? "UP" : "DOWN",
+        mySelectedOptionIndex: idx,
+        optionStats: newStats,
+        isVotingOpen: activeIsVotingOpen,
+        votingEndsAt: activeVotingEndsAt,
+      };
+    } else {
+      // Multi-compare: increment selected option, decrement previous selection
+      const prevIdx = curIdx;
+      const rawCounts = (curStats ?? []).map((s) => {
+        let c = s.count;
+        if (s.index === idx) c += 1;
+        if (prevIdx !== null && prevIdx !== undefined && s.index === prevIdx && prevIdx !== idx)
+          c = Math.max(0, c - 1);
+        return { ...s, count: c };
+      });
+      const newMultiTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
+      const newStats = rawCounts.map((s) => ({
+        ...s,
+        percentage: newMultiTotal > 0 ? (s.count / newMultiTotal) * 100 : 0,
+      }));
+      newOptimistic = {
+        upvoteCount: optimisticVote?.upvoteCount ?? post.upvoteCount,
+        downvoteCount: optimisticVote?.downvoteCount ?? post.downvoteCount,
+        viewerVote: null,
+        mySelectedOptionIndex: idx,
+        optionStats: newStats,
+        isVotingOpen: activeIsVotingOpen,
+        votingEndsAt: activeVotingEndsAt,
+      };
+    }
+
+    setOptimisticVote(newOptimistic);
+    setDetailsExpanded(true);
     voteGuardUntil.current = Date.now() + 2000;
 
     if (voteInFlight.current) { pendingVote.current = { idx }; return; }
@@ -472,7 +521,7 @@ function FeedPostCardComponent({ post }: Props) {
     let currentIdx = idx;
     while (true) {
       try {
-        const result = await voteMut({ variables: { postId: post.id, selectedOptionIndex: currentIdx, anonymous: false } });
+        const result = await voteMut({ variables: { postId: post.id, selectedOptionIndex: currentIdx, anonymous: anon } });
         const payload = result.data?.votePost;
         if (payload?.countsPerOption && payload.countsPerOption.length >= 2) {
           const counts = payload.countsPerOption.map((n) => Math.max(0, Math.round(n)));
@@ -509,10 +558,21 @@ function FeedPostCardComponent({ post }: Props) {
     catch { setLiked(!next); setHypeCount((n) => Math.max(0, n + (next ? -1 : 1))); }
   }
 
+  async function handleAnonymousToggle(val: boolean) {
+    setAnon(val);
+    const curIdx = optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex;
+    if (hasVoted && curIdx != null) {
+      try { await voteMut({ variables: { postId: post.id, selectedOptionIndex: curIdx, anonymous: val } }); }
+      catch { setAnon(!val); }
+    }
+  }
+
   async function handleSave() {
-    const next = !saved; setSaved(next);
+    const next = !saved;
+    setSaved(next);
+    adjustSavedCount(next ? 1 : -1);
     try { await setKeepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setSaved(!next); }
+    catch { setSaved(!next); adjustSavedCount(next ? -1 : 1); }
   }
 
   async function handleShare() {
@@ -556,7 +616,7 @@ function FeedPostCardComponent({ post }: Props) {
   const authorName = post.authorDisplayName?.trim() || post.authorUsername;
   const authorInitial = authorName.slice(0, 1).toUpperCase();
   const authorAvatarUrl = post.authorProfileImageUrl ?? null;
-  const timeLabel = formatRelativeTime(post.createdAt);
+  const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 
   return (
     <View style={st.card}>
@@ -606,6 +666,7 @@ function FeedPostCardComponent({ post }: Props) {
                 key={`${post.id}-multi-${i}`}
                 style={[
                   styles.multiCell,
+                  { width: multiCellWidth, height: multiCellWidth },
                   isLoser && { opacity: 0.5 },
                   { transform: [{ scale: cellScale[i] }] },
                 ]}
@@ -691,6 +752,20 @@ function FeedPostCardComponent({ post }: Props) {
         <Image source={{ uri: post.imageUrls[0] }} style={st.singleImg} contentFit="cover" cachePolicy="memory-disk" />
       ) : null}
 
+      {/* Anonymous vote toggle — always visible while voting is open */}
+      {compareUrls && !isVotingClosed && isAuthenticated && (
+        <View style={st.anonRow}>
+          <Text style={st.anonIcon}>👻</Text>
+          <Text style={st.anonLabel}>Vote anonymously</Text>
+          <Switch
+            value={anon}
+            onValueChange={(val) => void handleAnonymousToggle(val)}
+            trackColor={{ false: colors.border, true: "#8b5cf6" }}
+            thumbColor="#ffffff"
+          />
+        </View>
+      )}
+
       {/* Vote hint */}
       {compareUrls && !isVotingClosed ? (
         <View style={st.voteHintRow}>
@@ -700,12 +775,14 @@ function FeedPostCardComponent({ post }: Props) {
         </View>
       ) : null}
 
-      {/* Countdown */}
-      {countdownStr && !isVotingClosed ? (
+      {/* Countdown + SEE DETAILS (shown whenever compare has votes or is closed) */}
+      {compareUrls && (countdownStr || binaryTotal > 0 || multiTotal > 0 || isVotingClosed) ? (
         <View style={st.countdownRow}>
-          <View style={st.countdownPill}>
-            <Text style={st.countdownText}>{countdownStr} LEFT</Text>
-          </View>
+          {countdownStr && !isVotingClosed ? (
+            <View style={st.countdownPill}>
+              <Text style={st.countdownText}>{countdownStr} LEFT</Text>
+            </View>
+          ) : <View />}
           <Pressable style={st.seeDetailsBtn} onPress={() => setDetailsExpanded(v => !v)}>
             <Text style={st.seeDetailsBtnText}>{detailsExpanded ? "HIDE DETAILS" : "SEE DETAILS"}</Text>
           </Pressable>
@@ -745,6 +822,31 @@ function FeedPostCardComponent({ post }: Props) {
         </View>
       ) : null}
 
+      {/* Multi-compare Live Split — only shown when expanded */}
+      {detailsExpanded && !isBinary && multiTotal > 0 ? (
+        <View style={st.liveSplit}>
+          <View style={st.liveSplitHeader}>
+            <Text style={st.liveSplitTitle}>LIVE SPLIT</Text>
+            <Text style={st.liveSplitTotal}>{multiTotal} votes</Text>
+          </View>
+          {(activeStats ?? []).map((stat) => {
+            const pct = Math.round(stat.percentage);
+            return (
+              <View key={stat.index} style={st.splitOptionRow}>
+                <View style={st.splitOptionMeta}>
+                  <Text style={st.splitOptionLabel} numberOfLines={1}>{stat.label}</Text>
+                  <Text style={st.splitOptionCount}>{stat.count} · {pct}%</Text>
+                </View>
+                <View style={st.optionBarTrack}>
+                  <View style={[st.optionBarFill, { flex: pct || 1, backgroundColor: "#8b5cf6" }]} />
+                  <View style={[st.optionBarEmpty, { flex: (100 - pct) || 1 }]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
       {/* Action chips */}
       <ScrollView
         horizontal
@@ -753,12 +855,12 @@ function FeedPostCardComponent({ post }: Props) {
         contentContainerStyle={st.actionsContent}
       >
         {(([
-          { i: 0, label: "DISCUSS", icon: "💬", onPress: goToPost },
+          { i: 0, label: `DISCUSS${(post.commentCount ?? 0) > 0 ? " " + String(post.commentCount) : ""}`, icon: "💬", onPress: goToPost },
           { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
           { i: 2, label: "FULL PAGE", icon: "⛶", onPress: goToPost },
           {
             i: 3,
-            label: `HYPE${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
+            label: `${liked ? "UNHYPE" : "HYPE"}${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
             icon: liked ? "♥" : "♡",
             onPress: () => void handleHype(),
             active: liked,
@@ -852,7 +954,7 @@ const styles = StyleSheet.create({
   absoluteFill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   // Multi-option grid (3–4 options)
   multiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
-  multiCell: { width: (SCREEN_W - 2) / 2, height: (SCREEN_W - 2) / 2 * 0.8, overflow: "hidden" },
+  multiCell: { overflow: "hidden" },
   multiImg: { width: "100%", height: "100%" },
   // More menu
   menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
