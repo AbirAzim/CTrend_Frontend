@@ -1,5 +1,5 @@
 import { router, Tabs } from "expo-router";
-import { Pressable, ScrollView, Text } from "react-native";
+import { Pressable, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
