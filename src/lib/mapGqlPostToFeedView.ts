@@ -23,6 +23,7 @@ function mapViewerVote(
 /** Maps a `PostGql`-shaped object from `feedPosts` or `getPostById` into `FeedPostView`. */
 export function mapGqlPostToFeedView(p: {
   id: string;
+  type?: string | null;
   authorId?: string | null;
   authorUsername: string;
   authorDisplayName?: string | null;
@@ -77,8 +78,14 @@ export function mapGqlPostToFeedView(p: {
     : null;
   const postOptions =
     p.options?.map((o) => ({ label: o.label })) ?? null;
+  const rawType = p.type?.toLowerCase();
+  const postType =
+    rawType === "system" || rawType === "org" || rawType === "user"
+      ? rawType
+      : null;
   return {
     id: p.id,
+    postType,
     authorId: p.authorId ?? null,
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,

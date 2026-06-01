@@ -33,6 +33,7 @@ import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { playVoteSound } from "../lib/notificationSound";
 import type { FeedPostView, VoteDirectionGql } from "../types/feed";
+import { MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -251,11 +252,34 @@ function FeedPostCardComponent({
   const [voterSearch, setVoterSearch] = useState("");
   /** Which option group the modal is scoped to (undefined = all voters). */
   const [voterOptionIndex, setVoterOptionIndex] = useState<number | undefined>(undefined);
+  const userDismissedDiscussRef = useRef(false);
   const [commentsOpen, setCommentsOpen] = useState(Boolean(highlightCommentId));
 
   useEffect(() => {
-    if (highlightCommentId) setCommentsOpen(true);
+    userDismissedDiscussRef.current = false;
+  }, [post.id]);
+
+  useEffect(() => {
+    if (highlightCommentId && !userDismissedDiscussRef.current) {
+      setCommentsOpen(true);
+    }
   }, [highlightCommentId]);
+
+  const closeDiscuss = useCallback(() => {
+    userDismissedDiscussRef.current = true;
+    setCommentsOpen(false);
+  }, []);
+
+  const toggleDiscuss = useCallback(() => {
+    setCommentsOpen((open) => {
+      if (open) {
+        userDismissedDiscussRef.current = true;
+        return false;
+      }
+      userDismissedDiscussRef.current = false;
+      return true;
+    });
+  }, []);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
   const [justVotedIndex, setJustVotedIndex] = useState<number | null>(null);
@@ -1262,10 +1286,25 @@ function FeedPostCardComponent({
     setDetailsOpen(false);
   }, [post.id]);
 
+  const isPlatformPost = post.postType === "system";
+
   return (
-    <article className="ig-post">
+    <article className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}`}>
       <header className="ig-post-header">
-        {post.authorId ? (
+        {isPlatformPost ? (
+          <div className="ig-post-user cx-platform-post-user">
+            <span className="ig-avatar sm cx-platform-post-avatar">
+              <img src="/logo.png" alt="" decoding="async" />
+            </span>
+            <div>
+              <span className="ig-post-username-row">
+                <span className="ig-post-username">{MODERATOR_PLATFORM_NAME}</span>
+                <span className="cx-platform-post-badge">Platform</span>
+              </span>
+              <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
+            </div>
+          </div>
+        ) : post.authorId ? (
           <NavLink
             to={isOwner ? "/profile" : `/profile/${post.authorId}`}
             className="ig-post-user ig-post-user--link"
@@ -1792,16 +1831,23 @@ function FeedPostCardComponent({
           <div className="cx-action-rail-icons" role="toolbar" aria-label="Post actions">
           <button
             type="button"
-            className={`cx-action-chip${commentsOpen ? " cx-action-chip--pressed" : ""}`}
-            aria-label={commentsOpen ? "Hide comments" : "Show comments"}
-            title="Comments"
+            className={`cx-action-chip cx-action-chip--discuss${commentsOpen ? " cx-action-chip--pressed cx-action-chip--discuss-open" : ""}`}
+            aria-label={
+              commentsOpen
+                ? "Hide comments"
+                : `Discuss${commentCount > 0 ? `, ${commentCount} comments` : ""}`
+            }
+            title={commentsOpen ? "Hide comments" : "Discuss"}
             aria-expanded={commentsOpen}
-            onClick={() => {
-              setCommentsOpen((v) => !v);
+            aria-controls={`post-discuss-${post.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleDiscuss();
             }}
           >
             <IconComment />
-            {commentCount > 0 ? (
+            <span className="cx-action-chip-label">{commentsOpen ? "Hide" : "Discuss"}</span>
+            {!commentsOpen && commentCount > 0 ? (
               <span className="cx-action-chip-count">{commentCount}</span>
             ) : null}
           </button>
@@ -1888,6 +1934,19 @@ function FeedPostCardComponent({
           </div>
         </div>
 
+        {commentsOpen ? (
+          <div id={`post-discuss-${post.id}`} className="cx-discuss-slot">
+            <PostCommentsPanel
+              postId={post.id}
+              voteMode={voteMode}
+              isAuthenticated={isAuthenticated}
+              meLabel={meLabel}
+              highlightCommentId={highlightCommentId}
+              onClose={closeDiscuss}
+            />
+          </div>
+        ) : null}
+
         {shareHint ? (
           <p className="ig-share-hint" role="status">
             {shareHint}
@@ -1896,16 +1955,6 @@ function FeedPostCardComponent({
 
         {timeLabel ? <p className="cx-post-meta-time">{timeLabel}</p> : null}
       </div>
-
-      {commentsOpen ? (
-        <PostCommentsPanel
-          postId={post.id}
-          voteMode={voteMode}
-          isAuthenticated={isAuthenticated}
-          meLabel={meLabel}
-          highlightCommentId={highlightCommentId}
-        />
-      ) : null}
       {showVoters ? (
         <div
           className="ig-modal-overlay cx-voters-overlay"

@@ -15,6 +15,7 @@ export const MY_NOTIFICATIONS = gql`
         latestActorId
         latestActorName
         read
+        archived
         createdAt
       }
       totalCount
@@ -38,6 +39,12 @@ export const MARK_NOTIFICATION_READ = gql`
 export const MARK_ALL_NOTIFICATIONS_READ = gql`
   mutation MarkAllNotificationsRead {
     markAllNotificationsRead
+  }
+`;
+
+export const ARCHIVE_NOTIFICATION = gql`
+  mutation ArchiveNotification($id: ID!) {
+    archiveNotification(id: $id)
   }
 `;
 
@@ -67,6 +74,7 @@ export const NEW_NOTIFICATION_SUB = gql`
       latestActorId
       latestActorName
       read
+      archived
       createdAt
     }
   }

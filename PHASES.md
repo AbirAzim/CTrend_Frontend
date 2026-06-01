@@ -114,7 +114,36 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
 
 ---
 
+## Interstitial — Platform posts, discuss perf & admin post management ☑ (2026-06-01)
+
+**Not Phase 5.** This is extra web work done before starting issue **#8** (message
+reactions). All porting notes live in `react_change_2/` — start at
+[2026-06-01_web-session-porting-guide.md](./react_change_2/2026-06-01_web-session-porting-guide.md).
+
+- ☑ **Discuss UX** — inline panel in post footer, Hide toggle, `DiscussMoreButton`,
+  show-more scroll, `userDismissedDiscussRef`.
+- ☑ **Comment load** — backend batch hydration (~4 queries); panel
+  `cache-and-network` / `cache-first`.
+- ☑ **POST_VOTE notifications** — new vote notify; anonymous → “Someone”, no
+  `actorId`/avatar; `votes.service` + `forwardRef` notifications module.
+- ☑ **Platform-wide posts (Ke Jitbe)** — no feed banner / no Bengali tagline;
+  per-post `.ig-post--platform` + logo header; mixed feed list; mobile + shared
+  `postType`.
+- ☑ **Admin Post management** — tab + table (Votes, Comments, Hype, Saves),
+  search/filter/sort, `AdminPersonLink` avatars, admin edit + `editedBy` /
+  `lastEditedBy` audit trail.
+
+**Files (frontend):** `PostCommentsPanel.tsx`, `FeedPostCard.tsx`, `FeedPage.tsx`,
+`NotificationBell.tsx`, `AdminPage.tsx`, `graphql/admin.ts`, `CreatePostPage.tsx`,
+`mapGqlPostToFeedView.ts`, `moderatorBrand.ts`, `index.css`, `packages/shared/*`,
+`mobile/*`
+**Files (backend):** `comments/*`, `votes/*`, `notifications/*`, `posts/*`
+
+---
+
 ## Phase 5 — Message reactions like Messenger (frontend + backend) ☐
+
+**Do this later** — after the interstitial web work above is ported / stable.
 
 - ☐ **#8 React to a message** — long-press / hover a message bubble → emoji picker
   → reaction shows on the bubble (Messenger-style), persisted and pushed live to
@@ -153,3 +182,7 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
   (backend `myVotedPosts`), and a compact single-post view. Mobile docs:
   `…_phase2b-two-zone-action-bar-redesign.md`,
   `…_profile-stats-voted-tab-compact-post.md`.
+- **2026-06-01** — **Interstitial** platform posts, discuss performance, vote
+  notifications, and admin post management (web + backend). Docs:
+  `react_change_2/2026-06-01_web-session-porting-guide.md` (+ audit checklist).
+  **Phase 5 (message reactions) not started.**

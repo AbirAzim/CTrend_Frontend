@@ -10,6 +10,7 @@ import {
   FRIEND_REQUESTS,
   FRIEND_SUGGESTIONS,
   ADD_FRIEND,
+  FRIEND_SOCIAL_REFETCH_QUERIES,
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
   CANCEL_FRIEND_REQUEST,
@@ -162,7 +163,9 @@ export function ProfilePage() {
   });
 
   const [addFriendMut] = useMutation(ADD_FRIEND);
-  const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST);
+  const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST, {
+    refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
+  });
   const [unfriendMut] = useMutation(UNFRIEND);
   const [cancelFriendMut] = useMutation(CANCEL_FRIEND_REQUEST);
   const { data: savedPostsData, loading: savedPostsLoading } = useQuery(MY_SAVED_POSTS, {

@@ -7,6 +7,7 @@ import {
   ADD_FRIEND,
   CANCEL_FRIEND_REQUEST,
   FRIEND_REQUESTS,
+  FRIEND_SOCIAL_REFETCH_QUERIES,
   FRIEND_SUGGESTIONS,
   MY_FRIENDS,
   RESPOND_FRIEND_REQUEST,
@@ -21,7 +22,6 @@ import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import type { FeedPostView } from "../types/feed";
 import { CampaignBanners } from "../components/CampaignBanners";
-
 type FriendRow = {
   id: string;
   username?: string | null;
@@ -154,8 +154,7 @@ export function FeedPage() {
     RESPOND_FRIEND_REQUEST,
     {
       refetchQueries: [
-        { query: FRIEND_REQUESTS },
-        { query: MY_FRIENDS },
+        ...FRIEND_SOCIAL_REFETCH_QUERIES,
         { query: FRIEND_SUGGESTIONS, variables: { limit: 8 } },
       ],
     },
@@ -471,8 +470,8 @@ export function FeedPage() {
           <div className="ig-feed-empty-state">
             <p className="ig-feed-empty-title">Nothing here yet</p>
             <p className="ig-feed-empty-desc">
-              Follow people to see their posts here. The feed shows posts from
-              people you follow — platform-wide posts from Ke Jitbe also appear here.
+              Follow people to see their posts here. Official platform polls from
+              Ke Jitbe are mixed into your feed when available.
             </p>
             {isAuthenticated && (
               <p className="muted small">

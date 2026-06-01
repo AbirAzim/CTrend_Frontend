@@ -1,13 +1,16 @@
 import { useMutation, useQuery } from "@apollo/client";
 import React, { useEffect, useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
+import { EditPostModal } from "../components/EditPostModal";
 import { AdminMessagesTab } from "./AdminMessagesTab";
 import {
   CANCEL_INVITATION,
   CREATE_CATEGORY,
   DELETE_CATEGORY,
   LIST_INVITATIONS,
+  ADMIN_PLATFORM_POSTS,
+  ADMIN_PLATFORM_POSTS_COUNT,
   LIST_USERS,
   LIST_USERS_COUNT,
   REMOVE_ADMIN,
@@ -19,6 +22,7 @@ import { CATEGORIES } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import {
   CAMPAIGN_WINNERS,
   CREATE_WORLD_CUP_CAMPAIGN_POST,
@@ -345,6 +349,62 @@ function ConfirmDialog({
 }
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
+
+type AdminPerson = {
+  id: string;
+  displayName?: string | null;
+  username: string;
+  email?: string | null;
+  profileImageUrl?: string | null;
+};
+
+function adminPersonAvatarUrl(person: AdminPerson): string | null {
+  const normalized = normalizeProfileImageUrl(person.profileImageUrl);
+  if (normalized) return normalized;
+  const email = person.email?.trim().toLowerCase();
+  if (email?.endsWith("@gmail.com")) {
+    return `https://www.google.com/s2/photos/profile/${encodeURIComponent(email)}?sz=64`;
+  }
+  return null;
+}
+
+function AdminPersonLink({
+  person,
+  adminStyle = false,
+  compact = false,
+}: {
+  person: AdminPerson;
+  adminStyle?: boolean;
+  compact?: boolean;
+}) {
+  const label = person.displayName?.trim() || person.username;
+  const src = adminPersonAvatarUrl(person);
+  const initials = (label || "?")[0]!.toUpperCase();
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <NavLink
+      to={`/profile/${person.id}`}
+      className={`admin-person-link${compact ? " admin-person-link--compact" : ""}`}
+      onClick={(e) => e.stopPropagation()}
+      title={`View profile: ${label}`}
+    >
+      {src && !failed ? (
+        <img
+          src={src}
+          alt=""
+          className={`admin-user-avatar admin-user-avatar--img${adminStyle ? " admin-user-avatar--admin" : ""}`}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span className={`admin-user-avatar${adminStyle ? " admin-user-avatar--admin" : ""}`}>
+          {initials}
+        </span>
+      )}
+      <span className="admin-person-link-label">{label}</span>
+    </NavLink>
+  );
+}
 
 function AdminAvatar({ user, adminStyle }: { user: UserRow; adminStyle?: boolean }) {
   const src = avatarUrl(user);
@@ -1881,11 +1941,474 @@ function CategoriesTab() {
   );
 }
 
+// ─── Post Management Tab (platform-wide / SYSTEM posts) ─────────────────────
+
+type PlatformPostEditor = AdminPerson;
+
+type PlatformPostRow = {
+  id: string;
+  type?: string | null;
+  caption?: string | null;
+  imageUrls?: string[] | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  status?: string | null;
+  scheduledAt?: string | null;
+  votingEndsAt?: string | null;
+  isVotingOpen?: boolean | null;
+  commentCount?: number | null;
+  hypeCount?: number | null;
+  saveCount?: number | null;
+  totalVotes?: number | null;
+  upvoteCount?: number | null;
+  downvoteCount?: number | null;
+  authorId?: string | null;
+  authorDisplayName?: string | null;
+  authorUsername?: string | null;
+  authorEmail?: string | null;
+  authorProfileImageUrl?: string | null;
+  category?: { id: string; name: string; slug?: string | null } | null;
+  options?: Array<{ label: string; imageUrl?: string | null }> | null;
+  editedBy?: PlatformPostEditor[] | null;
+  lastEditedBy?: PlatformPostEditor | null;
+};
+
+type PostStatusFilter = "all" | "PUBLISHED" | "SCHEDULED";
+type PostVotingFilter = "all" | "live" | "closed";
+type PostSortBy = "createdAt" | "votes" | "caption" | "updatedAt";
+type PostSortOrder = "asc" | "desc";
+
+function PostsTab() {
+  const navigate = useNavigate();
+  const [skip, setSkip] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PostStatusFilter>("all");
+  const [votingFilter, setVotingFilter] = useState<PostVotingFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<PostSortBy>("createdAt");
+  const [sortOrder, setSortOrder] = useState<PostSortOrder>("desc");
+  const [editingPost, setEditingPost] = useState<PlatformPostRow | null>(null);
+
+  const { data: catsData } = useQuery<{ categories: Array<{ id: string; name: string }> }>(
+    CATEGORIES,
+  );
+  const categories = catsData?.categories ?? [];
+
+  const listFilter = useMemo(
+    () => ({
+      search: searchTerm.trim() || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      categoryId: categoryFilter === "all" ? undefined : categoryFilter,
+      votingFilter: votingFilter === "all" ? undefined : votingFilter,
+      sortBy,
+      sortOrder,
+    }),
+    [searchTerm, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder],
+  );
+
+  const countFilter = useMemo(
+    () => ({
+      search: listFilter.search,
+      status: listFilter.status,
+      categoryId: listFilter.categoryId,
+      votingFilter: listFilter.votingFilter,
+    }),
+    [listFilter],
+  );
+
+  useEffect(() => {
+    setSkip(0);
+  }, [searchTerm, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder]);
+
+  const { data, loading, error, refetch } = useQuery<{
+    adminPlatformPosts: PlatformPostRow[];
+  }>(ADMIN_PLATFORM_POSTS, {
+    variables: {
+      query: listFilter,
+      skip,
+      take: PAGE_SIZE,
+    },
+    fetchPolicy: "network-only",
+  });
+
+  const { data: countData } = useQuery<{ adminPlatformPostsCount: number }>(
+    ADMIN_PLATFORM_POSTS_COUNT,
+    {
+      variables: { filter: countFilter },
+      fetchPolicy: "cache-and-network",
+    },
+  );
+
+  const posts = data?.adminPlatformPosts ?? [];
+  const total = countData?.adminPlatformPostsCount ?? posts.length;
+
+  function openPost(postId: string) {
+    navigate(`/post/${postId}`);
+  }
+
+  return (
+    <div className="admin-tab-panel">
+      <AdminSectionHead
+        title="Post management"
+        subtitle="Platform-wide polls — search, filter, open a post, or edit as any admin."
+        action={
+          <Link to="/create" className="admin-btn-cta">
+            <span className="admin-btn-cta-icon" aria-hidden>+</span>
+            New platform post
+          </Link>
+        }
+      />
+
+      <div className="admin-toolbar">
+        <AdminSearchInput
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search caption or option labels…"
+        />
+        <div className="admin-toolbar-controls">
+          <AdminToolbarSelect
+            label="Status"
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as PostStatusFilter)}
+          >
+            <option value="all">All</option>
+            <option value="PUBLISHED">Published</option>
+            <option value="SCHEDULED">Scheduled</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect
+            label="Voting"
+            value={votingFilter}
+            onChange={(v) => setVotingFilter(v as PostVotingFilter)}
+          >
+            <option value="all">All</option>
+            <option value="live">Live</option>
+            <option value="closed">Closed</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect
+            label="Category"
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+          >
+            <option value="all">All</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </AdminToolbarSelect>
+          <AdminToolbarSelect
+            label="Sort by"
+            value={sortBy}
+            onChange={(v) => setSortBy(v as PostSortBy)}
+          >
+            <option value="createdAt">Created</option>
+            <option value="updatedAt">Last updated</option>
+            <option value="votes">Votes</option>
+            <option value="caption">Caption</option>
+          </AdminToolbarSelect>
+          <AdminToolbarSelect
+            label="Order"
+            value={sortOrder}
+            onChange={(v) => setSortOrder(v as PostSortOrder)}
+          >
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </AdminToolbarSelect>
+          {(searchTerm ||
+            statusFilter !== "all" ||
+            votingFilter !== "all" ||
+            categoryFilter !== "all" ||
+            sortBy !== "createdAt" ||
+            sortOrder !== "desc") ? (
+            <button
+              type="button"
+              className="admin-toolbar-reset"
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("all");
+                setVotingFilter("all");
+                setCategoryFilter("all");
+                setSortBy("createdAt");
+                setSortOrder("desc");
+              }}
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {error ? (
+        <p className="error" role="alert">
+          {getApolloErrorMessage(error)}
+        </p>
+      ) : null}
+
+      {loading && posts.length === 0 ? (
+        <p className="muted">Loading platform posts…</p>
+      ) : null}
+
+      {!loading && posts.length === 0 ? (
+        <p className="muted">No posts match your filters.</p>
+      ) : null}
+
+      {posts.length > 0 ? (
+        <div className="admin-table-wrap admin-table-wrap--posts">
+          <table className="admin-table admin-table--posts">
+            <thead>
+              <tr>
+                <th>Post</th>
+                <th>Compare</th>
+                <th>Created by</th>
+                <th>Category</th>
+                <th>Votes</th>
+                <th className="admin-table-num">Comments</th>
+                <th className="admin-table-num">Hype</th>
+                <th className="admin-table-num">Saves</th>
+                <th>Status</th>
+                <th>Edited by</th>
+                <th>Last edited</th>
+                <th>Created</th>
+                <th className="admin-table-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {posts.map((post) => {
+                const votes =
+                  post.totalVotes ??
+                  (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0);
+                const caption = post.caption?.trim() || "(No caption)";
+                const preview =
+                  caption.length > 48 ? `${caption.slice(0, 48)}…` : caption;
+                const compareItems = (post.options ?? []).map((opt, i) => ({
+                  label: opt.label?.trim() || `Option ${i + 1}`,
+                  imageUrl:
+                    opt.imageUrl?.trim() ||
+                    post.imageUrls?.[i]?.trim() ||
+                    "",
+                }));
+                const editors = post.editedBy ?? [];
+                const creator: AdminPerson | null = post.authorId
+                  ? {
+                      id: post.authorId,
+                      displayName: post.authorDisplayName,
+                      username: post.authorUsername ?? "unknown",
+                      email: post.authorEmail,
+                      profileImageUrl: post.authorProfileImageUrl,
+                    }
+                  : null;
+
+                return (
+                  <tr
+                    key={post.id}
+                    className="admin-table-row admin-table-row--clickable"
+                    onClick={() => openPost(post.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openPost(post.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open post: ${caption}`}
+                  >
+                    <td className="admin-post-cell">
+                      <div className="admin-post-cell-main">
+                        {post.imageUrls?.[0] ? (
+                          <img
+                            src={post.imageUrls[0]}
+                            alt=""
+                            className="admin-post-thumb"
+                          />
+                        ) : (
+                          <span className="admin-post-thumb admin-post-thumb--empty">🗳</span>
+                        )}
+                        <div>
+                          <strong className="admin-post-caption">{preview}</strong>
+                          <span className="muted small admin-post-id">
+                            {post.id.slice(0, 10)}…
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      className="admin-post-compare-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ul className="admin-post-compare-list admin-post-compare-list--table">
+                        {compareItems.map((item, i) => (
+                          <li
+                            key={`${post.id}-opt-${i}`}
+                            className="admin-post-compare-item"
+                          >
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt=""
+                                className="admin-post-compare-thumb"
+                              />
+                            ) : (
+                              <span className="admin-post-compare-thumb admin-post-compare-thumb--empty">
+                                ?
+                              </span>
+                            )}
+                            <span className="admin-post-compare-label" title={item.label}>
+                              {item.label}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td
+                      className="admin-post-person-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {creator ? (
+                        <AdminPersonLink person={creator} adminStyle compact />
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>{post.category?.name ?? "—"}</td>
+                    <td className="admin-table-num">{votes.toLocaleString()}</td>
+                    <td className="admin-table-num">{(post.commentCount ?? 0).toLocaleString()}</td>
+                    <td className="admin-table-num">{(post.hypeCount ?? 0).toLocaleString()}</td>
+                    <td className="admin-table-num">{(post.saveCount ?? 0).toLocaleString()}</td>
+                    <td>
+                      <span
+                        className={`admin-user-status admin-user-status--${post.isVotingOpen ? "verified" : "unverified"}`}
+                      >
+                        {post.status ?? "published"}
+                        {post.isVotingOpen ? " · live" : " · closed"}
+                      </span>
+                      {post.votingEndsAt ? (
+                        <span className="muted small admin-post-ends">
+                          Ends {formatRelativeTime(post.votingEndsAt)}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td
+                      className="admin-post-editors-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {editors.length === 0 ? (
+                        <span className="muted">—</span>
+                      ) : (
+                        <div className="admin-person-list admin-person-list--stacked">
+                          {editors.map((editor) => (
+                            <AdminPersonLink
+                              key={editor.id}
+                              person={editor}
+                              adminStyle
+                              compact
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      className="admin-table-joined admin-post-person-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {post.lastEditedBy ? (
+                        <>
+                          <AdminPersonLink
+                            person={post.lastEditedBy}
+                            adminStyle
+                            compact
+                          />
+                          {post.updatedAt ? (
+                            <span className="muted small">
+                              {formatRelativeTime(post.updatedAt)}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="admin-table-joined">
+                      {formatJoinedAt(post.createdAt)}
+                      {post.scheduledAt ? (
+                        <span className="muted small">Scheduled</span>
+                      ) : null}
+                    </td>
+                    <td
+                      className="admin-table-actions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="admin-link-btn"
+                        onClick={() => openPost(post.id)}
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-link-btn admin-link-btn--secondary"
+                        onClick={() => setEditingPost(post)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <AdminPaginationBar
+        skip={skip}
+        total={total}
+        shown={posts.length}
+        loading={loading}
+        onPrev={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
+        onNext={() => setSkip((s) => s + PAGE_SIZE)}
+      />
+      <div className="admin-posts-refresh">
+        <button type="button" className="btn-ghost" onClick={() => void refetch()}>
+          Refresh list
+        </button>
+      </div>
+
+      {editingPost ? (
+        <EditPostModal
+          post={{
+            id: editingPost.id,
+            caption: editingPost.caption,
+            imageUrls: editingPost.imageUrls ?? [],
+            options: editingPost.options,
+            category: editingPost.category,
+            votingEndsAt: editingPost.votingEndsAt,
+            isVotingOpen: editingPost.isVotingOpen,
+          }}
+          onClose={() => setEditingPost(null)}
+          onSaved={() => {
+            setEditingPost(null);
+            void refetch();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<
-    "users" | "admins" | "invitations" | "campaigns" | "categories" | "worldcup" | "admin-messages"
+    | "users"
+    | "admins"
+    | "invitations"
+    | "campaigns"
+    | "categories"
+    | "posts"
+    | "worldcup"
+    | "admin-messages"
   >("users");
   const [messagesTargetUserId, setMessagesTargetUserId] = useState<string | null>(null);
 
@@ -1946,6 +2469,13 @@ export function AdminPage() {
         </button>
         <button
           type="button"
+          className={`admin-tab${activeTab === "posts" ? " admin-tab--active" : ""}`}
+          onClick={() => setActiveTab("posts")}
+        >
+          Post management
+        </button>
+        <button
+          type="button"
           className={`admin-tab${activeTab === "admin-messages" ? " admin-tab--active" : ""}`}
           onClick={() => setActiveTab("admin-messages")}
         >
@@ -1966,6 +2496,7 @@ export function AdminPage() {
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "campaigns" && <CampaignsTab />}
         {activeTab === "categories" && <CategoriesTab />}
+        {activeTab === "posts" && <PostsTab />}
         {activeTab === "worldcup" && <WorldCupTab />}
         {activeTab === "admin-messages" && (
           <AdminMessagesTab
