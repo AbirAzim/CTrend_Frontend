@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,7 +22,6 @@ import { RESPOND_FRIEND_REQUEST } from "@ctrend/shared/graphql/friends";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
-import { useSounds } from "../../context/SoundContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -220,7 +220,11 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
-  const { playNotification } = useSounds();
+
+  // Clear app icon badge when user opens the notifications screen
+  useEffect(() => {
+    void Notifications.setBadgeCountAsync(0);
+  }, []);
 
   const [skip, setSkip] = useState(0);
   const [items, setItems] = useState<GqlNotification[]>([]);
@@ -243,15 +247,14 @@ export default function NotificationsScreen() {
   const [markAll, { loading: markingAll }] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
   const [respondMut] = useMutation(RESPOND_FRIEND_REQUEST);
 
+  // Sound is played by the global subscription in _layout.tsx — only update list here.
   useSubscription(NEW_NOTIFICATION_SUB, {
     onData: ({ data }) => {
       const n = data.data?.newNotification as GqlNotification | null;
       if (!n) return;
-      playNotification();
       setItems((prev) => {
         const exists = prev.some((x) => x.id === n.id);
         if (exists) {
-          // Grouped update: replace in place and bubble to top
           return [n, ...prev.filter((x) => x.id !== n.id)];
         }
         return [n, ...prev];
