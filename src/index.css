@@ -2840,15 +2840,35 @@ a.cx-friend-avatar:hover {
 
 .cx-action-rail {
   display: flex;
-  /* Wrap to multiple rows so every action stays visible — no sideways scroll */
-  flex-wrap: wrap;
-  align-items: stretch;
-  justify-content: center;
+  flex-wrap: nowrap;
+  align-items: center;
+  /* One combined row: voting status (left) · actions (center) · details (right) */
+  justify-content: space-between;
   gap: 8px;
   background: rgb(255 255 255 / 0.7);
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.14);
   border-radius: 14px;
   padding: 8px;
+}
+
+/* Center group holds the action icons; wraps internally so nothing scrolls
+   sideways while the status badge and details toggle stay pinned to the edges. */
+.cx-action-rail-icons {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cx-action-rail-status {
+  flex-shrink: 0;
+}
+
+.cx-action-rail-details {
+  flex-shrink: 0;
 }
 
 .cx-action-rail::-webkit-scrollbar {
@@ -2977,9 +2997,16 @@ a.cx-friend-avatar:hover {
 /* Anon toggle row — always visible below compare images */
 .cx-anon-toggle-row {
   display: flex;
-  justify-content: center;
-  padding: 6px 16px 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
   background: rgb(var(--cx-ink-rgb) / 0.04);
+}
+
+.cx-anon-toggle-status {
+  flex-shrink: 0;
 }
 
 .cx-anon-toggle {

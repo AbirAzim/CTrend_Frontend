@@ -45,16 +45,35 @@ Grew well beyond the original scope. Confirmed working on web.
 
 ---
 
-## Phase 2 — Comment UX (frontend) ☐
+## Phase 2 — Comment UX + vote-bar layout + single-tap unvote ☑ (confirmed 2026-06-01)
 
-- ☐ **#4 Enter to post a comment** — top-level comment box is a `<textarea>` with a
-  Post button. Add Enter-to-submit (Shift+Enter = newline), matching the chat
-  input pattern already in `MessengerPanel.handleKeyDown`.
-- ☐ **#9 Newest comment on top** — `PostCommentsPanel` currently appends new
-  comments to the bottom (`[...prev, optimistic]`) and renders server order.
-  Sort top-level threads newest-first; keep replies oldest-first.
+Original scope was the two comment items; grew to include a vote-bar layout
+redesign and a full single-tap unvote (frontend + backend) during testing.
 
-**Files:** `src/components/PostCommentsPanel.tsx`
+- ☑ **#4 Enter to post a comment** — Enter posts, Shift+Enter = newline, on both the
+  comment box and the reply box.
+- ☑ **#9 Newest comment on top** — top-level comments sorted newest-first; replies
+  stay oldest-first (chronological).
+- ☑ **Action bar / voting-status layout** — merged the old separate "countdown +
+  See details" header row into the action toolbar; then moved the voting status
+  /countdown into the **"Vote anonymously"** row for open compare posts (fallback:
+  the action-bar left slot for closed/binary/demo posts). Action bar = icons
+  (center) + See details (right).
+- ☑ **Single-tap unvote (withdraw)** — tapping the option you already chose now
+  withdraws your vote (was a no-op in API mode). New backend `removeVote` mutation
+  (publishes the same real-time events as voting); frontend optimistic clear.
+- ☑ **Seamless vote/unvote switching** — unified `processVoteIntent` engine so
+  vote and unvote share one in-flight queue (`pendingVoteRef`); rapid
+  vote→unvote→vote-other always converges on the last tap. Fixed a `??`
+  null-coalescing bug that hid the optimistic withdraw.
+
+**Files (frontend):** `src/components/PostCommentsPanel.tsx`,
+`src/components/FeedPostCard.tsx`, `src/graphql/feed.ts`, `src/index.css`
+**Files (backend):** `src/votes/votes.resolver.ts`, `src/votes/votes.service.ts`,
+`src/schema.gql`
+**Mobile docs:**
+- `react_change_2/2026-06-01_phase2-comment-ux.md`
+- `react_change_2/2026-06-01_phase2-vote-bar-layout-and-unvote.md`
 
 ---
 
@@ -118,3 +137,7 @@ Grew well beyond the original scope. Confirmed working on web.
   scroll, nav z-index + edge scroll handoff), notification dark-mode hover, and an
   icon-only wrapping action bar with count badges. Backend `votersByPost` extended
   with `search`/`skip`/`take`. Mobile-porting docs written in `react_change_2/`.
+- **2026-06-01** — Phase 2 **confirmed done** (web). Comment Enter-to-post +
+  newest-on-top, vote-bar/status layout (status in the anonymous row), and
+  single-tap unvote with a unified vote/unvote engine. Backend gained the
+  `removeVote` mutation. Mobile-porting docs written in `react_change_2/`.
