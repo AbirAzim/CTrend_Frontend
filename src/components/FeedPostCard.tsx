@@ -229,12 +229,15 @@ type Props = {
   voteMode: "api" | "local";
   /** When false, hide “open post page” (e.g. on `/post/:id` itself). Share still works. */
   showPermalinkToolbar?: boolean;
+  /** From `/post/:id#comment-…` — opens comments and scrolls to this comment. */
+  highlightCommentId?: string | null;
 };
 
 function FeedPostCardComponent({
   post,
   voteMode,
   showPermalinkToolbar = true,
+  highlightCommentId = null,
 }: Props) {
   const { user: authUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -248,7 +251,11 @@ function FeedPostCardComponent({
   const [voterSearch, setVoterSearch] = useState("");
   /** Which option group the modal is scoped to (undefined = all voters). */
   const [voterOptionIndex, setVoterOptionIndex] = useState<number | undefined>(undefined);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(Boolean(highlightCommentId));
+
+  useEffect(() => {
+    if (highlightCommentId) setCommentsOpen(true);
+  }, [highlightCommentId]);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
   const [justVotedIndex, setJustVotedIndex] = useState<number | null>(null);
@@ -1896,6 +1903,7 @@ function FeedPostCardComponent({
           voteMode={voteMode}
           isAuthenticated={isAuthenticated}
           meLabel={meLabel}
+          highlightCommentId={highlightCommentId}
         />
       ) : null}
       {showVoters ? (

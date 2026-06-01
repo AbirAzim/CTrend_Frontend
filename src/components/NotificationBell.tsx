@@ -5,6 +5,9 @@ import { useNotifications, type NotificationItem } from "../context/Notification
 import { useMessenger } from "../context/MessengerContext";
 import { RESPOND_FRIEND_REQUEST, FRIEND_REQUESTS, MY_FRIENDS } from "../graphql/friends";
 import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+
+type FriendRequestStatus = "accepted" | "rejected";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -41,11 +44,14 @@ function notificationTitle(n: NotificationItem): string {
 }
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markRead, markAllRead, refetch } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const { openChat, refetchConversations, ensureConversation } = useMessenger();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
+  const [friendReqStatus, setFriendReqStatus] = useState<
+    Record<string, FriendRequestStatus>
+  >({});
   const ref = useRef<HTMLDivElement>(null);
 
   const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST, {
@@ -102,10 +108,26 @@ export function NotificationBell() {
       navigate(`/profile/${n.referenceId}`);
       return;
     }
-    // Comment notifications deep-link to the post (postId preferred)
+    // Comment notifications deep-link to the exact comment when possible
+    if (n.postId && n.commentId) {
+      navigate(`/post/${n.postId}#comment-${n.commentId}`);
+      return;
+    }
     if (n.postId) {
       navigate(`/post/${n.postId}`);
       return;
+    }
+    if (
+      n.commentId &&
+      (n.type === "COMMENT_REPLY" ||
+        n.type === "COMMENT_REACTION" ||
+        n.type === "POST_COMMENT")
+    ) {
+      const postTarget = n.referenceType === "Post" ? n.referenceId : n.postId;
+      if (postTarget) {
+        navigate(`/post/${postTarget}#comment-${n.commentId}`);
+        return;
+      }
     }
     // Anything referencing a Post jumps to the post detail page
     if (n.referenceType === "Post" && n.referenceId) {
@@ -128,8 +150,8 @@ export function NotificationBell() {
       await respondFriendMut({
         variables: { requesterId: n.referenceId, accept: true },
       });
+      setFriendReqStatus((prev) => ({ ...prev, [n.id]: "accepted" }));
       markRead(n.id);
-      void refetch();
     } catch { /* silent */ }
     setActionLoading(n.id, false);
   }
@@ -142,8 +164,8 @@ export function NotificationBell() {
       await respondFriendMut({
         variables: { requesterId: n.referenceId, accept: false },
       });
+      setFriendReqStatus((prev) => ({ ...prev, [n.id]: "rejected" }));
       markRead(n.id);
-      void refetch();
     } catch { /* silent */ }
     setActionLoading(n.id, false);
   }
@@ -189,6 +211,8 @@ export function NotificationBell() {
                 const isFriendReq = n.type === "FRIEND_REQUEST";
                 const isAdminMsg = isOfficialAdminMessage(n);
                 const isLoading = actionLoadingIds.has(n.id);
+                const reqStatus = friendReqStatus[n.id];
+                const avatarUrl = normalizeProfileImageUrl(n.latestActorAvatar);
                 return (
                   <li
                     key={n.id}
@@ -196,7 +220,19 @@ export function NotificationBell() {
                     role="menuitem"
                     onClick={() => handleClick(n)}
                   >
-                    <span className="nb-item-icon" aria-hidden>{typeIcon(n.type, n.referenceType)}</span>
+                    {avatarUrl ? (
+                      <img
+                        className="nb-item-avatar"
+                        src={avatarUrl}
+                        alt=""
+                        width={36}
+                        height={36}
+                      />
+                    ) : (
+                      <span className="nb-item-icon" aria-hidden>
+                        {typeIcon(n.type, n.referenceType)}
+                      </span>
+                    )}
                     <div className="nb-item-body">
                       <p className="nb-item-title">
                         {notificationTitle(n)}
@@ -210,7 +246,17 @@ export function NotificationBell() {
                       </p>
                       <span className="nb-item-time">{timeAgo(n.createdAt)}</span>
 
-                      {isFriendReq && (
+                      {isFriendReq && reqStatus === "accepted" ? (
+                        <p className="nb-friend-status nb-friend-status--accepted">
+                          Accepted ✓
+                        </p>
+                      ) : null}
+                      {isFriendReq && reqStatus === "rejected" ? (
+                        <p className="nb-friend-status nb-friend-status--rejected">
+                          Rejected
+                        </p>
+                      ) : null}
+                      {isFriendReq && !reqStatus ? (
                         <div className="nb-item-actions">
                           <button
                             type="button"
@@ -237,7 +283,7 @@ export function NotificationBell() {
                             View profile
                           </button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                     {!n.read && <span className="nb-unread-dot" aria-hidden />}
                   </li>

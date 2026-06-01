@@ -13338,6 +13338,48 @@ a.cx-profile-btn-accent {
 }
 
 .nb-item-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+
+.nb-item-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border: 1px solid rgb(var(--cx-ink-rgb) / 0.08);
+  background: rgb(var(--cx-ink-rgb) / 0.06);
+}
+
+.nb-friend-status {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.nb-friend-status--accepted {
+  color: #15803d;
+}
+
+.nb-friend-status--rejected {
+  color: var(--ig-muted);
+}
+
+.cx-comment-row--highlight {
+  animation: cx-comment-highlight 3s ease-out;
+}
+
+@keyframes cx-comment-highlight {
+  0%,
+  18% {
+    background: rgb(var(--cx-accent-rgb) / 0.14);
+    box-shadow: 0 0 0 2px rgb(var(--cx-accent-rgb) / 0.35);
+    border-radius: 12px;
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
 .nb-item-body { flex: 1; min-width: 0; }
 .nb-item-title { margin: 0 0 2px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nb-item-desc { margin: 0 0 3px; font-size: 0.78rem; color: var(--ig-muted, #888); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

@@ -1,6 +1,6 @@
 import { useQuery } from "@apollo/client";
 import { useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { GET_POST_BY_ID } from "../graphql/feed";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
@@ -10,7 +10,13 @@ import type { FeedPostView } from "../types/feed";
 
 export function PostDetailPage() {
   const { postId } = useParams<{ postId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const highlightCommentId = useMemo(() => {
+    const match = location.hash.match(/^#comment-(.+)$/);
+    return match?.[1] ?? null;
+  }, [location.hash]);
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const mockPost = useMemo((): FeedPostView | null => {
@@ -79,6 +85,7 @@ export function PostDetailPage() {
           post={post}
           voteMode={useMockFeed ? "local" : "api"}
           showPermalinkToolbar={false}
+          highlightCommentId={highlightCommentId}
         />
       ) : null}
     </div>
