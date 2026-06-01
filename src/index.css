@@ -6132,6 +6132,18 @@ a.cx-friend-avatar:hover {
   padding: 0 12px 28px;
 }
 
+/* Keep the single-post view compact — same visual weight as a feed card, so a
+   tall compare image doesn't take over the whole page. */
+.ig-post-detail .ig-post-media-wrap,
+.ig-post-detail .ig-post-media-wrap--compare,
+.ig-post-detail .ig-post-media-wrap--compare-grid {
+  max-height: 58vh;
+}
+.ig-post-detail .ig-post-media-wrap img,
+.ig-post-detail .ig-compare-cell img {
+  object-fit: cover;
+}
+
 .ig-post-detail-bar {
   display: flex;
   flex-wrap: wrap;
@@ -8367,6 +8379,73 @@ a.cx-profile-btn-accent {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Per-drop engagement stats (votes · comments · hype · keeps) */
+.cx-drop-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 4px;
+}
+
+.cx-drop-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ig-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.cx-drop-stat-icon {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.cx-drop-stat-label {
+  font-weight: 600;
+  color: var(--ig-muted);
+}
+
+/* Voted tab — All / Anonymous segmented filter */
+.cx-voted-filter {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 4px;
+  background: rgb(var(--cx-ink-rgb) / 0.05);
+  border-radius: 999px;
+}
+
+.cx-voted-filter-btn {
+  border: none;
+  background: transparent;
+  color: var(--ig-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 15px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s var(--cx-ease-out), color 0.18s var(--cx-ease-out);
+}
+
+.cx-voted-filter-btn--active {
+  background: var(--ig-card);
+  color: var(--cx-accent-deep);
+  box-shadow: 0 1px 3px rgb(var(--cx-ink-rgb) / 0.14);
+}
+
+:root[data-theme="dark"] .cx-voted-filter {
+  background: rgb(255 255 255 / 0.05);
+}
+:root[data-theme="dark"] .cx-voted-filter-btn--active {
+  background: rgb(255 255 255 / 0.1);
+  color: var(--cx-accent);
 }
 
 .cx-drop-status {

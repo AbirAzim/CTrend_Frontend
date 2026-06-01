@@ -142,3 +142,8 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
   newest-on-top, vote-bar/status layout (status in the anonymous row), and
   single-tap unvote with a unified vote/unvote engine. Backend gained the
   `removeVote` mutation. Mobile-porting docs written in `react_change_2/`.
+- **2026-06-01** — Interstitial (pre-Phase-3) profile/post-view polish: two-zone
+  action bar redesign, per-drop stats, new **Voted** tab + anonymous filter
+  (backend `myVotedPosts`), and a compact single-post view. Mobile docs:
+  `…_phase2b-two-zone-action-bar-redesign.md`,
+  `…_profile-stats-voted-tab-compact-post.md`.

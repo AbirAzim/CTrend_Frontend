@@ -15,7 +15,7 @@ import {
   CANCEL_FRIEND_REQUEST,
 } from "../graphql/friends";
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
-import { ME, UPDATE_PROFILE, USER_POSTS } from "../graphql/profile";
+import { ME, UPDATE_PROFILE, USER_POSTS, MY_VOTED_POSTS } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
@@ -182,6 +182,13 @@ export function ProfilePage() {
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
+  const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
+  const { data: votedPostsData, loading: votedPostsLoading } = useQuery(MY_VOTED_POSTS, {
+    variables: { anonymousOnly: votedFilter === "anonymous" },
+    skip: useMockFeed || !user,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
+  });
 
   const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
     id: string;
@@ -191,6 +198,9 @@ export function ProfilePage() {
     totalVotes?: number | null;
     upvoteCount?: number | null;
     downvoteCount?: number | null;
+    commentCount?: number | null;
+    hypeCount?: number | null;
+    saveCount?: number | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
     options?: Array<{ label?: string | null }> | null;
@@ -212,6 +222,9 @@ export function ProfilePage() {
     totalVotes?: number | null;
     upvoteCount?: number | null;
     downvoteCount?: number | null;
+    commentCount?: number | null;
+    hypeCount?: number | null;
+    saveCount?: number | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
     options?: Array<{ label?: string | null }> | null;
@@ -219,6 +232,7 @@ export function ProfilePage() {
   }> = useMockFeed
     ? playgroundPosts
     : apiPosts;
+  const votedPosts = (votedPostsData?.myVotedPosts ?? []) as typeof gridPosts;
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const requestedMe = (friendRequestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
@@ -226,7 +240,7 @@ export function ProfilePage() {
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
   const [connectionsTab, setConnectionsTab] = useState<"friends" | "requests" | "suggestions">("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
-  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept">(
+  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept" | "voted">(
     initialTab === "kept" ? "kept" : "drops",
   );
 
@@ -670,6 +684,16 @@ export function ProfilePage() {
             🔖 Kept
             {savedPosts.length > 0 && <span className="cx-conn-tab-badge">{savedPosts.length}</span>}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={profileContentTab === "voted"}
+            className={`cx-conn-tab${profileContentTab === "voted" ? " cx-conn-tab--active" : ""}`}
+            onClick={() => setProfileContentTab("voted")}
+          >
+            🗳️ Voted
+            {votedPosts.length > 0 && <span className="cx-conn-tab-badge">{votedPosts.length}</span>}
+          </button>
         </div>
 
         {profileContentTab === "drops" && (
@@ -734,15 +758,30 @@ export function ProfilePage() {
                     {/* Info */}
                     <div className="cx-drop-info">
                       <p className="cx-drop-title">{post.caption?.trim() || "Untitled compare"}</p>
-                      <p className="cx-drop-meta">
-                        {post.category?.name ?? "General"}
-                        <span className="cx-drop-meta-sep">·</span>
-                        {(post.totalVotes ?? 0).toLocaleString()} votes
-                      </p>
+                      <p className="cx-drop-meta">{post.category?.name ?? "General"}</p>
                       <div className="cx-drop-option-chips">
                         {(post.options ?? []).map((o, i) => o.label?.trim() ? (
                           <span key={i} className="cx-drop-chip">{o.label}</span>
                         ) : null)}
+                      </div>
+                      <div className="cx-drop-stats" aria-label="Drop stats">
+                        <span className="cx-drop-stat" title="Votes">
+                          <span className="cx-drop-stat-icon" aria-hidden>🗳️</span>
+                          {(post.totalVotes ?? (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0)).toLocaleString()}
+                          <span className="cx-drop-stat-label"> votes</span>
+                        </span>
+                        <span className="cx-drop-stat" title="Comments">
+                          <span className="cx-drop-stat-icon" aria-hidden>💬</span>
+                          {(post.commentCount ?? 0).toLocaleString()}
+                        </span>
+                        <span className="cx-drop-stat" title="Hype">
+                          <span className="cx-drop-stat-icon" aria-hidden>❤️</span>
+                          {(post.hypeCount ?? 0).toLocaleString()}
+                        </span>
+                        <span className="cx-drop-stat" title="Keeps">
+                          <span className="cx-drop-stat-icon" aria-hidden>🔖</span>
+                          {(post.saveCount ?? 0).toLocaleString()}
+                        </span>
                       </div>
                       <span className={`cx-drop-status${ended ? " cx-drop-status--closed" : " cx-drop-status--open"}`}>
                         {ended ? "🔒 Closed" : "🔴 Open"}
@@ -818,6 +857,97 @@ export function ProfilePage() {
                   );
                 })}
               </div>
+            )}
+          </div>
+        )}
+
+        {profileContentTab === "voted" && (
+          <div className="cx-profile-content-panel" role="tabpanel">
+            <div className="cx-voted-filter" role="group" aria-label="Filter voted posts">
+              <button
+                type="button"
+                className={`cx-voted-filter-btn${votedFilter === "all" ? " cx-voted-filter-btn--active" : ""}`}
+                aria-pressed={votedFilter === "all"}
+                onClick={() => setVotedFilter("all")}
+              >
+                All votes
+              </button>
+              <button
+                type="button"
+                className={`cx-voted-filter-btn${votedFilter === "anonymous" ? " cx-voted-filter-btn--active" : ""}`}
+                aria-pressed={votedFilter === "anonymous"}
+                onClick={() => setVotedFilter("anonymous")}
+              >
+                👻 Anonymous
+              </button>
+            </div>
+            {!useMockFeed && votedPostsLoading && votedPosts.length === 0 ? (
+              <p className="cx-conn-empty">Loading voted posts…</p>
+            ) : votedPosts.length === 0 ? (
+              <div className="cx-conn-empty">
+                <span className="cx-conn-empty-icon">🗳️</span>
+                <p>
+                  {votedFilter === "anonymous"
+                    ? "You haven't voted anonymously on any posts yet."
+                    : "You haven't voted on any posts yet."}
+                </p>
+              </div>
+            ) : (
+              <ul className="cx-drop-list">
+                {votedPosts.map((post) => {
+                  const ended = post.isVotingOpen === false || rel(post.votingEndsAt) === "ended";
+                  return (
+                    <li key={`voted-${post.id}`} className="cx-drop-item">
+                      <div className="cx-drop-item-main">
+                        <NavLink to={`/post/${post.id}`} className="cx-drop-thumbs" aria-label="View post">
+                          {post.imageUrls.slice(0, 3).map((u, idx) => (
+                            <span key={idx} className="cx-drop-thumb" style={{ backgroundImage: `url(${u})` }} />
+                          ))}
+                          {post.imageUrls.length > 3 && (
+                            <span className="cx-drop-thumb cx-drop-thumb--more">+{post.imageUrls.length - 3}</span>
+                          )}
+                        </NavLink>
+                        <div className="cx-drop-info">
+                          <p className="cx-drop-title">{post.caption?.trim() || "Untitled compare"}</p>
+                          <p className="cx-drop-meta">{post.category?.name ?? "General"}</p>
+                          <div className="cx-drop-option-chips">
+                            {(post.options ?? []).map((o, i) => o.label?.trim() ? (
+                              <span key={i} className="cx-drop-chip">{o.label}</span>
+                            ) : null)}
+                          </div>
+                          <div className="cx-drop-stats" aria-label="Drop stats">
+                            <span className="cx-drop-stat" title="Votes">
+                              <span className="cx-drop-stat-icon" aria-hidden>🗳️</span>
+                              {(post.totalVotes ?? (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0)).toLocaleString()}
+                              <span className="cx-drop-stat-label"> votes</span>
+                            </span>
+                            <span className="cx-drop-stat" title="Comments">
+                              <span className="cx-drop-stat-icon" aria-hidden>💬</span>
+                              {(post.commentCount ?? 0).toLocaleString()}
+                            </span>
+                            <span className="cx-drop-stat" title="Hype">
+                              <span className="cx-drop-stat-icon" aria-hidden>❤️</span>
+                              {(post.hypeCount ?? 0).toLocaleString()}
+                            </span>
+                            <span className="cx-drop-stat" title="Keeps">
+                              <span className="cx-drop-stat-icon" aria-hidden>🔖</span>
+                              {(post.saveCount ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <span className={`cx-drop-status${ended ? " cx-drop-status--closed" : " cx-drop-status--open"}`}>
+                            {ended ? "🔒 Closed" : "🔴 Open"}
+                          </span>
+                        </div>
+                        <div className="cx-drop-actions">
+                          <NavLink to={`/post/${post.id}`} className="cx-drop-action-btn" title="View post">
+                            👁
+                          </NavLink>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         )}
