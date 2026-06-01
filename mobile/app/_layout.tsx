@@ -340,7 +340,7 @@ function NotificationResponseHandler() {
     });
 
     return () => sub.remove();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return null;
 }

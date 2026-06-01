@@ -81,7 +81,7 @@ function dateLabelShort(d: Date): string {
 // ─── DateTimePicker (shared between voting deadline + schedule) ───────────────
 
 function DateTimePicker({
-  colors, enabled, onToggle, presetHours, onPresetChange,
+  colors, enabled, presetHours, onPresetChange,
   customDate, onCustomChange, showCustom,
 }: {
   colors: ReturnType<typeof useTheme>["colors"];

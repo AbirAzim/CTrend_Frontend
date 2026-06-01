@@ -1,9 +1,8 @@
 import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
-import * as Notifications from "expo-notifications";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
-import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -37,7 +36,6 @@ import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useSounds } from "../../context/SoundContext";
-import { setActiveConversationId } from "../../lib/activeConversation";
 import { clearConversationNotification } from "../../lib/messageNotifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
