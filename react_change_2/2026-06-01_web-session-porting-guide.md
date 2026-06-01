@@ -1,7 +1,7 @@
 # Web session — porting guide (done on web, Phase 5 messages later)
 
 **Date:** 2026-06-01  
-**Status:** Web implemented · mobile port pending · **PHASES.md Phase 5 (message reactions) not started**
+**Status:** Web implemented · mobile port pending · **Phase 5 (message reactions)** → [phase5-message-reactions.md](./2026-06-01_phase5-message-reactions.md)
 
 Use this as the **single entry point** for everything changed on web in this session.
 Read docs **in order** when porting to React Native.
@@ -69,11 +69,11 @@ Read docs **in order** when porting to React Native.
 
 ---
 
-## Not in this bundle (do later)
+## Not in this bundle
 
 | Item | Where |
 |------|--------|
-| Message reactions (#8) | `PHASES.md` **Phase 5** — no `react_change_2` doc yet |
+| Message reactions (#8) | [phase5-message-reactions.md](./2026-06-01_phase5-message-reactions.md) |
 | Phases 1–4, profile interstitial | Existing `react_change_2` phase1–4 / profile docs |
 
 ---

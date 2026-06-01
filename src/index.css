@@ -15172,6 +15172,101 @@ a.cx-profile-btn-accent {
 }
 .cw-bubble:hover .cw-bubble-time { display: inline; }
 
+/* Message reactions (Messenger-style) */
+.cw-bubble-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+}
+.cw-msg--mine .cw-bubble-wrap {
+  align-items: flex-end;
+}
+
+.cw-bubble-quick-react {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--ig-surface, #fff);
+  border: 1px solid var(--ig-border, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 4;
+}
+.cw-msg--mine .cw-bubble-quick-react {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+[data-theme="dark"] .cw-bubble-quick-react {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.cw-bubble-quick-react-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 4px 5px;
+  border-radius: 8px;
+  transition: background 0.12s, transform 0.12s;
+}
+.cw-bubble-quick-react-btn:hover {
+  background: rgba(99, 102, 241, 0.12);
+  transform: scale(1.12);
+}
+.cw-bubble-quick-react-btn--active {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.cw-bubble-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.cw-msg--mine .cw-bubble-reactions {
+  justify-content: flex-end;
+}
+
+.cw-bubble-reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ig-border, rgba(0, 0, 0, 0.08));
+  background: var(--ig-surface, #fff);
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1.3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.cw-bubble-reaction-chip--mine {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.1);
+}
+[data-theme="dark"] .cw-bubble-reaction-chip {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+[data-theme="dark"] .cw-bubble-reaction-chip--mine {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.cw-bubble-reaction-count {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+}
+
 /* Seen */
 .cw-seen {
   display: flex;

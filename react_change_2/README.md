@@ -13,11 +13,11 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 
 ---
 
-## Start here — web done this session (Phase 5 messages **later**)
+## Phase 5 — message reactions ☑
 
-**[web-session-porting-guide.md](./2026-06-01_web-session-porting-guide.md)** — ordered docs for Discuss, votes notify, Ke Jitbe, admin posts.
+**[phase5-message-reactions.md](./2026-06-01_phase5-message-reactions.md)** — Messenger bubble reactions (web done).
 
-`PHASES.md` **Phase 5** = message reactions (#8) — **not started**, do later.
+Interstitial session (Discuss, admin, platform): **[web-session-porting-guide.md](./2026-06-01_web-session-porting-guide.md)**.
 
 ---
 
