@@ -713,11 +713,6 @@ function FeedPostCardComponent({
       : votingHasEndDate
         ? `Ends ${formatRelativeTime(activeVotingEndsAt) || ""}`
       : "Voting open";
-  // The "Vote anonymously" row only renders for open, API-mode compare posts.
-  // When it does, the status badge lives there; otherwise it sits in the
-  // action toolbar so the voting status is always visible somewhere.
-  const statusInAnonRow =
-    voteMode === "api" && !isVotingClosed && Boolean(compareUrls);
   // Buttons stay enabled while mutation is in flight — `voteInFlight` ref
   // prevents duplicate submissions without the cursor: not-allowed flash.
   const voteControlsDisabled = isVotingClosed;
@@ -1566,9 +1561,6 @@ function FeedPostCardComponent({
           )}
           {voteMode === "api" && !isVotingClosed && (
             <div className="cx-anon-toggle-row">
-              <span className="cx-voting-badge cx-anon-toggle-status">
-                {votingStatusLabel}
-              </span>
               <label className="cx-anon-toggle">
                 <span className="cx-anon-toggle-icon" aria-hidden>👻</span>
                 <span className="cx-anon-toggle-text">Vote anonymously</span>
@@ -1789,15 +1781,8 @@ function FeedPostCardComponent({
           </div>
         ) : null}
 
-        <div className="cx-action-rail" role="toolbar" aria-label="Post actions">
-          {!statusInAnonRow ? (
-            <span
-              className={`cx-voting-badge cx-action-rail-status${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
-            >
-              {isVotingClosed ? "🏆 Result" : votingStatusLabel}
-            </span>
-          ) : null}
-          <div className="cx-action-rail-icons">
+        <div className="cx-action-rail">
+          <div className="cx-action-rail-icons" role="toolbar" aria-label="Post actions">
           <button
             type="button"
             className={`cx-action-chip${commentsOpen ? " cx-action-chip--pressed" : ""}`}
@@ -1873,15 +1858,27 @@ function FeedPostCardComponent({
             ) : null}
           </button>
           </div>
-          <button
-            type="button"
-            className="cx-details-toggle cx-action-rail-details"
-            aria-expanded={detailsOpen}
-            aria-controls={`post-details-${post.id}`}
-            onClick={() => setDetailsOpen((prev) => !prev)}
-          >
-            {detailsOpen ? "Hide details" : "See details"}
-          </button>
+          <div className="cx-action-rail-context">
+            <span
+              className={`cx-action-status-line${isVotingClosed ? " cx-action-status-line--result" : ""}`}
+            >
+              {isVotingClosed
+                ? `🏆 ${votingWinnerSummary || "Results are in"}`
+                : `${votingHasEndDate ? "⏳ " : ""}${votingStatusLabel}`}
+            </span>
+            <button
+              type="button"
+              className="cx-action-rail-details"
+              aria-expanded={detailsOpen}
+              aria-controls={`post-details-${post.id}`}
+              onClick={() => setDetailsOpen((prev) => !prev)}
+            >
+              {detailsOpen ? "Hide details" : "See details"}
+              <span className="cx-action-rail-details-arrow" aria-hidden>
+                {detailsOpen ? "‹" : "›"}
+              </span>
+            </button>
+          </div>
         </div>
 
         {shareHint ? (

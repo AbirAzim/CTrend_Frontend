@@ -54,11 +54,11 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
   comment box and the reply box.
 - ☑ **#9 Newest comment on top** — top-level comments sorted newest-first; replies
   stay oldest-first (chronological).
-- ☑ **Action bar / voting-status layout** — merged the old separate "countdown +
-  See details" header row into the action toolbar; then moved the voting status
-  /countdown into the **"Vote anonymously"** row for open compare posts (fallback:
-  the action-bar left slot for closed/binary/demo posts). Action bar = icons
-  (center) + See details (right).
+- ☑ **Action bar / voting-status layout** — iterated to a **two-zone action bar**:
+  zone 1 = flat, evenly-spaced action icons (count badges kept); divider; zone 2 =
+  result summary (🏆 closed) / countdown (⏳ open) on the left + "See details ›" on
+  the right. Redundant status badge removed (image banner covers it); "Vote
+  anonymously" row reverted to just the toggle. Full design spec in the mobile doc.
 - ☑ **Single-tap unvote (withdraw)** — tapping the option you already chose now
   withdraws your vote (was a no-op in API mode). New backend `removeVote` mutation
   (publishes the same real-time events as voting); frontend optimistic clear.
@@ -74,6 +74,7 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
 **Mobile docs:**
 - `react_change_2/2026-06-01_phase2-comment-ux.md`
 - `react_change_2/2026-06-01_phase2-vote-bar-layout-and-unvote.md`
+- `react_change_2/2026-06-01_phase2b-two-zone-action-bar-redesign.md` (full design spec)
 
 ---
 

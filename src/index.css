@@ -2838,43 +2838,96 @@ a.cx-friend-avatar:hover {
   background: rgb(var(--cx-accent-rgb) / 0.35);
 }
 
+/* Two-zone action bar:
+   zone 1 = evenly-spaced action icons · zone 2 = result/countdown + See details */
 .cx-action-rail {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  /* One combined row: voting status (left) · actions (center) · details (right) */
-  justify-content: space-between;
-  gap: 8px;
-  background: rgb(255 255 255 / 0.7);
+  flex-direction: column;
+  background: rgb(255 255 255 / 0.72);
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.14);
-  border-radius: 14px;
-  padding: 8px;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-/* Center group holds the action icons; wraps internally so nothing scrolls
-   sideways while the status badge and details toggle stay pinned to the edges. */
+/* Zone 1 — action icons spread evenly across the bar */
 .cx-action-rail-icons {
   display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: space-evenly;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 7px 8px;
 }
 
-.cx-action-rail-status {
-  flex-shrink: 0;
+/* Flat icon buttons inside the rail — the container groups them, so the
+   individual chips lose their pill border/background for a cleaner row. */
+.cx-action-rail-icons .cx-action-chip {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 10px;
+}
+.cx-action-rail-icons .cx-action-chip:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  border-color: transparent;
+  transform: none;
+}
+.cx-action-rail-icons .cx-action-chip:active {
+  transform: scale(0.94);
+}
+
+/* Zone 2 — context line: result/countdown (left) + See details (right) */
+.cx-action-rail-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
+  background: rgb(var(--cx-ink-rgb) / 0.025);
+}
+
+.cx-action-status-line {
+  min-width: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--cx-accent-deep);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-action-status-line--result {
+  color: #b45309;
 }
 
 .cx-action-rail-details {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--cx-accent-deep);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.18s var(--cx-ease-out), color 0.18s var(--cx-ease-out);
 }
 
-.cx-action-rail::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+.cx-action-rail-details:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.cx-action-rail-details-arrow {
+  font-size: 1.05rem;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .cx-action-chip {
@@ -2998,15 +3051,9 @@ a.cx-friend-avatar:hover {
 .cx-anon-toggle-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: center;
   padding: 8px 16px;
   background: rgb(var(--cx-ink-rgb) / 0.04);
-}
-
-.cx-anon-toggle-status {
-  flex-shrink: 0;
 }
 
 .cx-anon-toggle {
@@ -6543,6 +6590,36 @@ a.cx-action-chip {
 :root[data-theme="dark"] .cx-action-rail {
   background: rgb(15 23 42 / 0.64);
   border-color: rgb(148 163 184 / 0.24);
+}
+
+:root[data-theme="dark"] .cx-action-rail-context {
+  border-top-color: rgb(148 163 184 / 0.18);
+  background: rgb(255 255 255 / 0.03);
+}
+
+:root[data-theme="dark"] .cx-action-status-line {
+  color: var(--cx-accent);
+}
+
+:root[data-theme="dark"] .cx-action-status-line--result {
+  color: #fcd34d;
+}
+
+:root[data-theme="dark"] .cx-action-rail-details {
+  color: var(--cx-accent);
+}
+
+:root[data-theme="dark"] .cx-action-rail-details:hover {
+  background: rgb(129 140 248 / 0.18);
+}
+
+/* Flat icons inside the rail keep their transparent look in dark mode too */
+:root[data-theme="dark"] .cx-action-rail-icons .cx-action-chip {
+  background: transparent;
+  border-color: transparent;
+}
+:root[data-theme="dark"] .cx-action-rail-icons .cx-action-chip:hover {
+  background: rgb(129 140 248 / 0.16);
 }
 
 :root[data-theme="dark"] .cx-action-chip {
