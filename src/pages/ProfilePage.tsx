@@ -20,6 +20,7 @@ import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
+import { ProfileCompareCard } from "../components/ProfileCompareCard";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import type { FeedPostView } from "../types/feed";
@@ -27,19 +28,6 @@ import type { FeedPostView } from "../types/feed";
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
   return s ? s[0]!.toUpperCase() : "?";
-}
-
-function rel(iso?: string | null): string {
-  if (!iso) return "";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return "";
-  const d = t - Date.now();
-  const absMin = Math.floor(Math.abs(d) / 60000);
-  if (d <= 0) return "ended";
-  const h = Math.floor(absMin / 60);
-  const m = absMin % 60;
-  if (h > 0) return `${h}h ${m}m left`;
-  return `${Math.max(1, m)}m left`;
 }
 
 function gmailAvatarFromEmail(email: string): string | null {
@@ -708,22 +696,20 @@ export function ProfilePage() {
           </p>
         )}
         {!useMockFeed && postsLoading && gridPosts.length === 0 && (
-          <ul className="cx-drop-list cx-drop-list--skeleton" aria-label="Loading your compares">
+          <div className="cx-kept-grid" aria-label="Loading your compares">
             {[0, 1, 2].map((i) => (
-              <li key={i} className="cx-drop-item">
-                <div className="cx-drop-item-main">
-                  <div className="cx-drop-thumbs">
-                    <span className="cx-drop-thumb cx-skeleton" />
-                    <span className="cx-drop-thumb cx-skeleton" />
-                  </div>
-                  <div className="cx-drop-info">
-                    <span className="cx-skeleton cx-skeleton-line" style={{ width: "70%", height: "14px" }} />
-                    <span className="cx-skeleton cx-skeleton-line" style={{ width: "45%", height: "11px" }} />
-                  </div>
+              <div key={i} className="cx-kept-card cx-profile-card cx-profile-card--skeleton">
+                <div className="cx-kept-card-media">
+                  <span className="cx-kept-card-thumb cx-skeleton" />
+                  <span className="cx-kept-card-thumb cx-skeleton" />
                 </div>
-              </li>
+                <div className="cx-kept-card-info">
+                  <span className="cx-skeleton cx-skeleton-line" style={{ width: "80%", height: "12px" }} />
+                  <span className="cx-skeleton cx-skeleton-line" style={{ width: "50%", height: "10px" }} />
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
         {!useMockFeed && !postsLoading && gridPosts.length === 0 && (
           <div className="cx-conn-empty">
@@ -735,80 +721,16 @@ export function ProfilePage() {
           </div>
         )}
         {gridPosts.length > 0 && (
-          <ul className="cx-drop-list">
-            {gridPosts.map((post) => {
-              const ended = post.isVotingOpen === false || rel(post.votingEndsAt) === "ended";
-              return (
-                <li key={post.id} className="cx-drop-item">
-                  <div className="cx-drop-item-main">
-                    {/* Thumbnail strip */}
-                    <NavLink to={`/post/${post.id}`} className="cx-drop-thumbs" aria-label="View post">
-                      {post.imageUrls.slice(0, 3).map((u, idx) => (
-                        <span
-                          key={idx}
-                          className="cx-drop-thumb"
-                          style={{ backgroundImage: `url(${u})` }}
-                        />
-                      ))}
-                      {post.imageUrls.length > 3 && (
-                        <span className="cx-drop-thumb cx-drop-thumb--more">+{post.imageUrls.length - 3}</span>
-                      )}
-                    </NavLink>
-
-                    {/* Info */}
-                    <div className="cx-drop-info">
-                      <p className="cx-drop-title">{post.caption?.trim() || "Untitled compare"}</p>
-                      <p className="cx-drop-meta">{post.category?.name ?? "General"}</p>
-                      <div className="cx-drop-option-chips">
-                        {(post.options ?? []).map((o, i) => o.label?.trim() ? (
-                          <span key={i} className="cx-drop-chip">{o.label}</span>
-                        ) : null)}
-                      </div>
-                      <div className="cx-drop-stats" aria-label="Drop stats">
-                        <span className="cx-drop-stat" title="Votes">
-                          <span className="cx-drop-stat-icon" aria-hidden>🗳️</span>
-                          {(post.totalVotes ?? (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0)).toLocaleString()}
-                          <span className="cx-drop-stat-label"> votes</span>
-                        </span>
-                        <span className="cx-drop-stat" title="Comments">
-                          <span className="cx-drop-stat-icon" aria-hidden>💬</span>
-                          {(post.commentCount ?? 0).toLocaleString()}
-                        </span>
-                        <span className="cx-drop-stat" title="Hype">
-                          <span className="cx-drop-stat-icon" aria-hidden>❤️</span>
-                          {(post.hypeCount ?? 0).toLocaleString()}
-                        </span>
-                        <span className="cx-drop-stat" title="Keeps">
-                          <span className="cx-drop-stat-icon" aria-hidden>🔖</span>
-                          {(post.saveCount ?? 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <span className={`cx-drop-status${ended ? " cx-drop-status--closed" : " cx-drop-status--open"}`}>
-                        {ended ? "🔒 Closed" : "🔴 Open"}
-                      </span>
-                    </div>
-
-                    {/* Action buttons */}
-                    {!useMockFeed && (
-                      <div className="cx-drop-actions">
-                        <button
-                          type="button"
-                          className="cx-drop-action-btn"
-                          title="Edit post"
-                          onClick={() => setEditingPost(post)}
-                        >
-                          ✏️
-                        </button>
-                        <NavLink to={`/post/${post.id}`} className="cx-drop-action-btn" title="View post">
-                          👁
-                        </NavLink>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="cx-kept-grid">
+            {gridPosts.map((post) => (
+              <ProfileCompareCard
+                key={post.id}
+                post={post}
+                variant="drops"
+                onEdit={!useMockFeed ? () => setEditingPost(post) : undefined}
+              />
+            ))}
+          </div>
         )}
       </section>
           </div>
@@ -825,37 +747,9 @@ export function ProfilePage() {
               </div>
             ) : (
               <div className="cx-kept-grid">
-                {savedPosts.map((post) => {
-                  const totalVotes = (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0);
-                  const isOpen = post.isVotingOpen !== false;
-                  return (
-                    <NavLink key={`kept-${post.id}`} to={`/post/${post.id}`} className="cx-kept-card">
-                      <div className="cx-kept-card-media">
-                        {post.imageUrls.slice(0, 2).map((url, idx) => (
-                          <span
-                            key={idx}
-                            className="cx-kept-card-thumb"
-                            style={{ backgroundImage: `url(${url})` }}
-                          />
-                        ))}
-                        {post.imageUrls.length > 2 && (
-                          <span className="cx-kept-card-more">+{post.imageUrls.length - 2}</span>
-                        )}
-                      </div>
-                      <div className="cx-kept-card-info">
-                        <p className="cx-kept-card-title">
-                          {post.caption?.trim() || "Untitled compare"}
-                        </p>
-                        <p className="cx-kept-card-meta">
-                          {totalVotes.toLocaleString()} votes
-                          <span className={`cx-kept-card-status${isOpen ? "" : " cx-kept-card-status--closed"}`}>
-                            {isOpen ? "Open" : "Closed"}
-                          </span>
-                        </p>
-                      </div>
-                    </NavLink>
-                  );
-                })}
+                {savedPosts.map((post) => (
+                  <ProfileCompareCard key={`kept-${post.id}`} post={post} variant="kept" />
+                ))}
               </div>
             )}
           </div>
@@ -893,61 +787,11 @@ export function ProfilePage() {
                 </p>
               </div>
             ) : (
-              <ul className="cx-drop-list">
-                {votedPosts.map((post) => {
-                  const ended = post.isVotingOpen === false || rel(post.votingEndsAt) === "ended";
-                  return (
-                    <li key={`voted-${post.id}`} className="cx-drop-item">
-                      <div className="cx-drop-item-main">
-                        <NavLink to={`/post/${post.id}`} className="cx-drop-thumbs" aria-label="View post">
-                          {post.imageUrls.slice(0, 3).map((u, idx) => (
-                            <span key={idx} className="cx-drop-thumb" style={{ backgroundImage: `url(${u})` }} />
-                          ))}
-                          {post.imageUrls.length > 3 && (
-                            <span className="cx-drop-thumb cx-drop-thumb--more">+{post.imageUrls.length - 3}</span>
-                          )}
-                        </NavLink>
-                        <div className="cx-drop-info">
-                          <p className="cx-drop-title">{post.caption?.trim() || "Untitled compare"}</p>
-                          <p className="cx-drop-meta">{post.category?.name ?? "General"}</p>
-                          <div className="cx-drop-option-chips">
-                            {(post.options ?? []).map((o, i) => o.label?.trim() ? (
-                              <span key={i} className="cx-drop-chip">{o.label}</span>
-                            ) : null)}
-                          </div>
-                          <div className="cx-drop-stats" aria-label="Drop stats">
-                            <span className="cx-drop-stat" title="Votes">
-                              <span className="cx-drop-stat-icon" aria-hidden>🗳️</span>
-                              {(post.totalVotes ?? (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0)).toLocaleString()}
-                              <span className="cx-drop-stat-label"> votes</span>
-                            </span>
-                            <span className="cx-drop-stat" title="Comments">
-                              <span className="cx-drop-stat-icon" aria-hidden>💬</span>
-                              {(post.commentCount ?? 0).toLocaleString()}
-                            </span>
-                            <span className="cx-drop-stat" title="Hype">
-                              <span className="cx-drop-stat-icon" aria-hidden>❤️</span>
-                              {(post.hypeCount ?? 0).toLocaleString()}
-                            </span>
-                            <span className="cx-drop-stat" title="Keeps">
-                              <span className="cx-drop-stat-icon" aria-hidden>🔖</span>
-                              {(post.saveCount ?? 0).toLocaleString()}
-                            </span>
-                          </div>
-                          <span className={`cx-drop-status${ended ? " cx-drop-status--closed" : " cx-drop-status--open"}`}>
-                            {ended ? "🔒 Closed" : "🔴 Open"}
-                          </span>
-                        </div>
-                        <div className="cx-drop-actions">
-                          <NavLink to={`/post/${post.id}`} className="cx-drop-action-btn" title="View post">
-                            👁
-                          </NavLink>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="cx-kept-grid">
+                {votedPosts.map((post) => (
+                  <ProfileCompareCard key={`voted-${post.id}`} post={post} variant="voted" />
+                ))}
+              </div>
             )}
           </div>
         )}

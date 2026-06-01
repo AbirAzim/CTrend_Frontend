@@ -18,3 +18,10 @@ react_change_2/
 ```
 
 Use [`TEMPLATE.md`](./TEMPLATE.md) as the starting structure for each entry.
+
+**Recent:** `2026-06-01_profile-drops-grid-and-search-thumbs.md` — **full design spec**
+(profile grid cards: layout wireframe, variants, status pill, footer placement,
+edit control, search multi-thumb, CSS reference, mobile port notes).
+
+Other batch-2 entries: phase1/2 voters & comments, profile voted-tab stats,
+compact single-post view — see files in this folder.
