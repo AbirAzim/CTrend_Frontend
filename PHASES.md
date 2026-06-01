@@ -95,27 +95,22 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
 
 ---
 
-## Phase 4 — Notifications (frontend + backend) ☐
+## Phase 4 — Notifications (frontend + backend) ☑ (2026-06-01)
 
-- ☐ **#10 Show actor's user image on the notification** — backend
-  `myNotifications` / `newNotification` need a `latestActorAvatarUrl` (or
-  actor object) field; frontend renders avatar instead of emoji where available.
-- ☐ **#1 Updated notification re-surfaces as new with new time** — when a grouped
-  notification (new hype/comment) updates, backend should bump `createdAt` and
-  set `read=false`; frontend already moves it to top — verify unread + time refresh.
-- ☐ **#6 Friend-request accept/reject shows status instantly** — after pressing
-  Accept/Reject, the row should immediately read "Accepted ✓" / "Rejected"
-  instead of just hiding/spinning. Local optimistic state in `NotificationBell`.
-- ☐ **#7 Comment notification deep-links to the exact comment** — notification must
-  carry the comment id; clicking navigates to `/post/:postId#comment-:commentId`,
-  the post page scrolls to & highlights that comment. Needs backend to expose
-  comment id on POST_COMMENT/COMMENT_REPLY/COMMENT_REACTION notifications +
-  `PostDetailPage`/`PostCommentsPanel` scroll-to logic.
+- ☑ **#10 Actor avatar** — `latestActorAvatar` field resolver; bell shows round
+  avatar when available, emoji fallback otherwise.
+- ☑ **#1 Grouped resurface** — backend bumps `createdAt`, sets `read=false`, updates
+  body; comment types re-notify on same actor; subscription merge moves row to top.
+- ☑ **#6 Friend request status** — Accept/Reject shows **Accepted ✓** / **Rejected**
+  via local state (no refetch-hide).
+- ☑ **#7 Comment deep-link** — `commentId` on schema + emit sites; navigate to
+  `#comment-{id}`; post page opens comments, scrolls + highlights target.
 
 **Files (frontend):** `src/graphql/notifications.ts`, `src/context/NotificationContext.tsx`,
 `src/components/NotificationBell.tsx`, `src/components/PostCommentsPanel.tsx`,
-`src/pages/PostDetailPage.tsx`
-**Files (backend):** notification resolvers/schema + emit sites in `~/documents/code/CTrend`
+`src/pages/PostDetailPage.tsx`, `src/components/FeedPostCard.tsx`, `src/index.css`
+**Files (backend):** `notifications/*`, `comments/comments.service.ts`, `schema.gql`
+**Mobile doc:** `react_change_2/2026-06-01_phase4-notifications.md`
 
 ---
 
@@ -147,6 +142,9 @@ redesign and a full single-tap unvote (frontend + backend) during testing.
   newest-on-top, vote-bar/status layout (status in the anonymous row), and
   single-tap unvote with a unified vote/unvote engine. Backend gained the
   `removeVote` mutation. Mobile-porting docs written in `react_change_2/`.
+- **2026-06-01** — Phase 4 **done** (web). Notification avatars, grouped resurface,
+  friend-request status labels, comment deep-links (`commentId` + hash scroll).
+  Mobile doc: `react_change_2/2026-06-01_phase4-notifications.md`.
 - **2026-06-01** — Phase 3 **done** (web). Mobile Safari + Chrome: 16px form controls,
   viewport `interactive-widget=resizes-content`, messenger/comment/search/auth inputs,
   dvh modal heights, safe-area overlays, touch-action on chrome controls.

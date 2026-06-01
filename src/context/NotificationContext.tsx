@@ -27,6 +27,8 @@ export type NotificationItem = {
   actorCount?: number | null;
   latestActorId?: string | null;
   latestActorName?: string | null;
+  latestActorAvatar?: string | null;
+  commentId?: string | null;
   read: boolean;
   createdAt: string;
 };
@@ -76,8 +78,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         // when updated — replace the existing entry rather than duplicating
         const existingIdx = prev.findIndex((p) => p.id === n.id);
         if (existingIdx >= 0) {
-          const next = [n, ...prev.slice(0, existingIdx), ...prev.slice(existingIdx + 1)];
-          return next;
+          const merged = { ...prev[existingIdx], ...n, read: n.read ?? false };
+          return [merged, ...prev.slice(0, existingIdx), ...prev.slice(existingIdx + 1)];
         }
         return [n, ...prev];
       });

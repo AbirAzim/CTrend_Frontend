@@ -47,6 +47,8 @@ type Props = {
   voteMode: "api" | "local";
   isAuthenticated: boolean;
   meLabel: string;
+  /** Scroll to and briefly highlight this comment (from notification deep link). */
+  highlightCommentId?: string | null;
 };
 
 function commentDisplayName(author: CommentAuthor): string {
@@ -290,7 +292,13 @@ function CommentItem({
   );
 }
 
-export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }: Props) {
+export function PostCommentsPanel({
+  postId,
+  voteMode,
+  isAuthenticated,
+  meLabel,
+  highlightCommentId = null,
+}: Props) {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const [showAllComments, setShowAllComments] = useState(false);
@@ -332,6 +340,33 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
   const threads = useMemo(() => buildThreads(commentsLive), [commentsLive]);
   const displayedThreads = showAllComments ? threads : threads.slice(0, 2);
   const hasMoreThreads = threads.length > 2;
+
+  useEffect(() => {
+    if (!highlightCommentId || voteMode !== "api" || commentsLoading) return;
+    const idx = threads.findIndex(
+      (t) =>
+        t.comment.id === highlightCommentId ||
+        t.replies.some((r) => r.id === highlightCommentId),
+    );
+    if (idx >= 2 && !showAllComments) setShowAllComments(true);
+  }, [highlightCommentId, voteMode, commentsLoading, threads, showAllComments]);
+
+  useEffect(() => {
+    if (!highlightCommentId || commentsLoading) return;
+    const el = document.getElementById(`comment-${highlightCommentId}`);
+    if (!el) return;
+    const frame = requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("cx-comment-row--highlight");
+    });
+    const timer = window.setTimeout(() => {
+      el.classList.remove("cx-comment-row--highlight");
+    }, 3200);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [highlightCommentId, commentsLoading, displayedThreads, showAllComments]);
 
   const displayedLocalComments = showAllComments ? localComments : localComments.slice(0, 2);
   const hasMoreLocalComments = localComments.length > 2;
