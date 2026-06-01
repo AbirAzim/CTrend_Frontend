@@ -24,6 +24,10 @@ import {
   initMessageNotifications,
   registerNotifeeHandlers,
   handleNotifeeBackgroundPress,
+  handleInlineReply,
+  handleMarkReadAction,
+  REPLY_ACTION_ID,
+  MARK_READ_ACTION_ID,
 } from "../lib/messageNotifications";
 import {
   consumePendingChatNavigation,
@@ -33,44 +37,51 @@ import {
 
 // Background event handler — must be registered at module level (runs when app is killed/bg)
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-  if (type !== EventType.PRESS) return;
   const data = detail.notification?.data as { type?: string; conversationId?: string } | undefined;
-  if (data?.type === "MESSAGE" && data.conversationId) {
-    handleNotifeeBackgroundPress(data.conversationId);
+  if (data?.type !== "MESSAGE" || !data.conversationId) return;
+  const conversationId = data.conversationId;
+
+  if (type === EventType.PRESS) {
+    handleNotifeeBackgroundPress(conversationId);
+    return;
+  }
+
+  if (type === EventType.ACTION_PRESS) {
+    if (detail.pressAction?.id === REPLY_ACTION_ID && detail.input?.trim()) {
+      await handleInlineReply(conversationId, detail.input.trim());
+    } else if (detail.pressAction?.id === MARK_READ_ACTION_ID) {
+      await handleMarkReadAction(conversationId);
+    }
   }
 });
 
-// Ensure the Android notification channel exists before scheduling local notifications.
-async function ensureChannel() {
-  if (Platform.OS !== "android") return;
-  await Notifications.setNotificationChannelAsync("default", {
-    name: "Ke Jitbe",
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: "#6366f1",
-    sound: "default",
-    showBadge: true,
-  });
-}
+// Use the "default" channel (importance=MAX, created by usePushNotifications) for
+// all system notifications — it is verified to exist on every install.
+const BELL_CHANNEL_ID = "default";
 
-// Posts a bell/system notification (votes, comments, friend requests, etc.)
 async function postSystemNotification(
   title: string,
   body: string,
   data: Record<string, unknown>,
 ) {
-  await ensureChannel();
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: title || "New notification",
-      body: body || " ",
-      data,
-      sound: true,
-      vibrate: [0, 250, 250, 250],
-      color: "#6366f1",
-    },
-    trigger: Platform.OS === "android" ? { channelId: "default" } : null,
-  });
+  try {
+    const safeData: Record<string, string> = {};
+    for (const [k, v] of Object.entries(data)) {
+      safeData[k] = v == null ? "" : String(v);
+    }
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: title || "Ke Jitbe",
+        body: body || " ",
+        data: safeData,
+        sound: true,
+      },
+      trigger: Platform.OS === "android" ? { channelId: BELL_CHANNEL_ID } : null,
+    });
+    console.warn("[bell] posted:", title);
+  } catch (e) {
+    console.warn("[bell] postSystemNotification failed:", e);
+  }
 }
 
 function AppStatusBar() {
@@ -107,6 +118,7 @@ function GlobalNotificationSubscription() {
     onData: ({ data }) => {
       const n = data.data?.newNotification as (NotifToast & { read?: boolean }) | null;
       if (!n) return;
+      console.warn("[bell] received:", n.type, n.title);
 
       // In-app banner
       playNotification();
