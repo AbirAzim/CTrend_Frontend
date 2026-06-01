@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
-import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS } from "@ctrend/shared/graphql/feed";
+import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "@ctrend/shared/graphql/feed";
 import { MY_FRIENDS, FRIEND_SUGGESTIONS, FRIEND_REQUESTS } from "@ctrend/shared/graphql/friends";
 import { ME } from "@ctrend/shared/graphql/profile";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
@@ -60,7 +60,7 @@ function FeedTopBar() {
     <View style={[styles.topBar, { paddingTop: insets.top, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
       {/* Brand */}
       <Pressable style={styles.brand} hitSlop={4}>
-        <Text style={[styles.brandText, { color: colors.accentLight }]}>Ke Jitbe</Text>
+        <Text style={[styles.brandText, { color: colors.accentLight }]} numberOfLines={1}>Ke Jitbe</Text>
         <Image
           source={logoAsset}
           style={styles.brandLogo}
@@ -70,6 +70,11 @@ function FeedTopBar() {
 
       {/* Action icons */}
       <View style={styles.actions}>
+        {/* Search */}
+        <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
+          <Text style={styles.iconSymbol}>🔍</Text>
+        </Pressable>
+
         {/* Theme toggle */}
         <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
           <Text style={styles.iconSymbol}>{isDark ? "✶" : "🌙"}</Text>
@@ -125,6 +130,7 @@ export default function FeedScreen() {
   const { colors } = useTheme();
   const { isAuthenticated } = useAuth();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
@@ -154,7 +160,7 @@ export default function FeedScreen() {
 
   const { data, loading, error, refetch, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
-    { fetchPolicy: "cache-and-network", notifyOnNetworkStatusChange: true },
+    { fetchPolicy: "cache-and-network", notifyOnNetworkStatusChange: true, pollInterval: 20000 },
   );
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
@@ -207,12 +213,14 @@ export default function FeedScreen() {
   }, [data, meData, friendsData, suggestionsData, requestsData]);
 
   const knownIds = new Set(apiPosts.map((p) => p.id));
-  const posts: FeedPostView[] = [...liveQueue.filter((p) => !knownIds.has(p.id)), ...apiPosts];
+  const allPosts: FeedPostView[] = [...liveQueue.filter((p) => !knownIds.has(p.id)), ...apiPosts];
+  const posts = allPosts.filter((p) => !removedIds.has(p.id));
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     onData: ({ data: sub }) => {
       const postId = sub.data?.newPosts?.postId;
       if (!postId) return;
+      void refetch();
       void client
         .query({ query: GET_POST_BY_ID, variables: { id: postId }, fetchPolicy: "network-only" })
         .then(({ data: d }) => {
@@ -224,6 +232,15 @@ export default function FeedScreen() {
           });
         })
         .catch(() => {});
+    },
+  });
+
+  useSubscription<{ postDeleted: { postId: string } }>(POST_DELETED_SUB, {
+    onData: ({ data: sub }) => {
+      const postId = sub.data?.postDeleted?.postId;
+      if (!postId) return;
+      setRemovedIds((prev) => new Set([...prev, postId]));
+      void refetch();
     },
   });
 
@@ -257,7 +274,7 @@ export default function FeedScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={() => { setLiveQueue([]); void refetch(); }}
+              onRefresh={() => { setLiveQueue([]); setRemovedIds(new Set()); void refetch(); }}
               colors={[colors.accent]}
               tintColor={colors.accent}
             />
@@ -293,7 +310,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
   },
-  brand: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   brandText: { fontSize: 20, fontWeight: "800", letterSpacing: 0.3 },
   brandLogo: { width: 24, height: 22 },
   actions: { flexDirection: "row", alignItems: "center", gap: 7 },

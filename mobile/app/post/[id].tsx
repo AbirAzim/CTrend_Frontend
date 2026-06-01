@@ -13,6 +13,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -23,6 +24,7 @@ import {
   COMMENTS_BY_POST,
   COMMENT_POST,
   SET_COMMENT_LIKE,
+  SET_COMMENT_REACTION,
 } from "@ctrend/shared/graphql/comments";
 import {
   DELETE_POST,
@@ -38,6 +40,7 @@ import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
 import { postPermalink } from "../../lib/postPermalink";
@@ -48,6 +51,8 @@ const IMG_H = IMG_W * 1.55;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+
 type GqlComment = {
   id: string;
   content: string;
@@ -56,7 +61,9 @@ type GqlComment = {
   viewerHasLiked: boolean;
   postId: string;
   parentId: string | null;
-  author: { id: string; username: string; displayName: string | null };
+  viewerReaction: string | null;
+  reactions: Array<{ emoji: string; count: number }>;
+  author: { id: string; username: string; displayName: string | null; profileImageUrl?: string | null };
 };
 
 type GqlVoter = {
@@ -125,6 +132,7 @@ function makeStyles(c: ColorPalette) {
       backgroundColor: "#312e81",
       alignItems: "center",
       justifyContent: "center",
+      overflow: "hidden",
     },
     commentAvatarText: { color: "#fff", fontSize: 11, fontWeight: "700" },
     commentAuthor: { fontSize: 13, fontWeight: "700", color: c.text },
@@ -297,6 +305,19 @@ function makeStyles(c: ColorPalette) {
     },
     extendCancelText: { fontSize: 14, color: c.muted },
 
+    reactionStrip: {
+      flexDirection: "row" as const, flexWrap: "wrap" as const,
+      gap: 4, marginTop: 6, marginLeft: 36,
+    },
+    reactionBtn: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      paddingHorizontal: 7, paddingVertical: 3,
+      borderRadius: 12, borderWidth: 1, borderColor: c.border,
+      backgroundColor: c.section,
+    },
+    reactionBtnActive: { borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.14)" },
+    reactionText: { fontSize: 11, color: c.text },
+
     empty: { paddingVertical: 24, alignItems: "center" },
     emptyText: { fontSize: 13, color: c.muted },
 
@@ -359,9 +380,15 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
   const [localLiked, setLocalLiked] = useState(comment.viewerHasLiked);
   const [localCount, setLocalCount] = useState(comment.likeCount);
   const [showReplies, setShowReplies] = useState(false);
+  const [localReaction, setLocalReaction] = useState<string | null>(comment.viewerReaction ?? null);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
+    Object.fromEntries((comment.reactions ?? []).map((r) => [r.emoji, r.count])),
+  );
+  const [reactMut] = useMutation(SET_COMMENT_REACTION);
 
   const authorName = comment.author.displayName?.trim() || comment.author.username;
   const initial = authorName.slice(0, 1).toUpperCase();
+  const authorImg = normalizeProfileImageUrl(comment.author.profileImageUrl);
 
   function handleLike() {
     const next = !localLiked;
@@ -370,16 +397,40 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
     onLike(comment.id, next);
   }
 
+  async function handleReact(emoji: string) {
+    const prev = localReaction;
+    const next = prev === emoji ? null : emoji;
+    setLocalReaction(next);
+    setReactionCounts((c) => {
+      const updated = { ...c };
+      if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 1) - 1);
+      if (next) updated[next] = (updated[next] ?? 0) + 1;
+      return updated;
+    });
+    try {
+      await reactMut({ variables: { commentId: comment.id, emoji: next } });
+    } catch {
+      setLocalReaction(prev);
+      setReactionCounts(Object.fromEntries((comment.reactions ?? []).map((r) => [r.emoji, r.count])));
+    }
+  }
+
   return (
     <>
       <View style={st.commentRow}>
-        <View style={st.commentHeader}>
+        <Pressable
+          style={st.commentHeader}
+          onPress={() => router.push(`/profile/${comment.author.id}` as `/${string}`)}
+        >
           <View style={st.commentAvatar}>
-            <Text style={st.commentAvatarText}>{initial}</Text>
+            {authorImg
+              ? <Image source={{ uri: authorImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+              : <Text style={st.commentAvatarText}>{initial}</Text>
+            }
           </View>
           <Text style={st.commentAuthor}>{authorName}</Text>
           <Text style={st.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
-        </View>
+        </Pressable>
         <Text style={st.commentContent}>{comment.content}</Text>
         <View style={st.commentActions}>
           <Pressable style={st.commentActionBtn} onPress={handleLike} hitSlop={8}>
@@ -387,11 +438,7 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
               {localLiked ? "♥" : "♡"} {localCount > 0 ? localCount : ""}
             </Text>
           </Pressable>
-          <Pressable
-            style={st.replyBtn}
-            onPress={() => onReply(comment.id, authorName)}
-            hitSlop={8}
-          >
+          <Pressable style={st.replyBtn} onPress={() => onReply(comment.id, authorName)} hitSlop={8}>
             <Text style={st.replyBtnText}>↩ Reply</Text>
           </Pressable>
           {replies.length > 0 && (
@@ -402,11 +449,24 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
             </Pressable>
           )}
         </View>
+        {/* Emoji reaction strip */}
+        <View style={st.reactionStrip}>
+          {REACTION_EMOJIS.map((emoji) => {
+            const count = reactionCounts[emoji] ?? 0;
+            const isActive = localReaction === emoji;
+            return (
+              <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
+                <View style={[st.reactionBtn, isActive && st.reactionBtnActive]}>
+                  <Text style={st.reactionText}>{emoji}{count > 0 ? ` ${count}` : ""}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
-      {showReplies &&
-        replies.map((r) => (
-          <ReplyItem key={r.id} reply={r} st={st} onLike={onLike} />
-        ))}
+      {showReplies && replies.map((r) => (
+        <ReplyItem key={r.id} reply={r} st={st} onLike={onLike} />
+      ))}
     </>
   );
 }
@@ -420,9 +480,15 @@ type ReplyItemProps = {
 function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
   const [localLiked, setLocalLiked] = useState(reply.viewerHasLiked);
   const [localCount, setLocalCount] = useState(reply.likeCount);
+  const [localReaction, setLocalReaction] = useState<string | null>(reply.viewerReaction ?? null);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
+    Object.fromEntries((reply.reactions ?? []).map((r) => [r.emoji, r.count])),
+  );
+  const [reactMut] = useMutation(SET_COMMENT_REACTION);
 
   const authorName = reply.author.displayName?.trim() || reply.author.username;
   const initial = authorName.slice(0, 1).toUpperCase();
+  const authorImg = normalizeProfileImageUrl(reply.author.profileImageUrl);
 
   function handleLike() {
     const next = !localLiked;
@@ -431,15 +497,39 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
     onLike(reply.id, next);
   }
 
+  async function handleReact(emoji: string) {
+    const prev = localReaction;
+    const next = prev === emoji ? null : emoji;
+    setLocalReaction(next);
+    setReactionCounts((c) => {
+      const updated = { ...c };
+      if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 1) - 1);
+      if (next) updated[next] = (updated[next] ?? 0) + 1;
+      return updated;
+    });
+    try {
+      await reactMut({ variables: { commentId: reply.id, emoji: next } });
+    } catch {
+      setLocalReaction(prev);
+      setReactionCounts(Object.fromEntries((reply.reactions ?? []).map((r) => [r.emoji, r.count])));
+    }
+  }
+
   return (
     <View style={st.replyRow}>
-      <View style={st.commentHeader}>
+      <Pressable
+        style={st.commentHeader}
+        onPress={() => router.push(`/profile/${reply.author.id}` as `/${string}`)}
+      >
         <View style={[st.commentAvatar, { width: 24, height: 24, borderRadius: 12 }]}>
-          <Text style={[st.commentAvatarText, { fontSize: 9 }]}>{initial}</Text>
+          {authorImg
+            ? <Image source={{ uri: authorImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+            : <Text style={[st.commentAvatarText, { fontSize: 9 }]}>{initial}</Text>
+          }
         </View>
         <Text style={st.commentAuthor}>{authorName}</Text>
         <Text style={st.commentTime}>{formatRelativeTime(reply.createdAt)}</Text>
-      </View>
+      </Pressable>
       <Text style={[st.commentContent, { marginLeft: 32 }]}>{reply.content}</Text>
       <View style={[st.commentActions, { marginLeft: 32 }]}>
         <Pressable style={st.commentActionBtn} onPress={handleLike} hitSlop={8}>
@@ -447,6 +537,20 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
             {localLiked ? "♥" : "♡"} {localCount > 0 ? localCount : ""}
           </Text>
         </Pressable>
+      </View>
+      {/* Emoji reactions on replies */}
+      <View style={[st.reactionStrip, { marginLeft: 32 }]}>
+        {REACTION_EMOJIS.map((emoji) => {
+          const count = reactionCounts[emoji] ?? 0;
+          const isActive = localReaction === emoji;
+          return (
+            <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
+              <View style={[st.reactionBtn, isActive && st.reactionBtnActive]}>
+                <Text style={st.reactionText}>{emoji}{count > 0 ? ` ${count}` : ""}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -598,14 +702,15 @@ type PostDetailCardProps = {
 
 function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const { isAuthenticated } = useAuth();
+  const { adjustSavedCount } = useTabBar();
   const [voteMut] = useMutation(VOTE_POST);
   const [hypeMut] = useMutation(SET_POST_HYPE);
   const [keepMut] = useMutation(SET_POST_KEEP);
   const [viewerVote, setViewerVote] = useState(post.viewerVote);
   const [up, setUp] = useState(post.upvoteCount);
   const [down, setDown] = useState(post.downvoteCount);
-  const [anonymous, setAnonymous] = useState(false);
-  const [hyped, setHyped] = useState(false);
+  const [anonymous, setAnonymous] = useState(Boolean(post.myVoteAnonymous));
+  const [hyped, setHyped] = useState(Boolean(post.viewerHasHyped));
   const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
   const [kept, setKept] = useState(Boolean(post.viewerHasSaved));
 
@@ -656,6 +761,15 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     }
   }
 
+  async function handleAnonymousToggle(val: boolean) {
+    setAnonymous(val);
+    const curIdx = viewerVote === "UP" ? 0 : viewerVote === "DOWN" ? 1 : null;
+    if (hasVoted && curIdx !== null) {
+      try { await voteMut({ variables: { postId: post.id, selectedOptionIndex: curIdx, anonymous: val } }); }
+      catch { setAnonymous(!val); }
+    }
+  }
+
   async function handleHype() {
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     const next = !hyped;
@@ -669,8 +783,9 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     const next = !kept;
     setKept(next);
+    adjustSavedCount(next ? 1 : -1);
     try { await keepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setKept(!next); }
+    catch { setKept(!next); adjustSavedCount(next ? -1 : 1); }
   }
 
   async function handleShare() {
@@ -743,9 +858,9 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
         </View>
       ) : null}
 
-      {/* Vote hint + anonymous toggle */}
+      {/* Vote hint */}
       {compareUrls && !isVotingClosed && (
-        <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
+        <View style={st.postVoteHint}>
           <Text style={[st.postVoteHintText, hasVoted && st.postVoteHintVoted]}>
             {hasVoted ? "✓ Vote recorded — tap to change" : "👆 Tap an image to vote"}
           </Text>
@@ -754,25 +869,26 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
               ⏱ {timeLeft}
             </Text>
           ) : null}
-          <Pressable
-            style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}
-            onPress={() => setAnonymous((v) => !v)}
-          >
-            <View style={{
-              width: 18, height: 18, borderRadius: 4, borderWidth: 2,
-              borderColor: anonymous ? colors.accent : colors.subtext,
-              backgroundColor: anonymous ? colors.accent : "transparent",
-              alignItems: "center", justifyContent: "center",
-            }}>
-              {anonymous && <Text style={{ color: "#fff", fontSize: 12, fontWeight: "900" }}>✓</Text>}
-            </View>
-            <Text style={[st.postVoteHintText, { color: anonymous ? colors.accent : colors.text }]}>Vote anonymously</Text>
-          </Pressable>
-          {post.votingEndsAt && (
-            <Text style={[st.postVoteHintText, { marginTop: 4 }]}>
-              Ends at {new Date(post.votingEndsAt).toLocaleString()}
-            </Text>
-          )}
+        </View>
+      )}
+
+      {/* Anonymous toggle — same Switch as feed card */}
+      {compareUrls && !isVotingClosed && (
+        <View style={{
+          flexDirection: "row", alignItems: "center",
+          paddingHorizontal: 14, paddingVertical: 8, gap: 8,
+          backgroundColor: colors.section,
+        }}>
+          <Text style={{ fontSize: 13 }}>👻</Text>
+          <Text style={{ flex: 1, fontSize: 12, color: colors.subtext, fontWeight: "500" }}>
+            Vote anonymously
+          </Text>
+          <Switch
+            value={anonymous}
+            onValueChange={(val) => void handleAnonymousToggle(val)}
+            trackColor={{ false: colors.border, true: "#8b5cf6" }}
+            thumbColor="#ffffff"
+          />
         </View>
       )}
 

@@ -1,8 +1,9 @@
 import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import * as Notifications from "expo-notifications";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -28,6 +29,7 @@ import {
   SEND_MESSAGE,
   SET_TYPING,
   TYPING_INDICATOR_SUB,
+
 } from "@ctrend/shared/graphql/messages";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
@@ -35,6 +37,8 @@ import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useSounds } from "../../context/SoundContext";
+import { setActiveConversationId } from "../../lib/activeConversation";
+import { clearConversationNotification } from "../../lib/messageNotifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +169,10 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<Message[]>([]);
+  // Ref-based dedup: immune to React batching race conditions
+  const seenIds = useRef(new Set<string>());
+  // Synchronous guard — prevents double loadMore calls before state re-renders
+  const loadingMoreRef = useRef(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -202,15 +210,20 @@ export default function ChatScreen() {
       const sorted = [...(data.messages ?? [])].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+      // Add to seenIds (never reset — avoids race where subscription fires mid-seed)
+      sorted.forEach((m) => seenIds.current.add(m.id));
       setMessages(sorted);
       setHasMore((data.messages ?? []).length === PAGE_SIZE);
     },
   });
 
-  // ── Mark read on mount ──────────────────────────────────────────────────────
+  // ── Mark read on mount + dismiss grouped notification ──────────────────────
   const [markRead] = useMutation(MARK_CONVERSATION_READ);
   useEffect(() => {
     if (conversationId) {
+      // Dismiss notifee grouped notification for this conversation
+      clearConversationNotification(conversationId);
+
       void markRead({ variables: { conversationId },
         refetchQueries: [MY_CONVERSATIONS],
       });
@@ -228,19 +241,16 @@ export default function ChatScreen() {
     onData: ({ data }) => {
       const msg = data.data?.messageReceived;
       if (!msg || msg.conversationId !== conversationId) return;
-      setMessages((prev) => {
-        if (prev.find((m) => m.id === msg.id)) return prev;
-        return [msg, ...prev];
-      });
-      // Play sound only for incoming messages (not own)
+
+      // Ref-based dedup: immune to React batching races
+      if (seenIds.current.has(msg.id)) return;
+      seenIds.current.add(msg.id);
+      setMessages((prev) => [msg, ...prev]);
       if (msg.senderId !== user?.id) {
         playNotification();
         Vibration.vibrate(150);
       }
-      // Mark read when new message arrives while screen is open
-      void markRead({ variables: { conversationId },
-        refetchQueries: [MY_CONVERSATIONS],
-      });
+      void markRead({ variables: { conversationId }, refetchQueries: [MY_CONVERSATIONS] });
     },
   });
 
@@ -387,7 +397,9 @@ export default function ChatScreen() {
   const canSend = (text.trim().length > 0 || imageUri !== null) && !sending && !imageUploading;
 
   const handleLoadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !conversationId) return;
+    // Use ref (synchronous) not state (async) to prevent double-fire race
+    if (loadingMoreRef.current || !hasMore || !conversationId || messages.length === 0) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       const { data } = await client.query({
@@ -398,11 +410,18 @@ export default function ChatScreen() {
       const older = [...((data as MessagesData).messages ?? [])].sort(
         (a: Message, b: Message) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      setMessages((prev) => [...prev, ...older]);
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id));
+        const fresh = older.filter((m) => !existingIds.has(m.id));
+        return [...prev, ...fresh];
+      });
       setHasMore(((data as MessagesData).messages ?? []).length === PAGE_SIZE);
     } catch { /* ignore */ }
-    finally { setLoadingMore(false); }
-  }, [client, conversationId, hasMore, loadingMore, messages.length]);
+    finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [client, conversationId, hasMore, messages.length]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>

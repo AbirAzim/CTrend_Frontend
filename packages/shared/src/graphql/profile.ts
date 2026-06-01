@@ -11,6 +11,9 @@ export const ME = gql`
       interests
       profileImageUrl
       role
+      voteSoundId
+      notificationSoundId
+      messageSoundId
     }
   }
 `;

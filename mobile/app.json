@@ -9,6 +9,11 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.ctrend.app",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#312e81",
         "foregroundImage": "./assets/android-icon-foreground.png",

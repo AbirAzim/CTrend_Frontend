@@ -10,10 +10,16 @@ export const COMMENTS_BY_POST = gql`
       viewerHasLiked
       postId
       parentId
+      viewerReaction
+      reactions {
+        emoji
+        count
+      }
       author {
         id
         username
         displayName
+        profileImageUrl
       }
     }
   }
@@ -38,6 +44,16 @@ export const SET_COMMENT_LIKE = gql`
       id
       likeCount
       viewerHasLiked
+    }
+  }
+`;
+
+export const SET_COMMENT_REACTION = gql`
+  mutation SetCommentReaction($commentId: ID!, $emoji: String) {
+    setCommentReaction(commentId: $commentId, emoji: $emoji) {
+      id
+      viewerReaction
+      reactions { emoji count }
     }
   }
 `;

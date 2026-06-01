@@ -27,6 +27,8 @@ export type FeedPostView = {
   hypeCount?: number;
   saveCount?: number;
   viewerHasSaved?: boolean;
+  viewerHasHyped?: boolean | null;
+  myVoteAnonymous?: boolean | null;
   commentCount?: number;
   recentComments?: Array<{
     id: string;

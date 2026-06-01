@@ -1,5 +1,5 @@
 import { router, Tabs } from "expo-router";
-import { Pressable, Text } from "react-native";
+import { Pressable, ScrollView, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
@@ -37,13 +37,37 @@ export default function AdminLayout() {
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "700" },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: "700" },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Users", tabBarLabel: "Users", tabBarIcon: () => <Text>👥</Text> }} />
-      <Tabs.Screen name="invitations" options={{ title: "Invitations", tabBarLabel: "Invites", tabBarIcon: () => <Text>✉️</Text> }} />
-      <Tabs.Screen name="campaigns" options={{ title: "Campaigns", tabBarLabel: "Campaigns", tabBarIcon: () => <Text>🏆</Text> }} />
-      <Tabs.Screen name="world-cup" options={{ title: "World Cup", tabBarLabel: "World Cup", tabBarIcon: () => <Text>⚽</Text> }} />
+      <Tabs.Screen
+        name="index"
+        options={{ title: "Users", tabBarLabel: "Users", tabBarIcon: () => <Text>👥</Text> }}
+      />
+      <Tabs.Screen
+        name="admin-management"
+        options={{ title: "Admin Management", tabBarLabel: "Admins", tabBarIcon: () => <Text>🛡</Text> }}
+      />
+      <Tabs.Screen
+        name="invitations"
+        options={{ title: "Invitations", tabBarLabel: "Invites", tabBarIcon: () => <Text>✉️</Text> }}
+      />
+      <Tabs.Screen
+        name="campaigns"
+        options={{ title: "Campaigns", tabBarLabel: "Campaigns", tabBarIcon: () => <Text>📣</Text> }}
+      />
+      <Tabs.Screen
+        name="categories"
+        options={{ title: "Categories", tabBarLabel: "Categories", tabBarIcon: () => <Text>🏷</Text> }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{ title: "Admin Messages", tabBarLabel: "Messages", tabBarIcon: () => <Text>💬</Text> }}
+      />
+      <Tabs.Screen
+        name="world-cup"
+        options={{ title: "World Cup", tabBarLabel: "World Cup", tabBarIcon: () => <Text>⚽</Text> }}
+      />
     </Tabs>
   );
 }
