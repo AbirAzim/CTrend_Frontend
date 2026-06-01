@@ -1,10 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@apollo/client";
+import { useMutation, useQuery } from "@apollo/client";
 import { useNotifications, type NotificationItem } from "../context/NotificationContext";
 import { useMessenger } from "../context/MessengerContext";
-import { RESPOND_FRIEND_REQUEST, FRIEND_REQUESTS, MY_FRIENDS } from "../graphql/friends";
+import { useAuth } from "../context/AuthContext";
+import {
+  MY_FRIENDS,
+  RESPOND_FRIEND_REQUEST,
+  FRIEND_SOCIAL_REFETCH_QUERIES,
+} from "../graphql/friends";
+import {
+  friendRequestAcceptedPatch,
+  friendRequestAlreadyFriendsPatch,
+  friendRequestRejectedPatch,
+  isPendingFriendRequestNotification,
+  isResolvedFriendRequest,
+} from "../lib/friendRequestNotification";
+import { IconArchive, IconMarkRead } from "./IgIcons";
 import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -22,8 +36,10 @@ function typeIcon(type: string, referenceType?: string | null): string {
     case "MESSAGE":          return "💬";
     case "ANNOUNCEMENT":     return "📢";
     case "FRIEND_REQUEST":   return "👋";
+    case "FRIEND_REQUEST_ACCEPTED": return "🤝";
     case "NEW_POST_FRIEND":  return "✨";
     case "POST_HYPE":        return "❤️";
+    case "POST_VOTE":        return "🗳️";
     case "POST_COMMENT":     return "💭";
     case "COMMENT_REPLY":    return "↩️";
     case "COMMENT_REACTION": return "😊";
@@ -40,26 +56,71 @@ function notificationTitle(n: NotificationItem): string {
   return n.title;
 }
 
+function friendRequestRowIcon(n: NotificationItem, resolved = false): string {
+  if (!resolved && !isResolvedFriendRequest(n)) {
+    return typeIcon(n.type, n.referenceType);
+  }
+  const title = n.title.trim();
+  if (title === "Friend request declined" || title === "Friend request withdrawn") {
+    return "✕";
+  }
+  return "🤝";
+}
+
 export function NotificationBell() {
-  const { notifications, unreadCount, markRead, markAllRead, refetch } = useNotifications();
+  const { isAuthenticated } = useAuth();
+  const {
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    archiveNotification,
+    updateNotification,
+    refetch: refetchNotifications,
+  } = useNotifications();
   const { openChat, refetchConversations, ensureConversation } = useMessenger();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
   const ref = useRef<HTMLDivElement>(null);
 
+  const { data: friendsData } = useQuery(MY_FRIENDS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const friendIdSet = useMemo(
+    () => new Set((friendsData?.myFriends ?? []).map((f: { id: string }) => f.id)),
+    [friendsData],
+  );
+
   const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST, {
-    refetchQueries: [{ query: FRIEND_REQUESTS }, { query: MY_FRIENDS }],
+    refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
   });
 
   useEffect(() => {
     if (!open) return;
+    void refetchNotifications();
     function onDown(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+  }, [open, refetchNotifications]);
+
+  // Hide Accept/Reject when we are already friends (e.g. accepted on profile).
+  useEffect(() => {
+    for (const n of notifications) {
+      if (
+        !isPendingFriendRequestNotification(n) ||
+        !n.referenceId ||
+        !friendIdSet.has(n.referenceId)
+      ) {
+        continue;
+      }
+      updateNotification(n.id, friendRequestAlreadyFriendsPatch(n));
+    }
+  }, [notifications, friendIdSet, updateNotification]);
 
   function setActionLoading(id: string, on: boolean) {
     setActionLoadingIds((prev) => {
@@ -98,14 +159,33 @@ export function NotificationBell() {
     }
 
     // FRIEND_REQUEST: inline buttons handle the action; clicking row → profile
-    if (n.type === "FRIEND_REQUEST" && n.referenceId) {
+    if (
+      (n.type === "FRIEND_REQUEST" || n.type === "FRIEND_REQUEST_ACCEPTED") &&
+      n.referenceId
+    ) {
       navigate(`/profile/${n.referenceId}`);
       return;
     }
-    // Comment notifications deep-link to the post (postId preferred)
+    // Comment notifications deep-link to the exact comment when possible
+    if (n.postId && n.commentId) {
+      navigate(`/post/${n.postId}#comment-${n.commentId}`);
+      return;
+    }
     if (n.postId) {
       navigate(`/post/${n.postId}`);
       return;
+    }
+    if (
+      n.commentId &&
+      (n.type === "COMMENT_REPLY" ||
+        n.type === "COMMENT_REACTION" ||
+        n.type === "POST_COMMENT")
+    ) {
+      const postTarget = n.referenceType === "Post" ? n.referenceId : n.postId;
+      if (postTarget) {
+        navigate(`/post/${postTarget}#comment-${n.commentId}`);
+        return;
+      }
     }
     // Anything referencing a Post jumps to the post detail page
     if (n.referenceType === "Post" && n.referenceId) {
@@ -123,28 +203,38 @@ export function NotificationBell() {
   async function handleAcceptRequest(n: NotificationItem, e: React.MouseEvent) {
     e.stopPropagation();
     if (!n.referenceId) return;
+    updateNotification(n.id, friendRequestAcceptedPatch(n));
     setActionLoading(n.id, true);
     try {
       await respondFriendMut({
         variables: { requesterId: n.referenceId, accept: true },
       });
-      markRead(n.id);
-      void refetch();
-    } catch { /* silent */ }
+    } catch {
+      updateNotification(n.id, {
+        title: n.title,
+        body: n.body,
+        read: n.read,
+      });
+    }
     setActionLoading(n.id, false);
   }
 
   async function handleRejectRequest(n: NotificationItem, e: React.MouseEvent) {
     e.stopPropagation();
     if (!n.referenceId) return;
+    updateNotification(n.id, friendRequestRejectedPatch(n));
     setActionLoading(n.id, true);
     try {
       await respondFriendMut({
         variables: { requesterId: n.referenceId, accept: false },
       });
-      markRead(n.id);
-      void refetch();
-    } catch { /* silent */ }
+    } catch {
+      updateNotification(n.id, {
+        title: n.title,
+        body: n.body,
+        read: n.read,
+      });
+    }
     setActionLoading(n.id, false);
   }
 
@@ -154,6 +244,16 @@ export function NotificationBell() {
     if (!n.read) markRead(n.id);
     setOpen(false);
     navigate(`/profile/${n.referenceId}`);
+  }
+
+  function handleMarkRead(n: NotificationItem, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!n.read) markRead(n.id);
+  }
+
+  function handleArchive(n: NotificationItem, e: React.MouseEvent) {
+    e.stopPropagation();
+    archiveNotification(n.id);
   }
 
   return (
@@ -189,6 +289,23 @@ export function NotificationBell() {
                 const isFriendReq = n.type === "FRIEND_REQUEST";
                 const isAdminMsg = isOfficialAdminMessage(n);
                 const isLoading = actionLoadingIds.has(n.id);
+                const alreadyFriends =
+                  isFriendReq &&
+                  Boolean(n.referenceId) &&
+                  friendIdSet.has(n.referenceId);
+                const showFriendReqActions =
+                  isFriendReq &&
+                  isPendingFriendRequestNotification(n) &&
+                  !alreadyFriends &&
+                  Boolean(n.referenceId);
+                const hideVoteActor =
+                  n.type === "POST_VOTE" &&
+                  (!n.latestActorId ||
+                    n.latestActorName === "Someone" ||
+                    !n.latestActorAvatar?.trim());
+                const avatarUrl = hideVoteActor
+                  ? null
+                  : normalizeProfileImageUrl(n.latestActorAvatar);
                 return (
                   <li
                     key={n.id}
@@ -196,7 +313,24 @@ export function NotificationBell() {
                     role="menuitem"
                     onClick={() => handleClick(n)}
                   >
-                    <span className="nb-item-icon" aria-hidden>{typeIcon(n.type, n.referenceType)}</span>
+                    {avatarUrl ? (
+                      <img
+                        className="nb-item-avatar"
+                        src={avatarUrl}
+                        alt=""
+                        width={36}
+                        height={36}
+                      />
+                    ) : (
+                      <span className="nb-item-icon" aria-hidden>
+                        {isFriendReq
+                          ? friendRequestRowIcon(
+                              n,
+                              isResolvedFriendRequest(n) || alreadyFriends,
+                            )
+                          : typeIcon(n.type, n.referenceType)}
+                      </span>
+                    )}
                     <div className="nb-item-body">
                       <p className="nb-item-title">
                         {notificationTitle(n)}
@@ -208,9 +342,21 @@ export function NotificationBell() {
                         {isAdminMsg ? `From ${MODERATOR_BRAND_NAME} · ` : ""}
                         {n.body}
                       </p>
-                      <span className="nb-item-time">{timeAgo(n.createdAt)}</span>
+                      <div className="nb-item-meta">
+                        <span className="nb-item-time">{timeAgo(n.createdAt)}</span>
+                        {showFriendReqActions ? (
+                          <button
+                            type="button"
+                            className="nb-friend-profile-link"
+                            disabled={isLoading}
+                            onClick={(e) => handleViewProfile(n, e)}
+                          >
+                            View profile
+                          </button>
+                        ) : null}
+                      </div>
 
-                      {isFriendReq && (
+                      {showFriendReqActions ? (
                         <div className="nb-item-actions">
                           <button
                             type="button"
@@ -228,16 +374,36 @@ export function NotificationBell() {
                           >
                             Reject
                           </button>
-                          <button
-                            type="button"
-                            className="nb-action-btn nb-action-btn--view"
-                            disabled={isLoading}
-                            onClick={(e) => handleViewProfile(n, e)}
-                          >
-                            View profile
-                          </button>
                         </div>
-                      )}
+                      ) : null}
+                    </div>
+                    <div
+                      className="nb-item-tools"
+                      role="group"
+                      aria-label="Notification actions"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      {!n.read ? (
+                        <button
+                          type="button"
+                          className="nb-tool-btn"
+                          aria-label="Mark as read"
+                          title="Mark as read"
+                          onClick={(e) => handleMarkRead(n, e)}
+                        >
+                          <IconMarkRead size={16} />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="nb-tool-btn"
+                        aria-label="Archive"
+                        title="Archive"
+                        onClick={(e) => handleArchive(n, e)}
+                      >
+                        <IconArchive size={16} />
+                      </button>
                     </div>
                     {!n.read && <span className="nb-unread-dot" aria-hidden />}
                   </li>

@@ -1,4 +1,5 @@
 import { gql } from "@apollo/client";
+import { MY_NOTIFICATIONS } from "./notifications";
 
 export const ADD_FRIEND = gql`
   mutation AddFriend($userId: ID!) {
@@ -81,9 +82,17 @@ export const GET_USER_PROFILE = gql`
       id
       username
       displayName
+      email
       bio
       profileImageUrl
       interests
     }
   }
 `;
+
+/** Refetch friend lists + bell after accept/decline/cancel. */
+export const FRIEND_SOCIAL_REFETCH_QUERIES = [
+  { query: FRIEND_REQUESTS },
+  { query: MY_FRIENDS },
+  { query: MY_NOTIFICATIONS, variables: { skip: 0, take: 30 } },
+] as const;

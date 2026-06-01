@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 import {
   ADD_FRIEND,
   FRIEND_REQUESTS,
+  FRIEND_SOCIAL_REFETCH_QUERIES,
   FRIEND_SUGGESTIONS,
   MY_FRIENDS,
   RESPOND_FRIEND_REQUEST,
@@ -100,12 +101,7 @@ export function FriendsPage() {
   });
   const [respondRequest, { loading: responding }] = useMutation(
     RESPOND_FRIEND_REQUEST,
-    {
-      refetchQueries: [
-        { query: FRIEND_REQUESTS },
-        { query: MY_FRIENDS },
-      ],
-    },
+    { refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES] },
   );
 
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];

@@ -42,11 +42,18 @@ type CommentsByPostQueryData = {
   commentsByPost: CommentRow[];
 };
 
+/** Top-level comment threads shown before "Show more". */
+const PREVIEW_THREAD_COUNT = 5;
+
 type Props = {
   postId: string;
   voteMode: "api" | "local";
   isAuthenticated: boolean;
   meLabel: string;
+  /** Scroll to and briefly highlight this comment (from notification deep link). */
+  highlightCommentId?: string | null;
+  /** Collapse panel (Discuss chip / header close). */
+  onClose?: () => void;
 };
 
 function commentDisplayName(author: CommentAuthor): string {
@@ -73,6 +80,11 @@ function buildThreads(comments: CommentRow[]) {
     list.push(c);
     repliesByParent.set(c.parentId, list);
   }
+  // Newest top-level comments first; replies stay oldest-first (chronological).
+  const createdAsc = (a: CommentRow, b: CommentRow) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  topLevel.sort((a, b) => -createdAsc(a, b));
+  for (const list of repliesByParent.values()) list.sort(createdAsc);
   return topLevel.map((comment) => ({
     comment,
     replies: repliesByParent.get(comment.id) ?? [],
@@ -142,6 +154,47 @@ type CommentItemProps = {
   onPickReaction: (commentId: string, emoji: string | null) => void;
 };
 
+function DiscussHideButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button type="button" className="cx-discuss-hide-btn" onClick={onClose}>
+      <span className="cx-discuss-hide-chevron" aria-hidden />
+      Hide discussion
+    </button>
+  );
+}
+
+function DiscussMoreButton({
+  expanded,
+  hiddenCount,
+  onToggle,
+}: {
+  expanded: boolean;
+  hiddenCount: number;
+  onToggle: () => void;
+}) {
+  if (hiddenCount <= 0) return null;
+  return (
+    <div className="cx-discuss-more-wrap">
+      <button
+        type="button"
+        className="cx-discuss-more-btn"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <span
+          className={`cx-discuss-more-chevron${expanded ? " cx-discuss-more-chevron--up" : ""}`}
+          aria-hidden
+        />
+        <span className="cx-discuss-more-label">
+          {expanded
+            ? "Show less"
+            : `Show ${hiddenCount} more ${hiddenCount === 1 ? "comment" : "comments"}`}
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function CommentItem({
   row,
   isReply = false,
@@ -160,51 +213,29 @@ function CommentItem({
   const replyOpen = replyTargetId === row.id;
 
   return (
-    <article className={`cx-comment-row${isReply ? " cx-comment-row--reply" : ""}`}>
+    <article
+      id={`comment-${row.id}`}
+      className={`cx-comment-row cx-discuss-comment${isReply ? " cx-comment-row--reply" : ""}${row.viewerReaction ? " cx-discuss-comment--reacted" : ""}`}
+    >
       <CommentAvatar author={row.author} />
-      <div className="cx-comment-main">
-        <div className="cx-comment-bubble">
+      <div className="cx-comment-main cx-discuss-comment-body">
+        <header className="cx-discuss-comment-head">
           <Link to={`/profile/${row.author.id}`} className="cx-comment-author">
             {name}
           </Link>
-          <p className="cx-comment-body">{row.content}</p>
-        </div>
-        <div className="cx-comment-meta">
-          <time dateTime={row.createdAt}>{formatRelativeTime(row.createdAt) || "just now"}</time>
-          {isAuthenticated ? (
-            <>
-              <button
-                type="button"
-                className="cx-comment-action-btn"
-                aria-expanded={pickerOpen}
-                onClick={() => setReactionOpenId(pickerOpen ? null : row.id)}
-              >
-                {row.viewerReaction ? `${row.viewerReaction} Reacted` : "React"}
-              </button>
-              {!isReply ? (
-                <button
-                  type="button"
-                  className="cx-comment-action-btn"
-                  aria-expanded={replyOpen}
-                  onClick={() => {
-                    setReplyTargetId(replyOpen ? null : row.id);
-                    setReplyDraft("");
-                  }}
-                >
-                  Reply
-                </button>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+          <time className="cx-discuss-comment-time" dateTime={row.createdAt}>
+            {formatRelativeTime(row.createdAt) || "just now"}
+          </time>
+        </header>
+        <p className="cx-comment-body">{row.content}</p>
 
         {row.reactions.length > 0 ? (
-          <div className="cx-comment-reactions" aria-label="Reactions">
+          <div className="cx-discuss-reaction-strip" aria-label="Reactions">
             {row.reactions.map((r) => (
               <button
                 key={r.emoji}
                 type="button"
-                className={`cx-comment-reaction-pill${row.viewerReaction === r.emoji ? " cx-comment-reaction-pill--mine" : ""}`}
+                className={`cx-discuss-reaction-chip${row.viewerReaction === r.emoji ? " cx-discuss-reaction-chip--mine" : ""}`}
                 disabled={!isAuthenticated}
                 onClick={() =>
                   onPickReaction(row.id, row.viewerReaction === r.emoji ? null : r.emoji)
@@ -217,8 +248,38 @@ function CommentItem({
           </div>
         ) : null}
 
+        <div className="cx-discuss-comment-actions">
+          {isAuthenticated ? (
+            <>
+              <button
+                type="button"
+                className={`cx-discuss-action-link${pickerOpen ? " cx-discuss-action-link--active" : ""}${row.viewerReaction ? " cx-discuss-action-link--reacted" : ""}`}
+                aria-expanded={pickerOpen}
+                onClick={() => setReactionOpenId(pickerOpen ? null : row.id)}
+              >
+                {row.viewerReaction ? `${row.viewerReaction} Reacted` : "React"}
+              </button>
+              {!isReply ? (
+                <button
+                  type="button"
+                  className={`cx-discuss-action-link${replyOpen ? " cx-discuss-action-link--active" : ""}`}
+                  aria-expanded={replyOpen}
+                  onClick={() => {
+                    setReplyTargetId(replyOpen ? null : row.id);
+                    setReplyDraft("");
+                  }}
+                >
+                  Reply
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <span className="cx-discuss-signin-hint muted small">Sign in to react or reply</span>
+          )}
+        </div>
+
         {pickerOpen && isAuthenticated ? (
-          <div className="cx-comment-reaction-picker" role="listbox" aria-label="Pick a reaction">
+          <div className="cx-comment-reaction-picker cx-discuss-reaction-picker" role="listbox" aria-label="Pick a reaction">
             {COMMENT_REACTION_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
@@ -248,9 +309,15 @@ function CommentItem({
               className="ig-post-comments-input cx-comment-reply-input"
               rows={2}
               maxLength={5000}
-              placeholder={`Reply to ${name}…`}
+              placeholder={`Reply to ${name}… (Enter to post)`}
               value={replyDraft}
               onChange={(ev) => setReplyDraft(ev.target.value)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter" && !ev.shiftKey) {
+                  ev.preventDefault();
+                  onSubmitReply(row.id);
+                }
+              }}
               autoFocus
             />
             <div className="cx-comment-reply-actions">
@@ -279,7 +346,14 @@ function CommentItem({
   );
 }
 
-export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }: Props) {
+export function PostCommentsPanel({
+  postId,
+  voteMode,
+  isAuthenticated,
+  meLabel,
+  highlightCommentId = null,
+  onClose,
+}: Props) {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const [showAllComments, setShowAllComments] = useState(false);
@@ -292,9 +366,15 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
   const [commentsLive, setCommentsLive] = useState<CommentRow[]>([]);
   const commentsLiveRef = useRef(commentsLive);
   commentsLiveRef.current = commentsLive;
+  const discussListRef = useRef<HTMLUListElement>(null);
+  const discussFeedEndRef = useRef<HTMLDivElement>(null);
+  const pendingScrollAfterExpandRef = useRef(false);
 
   const [fetchComments, { data: commentsData, loading: commentsLoading, error: commentsQueryError }] =
-    useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, { fetchPolicy: "network-only" });
+    useLazyQuery<CommentsByPostQueryData>(COMMENTS_BY_POST, {
+      fetchPolicy: "cache-and-network",
+      nextFetchPolicy: "cache-first",
+    });
 
   const [commentMut] = useMutation(COMMENT_POST);
   const [replyMut] = useMutation(COMMENT_POST);
@@ -314,16 +394,45 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
       if (pending.length === 0) return serverRows;
       const serverIds = new Set(serverRows.map((row) => row.id));
       const stillPending = pending.filter((row) => !serverIds.has(row.id));
-      return [...serverRows, ...stillPending];
+      return [...stillPending, ...serverRows];
     });
   }, [commentsData?.commentsByPost]);
 
   const threads = useMemo(() => buildThreads(commentsLive), [commentsLive]);
-  const displayedThreads = showAllComments ? threads : threads.slice(0, 2);
-  const hasMoreThreads = threads.length > 2;
+  const displayedThreads = showAllComments
+    ? threads
+    : threads.slice(0, PREVIEW_THREAD_COUNT);
 
-  const displayedLocalComments = showAllComments ? localComments : localComments.slice(0, 2);
-  const hasMoreLocalComments = localComments.length > 2;
+  useEffect(() => {
+    if (!highlightCommentId || voteMode !== "api" || commentsLoading) return;
+    const idx = threads.findIndex(
+      (t) =>
+        t.comment.id === highlightCommentId ||
+        t.replies.some((r) => r.id === highlightCommentId),
+    );
+    if (idx >= PREVIEW_THREAD_COUNT && !showAllComments) setShowAllComments(true);
+  }, [highlightCommentId, voteMode, commentsLoading, threads, showAllComments]);
+
+  useEffect(() => {
+    if (!highlightCommentId || commentsLoading) return;
+    const el = document.getElementById(`comment-${highlightCommentId}`);
+    if (!el) return;
+    const frame = requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("cx-comment-row--highlight");
+    });
+    const timer = window.setTimeout(() => {
+      el.classList.remove("cx-comment-row--highlight");
+    }, 3200);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [highlightCommentId, commentsLoading, displayedThreads, showAllComments]);
+
+  const displayedLocalComments = showAllComments
+    ? localComments
+    : localComments.slice(0, PREVIEW_THREAD_COUNT);
 
   const buildAuthor = useCallback((): CommentAuthor | null => {
     if (!authUser) return null;
@@ -335,6 +444,42 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
       email: authUser.email,
     };
   }, [authUser]);
+
+  const hiddenThreadCount = showAllComments
+    ? 0
+    : Math.max(0, threads.length - displayedThreads.length);
+  const hiddenLocalCount = showAllComments
+    ? 0
+    : Math.max(0, localComments.length - displayedLocalComments.length);
+  const totalCommentCount =
+    voteMode === "api" ? threads.length : localComments.length;
+  const composerAuthor = buildAuthor();
+
+  const handleToggleShowMore = useCallback(() => {
+    setShowAllComments((expanded) => {
+      if (!expanded) pendingScrollAfterExpandRef.current = true;
+      return !expanded;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showAllComments || !pendingScrollAfterExpandRef.current) return;
+    pendingScrollAfterExpandRef.current = false;
+    let innerFrame = 0;
+    const outerFrame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(() => {
+        const list = discussListRef.current;
+        if (list) {
+          list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+        }
+        discussFeedEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+    };
+  }, [showAllComments, displayedThreads.length, displayedLocalComments.length]);
 
   const buildOptimisticComment = useCallback(
     (content: string, parentId?: string): CommentRow | null => {
@@ -367,6 +512,10 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
 
   function onSubmitTopComment(e: React.FormEvent) {
     e.preventDefault();
+    submitTopComment();
+  }
+
+  function submitTopComment() {
     setCommentError(null);
     const text = commentDraft.trim();
     if (!text) return;
@@ -394,7 +543,7 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
     if (!optimistic) return;
 
     const snapshot = commentsLiveRef.current;
-    setCommentsLive((prev) => [...prev, optimistic]);
+    setCommentsLive((prev) => [optimistic, ...prev]);
     setCommentDraft("");
 
     void commentMut({
@@ -433,7 +582,7 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
     if (!optimistic) return;
 
     const snapshot = commentsLiveRef.current;
-    setCommentsLive((prev) => [...prev, optimistic]);
+    setCommentsLive((prev) => [optimistic, ...prev]);
     setReplyDraft("");
     setReplyTargetId(null);
     setShowAllComments(true);
@@ -498,13 +647,23 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
   }
 
   return (
-    <section className="ig-post-comments" aria-label="Comments">
-      <div className="ig-post-comments-head">
-        <h3 className="ig-post-comments-title">Comments</h3>
-        {voteMode === "api" && commentsLoading ? (
-          <span className="ig-post-comments-status">Loading…</span>
-        ) : null}
-      </div>
+    <section className="ig-post-comments cx-discuss" aria-label="Discussion">
+      <header className="cx-discuss-head ig-post-comments-head">
+        <div className="cx-discuss-head-main">
+          <h3 className="ig-post-comments-title">Discussion</h3>
+          {totalCommentCount > 0 ? (
+            <span className="cx-discuss-count-badge">{totalCommentCount}</span>
+          ) : null}
+        </div>
+        <div className="cx-discuss-head-actions">
+          {voteMode === "api" && commentsLoading ? (
+            <span className="ig-post-comments-status">Loading…</span>
+          ) : (
+            <span className="cx-discuss-head-hint">Newest first</span>
+          )}
+          {onClose ? <DiscussHideButton onClose={onClose} /> : null}
+        </div>
+      </header>
 
       {voteMode === "api" && commentsQueryError ? (
         <p className="ig-post-comments-error" role="alert">
@@ -517,96 +676,136 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
         </p>
       ) : null}
 
-      {voteMode === "api" ? (
-        <ul className="ig-post-comments-list cx-comment-thread-list">
-          {displayedThreads.map(({ comment, replies }) => (
-            <li key={comment.id} className="cx-comment-thread">
-              <CommentItem
-                row={comment}
-                isAuthenticated={isAuthenticated}
-                reactionOpenId={reactionOpenId}
-                setReactionOpenId={setReactionOpenId}
-                replyTargetId={replyTargetId}
-                setReplyTargetId={setReplyTargetId}
-                replyDraft={replyDraft}
-                setReplyDraft={setReplyDraft}
-                onSubmitReply={onSubmitReply}
-                onPickReaction={onPickReaction}
-              />
-              {replies.length > 0 ? (
-                <div className="cx-comment-replies">
-                  {replies.map((reply) => (
-                    <CommentItem
-                      key={reply.id}
-                      row={reply}
-                      isReply
-                      isAuthenticated={isAuthenticated}
-                      reactionOpenId={reactionOpenId}
-                      setReactionOpenId={setReactionOpenId}
-                      replyTargetId={replyTargetId}
-                      setReplyTargetId={setReplyTargetId}
-                      replyDraft={replyDraft}
-                      setReplyDraft={setReplyDraft}
-                      onSubmitReply={onSubmitReply}
-                      onPickReaction={onPickReaction}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="ig-post-comments-list">
-          {displayedLocalComments.map((c) => (
-            <li key={c.id} className="ig-post-comment">
-              <span className="ig-post-comment-author">{c.authorLabel}</span>
-              <p className="ig-post-comment-body">{c.content}</p>
-              <time className="ig-post-comment-time" dateTime={c.createdAt}>
-                {formatRelativeTime(c.createdAt) || "just now"}
-              </time>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {(voteMode === "api" ? hasMoreThreads : hasMoreLocalComments) ? (
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() => setShowAllComments((v) => !v)}
-        >
-          {showAllComments ? "Show less" : "Show more"}
-        </button>
+      {voteMode === "api" && commentsLoading && threads.length === 0 ? (
+        <div className="cx-discuss-loading" aria-busy="true">
+          <span className="cx-discuss-loading-bar" />
+          <span className="cx-discuss-loading-bar cx-discuss-loading-bar--short" />
+          <span className="cx-discuss-loading-bar" />
+        </div>
       ) : null}
 
       {(voteMode === "api"
         ? threads.length === 0 && !commentsLoading
         : localComments.length === 0) ? (
-        <p className="ig-post-comments-empty muted">No comments yet — say something fun.</p>
+        <div className="cx-discuss-empty ig-post-comments-empty">
+          <span className="cx-discuss-empty-icon" aria-hidden>
+            💬
+          </span>
+          <p>No comments yet</p>
+          <span className="muted small">Start the conversation below your post.</span>
+        </div>
       ) : null}
 
-      <form className="ig-post-comments-form" onSubmit={onSubmitTopComment}>
-        <label className="ig-post-comments-label" htmlFor={`comment-${postId}`}>
-          Add a comment
-        </label>
-        <textarea
-          id={`comment-${postId}`}
-          className="ig-post-comments-input"
-          rows={2}
-          maxLength={5000}
-          placeholder={isAuthenticated ? "Share your take…" : "Sign in to comment…"}
-          value={commentDraft}
-          onChange={(ev) => setCommentDraft(ev.target.value)}
-        />
-        <button
-          type="submit"
-          className="ig-post-comments-submit"
-          disabled={commentDraft.trim().length === 0}
-        >
-          Post
-        </button>
-      </form>
+      {totalCommentCount > 0 ? (
+        <div className="cx-discuss-feed">
+          {voteMode === "api" ? (
+            <ul
+              ref={discussListRef}
+              className="ig-post-comments-list cx-comment-thread-list cx-discuss-thread-list"
+            >
+              {displayedThreads.map(({ comment, replies }) => (
+                <li key={comment.id} className="cx-comment-thread cx-discuss-thread">
+                  <CommentItem
+                    row={comment}
+                    isAuthenticated={isAuthenticated}
+                    reactionOpenId={reactionOpenId}
+                    setReactionOpenId={setReactionOpenId}
+                    replyTargetId={replyTargetId}
+                    setReplyTargetId={setReplyTargetId}
+                    replyDraft={replyDraft}
+                    setReplyDraft={setReplyDraft}
+                    onSubmitReply={onSubmitReply}
+                    onPickReaction={onPickReaction}
+                  />
+                  {replies.length > 0 ? (
+                    <div className="cx-comment-replies">
+                      {replies.map((reply) => (
+                        <CommentItem
+                          key={reply.id}
+                          row={reply}
+                          isReply
+                          isAuthenticated={isAuthenticated}
+                          reactionOpenId={reactionOpenId}
+                          setReactionOpenId={setReactionOpenId}
+                          replyTargetId={replyTargetId}
+                          setReplyTargetId={setReplyTargetId}
+                          replyDraft={replyDraft}
+                          setReplyDraft={setReplyDraft}
+                          onSubmitReply={onSubmitReply}
+                          onPickReaction={onPickReaction}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul ref={discussListRef} className="ig-post-comments-list cx-discuss-thread-list">
+              {displayedLocalComments.map((c) => (
+                <li key={c.id} className="cx-discuss-thread cx-discuss-local-item">
+                  <div className="cx-discuss-comment-head">
+                    <span className="cx-comment-author">{c.authorLabel}</span>
+                    <time className="cx-discuss-comment-time" dateTime={c.createdAt}>
+                      {formatRelativeTime(c.createdAt) || "just now"}
+                    </time>
+                  </div>
+                  <p className="cx-comment-body">{c.content}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <DiscussMoreButton
+            expanded={showAllComments}
+            hiddenCount={voteMode === "api" ? hiddenThreadCount : hiddenLocalCount}
+            onToggle={handleToggleShowMore}
+          />
+          <div ref={discussFeedEndRef} className="cx-discuss-feed-anchor" aria-hidden />
+        </div>
+      ) : null}
+
+      <footer className="cx-discuss-composer-wrap">
+        <form className="cx-discuss-composer ig-post-comments-form" onSubmit={onSubmitTopComment}>
+          <label className="ig-post-comments-label" htmlFor={`comment-${postId}`}>
+            Add a comment
+          </label>
+          <div className="cx-discuss-composer-row">
+            {composerAuthor ? (
+              <CommentAvatar author={composerAuthor} />
+            ) : (
+              <span className="cx-discuss-composer-avatar-fallback" aria-hidden>
+                ?
+              </span>
+            )}
+            <textarea
+              id={`comment-${postId}`}
+              className="ig-post-comments-input cx-discuss-composer-input"
+              rows={1}
+              maxLength={5000}
+              placeholder={
+                isAuthenticated ? "Add a comment…" : "Sign in to comment…"
+              }
+              value={commentDraft}
+              onChange={(ev) => setCommentDraft(ev.target.value)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter" && !ev.shiftKey) {
+                  ev.preventDefault();
+                  submitTopComment();
+                }
+              }}
+            />
+            <button
+              type="submit"
+              className="ig-post-comments-submit cx-discuss-post-btn"
+              disabled={commentDraft.trim().length === 0}
+              aria-label="Post comment"
+            >
+              Post
+            </button>
+          </div>
+        </form>
+      </footer>
     </section>
   );
 }

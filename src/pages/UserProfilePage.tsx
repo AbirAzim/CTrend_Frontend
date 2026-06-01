@@ -8,6 +8,7 @@ import {
   ADD_FRIEND,
   FRIENDSHIP_STATUS,
   GET_USER_PROFILE,
+  FRIEND_SOCIAL_REFETCH_QUERIES,
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
 } from "../graphql/friends";
@@ -19,6 +20,7 @@ type UserProfile = {
   id: string;
   username?: string | null;
   displayName?: string | null;
+  email?: string | null;
   bio?: string | null;
   profileImageUrl?: string | null;
   interests?: string[] | null;
@@ -59,7 +61,9 @@ function FriendButton({
 
   const [addFriend] = useMutation(ADD_FRIEND);
   const [unfriend] = useMutation(UNFRIEND);
-  const [respondRequest] = useMutation(RESPOND_FRIEND_REQUEST);
+  const [respondRequest] = useMutation(RESPOND_FRIEND_REQUEST, {
+    refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
+  });
 
   async function handleAddFriend() {
     setActionError(null);
@@ -257,7 +261,7 @@ export function UserProfilePage() {
 
   const name = displayName(profile);
   const initial = avatarInitial(profile);
-  const canSeeDetails = isFriend || !isLoggedIn;
+  const interests = profile.interests ?? [];
 
   return (
     <div className="cx-profile up-root">
@@ -291,15 +295,19 @@ export function UserProfilePage() {
           </div>
           <p className="cx-profile-handle">@{profile.username ?? "user"}</p>
 
-          {canSeeDetails && profile.bio ? (
+          {profile.email ? (
+            <p className="cx-profile-email-inline">{profile.email}</p>
+          ) : null}
+
+          {profile.bio ? (
             <p className="cx-profile-bio-preview">{profile.bio}</p>
           ) : null}
 
-          {canSeeDetails && profile.interests && profile.interests.length > 0 ? (
-            <div className="up-interests">
-              {profile.interests.map((interest) => (
-                <span key={interest} className="cx-profile-chip">
-                  {interest}
+          {interests.length > 0 ? (
+            <div className="cx-profile-interests up-interests">
+              {interests.map((interest) => (
+                <span key={interest} className="cx-profile-interest-tag">
+                  #{interest}
                 </span>
               ))}
             </div>

@@ -1,5 +1,5 @@
 import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { PostCommentsPanel } from "./PostCommentsPanel";
@@ -12,6 +12,7 @@ import {
   IconMore,
   IconOpenPost,
   IconShare,
+  IconUsers,
 } from "./IgIcons";
 import {
   DELETE_POST,
@@ -19,6 +20,7 @@ import {
   GET_POST_BY_ID,
   MY_SAVED_POSTS,
   POST_VOTE_UPDATED,
+  REMOVE_VOTE,
   SET_POST_HYPE,
   SET_POST_KEEP,
   VOTERS_BY_POST,
@@ -27,9 +29,11 @@ import {
 import { apolloClient } from "../lib/apolloClient";
 import { postPermalink } from "../lib/postPermalink";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { playVoteSound } from "../lib/notificationSound";
 import type { FeedPostView, VoteDirectionGql } from "../types/feed";
+import { MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -154,9 +158,29 @@ type VotersByPostData = {
       id: string;
       username?: string | null;
       displayName?: string | null;
+      profileImageUrl?: string | null;
     } | null;
   }>;
 };
+
+type VoterRow = VotersByPostData["votersByPost"][number];
+
+const VOTERS_PAGE_SIZE = 10;
+
+function voterDisplayName(v: VoterRow): string {
+  if (v.anonymous || !v.user) return "Anonymous voter";
+  return v.user.displayName?.trim() || v.user.username?.trim() || "Voter";
+}
+
+function voterInitial(v: VoterRow): string {
+  if (v.anonymous || !v.user) return "?";
+  return voterDisplayName(v).replace(/^@/, "").slice(0, 1).toUpperCase();
+}
+
+function voterAvatarSrc(v: VoterRow): string | null {
+  if (v.anonymous || !v.user) return null;
+  return normalizeProfileImageUrl(v.user.profileImageUrl);
+}
 
 type VoteLiveState = {
   upvoteCount: number;
@@ -196,18 +220,25 @@ type VotePostMutationData = {
   } | null;
 };
 
+type RemoveVoteMutationData = {
+  removeVote?: VotePostMutationData["votePost"];
+};
+
 type Props = {
   post: FeedPostView;
   /** `local` = demo feed only; `api` = call GraphQL `votePost`. */
   voteMode: "api" | "local";
   /** When false, hide “open post page” (e.g. on `/post/:id` itself). Share still works. */
   showPermalinkToolbar?: boolean;
+  /** From `/post/:id#comment-…` — opens comments and scrolls to this comment. */
+  highlightCommentId?: string | null;
 };
 
 function FeedPostCardComponent({
   post,
   voteMode,
   showPermalinkToolbar = true,
+  highlightCommentId = null,
 }: Props) {
   const { user: authUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -218,7 +249,37 @@ function FeedPostCardComponent({
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
   const [anonymousVote, setAnonymousVote] = useState(Boolean(post.myVoteAnonymous));
   const [showVoters, setShowVoters] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [voterSearch, setVoterSearch] = useState("");
+  /** Which option group the modal is scoped to (undefined = all voters). */
+  const [voterOptionIndex, setVoterOptionIndex] = useState<number | undefined>(undefined);
+  const userDismissedDiscussRef = useRef(false);
+  const [commentsOpen, setCommentsOpen] = useState(Boolean(highlightCommentId));
+
+  useEffect(() => {
+    userDismissedDiscussRef.current = false;
+  }, [post.id]);
+
+  useEffect(() => {
+    if (highlightCommentId && !userDismissedDiscussRef.current) {
+      setCommentsOpen(true);
+    }
+  }, [highlightCommentId]);
+
+  const closeDiscuss = useCallback(() => {
+    userDismissedDiscussRef.current = true;
+    setCommentsOpen(false);
+  }, []);
+
+  const toggleDiscuss = useCallback(() => {
+    setCommentsOpen((open) => {
+      if (open) {
+        userDismissedDiscussRef.current = true;
+        return false;
+      }
+      userDismissedDiscussRef.current = false;
+      return true;
+    });
+  }, []);
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [voteFx, setVoteFx] = useState(false);
   const [justVotedIndex, setJustVotedIndex] = useState<number | null>(null);
@@ -256,8 +317,18 @@ function FeedPostCardComponent({
     }
   }
 
-  const [fetchVoters, { data: votersData, loading: votersLoading, error: votersError }] =
-    useLazyQuery<VotersByPostData>(VOTERS_BY_POST, { fetchPolicy: "network-only" });
+  const [fetchVoters] = useLazyQuery<VotersByPostData>(VOTERS_BY_POST, {
+    fetchPolicy: "network-only",
+  });
+  // Paginated voter list (infinite scroll). We accumulate rows ourselves rather
+  // than reading the lazy-query cache so we can append pages.
+  const [voters, setVoters] = useState<VoterRow[]>([]);
+  const [votersHasMore, setVotersHasMore] = useState(false);
+  const [votersInitialLoading, setVotersInitialLoading] = useState(false);
+  const [votersLoadingMore, setVotersLoadingMore] = useState(false);
+  const [votersError, setVotersError] = useState<string | null>(null);
+  /** Monotonic id to ignore out-of-order / stale page responses. */
+  const votersReqId = useRef(0);
 
   const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
   const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
@@ -331,33 +402,95 @@ function FeedPostCardComponent({
       return;
     }
 
-    function handleOutsidePointerDown(event: MouseEvent | TouchEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-      if (votersModalCardRef.current?.contains(target)) {
-        return;
-      }
-      setShowVoters(false);
-    }
-
+    // The panel floats centered; the page behind stays scrollable (no body
+    // lock). Close on Escape or a click outside the card. We use `click` (not
+    // mousedown/touchstart) so a scroll/drag gesture never dismisses it, and
+    // defer attaching it one tick so the opening click doesn't close it.
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setShowVoters(false);
       }
     }
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Node && votersModalCardRef.current?.contains(target)) {
+        return;
+      }
+      setShowVoters(false);
+    }
 
-    document.addEventListener("mousedown", handleOutsidePointerDown);
-    document.addEventListener("touchstart", handleOutsidePointerDown);
     document.addEventListener("keydown", handleEscape);
+    const attachId = setTimeout(() => {
+      document.addEventListener("click", handleOutsideClick);
+    }, 0);
 
     return () => {
-      document.removeEventListener("mousedown", handleOutsidePointerDown);
-      document.removeEventListener("touchstart", handleOutsidePointerDown);
+      clearTimeout(attachId);
       document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("click", handleOutsideClick);
     };
   }, [showVoters]);
+
+  // Fetch (or re-fetch) the first page of voters: on open, and whenever the
+  // search term changes. Empty term loads immediately; typing is debounced.
+  const fetchVotersPage = useCallback(
+    async (skip: number, append: boolean, term: string, optionIndex: number | undefined) => {
+      const reqId = ++votersReqId.current;
+      if (append) {
+        setVotersLoadingMore(true);
+      } else {
+        setVotersInitialLoading(true);
+        setVotersError(null);
+      }
+      try {
+        const { data } = await fetchVoters({
+          variables: {
+            postId: post.id,
+            optionIndex,
+            search: term || null,
+            skip,
+            take: VOTERS_PAGE_SIZE,
+          },
+        });
+        if (reqId !== votersReqId.current) return; // a newer request superseded us
+        const rows = data?.votersByPost ?? [];
+        setVoters((prev) => (append ? [...prev, ...rows] : rows));
+        setVotersHasMore(rows.length === VOTERS_PAGE_SIZE);
+      } catch (err: unknown) {
+        if (reqId !== votersReqId.current) return;
+        if (!append) setVoters([]);
+        setVotersError(getApolloErrorMessage(err));
+      } finally {
+        if (reqId === votersReqId.current) {
+          setVotersInitialLoading(false);
+          setVotersLoadingMore(false);
+        }
+      }
+    },
+    [fetchVoters, post.id],
+  );
+
+  useEffect(() => {
+    if (!showVoters || voteMode !== "api") {
+      return;
+    }
+    const term = voterSearch.trim();
+    const run = () => void fetchVotersPage(0, false, term, voterOptionIndex);
+    if (!term) {
+      run();
+      return;
+    }
+    const handle = setTimeout(run, 300);
+    return () => clearTimeout(handle);
+  }, [showVoters, voterSearch, voterOptionIndex, voteMode, fetchVotersPage]);
+
+  function handleVotersScroll(e: React.UIEvent<HTMLDivElement>) {
+    if (votersLoadingMore || votersInitialLoading || !votersHasMore) return;
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 140) {
+      void fetchVotersPage(voters.length, true, voterSearch.trim(), voterOptionIndex);
+    }
+  }
 
   useEffect(() => {
     // When Apollo writes subscription data to the cache, post props change and
@@ -450,12 +583,11 @@ function FeedPostCardComponent({
     }
   }
 
-  async function openVotersList(optionIndex?: number) {
+  function openVotersList(optionIndex?: number) {
+    setVoterSearch("");
+    setVoterOptionIndex(optionIndex);
     setShowVoters(true);
-    if (voteMode !== "api") {
-      return;
-    }
-    await fetchVoters({ variables: { postId: post.id, optionIndex } });
+    // The fetch (initial + on search change) is handled by the effect below.
   }
 
   async function handleSharePostLink() {
@@ -523,6 +655,7 @@ function FeedPostCardComponent({
   );
 
   const [voteMut] = useMutation<VotePostMutationData>(VOTE_POST);
+  const [removeVoteMut] = useMutation<RemoveVoteMutationData>(REMOVE_VOTE);
 
   const useApiMulti =
     voteMode === "api" &&
@@ -542,10 +675,15 @@ function FeedPostCardComponent({
   const viewer =
     voteMode === "local"
       ? localViewer
-      : (optimisticVote?.viewerVote ?? post.viewerVote);
+      // When an optimistic snapshot exists, trust it fully — including an
+      // explicit `null` from a withdraw (don't fall back to the stale post vote).
+      : optimisticVote
+        ? optimisticVote.viewerVote
+        : post.viewerVote;
   const activeOptionStats = optimisticVote?.optionStats ?? post.optionStats;
-  const activeMySelectedOptionIndex =
-    optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
+  const activeMySelectedOptionIndex = optimisticVote
+    ? optimisticVote.mySelectedOptionIndex
+    : (post.mySelectedOptionIndex ?? null);
   const activeVotingEndsAt = optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
   const activeIsVotingOpen = optimisticVote?.isVotingOpen ?? post.isVotingOpen ?? null;
 
@@ -700,7 +838,7 @@ function FeedPostCardComponent({
           : selectedOptionIndex === 1
             ? "DOWN"
             : null,
-      mySelectedOptionIndex: selectedOptionIndex,
+      mySelectedOptionIndex: selectedOptionIndex < 0 ? null : selectedOptionIndex,
       optionStats: Array.from({ length: len }, (_, i) => ({
         index: i,
         label: labels[i],
@@ -715,6 +853,99 @@ function FeedPostCardComponent({
     voteGuardUntilRef.current = Date.now() + 500;
     setVoteFx(true);
     setTimeout(() => setVoteFx(false), 220);
+  }
+
+  // Shared mutation engine for both vote and unvote so rapid switches
+  // (vote → unvote → vote other side) always converge on the user's last
+  // intent. `targetIndex >= 0` votes that option; `targetIndex < 0` withdraws.
+  // Callers apply the optimistic UI first, then hand the intent to this engine.
+  async function processVoteIntent(targetIndex: number) {
+    // Arm the subscription guard so a concurrent broadcast can't overwrite us.
+    voteGuardUntilRef.current = Date.now() + 2000;
+    if (voteInFlight.current) {
+      // A mutation is already running — queue this as the latest intent; the
+      // running loop will pick it up (vote or unvote) when it finishes.
+      pendingVoteRef.current = { selectedOptionIndex: targetIndex };
+      return;
+    }
+    voteInFlight.current = true;
+    let currentIdx = targetIndex;
+    while (true) {
+      try {
+        let payload: VotePostMutationData["votePost"] | undefined;
+        if (currentIdx < 0) {
+          const { data } = await removeVoteMut({ variables: { postId: post.id } });
+          payload = data?.removeVote ?? undefined;
+        } else {
+          const { data } = await voteMut({
+            variables: {
+              postId: post.id,
+              selectedOptionIndex: currentIdx,
+              anonymous: anonymousVote,
+            },
+          });
+          payload = data?.votePost ?? undefined;
+        }
+        const pending = pendingVoteRef.current;
+        pendingVoteRef.current = null;
+        if (!pending) {
+          applyServerVoteSnapshot(payload, currentIdx);
+          break;
+        }
+        // A newer tap arrived mid-flight — discard this result and loop to it.
+        currentIdx = pending.selectedOptionIndex;
+      } catch (err: unknown) {
+        pendingVoteRef.current = null;
+        setOptimisticVote(null); // revert on error
+        const message = getApolloErrorMessage(err);
+        await refreshPostVotingState();
+        void message;
+        break;
+      }
+    }
+    voteInFlight.current = false;
+  }
+
+  // Withdraw the viewer's vote (single tap on the option they already chose).
+  // API mode only — local/demo toggles are handled inline by the vote handlers.
+  function withdrawVote(removedIndex: number) {
+    if (isVotingClosed) return;
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: location.pathname } });
+      return;
+    }
+
+    // Optimistic clear: drop the viewer's pick and decrement that option.
+    const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
+    const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
+    const newUp = removedIndex === 0 ? Math.max(0, curUp - 1) : curUp;
+    const newDown = removedIndex === 1 ? Math.max(0, curDown - 1) : curDown;
+    const curStats = optimisticVote?.optionStats ?? activeOptionStats ?? null;
+    const newStats = curStats
+      ? (() => {
+          const updated = curStats.map((s) =>
+            s.index === removedIndex ? { ...s, count: Math.max(0, s.count - 1) } : s,
+          );
+          const total = updated.reduce((a, s) => a + s.count, 0);
+          return updated.map((s) => ({
+            ...s,
+            percentage: total > 0 ? (s.count / total) * 100 : 0,
+          }));
+        })()
+      : null;
+
+    playVoteSound();
+    setJustUnvoted(removedIndex);
+    setOptimisticVote({
+      upvoteCount: newUp,
+      downvoteCount: newDown,
+      viewerVote: null,
+      mySelectedOptionIndex: null,
+      optionStats: newStats,
+      isVotingOpen: optimisticVote?.isVotingOpen ?? activeIsVotingOpen,
+      votingEndsAt: optimisticVote?.votingEndsAt ?? activeVotingEndsAt,
+    });
+    void processVoteIntent(-1);
   }
 
   async function handleVote(clicked: "UP" | "DOWN") {
@@ -774,6 +1005,8 @@ function FeedPostCardComponent({
     }
 
     if (direction === "NONE") {
+      // Re-tapped the side they already chose → withdraw the vote.
+      void withdrawVote(clicked === "UP" ? 0 : 1);
       return;
     }
 
@@ -820,46 +1053,7 @@ function FeedPostCardComponent({
     setJustVoted(selectedOptionIndex);
     setDetailsOpen(true);
 
-    // Arm the subscription guard so a concurrent broadcast can't overwrite our state.
-    voteGuardUntilRef.current = Date.now() + 2000;
-    if (voteInFlight.current) {
-      // A mutation is already in flight — queue this as the latest intent and
-      // let the running loop pick it up when it completes.
-      pendingVoteRef.current = { selectedOptionIndex };
-      return;
-    }
-    voteInFlight.current = true;
-    let currentIdx = selectedOptionIndex;
-    // Loop: after each mutation, check whether a newer tap came in.  If so,
-    // skip applying that result and immediately fire another mutation for the
-    // latest intent — ensuring the server always lands on the user's last choice.
-    while (true) {
-      try {
-        const { data } = await voteMut({
-          variables: {
-            postId: post.id,
-            selectedOptionIndex: currentIdx,
-            anonymous: anonymousVote,
-          },
-        });
-        const pending = pendingVoteRef.current;
-        pendingVoteRef.current = null;
-        if (!pending) {
-          applyServerVoteSnapshot(data?.votePost, currentIdx);
-          break;
-        }
-        // Newer intent queued — discard this stale result and loop.
-        currentIdx = pending.selectedOptionIndex;
-      } catch (err: unknown) {
-        pendingVoteRef.current = null;
-        setOptimisticVote(null); // revert on error
-        const message = getApolloErrorMessage(err);
-        await refreshPostVotingState();
-        if (/voting period has ended/i.test(message)) break;
-        break;
-      }
-    }
-    voteInFlight.current = false;
+    await processVoteIntent(selectedOptionIndex);
   }
 
   function handleBinaryCompareTap(side: 0 | 1) {
@@ -880,6 +1074,8 @@ function FeedPostCardComponent({
 
     if (voteMode === "api") {
       if (activeMySelectedOptionIndex === index) {
+        // Re-tapped the option they already chose → withdraw the vote.
+        void withdrawVote(index);
         return;
       }
 
@@ -918,39 +1114,7 @@ function FeedPostCardComponent({
       setJustVoted(index);
       setDetailsOpen(true);
 
-      voteGuardUntilRef.current = Date.now() + 2000;
-      if (voteInFlight.current) {
-        pendingVoteRef.current = { selectedOptionIndex: index };
-        return;
-      }
-      voteInFlight.current = true;
-      let currentMultiIdx = index;
-      while (true) {
-        try {
-          const { data } = await voteMut({
-            variables: {
-              postId: post.id,
-              selectedOptionIndex: currentMultiIdx,
-              anonymous: anonymousVote,
-            },
-          });
-          const pending = pendingVoteRef.current;
-          pendingVoteRef.current = null;
-          if (!pending) {
-            applyServerVoteSnapshot(data?.votePost, currentMultiIdx);
-            break;
-          }
-          currentMultiIdx = pending.selectedOptionIndex;
-        } catch (err: unknown) {
-          pendingVoteRef.current = null;
-          setOptimisticVote(null);
-          const message = getApolloErrorMessage(err);
-          await refreshPostVotingState();
-          if (/voting period has ended/i.test(message)) break;
-          break;
-        }
-      }
-      voteInFlight.current = false;
+      await processVoteIntent(index);
       return;
     }
 
@@ -992,18 +1156,15 @@ function FeedPostCardComponent({
   }
 
   const binaryTotal = up + down;
+  /** Total votes cast on this post (binary or multi) — shown on the Voters chip. */
+  const totalVoteCount = isMultiCompare ? multiTotalVotes : binaryTotal;
   const hypeCount = hypeCountLive;
   const commentCount = post.commentCount ?? 0;
-  const groupedVoters = useMemo(() => {
-    const rows = votersData?.votersByPost ?? [];
-    const groups = new Map<number, typeof rows>();
-    for (const row of rows) {
-      const existing = groups.get(row.selectedOptionIndex) ?? [];
-      existing.push(row);
-      groups.set(row.selectedOptionIndex, existing);
-    }
-    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
-  }, [votersData]);
+  // Flat, chronologically-sorted list (newest first, as returned by the server).
+  // A flat list keeps infinite-scroll stable — appending a page never reflows
+  // rows above the viewport the way regrouping would.
+  const showVoterOptionTag = voterOptionIndex === undefined;
+  const loadedVotersCount = voters.length;
   const leftPct =
     binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : null;
   const rightPct =
@@ -1125,10 +1286,25 @@ function FeedPostCardComponent({
     setDetailsOpen(false);
   }, [post.id]);
 
+  const isPlatformPost = post.postType === "system";
+
   return (
-    <article className="ig-post">
+    <article className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}`}>
       <header className="ig-post-header">
-        {post.authorId ? (
+        {isPlatformPost ? (
+          <div className="ig-post-user cx-platform-post-user">
+            <span className="ig-avatar sm cx-platform-post-avatar">
+              <img src="/logo.png" alt="" decoding="async" />
+            </span>
+            <div>
+              <span className="ig-post-username-row">
+                <span className="ig-post-username">{MODERATOR_PLATFORM_NAME}</span>
+                <span className="cx-platform-post-badge">Platform</span>
+              </span>
+              <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
+            </div>
+          </div>
+        ) : post.authorId ? (
           <NavLink
             to={isOwner ? "/profile" : `/profile/${post.authorId}`}
             className="ig-post-user ig-post-user--link"
@@ -1463,28 +1639,6 @@ function FeedPostCardComponent({
       )}
 
       <div className="cx-post-footer">
-        <div className="cx-post-details-head">
-          <div className="cx-post-details-status">
-            <span
-              className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
-            >
-              {isVotingClosed ? "🏆 Result" : votingStatusLabel}
-            </span>
-            {isVotingClosed && votingWinnerSummary ? (
-              <span className="cx-voting-result">{votingWinnerSummary}</span>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            className="cx-details-toggle"
-            aria-expanded={detailsOpen}
-            aria-controls={`post-details-${post.id}`}
-            onClick={() => setDetailsOpen((prev) => !prev)}
-          >
-            {detailsOpen ? "Hide details" : "See details"}
-          </button>
-        </div>
-
         {detailsOpen ? (
           <div className="cx-post-details-panel" id={`post-details-${post.id}`}>
             {compareUrls ? (
@@ -1673,20 +1827,29 @@ function FeedPostCardComponent({
           </div>
         ) : null}
 
-        <div className="cx-action-rail" role="toolbar" aria-label="Post actions">
+        <div className="cx-action-rail">
+          <div className="cx-action-rail-icons" role="toolbar" aria-label="Post actions">
           <button
             type="button"
-            className={`cx-action-chip${commentsOpen ? " cx-action-chip--pressed" : ""}`}
-            aria-label={commentsOpen ? "Hide comments" : "Show comments"}
+            className={`cx-action-chip cx-action-chip--discuss${commentsOpen ? " cx-action-chip--pressed cx-action-chip--discuss-open" : ""}`}
+            aria-label={
+              commentsOpen
+                ? "Hide comments"
+                : `Discuss${commentCount > 0 ? `, ${commentCount} comments` : ""}`
+            }
+            title={commentsOpen ? "Hide comments" : "Discuss"}
             aria-expanded={commentsOpen}
-            onClick={() => {
-              setCommentsOpen((v) => !v);
+            aria-controls={`post-discuss-${post.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleDiscuss();
             }}
           >
             <IconComment />
-            <span className="cx-action-chip-label">
-              Discuss{commentCount > 0 ? ` ${commentCount}` : ""}
-            </span>
+            <span className="cx-action-chip-label">{commentsOpen ? "Hide" : "Discuss"}</span>
+            {!commentsOpen && commentCount > 0 ? (
+              <span className="cx-action-chip-count">{commentCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -1696,7 +1859,6 @@ function FeedPostCardComponent({
             onClick={() => void handleSharePostLink()}
           >
             <IconShare />
-            <span className="cx-action-chip-label">Share</span>
           </button>
           {showPermalinkToolbar ? (
             <NavLink
@@ -1706,40 +1868,84 @@ function FeedPostCardComponent({
               title="Open post on its own page"
             >
               <IconOpenPost />
-              <span className="cx-action-chip-label">Full page</span>
             </NavLink>
           ) : null}
           <button
             type="button"
             className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
             aria-label={liked ? "Unhype" : "Hype"}
+            title={liked ? "Unhype" : "Hype"}
             aria-pressed={liked}
             disabled={hypeUpdating}
             onClick={() => void handleToggleHype()}
           >
             <IconHeart filled={liked} />
-            <span className="cx-action-chip-label">Hype {hypeCount}</span>
+            {hypeCount > 0 ? (
+              <span className="cx-action-chip-count">{hypeCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
             className={`cx-action-chip${saved ? " cx-action-chip--saved" : ""}`}
             aria-label={saved ? "Unsave" : "Save"}
+            title={saved ? "Unsave" : "Keep"}
             aria-pressed={saved}
             disabled={keepUpdating}
             onClick={() => void handleToggleKeep()}
           >
             <IconBookmark filled={saved} />
-            <span className="cx-action-chip-label">Keep{saveLiveCount > 0 ? ` ${saveLiveCount}` : ""}</span>
+            {saveLiveCount > 0 ? (
+              <span className="cx-action-chip-count">{saveLiveCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
             className="cx-action-chip"
             aria-label="See who voted"
+            title="Voters"
             onClick={() => void openVotersList()}
           >
-            <span className="cx-action-chip-label">Voters</span>
+            <IconUsers />
+            {totalVoteCount > 0 ? (
+              <span className="cx-action-chip-count">{totalVoteCount}</span>
+            ) : null}
           </button>
+          </div>
+          <div className="cx-action-rail-context">
+            <span
+              className={`cx-action-status-line${isVotingClosed ? " cx-action-status-line--result" : ""}`}
+            >
+              {isVotingClosed
+                ? `🏆 ${votingWinnerSummary || "Results are in"}`
+                : `${votingHasEndDate ? "⏳ " : ""}${votingStatusLabel}`}
+            </span>
+            <button
+              type="button"
+              className="cx-action-rail-details"
+              aria-expanded={detailsOpen}
+              aria-controls={`post-details-${post.id}`}
+              onClick={() => setDetailsOpen((prev) => !prev)}
+            >
+              {detailsOpen ? "Hide details" : "See details"}
+              <span className="cx-action-rail-details-arrow" aria-hidden>
+                {detailsOpen ? "‹" : "›"}
+              </span>
+            </button>
+          </div>
         </div>
+
+        {commentsOpen ? (
+          <div id={`post-discuss-${post.id}`} className="cx-discuss-slot">
+            <PostCommentsPanel
+              postId={post.id}
+              voteMode={voteMode}
+              isAuthenticated={isAuthenticated}
+              meLabel={meLabel}
+              highlightCommentId={highlightCommentId}
+              onClose={closeDiscuss}
+            />
+          </div>
+        ) : null}
 
         {shareHint ? (
           <p className="ig-share-hint" role="status">
@@ -1749,58 +1955,129 @@ function FeedPostCardComponent({
 
         {timeLabel ? <p className="cx-post-meta-time">{timeLabel}</p> : null}
       </div>
-
-      {commentsOpen ? (
-        <PostCommentsPanel
-          postId={post.id}
-          voteMode={voteMode}
-          isAuthenticated={isAuthenticated}
-          meLabel={meLabel}
-        />
-      ) : null}
       {showVoters ? (
         <div
-          className="ig-modal-overlay"
+          className="ig-modal-overlay cx-voters-overlay"
           role="dialog"
           aria-modal="true"
           aria-label="Voter list"
         >
-          <section ref={votersModalCardRef} className="ig-modal-card">
-            <div className="ig-post-comments-head">
-              <h3 className="ig-post-comments-title">Voted by</h3>
-            <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
+          <section ref={votersModalCardRef} className="ig-modal-card cx-voters-card">
+            <div className="ig-post-comments-head cx-voters-head">
+              <div className="cx-voters-head-titles">
+                <h3 className="ig-post-comments-title">Voted by</h3>
+                {!votersInitialLoading && !votersError ? (
+                  <span className="cx-voters-total">
+                    {loadedVotersCount}
+                    {votersHasMore ? "+" : ""}{" "}
+                    {loadedVotersCount === 1 && !votersHasMore ? "voter" : "voters"}
+                  </span>
+                ) : null}
+              </div>
+              <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
                 Close
               </button>
             </div>
-            {votersLoading ? <p className="muted small">Loading voters…</p> : null}
+            {voteMode === "api" ? (
+              <div className="cx-voters-search">
+                <svg className="cx-voters-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="15" height="15" aria-hidden>
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="search"
+                  className="cx-voters-search-input"
+                  placeholder="Search voters by name…"
+                  value={voterSearch}
+                  onChange={(e) => setVoterSearch(e.target.value)}
+                  aria-label="Search voters"
+                />
+                {voterSearch ? (
+                  <button
+                    type="button"
+                    className="cx-voters-search-clear"
+                    aria-label="Clear search"
+                    onClick={() => setVoterSearch("")}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {votersInitialLoading ? (
+              <div className="cx-voters-loading">
+                <span className="cx-voters-spinner" aria-hidden />
+                <span className="muted small">Loading voters…</span>
+              </div>
+            ) : null}
             {votersError ? (
               <p className="ig-post-comments-error" role="alert">
-                {votersError.message}
+                {votersError}
               </p>
             ) : null}
-            <div className="ig-voter-list-scroll">
-              {groupedVoters.map(([optionIndex, voters]) => (
-                <div key={`option-group-${optionIndex}`} className="ig-voter-group">
-                  <div className="ig-voter-group-head">
-                    <span>Chose {compareOptionLabel(post, optionIndex)}</span>
-                  </div>
-                  <ul className="ig-post-comments-list">
-                    {voters.map((v) => (
-                      <li key={v.voteId} className="ig-post-comment">
-                        <span className="ig-post-comment-author">
-                          {v.anonymous || !v.user
-                            ? "Anonymous voter"
-                            : v.user.displayName?.trim() || v.user.username || "Voter"}
+            {!votersInitialLoading && !votersError && loadedVotersCount === 0 ? (
+              <p className="cx-voters-empty muted small">
+                {voterSearch.trim()
+                  ? `No voters match “${voterSearch.trim()}”.`
+                  : "No votes yet — be the first."}
+              </p>
+            ) : null}
+            {!votersInitialLoading && loadedVotersCount > 0 ? (
+              <div
+                className="cx-voters-scroll"
+                onScroll={handleVotersScroll}
+              >
+                <ul className="cx-voter-list">
+                  {voters.map((v) => {
+                    const src = voterAvatarSrc(v);
+                    const name = voterDisplayName(v);
+                    const isAnon = v.anonymous || !v.user;
+                    const RowInner = (
+                      <>
+                        <span className={`cx-voter-avatar${isAnon ? " cx-voter-avatar--anon" : ""}`}>
+                          {src ? (
+                            <img src={src} alt="" referrerPolicy="no-referrer" loading="lazy" />
+                          ) : (
+                            <span className="cx-voter-avatar-initial">{voterInitial(v)}</span>
+                          )}
                         </span>
-                        <time className="ig-post-comment-time" dateTime={v.createdAt}>
-                          {formatRelativeTime(v.createdAt) || ""}
-                        </time>
+                        <span className="cx-voter-meta">
+                          <span className="cx-voter-name">{name}</span>
+                          <span className="cx-voter-sub">
+                            {showVoterOptionTag ? (
+                              <span className={`cx-voter-tag cx-voter-tag--c${v.selectedOptionIndex % 4}`}>
+                                {compareOptionLabel(post, v.selectedOptionIndex)}
+                              </span>
+                            ) : null}
+                            <time className="cx-voter-time" dateTime={v.createdAt}>
+                              {formatRelativeTime(v.createdAt) || "just now"}
+                            </time>
+                          </span>
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={v.voteId} className="cx-voter-row">
+                        {isAnon ? (
+                          <span className="cx-voter-rowlink cx-voter-rowlink--anon">{RowInner}</span>
+                        ) : (
+                          <NavLink to={`/profile/${v.user!.id}`} className="cx-voter-rowlink">
+                            {RowInner}
+                          </NavLink>
+                        )}
                       </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                    );
+                  })}
+                </ul>
+                {votersLoadingMore ? (
+                  <div className="cx-voters-more">
+                    <span className="cx-voters-spinner cx-voters-spinner--sm" aria-hidden />
+                  </div>
+                ) : null}
+                {!votersHasMore && loadedVotersCount > VOTERS_PAGE_SIZE ? (
+                  <p className="cx-voters-end">That’s everyone</p>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}

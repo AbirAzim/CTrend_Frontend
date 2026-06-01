@@ -32,6 +32,7 @@ type UserProfile = {
   id: string;
   username: string;
   displayName?: string | null;
+  email?: string | null;
   bio?: string | null;
   profileImageUrl?: string | null;
   interests?: string[] | null;
@@ -306,6 +307,9 @@ export default function UserProfileScreen() {
             {profile.username ? (
               <Text style={[styles.username, { color: colors.accent }]}>@{profile.username}</Text>
             ) : null}
+            {profile.email ? (
+              <Text style={[styles.email, { color: colors.muted }]}>{profile.email}</Text>
+            ) : null}
             {isOnline && (
               <View style={styles.onlinePill}>
                 <Text style={styles.onlinePillText}>● Online now</Text>
@@ -456,6 +460,7 @@ const styles = StyleSheet.create({
   },
   displayName: { fontSize: 22, fontWeight: "800", marginBottom: 2 },
   username: { fontSize: 14, marginBottom: 6 },
+  email: { fontSize: 13, marginBottom: 8 },
   onlinePill: {
     backgroundColor: "#16a34a22",
     borderRadius: 99,

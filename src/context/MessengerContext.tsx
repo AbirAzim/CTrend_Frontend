@@ -17,7 +17,9 @@ import {
   SET_TYPING,
   MESSAGE_RECEIVED,
   MESSAGE_READ_SUB,
+  MESSAGE_REACTION_CHANGED,
   PRESENCE_CHANGED,
+  REACT_MESSAGE,
   START_DIRECT_CONVERSATION,
 } from "../graphql/messages";
 import { useAuth } from "./AuthContext";
@@ -70,6 +72,8 @@ export type Conversation = {
   createdAt: string;
 };
 
+export type MessageReactionCount = { emoji: string; count: number };
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -79,6 +83,8 @@ export type Message = {
   text: string;
   imageUrl?: string | null;
   readBy: { userId: string; readAt: string }[];
+  reactions: MessageReactionCount[];
+  viewerReaction?: string | null;
   createdAt: string;
 };
 
@@ -93,6 +99,7 @@ type MessengerContextValue = {
   openChat: (conversationId: string) => void;
   closeChat: (conversationId: string) => void;
   sendMessage: (conversationId: string, text: string, imageUrl?: string) => Promise<void>;
+  reactMessage: (messageId: string, conversationId: string, emoji: string | null) => Promise<void>;
   markRead: (conversationId: string) => void;
   setTyping: (conversationId: string, isTyping: boolean) => void;
   prependMessages: (conversationId: string, msgs: Message[]) => void;
@@ -104,6 +111,45 @@ type MessengerContextValue = {
 const MessengerContext = createContext<MessengerContextValue | null>(null);
 
 const MAX_OPEN_WINDOWS = 3;
+
+function normalizeMessage(msg: Message): Message {
+  return {
+    ...msg,
+    reactions: msg.reactions ?? [],
+    viewerReaction: msg.viewerReaction ?? null,
+  };
+}
+
+function applyOptimisticMessageReaction(
+  msg: Message,
+  nextEmoji: string | null,
+): Message {
+  const prevEmoji = msg.viewerReaction ?? null;
+  if (prevEmoji === nextEmoji) return msg;
+
+  const reactionMap = new Map(msg.reactions.map((r) => [r.emoji, r.count]));
+
+  if (prevEmoji) {
+    const prevCount = reactionMap.get(prevEmoji) ?? 0;
+    if (prevCount <= 1) reactionMap.delete(prevEmoji);
+    else reactionMap.set(prevEmoji, prevCount - 1);
+  }
+
+  if (nextEmoji) {
+    reactionMap.set(nextEmoji, (reactionMap.get(nextEmoji) ?? 0) + 1);
+  }
+
+  const reactions = [...reactionMap.entries()].map(([emoji, count]) => ({
+    emoji,
+    count,
+  }));
+
+  return {
+    ...msg,
+    viewerReaction: nextEmoji,
+    reactions,
+  };
+}
 
 export function MessengerProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, user: authUser } = useAuth();
@@ -166,6 +212,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [sendMessageMut] = useMutation(SEND_MESSAGE);
+  const [reactMessageMut] = useMutation(REACT_MESSAGE);
   const [markReadMut] = useMutation(MARK_CONVERSATION_READ);
   const [setTypingMut] = useMutation(SET_TYPING);
   const [startDirectMut] = useMutation(START_DIRECT_CONVERSATION);
@@ -173,8 +220,9 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   useSubscription(MESSAGE_RECEIVED, {
     skip: !isAuthenticated,
     onData({ data }) {
-      const msg = data.data?.messageReceived as Message | undefined;
-      if (!msg) return;
+      const raw = data.data?.messageReceived as Message | undefined;
+      if (!raw) return;
+      const msg = normalizeMessage(raw);
       setMessagesByConvo((prev) => {
         const existing = prev[msg.conversationId] ?? [];
         if (existing.some((m) => m.id === msg.id)) return prev;
@@ -207,6 +255,36 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   // Real-time "Seen" — fires when any participant marks a conversation read.
   // We patch readBy on all messages in that convo so the sender's Seen badge
   // appears instantly without waiting for a full refetch.
+  useSubscription(MESSAGE_REACTION_CHANGED, {
+    skip: !isAuthenticated,
+    onData({ data }) {
+      const ev = data.data?.messageReactionChanged as
+        | {
+            messageId: string;
+            conversationId: string;
+            reactions: MessageReactionCount[];
+            actorUserId: string;
+            actorEmoji: string | null;
+          }
+        | undefined;
+      if (!ev) return;
+      setMessagesByConvo((prev) => {
+        const msgs = prev[ev.conversationId];
+        if (!msgs) return prev;
+        const updated = msgs.map((m) => {
+          if (m.id !== ev.messageId) return m;
+          return {
+            ...m,
+            reactions: ev.reactions,
+            viewerReaction:
+              ev.actorUserId === authUser?.id ? ev.actorEmoji : m.viewerReaction,
+          };
+        });
+        return { ...prev, [ev.conversationId]: updated };
+      });
+    },
+  });
+
   useSubscription(MESSAGE_READ_SUB, {
     skip: !isAuthenticated,
     onData({ data }) {
@@ -283,8 +361,9 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       const { data } = await sendMessageMut({
         variables: { conversationId, text, imageUrl },
       });
-      const msg = data?.sendMessage as Message | undefined;
-      if (!msg) return;
+      const raw = data?.sendMessage as Message | undefined;
+      if (!raw) return;
+      const msg = normalizeMessage(raw);
       setMessagesByConvo((prev) => {
         const existing = prev[conversationId] ?? [];
         if (existing.some((m) => m.id === msg.id)) return prev;
@@ -303,6 +382,46 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       );
     },
     [sendMessageMut],
+  );
+
+  const reactMessage = useCallback(
+    async (messageId: string, conversationId: string, emoji: string | null) => {
+      setMessagesByConvo((prev) => {
+        const msgs = prev[conversationId];
+        if (!msgs) return prev;
+        const updated = msgs.map((m) => {
+          if (m.id !== messageId) return m;
+          return applyOptimisticMessageReaction(m, emoji);
+        });
+        return { ...prev, [conversationId]: updated };
+      });
+      try {
+        const { data } = await reactMessageMut({
+          variables: { messageId, emoji },
+        });
+        const server = data?.reactMessage as
+          | Pick<Message, "id" | "reactions" | "viewerReaction">
+          | undefined;
+        if (!server) return;
+        setMessagesByConvo((prev) => {
+          const msgs = prev[conversationId];
+          if (!msgs) return prev;
+          const updated = msgs.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  reactions: server.reactions ?? m.reactions,
+                  viewerReaction: server.viewerReaction ?? null,
+                }
+              : m,
+          );
+          return { ...prev, [conversationId]: updated };
+        });
+      } catch {
+        void refetchConversations();
+      }
+    },
+    [reactMessageMut, refetchConversations],
   );
 
   const markRead = useCallback(
@@ -337,7 +456,9 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       setMessagesByConvo((prev) => {
         const existing = prev[conversationId] ?? [];
         const existingIds = new Set(existing.map((m) => m.id));
-        const newMsgs = msgs.filter((m) => !existingIds.has(m.id));
+        const newMsgs = msgs
+          .filter((m) => !existingIds.has(m.id))
+          .map(normalizeMessage);
         return { ...prev, [conversationId]: [...newMsgs, ...existing] };
       });
     },
@@ -382,6 +503,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       openChat,
       closeChat,
       sendMessage,
+      reactMessage,
       markRead,
       setTyping,
       prependMessages,
@@ -399,6 +521,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       openChat,
       closeChat,
       sendMessage,
+      reactMessage,
       markRead,
       setTyping,
       prependMessages,
