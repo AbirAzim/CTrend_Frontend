@@ -20,6 +20,7 @@ import {
   GET_POST_BY_ID,
   MY_SAVED_POSTS,
   POST_VOTE_UPDATED,
+  REMOVE_VOTE,
   SET_POST_HYPE,
   SET_POST_KEEP,
   VOTERS_BY_POST,
@@ -216,6 +217,10 @@ type VotePostMutationData = {
     countsPerOption: number[];
     percentages: number[];
   } | null;
+};
+
+type RemoveVoteMutationData = {
+  removeVote?: VotePostMutationData["votePost"];
 };
 
 type Props = {
@@ -619,6 +624,7 @@ function FeedPostCardComponent({
   );
 
   const [voteMut] = useMutation<VotePostMutationData>(VOTE_POST);
+  const [removeVoteMut] = useMutation<RemoveVoteMutationData>(REMOVE_VOTE);
 
   const useApiMulti =
     voteMode === "api" &&
@@ -638,10 +644,15 @@ function FeedPostCardComponent({
   const viewer =
     voteMode === "local"
       ? localViewer
-      : (optimisticVote?.viewerVote ?? post.viewerVote);
+      // When an optimistic snapshot exists, trust it fully — including an
+      // explicit `null` from a withdraw (don't fall back to the stale post vote).
+      : optimisticVote
+        ? optimisticVote.viewerVote
+        : post.viewerVote;
   const activeOptionStats = optimisticVote?.optionStats ?? post.optionStats;
-  const activeMySelectedOptionIndex =
-    optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
+  const activeMySelectedOptionIndex = optimisticVote
+    ? optimisticVote.mySelectedOptionIndex
+    : (post.mySelectedOptionIndex ?? null);
   const activeVotingEndsAt = optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
   const activeIsVotingOpen = optimisticVote?.isVotingOpen ?? post.isVotingOpen ?? null;
 
@@ -702,6 +713,11 @@ function FeedPostCardComponent({
       : votingHasEndDate
         ? `Ends ${formatRelativeTime(activeVotingEndsAt) || ""}`
       : "Voting open";
+  // The "Vote anonymously" row only renders for open, API-mode compare posts.
+  // When it does, the status badge lives there; otherwise it sits in the
+  // action toolbar so the voting status is always visible somewhere.
+  const statusInAnonRow =
+    voteMode === "api" && !isVotingClosed && Boolean(compareUrls);
   // Buttons stay enabled while mutation is in flight — `voteInFlight` ref
   // prevents duplicate submissions without the cursor: not-allowed flash.
   const voteControlsDisabled = isVotingClosed;
@@ -796,7 +812,7 @@ function FeedPostCardComponent({
           : selectedOptionIndex === 1
             ? "DOWN"
             : null,
-      mySelectedOptionIndex: selectedOptionIndex,
+      mySelectedOptionIndex: selectedOptionIndex < 0 ? null : selectedOptionIndex,
       optionStats: Array.from({ length: len }, (_, i) => ({
         index: i,
         label: labels[i],
@@ -811,6 +827,99 @@ function FeedPostCardComponent({
     voteGuardUntilRef.current = Date.now() + 500;
     setVoteFx(true);
     setTimeout(() => setVoteFx(false), 220);
+  }
+
+  // Shared mutation engine for both vote and unvote so rapid switches
+  // (vote → unvote → vote other side) always converge on the user's last
+  // intent. `targetIndex >= 0` votes that option; `targetIndex < 0` withdraws.
+  // Callers apply the optimistic UI first, then hand the intent to this engine.
+  async function processVoteIntent(targetIndex: number) {
+    // Arm the subscription guard so a concurrent broadcast can't overwrite us.
+    voteGuardUntilRef.current = Date.now() + 2000;
+    if (voteInFlight.current) {
+      // A mutation is already running — queue this as the latest intent; the
+      // running loop will pick it up (vote or unvote) when it finishes.
+      pendingVoteRef.current = { selectedOptionIndex: targetIndex };
+      return;
+    }
+    voteInFlight.current = true;
+    let currentIdx = targetIndex;
+    while (true) {
+      try {
+        let payload: VotePostMutationData["votePost"] | undefined;
+        if (currentIdx < 0) {
+          const { data } = await removeVoteMut({ variables: { postId: post.id } });
+          payload = data?.removeVote ?? undefined;
+        } else {
+          const { data } = await voteMut({
+            variables: {
+              postId: post.id,
+              selectedOptionIndex: currentIdx,
+              anonymous: anonymousVote,
+            },
+          });
+          payload = data?.votePost ?? undefined;
+        }
+        const pending = pendingVoteRef.current;
+        pendingVoteRef.current = null;
+        if (!pending) {
+          applyServerVoteSnapshot(payload, currentIdx);
+          break;
+        }
+        // A newer tap arrived mid-flight — discard this result and loop to it.
+        currentIdx = pending.selectedOptionIndex;
+      } catch (err: unknown) {
+        pendingVoteRef.current = null;
+        setOptimisticVote(null); // revert on error
+        const message = getApolloErrorMessage(err);
+        await refreshPostVotingState();
+        void message;
+        break;
+      }
+    }
+    voteInFlight.current = false;
+  }
+
+  // Withdraw the viewer's vote (single tap on the option they already chose).
+  // API mode only — local/demo toggles are handled inline by the vote handlers.
+  function withdrawVote(removedIndex: number) {
+    if (isVotingClosed) return;
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: location.pathname } });
+      return;
+    }
+
+    // Optimistic clear: drop the viewer's pick and decrement that option.
+    const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
+    const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
+    const newUp = removedIndex === 0 ? Math.max(0, curUp - 1) : curUp;
+    const newDown = removedIndex === 1 ? Math.max(0, curDown - 1) : curDown;
+    const curStats = optimisticVote?.optionStats ?? activeOptionStats ?? null;
+    const newStats = curStats
+      ? (() => {
+          const updated = curStats.map((s) =>
+            s.index === removedIndex ? { ...s, count: Math.max(0, s.count - 1) } : s,
+          );
+          const total = updated.reduce((a, s) => a + s.count, 0);
+          return updated.map((s) => ({
+            ...s,
+            percentage: total > 0 ? (s.count / total) * 100 : 0,
+          }));
+        })()
+      : null;
+
+    playVoteSound();
+    setJustUnvoted(removedIndex);
+    setOptimisticVote({
+      upvoteCount: newUp,
+      downvoteCount: newDown,
+      viewerVote: null,
+      mySelectedOptionIndex: null,
+      optionStats: newStats,
+      isVotingOpen: optimisticVote?.isVotingOpen ?? activeIsVotingOpen,
+      votingEndsAt: optimisticVote?.votingEndsAt ?? activeVotingEndsAt,
+    });
+    void processVoteIntent(-1);
   }
 
   async function handleVote(clicked: "UP" | "DOWN") {
@@ -870,6 +979,8 @@ function FeedPostCardComponent({
     }
 
     if (direction === "NONE") {
+      // Re-tapped the side they already chose → withdraw the vote.
+      void withdrawVote(clicked === "UP" ? 0 : 1);
       return;
     }
 
@@ -916,46 +1027,7 @@ function FeedPostCardComponent({
     setJustVoted(selectedOptionIndex);
     setDetailsOpen(true);
 
-    // Arm the subscription guard so a concurrent broadcast can't overwrite our state.
-    voteGuardUntilRef.current = Date.now() + 2000;
-    if (voteInFlight.current) {
-      // A mutation is already in flight — queue this as the latest intent and
-      // let the running loop pick it up when it completes.
-      pendingVoteRef.current = { selectedOptionIndex };
-      return;
-    }
-    voteInFlight.current = true;
-    let currentIdx = selectedOptionIndex;
-    // Loop: after each mutation, check whether a newer tap came in.  If so,
-    // skip applying that result and immediately fire another mutation for the
-    // latest intent — ensuring the server always lands on the user's last choice.
-    while (true) {
-      try {
-        const { data } = await voteMut({
-          variables: {
-            postId: post.id,
-            selectedOptionIndex: currentIdx,
-            anonymous: anonymousVote,
-          },
-        });
-        const pending = pendingVoteRef.current;
-        pendingVoteRef.current = null;
-        if (!pending) {
-          applyServerVoteSnapshot(data?.votePost, currentIdx);
-          break;
-        }
-        // Newer intent queued — discard this stale result and loop.
-        currentIdx = pending.selectedOptionIndex;
-      } catch (err: unknown) {
-        pendingVoteRef.current = null;
-        setOptimisticVote(null); // revert on error
-        const message = getApolloErrorMessage(err);
-        await refreshPostVotingState();
-        if (/voting period has ended/i.test(message)) break;
-        break;
-      }
-    }
-    voteInFlight.current = false;
+    await processVoteIntent(selectedOptionIndex);
   }
 
   function handleBinaryCompareTap(side: 0 | 1) {
@@ -976,6 +1048,8 @@ function FeedPostCardComponent({
 
     if (voteMode === "api") {
       if (activeMySelectedOptionIndex === index) {
+        // Re-tapped the option they already chose → withdraw the vote.
+        void withdrawVote(index);
         return;
       }
 
@@ -1014,39 +1088,7 @@ function FeedPostCardComponent({
       setJustVoted(index);
       setDetailsOpen(true);
 
-      voteGuardUntilRef.current = Date.now() + 2000;
-      if (voteInFlight.current) {
-        pendingVoteRef.current = { selectedOptionIndex: index };
-        return;
-      }
-      voteInFlight.current = true;
-      let currentMultiIdx = index;
-      while (true) {
-        try {
-          const { data } = await voteMut({
-            variables: {
-              postId: post.id,
-              selectedOptionIndex: currentMultiIdx,
-              anonymous: anonymousVote,
-            },
-          });
-          const pending = pendingVoteRef.current;
-          pendingVoteRef.current = null;
-          if (!pending) {
-            applyServerVoteSnapshot(data?.votePost, currentMultiIdx);
-            break;
-          }
-          currentMultiIdx = pending.selectedOptionIndex;
-        } catch (err: unknown) {
-          pendingVoteRef.current = null;
-          setOptimisticVote(null);
-          const message = getApolloErrorMessage(err);
-          await refreshPostVotingState();
-          if (/voting period has ended/i.test(message)) break;
-          break;
-        }
-      }
-      voteInFlight.current = false;
+      await processVoteIntent(index);
       return;
     }
 
@@ -1524,6 +1566,9 @@ function FeedPostCardComponent({
           )}
           {voteMode === "api" && !isVotingClosed && (
             <div className="cx-anon-toggle-row">
+              <span className="cx-voting-badge cx-anon-toggle-status">
+                {votingStatusLabel}
+              </span>
               <label className="cx-anon-toggle">
                 <span className="cx-anon-toggle-icon" aria-hidden>👻</span>
                 <span className="cx-anon-toggle-text">Vote anonymously</span>
@@ -1556,28 +1601,6 @@ function FeedPostCardComponent({
       )}
 
       <div className="cx-post-footer">
-        <div className="cx-post-details-head">
-          <div className="cx-post-details-status">
-            <span
-              className={`cx-voting-badge${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
-            >
-              {isVotingClosed ? "🏆 Result" : votingStatusLabel}
-            </span>
-            {isVotingClosed && votingWinnerSummary ? (
-              <span className="cx-voting-result">{votingWinnerSummary}</span>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            className="cx-details-toggle"
-            aria-expanded={detailsOpen}
-            aria-controls={`post-details-${post.id}`}
-            onClick={() => setDetailsOpen((prev) => !prev)}
-          >
-            {detailsOpen ? "Hide details" : "See details"}
-          </button>
-        </div>
-
         {detailsOpen ? (
           <div className="cx-post-details-panel" id={`post-details-${post.id}`}>
             {compareUrls ? (
@@ -1767,6 +1790,14 @@ function FeedPostCardComponent({
         ) : null}
 
         <div className="cx-action-rail" role="toolbar" aria-label="Post actions">
+          {!statusInAnonRow ? (
+            <span
+              className={`cx-voting-badge cx-action-rail-status${isVotingClosed ? " cx-voting-badge--closed" : ""}`}
+            >
+              {isVotingClosed ? "🏆 Result" : votingStatusLabel}
+            </span>
+          ) : null}
+          <div className="cx-action-rail-icons">
           <button
             type="button"
             className={`cx-action-chip${commentsOpen ? " cx-action-chip--pressed" : ""}`}
@@ -1840,6 +1871,16 @@ function FeedPostCardComponent({
             {totalVoteCount > 0 ? (
               <span className="cx-action-chip-count">{totalVoteCount}</span>
             ) : null}
+          </button>
+          </div>
+          <button
+            type="button"
+            className="cx-details-toggle cx-action-rail-details"
+            aria-expanded={detailsOpen}
+            aria-controls={`post-details-${post.id}`}
+            onClick={() => setDetailsOpen((prev) => !prev)}
+          >
+            {detailsOpen ? "Hide details" : "See details"}
           </button>
         </div>
 

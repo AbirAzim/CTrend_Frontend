@@ -73,6 +73,11 @@ function buildThreads(comments: CommentRow[]) {
     list.push(c);
     repliesByParent.set(c.parentId, list);
   }
+  // Newest top-level comments first; replies stay oldest-first (chronological).
+  const createdAsc = (a: CommentRow, b: CommentRow) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  topLevel.sort((a, b) => -createdAsc(a, b));
+  for (const list of repliesByParent.values()) list.sort(createdAsc);
   return topLevel.map((comment) => ({
     comment,
     replies: repliesByParent.get(comment.id) ?? [],
@@ -248,9 +253,15 @@ function CommentItem({
               className="ig-post-comments-input cx-comment-reply-input"
               rows={2}
               maxLength={5000}
-              placeholder={`Reply to ${name}…`}
+              placeholder={`Reply to ${name}… (Enter to post)`}
               value={replyDraft}
               onChange={(ev) => setReplyDraft(ev.target.value)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter" && !ev.shiftKey) {
+                  ev.preventDefault();
+                  onSubmitReply(row.id);
+                }
+              }}
               autoFocus
             />
             <div className="cx-comment-reply-actions">
@@ -367,6 +378,10 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
 
   function onSubmitTopComment(e: React.FormEvent) {
     e.preventDefault();
+    submitTopComment();
+  }
+
+  function submitTopComment() {
     setCommentError(null);
     const text = commentDraft.trim();
     if (!text) return;
@@ -595,9 +610,16 @@ export function PostCommentsPanel({ postId, voteMode, isAuthenticated, meLabel }
           className="ig-post-comments-input"
           rows={2}
           maxLength={5000}
-          placeholder={isAuthenticated ? "Share your take…" : "Sign in to comment…"}
+          placeholder={isAuthenticated ? "Share your take… (Enter to post)" : "Sign in to comment…"}
           value={commentDraft}
           onChange={(ev) => setCommentDraft(ev.target.value)}
+          onKeyDown={(ev) => {
+            // Enter posts; Shift+Enter inserts a newline.
+            if (ev.key === "Enter" && !ev.shiftKey) {
+              ev.preventDefault();
+              submitTopComment();
+            }
+          }}
         />
         <button
           type="submit"

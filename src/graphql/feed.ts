@@ -96,6 +96,17 @@ export const VOTE_POST = gql`
   }
 `;
 
+export const REMOVE_VOTE = gql`
+  mutation RemoveVote($postId: ID!) {
+    removeVote(postId: $postId) {
+      postId
+      totalVotes
+      countsPerOption
+      percentages
+    }
+  }
+`;
+
 export const SET_POST_KEEP = gql`
   mutation SetPostKeep($postId: ID!, $keep: Boolean!) {
     setPostKeep(postId: $postId, keep: $keep)
