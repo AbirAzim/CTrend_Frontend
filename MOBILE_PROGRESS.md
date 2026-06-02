@@ -662,25 +662,25 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 21 — Admin Posts Management Tab
+### ✅ PHASE 21 — Admin Posts Management Tab (COMPLETE 2026-06-02)
 
 **Source docs:** `admin-post-management.md`
 
-- [ ] Add **Posts** tab to admin panel navigator (`admin/_layout.tsx` — new 5th tab)
-- [ ] New screen `admin/posts.tsx`:
-  - Search bar (caption + option labels, server-side)
-  - Filter chips: Status (`PUBLISHED` / `SCHEDULED`), Voting (`live` / `closed`), Category
-  - Sort selector: `createdAt | updatedAt | votes | caption` × `asc | desc`
-  - **Reset filters** button when non-default
-  - `FlatList` of platform-wide posts (SYSTEM type only), 20/page, `onEndReached` for pagination
-  - Each row: thumbnail strip (2 images) + caption + short ID + vote/comment counts + status + author + last edited by
-  - Tap row → `/post/[id]`
-  - **Edit** → navigate to edit screen or show bottom-sheet modal
-  - **"+ New platform post"** button → `/tabs/create` with platform-wide flag pre-set
-- [ ] Add `ADMIN_PLATFORM_POSTS`, `ADMIN_PLATFORM_POSTS_COUNT` queries to `packages/shared/src/graphql/admin.ts` (currently web-only in `src/graphql/admin.ts`)
-- [ ] `AdminPersonLink` equivalent: `Pressable` row (avatar + name) that navigates to `/profile/[userId]` with `stopPropagation` from the row press
+- [x] Added **Posts** tab (📝) to admin navigator (`admin/_layout.tsx`)
+- [x] New screen `admin/posts.tsx`:
+  - Search bar (caption + option labels, server-side via `query.search`, 350ms debounce)
+  - Filter chip rows (horizontal scroll, not stacked selects): Status (All/Published/Scheduled), Voting (All/Live/Closed), Category (from CATEGORIES)
+  - Sort chip row: Created/Updated/Votes/Caption + Order Desc/Asc
+  - **Reset** button shown when filters non-default
+  - `FlatList` 20/page with Prev/Next pagination + "Showing X–Y of N" + count query
+  - Each row: 2-image thumb strip + caption + short ID + category + 🗳️/💬/❤️/🔖 counts + Published/Scheduled & Live/Closed pills + ends-relative-time + author PersonLink + "edited by" lastEditedBy PersonLink + updatedAt
+  - Tap row (or 👁 View) → `/post/[id]`
+  - **✏️ Edit** → `/edit-post?postId=` · **🗑** → DELETE_POST with Alert confirm
+  - **"+ New"** → `/tabs/create?platform=1` (create screen reads `platform` param → pre-checks Platform-wide)
+- [x] Added `ADMIN_PLATFORM_POSTS`, `ADMIN_PLATFORM_POSTS_COUNT` to `packages/shared/src/graphql/admin.ts`
+- [x] `PersonLink` component (avatar + name → `/profile/[id]`, `admin` variant = purple avatar) with its own Pressable so it doesn't trigger row navigation
 
-**APIs:** `ADMIN_PLATFORM_POSTS(query, skip, take)`, `ADMIN_PLATFORM_POSTS_COUNT(query)` — backend deployed
+**APIs:** `ADMIN_PLATFORM_POSTS(query, skip, take)`, `ADMIN_PLATFORM_POSTS_COUNT(filter)`, `DELETE_POST`, `CATEGORIES` — backend deployed
 
 ---
 
@@ -712,7 +712,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 | profile.ts | ✅ Complete (includes USER_POSTS) |
 | upload.ts | ✅ Complete (GET_IMAGE_UPLOAD_URL) |
 | messages.ts | ✅ Complete (reactions, viewerReaction, REACT_MESSAGE, MESSAGE_REACTION_CHANGED all present) |
-| admin.ts | ⚠️ Phase 21 — needs `ADMIN_PLATFORM_POSTS`, `ADMIN_PLATFORM_POSTS_COUNT` |
+| admin.ts | ✅ Complete (ADMIN_PLATFORM_POSTS + ADMIN_PLATFORM_POSTS_COUNT added) |
 | worldcup.ts | ✅ Phase 1 — added |
 | profile.ts | ⚠️ Phase 19 — needs `MY_VOTED_POSTS(anonymousOnly)` |
 | notifications.ts | ⚠️ Phase 17 — needs `commentId`, `latestActorAvatar` on MY_NOTIFICATIONS + sub |
@@ -821,3 +821,5 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 19 | Profile redesign — ProfileCompareCard component (drops/voted/kept variants), 2-col grid, live pulse dot, stats footer, 3rd Voted tab with All/Anonymous segmented filter — APK ✅ |
 | 2026-06-02 | Phase 20 | Post detail copy-link button (expo-clipboard + postWebUrl), compare image 58% height cap, platform Ke Jitbe branding applied (accent card border/bg + Platform pill badge in detail header, time-only meta) — APK ✅ |
 | 2026-06-02 | Detail parity | Full-page post now renders the **actual `FeedPostCard`** (`variant="detail"`) for exact feed parity — removed the separate `PostDetailCard`/`VotersPanel`/`ExtendSheet` (~590 lines). Detail variant: skips POST_VOTE_UPDATED sub (avoids dual-mount crash), hides Full-page chip, Comments chip scrolls to comments, delete pops back. — APK ✅ |
+| 2026-06-02 | Icons | Rail icons reworked: Share→**🔗 Copy link** (clipboard + Android toast), Full page→**↗️**, hype fixed from broken `♥`/`♡` dingbat → **❤️** (dim when inactive), VOTED badge `♥`→`✓`. Detail header keeps 🔗 Copy link. |
+| 2026-06-02 | Phase 21 | Admin Platform Posts tab — shared ADMIN_PLATFORM_POSTS(+count) queries, `admin/posts.tsx` (search/status/voting/category/sort chip filters, paginated list, stats, status pills, author + lastEditedBy PersonLinks, View/Edit/Delete, + New platform post → create?platform=1) — APK ✅ |

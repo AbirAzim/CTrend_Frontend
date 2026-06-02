@@ -191,6 +191,7 @@ export default function MessagesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [showNewDm, setShowNewDm] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) {
@@ -227,6 +228,19 @@ export default function MessagesScreen() {
   const onlineSet = new Set(onlineData?.onlineUserIds ?? []);
   const myId = user?.id ?? "";
 
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? conversations.filter((c) => {
+        if (convDisplayName(c, myId).toLowerCase().includes(q)) return true;
+        return c.participants.some(
+          (p) => p.id !== myId && (p.displayName?.toLowerCase() ?? "").includes(q),
+        );
+      })
+    : conversations;
+
+  // Floating tab bar occupies (insets.bottom + PILL margin 14 + PILL height 64)
+  const listBottomPad = insets.bottom + 78 + 16;
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <NewDmModal visible={showNewDm} onClose={() => setShowNewDm(false)} colors={colors} />
@@ -259,11 +273,37 @@ export default function MessagesScreen() {
           </Pressable>
         </View>
       ) : (
-        <FlatList
-          data={conversations}
-          keyExtractor={(c) => c.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item: conv }) => {
+        <>
+          {/* Search bar */}
+          <View style={[styles.listSearchWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <Text style={{ color: colors.muted, marginRight: 8 }}>🔍</Text>
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search messages…"
+              placeholderTextColor={colors.muted}
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch("")} hitSlop={8}>
+                <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <FlatList
+            data={filtered}
+            keyExtractor={(c) => c.id}
+            contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPad }]}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={{ alignItems: "center", paddingTop: 40 }}>
+                <Text style={{ color: colors.muted, fontSize: 14 }}>No conversations match “{search}”</Text>
+              </View>
+            }
+            renderItem={({ item: conv }) => {
             const other = otherParticipant(conv, myId);
             const name = convDisplayName(conv, myId);
             const avatar = normalizeProfileImageUrl(other?.avatarUrl);
@@ -327,7 +367,8 @@ export default function MessagesScreen() {
               </Pressable>
             );
           }}
-        />
+          />
+        </>
       )}
     </View>
   );
@@ -353,6 +394,17 @@ const styles = StyleSheet.create({
   startBtn: { borderRadius: 12, paddingHorizontal: 28, paddingVertical: 12 },
   startBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   listContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
+  listSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
   convRow: {
     flexDirection: "row",
     alignItems: "center",
