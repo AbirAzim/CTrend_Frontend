@@ -354,6 +354,13 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
       backgroundColor: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.1)",
       borderColor: isDark ? "#6366f1" : "#818cf8",
     },
+    reactionTotal: {
+      alignSelf: "center" as const,
+      fontSize: 11,
+      fontWeight: "600" as const,
+      color: c.muted,
+      marginLeft: 2,
+    },
     reactionPillEmoji: { fontSize: 13 },
     reactionPillCount: { fontSize: 11, fontWeight: "700" as const, color: c.subtext },
     reactionPillCountActive: { color: isDark ? "#818cf8" : "#4338ca" },
@@ -523,7 +530,8 @@ function useReactions(initialReaction: string | null, initialCounts: Array<{ emo
   }
 
   const activeReactions = REACTION_EMOJIS.filter((e) => (reactionCounts[e] ?? 0) > 0);
-  return { localReaction, reactionCounts, activeReactions, handleReact };
+  const totalReactions = activeReactions.reduce((sum, e) => sum + (reactionCounts[e] ?? 0), 0);
+  return { localReaction, reactionCounts, activeReactions, totalReactions, handleReact };
 }
 
 // ─── Comment component ────────────────────────────────────────────────────────
@@ -545,7 +553,7 @@ function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded, hig
   const [localCount, setLocalCount] = useState(comment.likeCount);
   const [showReplies, setShowReplies] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const { localReaction, reactionCounts, activeReactions, handleReact } = useReactions(
+  const { localReaction, reactionCounts, activeReactions, totalReactions, handleReact } = useReactions(
     comment.viewerReaction ?? null,
     comment.reactions ?? [],
     comment.id,
@@ -600,10 +608,12 @@ function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded, hig
             </Text>
           </Pressable>
 
-          {/* React chip — clearly labeled, opens emoji picker */}
+          {/* React chip — tap = quick toggle default reaction, long-press = emoji tray */}
           <Pressable
             style={[st.reactChip, localReaction ? st.reactChipActive : null]}
-            onPress={() => setShowPicker(true)}
+            onPress={() => void handleReact(localReaction ?? REACTION_EMOJIS[0])}
+            onLongPress={() => setShowPicker(true)}
+            delayLongPress={300}
             hitSlop={6}
           >
             <Text style={st.reactChipEmoji}>{localReaction ?? "❤️"}</Text>
@@ -625,7 +635,7 @@ function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded, hig
           )}
         </View>
 
-        {/* Compact reaction pills — only those with count > 0 */}
+        {/* Compact reaction summary — top emojis + total count */}
         {activeReactions.length > 0 && (
           <View style={st.reactionPillsRow}>
             {activeReactions.map((emoji) => (
@@ -638,6 +648,9 @@ function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded, hig
                 </View>
               </Pressable>
             ))}
+            {totalReactions > 1 && (
+              <Text style={st.reactionTotal}>{totalReactions} reactions</Text>
+            )}
           </View>
         )}
       </View>
@@ -669,7 +682,7 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
   const [localLiked, setLocalLiked] = useState(reply.viewerHasLiked);
   const [localCount, setLocalCount] = useState(reply.likeCount);
   const [showPicker, setShowPicker] = useState(false);
-  const { localReaction, reactionCounts, activeReactions, handleReact } = useReactions(
+  const { localReaction, reactionCounts, activeReactions, totalReactions, handleReact } = useReactions(
     reply.viewerReaction ?? null,
     reply.reactions ?? [],
     reply.id,
@@ -719,7 +732,9 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
           </Pressable>
           <Pressable
             style={[st.reactChip, localReaction ? st.reactChipActive : null]}
-            onPress={() => setShowPicker(true)}
+            onPress={() => void handleReact(localReaction ?? REACTION_EMOJIS[0])}
+            onLongPress={() => setShowPicker(true)}
+            delayLongPress={300}
             hitSlop={6}
           >
             <Text style={st.reactChipEmoji}>{localReaction ?? "❤️"}</Text>
@@ -741,6 +756,9 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
                 </View>
               </Pressable>
             ))}
+            {totalReactions > 1 && (
+              <Text style={st.reactionTotal}>{totalReactions} reactions</Text>
+            )}
           </View>
         )}
       </View>

@@ -867,18 +867,20 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 29 — Facebook-Style Comment Reactions
+### ⏳ PHASE 29 — Facebook-Style Comment Reactions — IMPLEMENTED (mostly pre-existing), awaiting device test
 
 **Source docs:** `2026-06-02_comment-reactions-fb-style.md`
 
 **Goal:** Comments get a reaction tray + bubble summary (separate from the Phase-18 *message* reactions).
 
-- [ ] **Shared GraphQL** — confirm comment reaction shape (`reactions { emoji count }` + viewer reaction) is in `comments.ts`; add the react-comment mutation if missing. (Doc says reuses existing data shape.)
-- [ ] **Comment UI** (in `FeedPostCard.tsx` discuss panel + `app/post/[id].tsx`):
-  - [ ] **Quick Like** toggles the default reaction (first of `COMMENT_REACTION_EMOJIS`); tapping again removes it.
-  - [ ] **Long-press Like** opens an emoji tray to pick a specific reaction (RN long-press replaces web hover).
-  - [ ] **Bubble summary** under each comment: top emojis + total count.
-  - [ ] Signed-out: show "Sign in to react", reactions disabled.
+> **Audit:** ~90% was already built in earlier phases — `app/post/[id].tsx` already had a labelled "Facebook-style" reaction system. (Note: mobile renders comments **only** on the post-detail screen; `FeedPostCard`'s Comments chip navigates there, so there's no separate feed discuss panel to wire.) Closed the two genuine spec gaps below.
+
+- [x] **Shared GraphQL** — already complete: `COMMENTS_BY_POST` returns `viewerReaction` + `reactions { emoji count }`; `SET_COMMENT_REACTION(commentId, emoji)` mutation present.
+- [x] **Emoji tray** — `EmojiPickerModal` (6 emojis 👍 ❤️ 😂 😮 😢 🔥) already present; opens via **long-press**. (Already done.)
+- [x] **Quick react (gap closed)** — the **React chip** now one-taps to toggle the default reaction (`REACTION_EMOJIS[0]` when none, removes when set); **long-press** opens the tray. Applied to both comments and replies.
+- [x] **Bubble summary (gap closed)** — per-emoji pills already shown; added an aggregated **"{n} reactions"** total at the end of the row (comments + replies).
+- [x] **Works on comments + replies** — both `CommentItem` and `ReplyItem`. (Already done.)
+- [x] **Signed-out** — N/A on mobile: the post-detail screen is auth-gated (redirects unauthenticated users to `/auth/login`), so the comment/reaction UI is never shown to guests.
 
 **APIs:** existing comment reaction data shape (no backend change per doc).
 
@@ -892,17 +894,17 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 30 — Platform Brand Avatar + Announcement Nav + Scheduled Time
+### ⏳ PHASE 30 — Platform Brand Avatar + Announcement Nav + Scheduled Time — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-02_platform-brand-avatar-and-announcement-nav.md`, `2026-06-02_scheduled-time-and-brand-notification-fixes.md`
 
 **Goal:** Make official/platform content feel consistent — brand-logo avatars, tappable announcements, correct scheduled-post timestamps.
 
-- [ ] **Shared GraphQL** — ensure `scheduledAt` is selected in `FEED_POSTS` + `GET_POST_BY_ID` (line 220 has it in feed; verify detail).
-- [ ] **Brand constant** — add `PLATFORM_BRAND_LOGO_URL` to a mobile lib (e.g. `lib/moderatorBrand`), pointing at the bundled logo asset.
-- [ ] **FeedPostCard** — platform/SYSTEM post header uses the brand logo constant (replace any hardcoded logo path).
-- [ ] **Feed meta time** — for scheduled posts, the card timestamp uses `scheduledAt` (go-live time) instead of createdAt.
-- [ ] **Notifications screen** — `ANNOUNCEMENT` notifications with a `postId`/`referenceId` navigate to `/post/[id]` on tap; platform announcements + system-generated types (`VOTE_ENDED`, etc.) use the **brand-logo avatar** instead of the generic emoji icon.
+- [x] **Shared GraphQL** — added `scheduledAt` to `FEED_POSTS`, `GET_POST_BY_ID` (+ `MY_SAVED_POSTS`, `CREATE_POST`). Mapper already carried it.
+- [x] **Brand constant** — mobile equivalent is the bundled `logoAsset` (`assets/logo.png`); imported into the notifications screen (FeedPostCard already used it for platform posts).
+- [x] **FeedPostCard** — platform/SYSTEM header already renders `logoAsset` (no hardcoded path); unchanged.
+- [x] **Feed meta time** — `FeedPostCard` already shows `formatRelativeTime(post.scheduledAt ?? post.createdAt)`; now that the query returns `scheduledAt`, scheduled posts display the go-live time.
+- [x] **Notifications screen** — added `ANNOUNCEMENT` to `POST_NOTIF_TYPES` (tap → `/post/[id]` via `postId ?? referenceId`); new `BRAND_NOTIF_TYPES` (`ANNOUNCEMENT`/`ADMIN_BROADCAST`/`SYSTEM`/`VOTE_ENDED`/`VOTE_WINNER`/`VOTE_PRIZE_CLAIMED`/`POST_WINNER`) render the **brand logo avatar** (with type-emoji badge) instead of a plain emoji when there's no actor avatar.
 
 **APIs:** `scheduledAt` on feed/detail (backend deployed); UI-only otherwise.
 
@@ -1092,3 +1094,5 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 26 | Vote-end notifications + winner claim — shared `CLAIM_POST_VOTE_PRIZE` mutation; notifications screen icons + `POST_NOTIF_TYPES` for `VOTE_ENDED`/`VOTE_WINNER`/`VOTE_PRIZE_CLAIMED`; "🏆 Claim prize" button on unclaimed winner rows → optimistic "Prize claim submitted" + hide button (rollback on error). APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 27 | Winner/claim visibility — `voteWinner`+claim fields on profile (voted/drops) + admin posts queries; `ProfileCompareCard` winner/claimed/claimable wrap pills; admin posts winner row (PersonLink + claimed/unclaimed pill); `FeedCampaignFilter` helper text. APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 28 | Image focal editor — `imageFocalX/Y` on options (feed/detail/saved queries + type + mapper); new `lib/imageFocal.ts` + drag-based `ImagePositionEditor`; create screen per-slot focal + "⊹ Position" trigger; `FeedPostCard` applies `contentPosition` on binary + multi compare images. APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-02 | Phase 29 | Comment reactions — audit found ~90% already built (post-detail FB-style picker/pills/replies). Closed 2 gaps: React chip now one-tap quick-react + long-press tray; added "{n} reactions" total to summary. Shared GraphQL already complete; signed-out N/A (detail auth-gated). APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-02 | Phase 30 | Brand avatar + announce nav + scheduled time — `scheduledAt` added to feed/detail queries (mapper already had it; FeedPostCard already shows scheduled time + platform logo); notifications: `ANNOUNCEMENT`→post nav + `BRAND_NOTIF_TYPES` render brand logo avatar for system-generated rows. APK installed on Pixel 6 — ⏳ awaiting device test. **react_change_3 mobile port code-complete (22–30).** |
