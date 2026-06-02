@@ -34,8 +34,10 @@ import {
   isPendingFriendRequestNotification,
 } from "@ctrend/shared/lib/friendRequestNotification";
 import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
+import { CLAIM_POST_VOTE_PRIZE } from "@ctrend/shared/graphql/feed";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import logoAsset from "../../assets/logo.png";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 
@@ -82,7 +84,10 @@ function notifIcon(type: string): string {
     case "NEW_FOLLOWER":
     case "FRIEND_REQUEST": return "👋";
     case "FRIEND_REQUEST_ACCEPTED": return "🤝";
-    case "POST_WINNER": return "🏆";
+    case "POST_WINNER":
+    case "VOTE_WINNER": return "🏆";
+    case "VOTE_ENDED": return "⏱️";
+    case "VOTE_PRIZE_CLAIMED": return "🎁";
     case "ANNOUNCEMENT":
     case "ADMIN_BROADCAST": return "📢";
     case "SYSTEM": return "ℹ";
@@ -93,6 +98,14 @@ function notifIcon(type: string): string {
 const POST_NOTIF_TYPES = new Set([
   "POST_HYPE", "POST_COMMENT", "NEW_POST_FRIEND",
   "COMMENT_REPLY", "COMMENT_REACTION", "NEW_COMMENT",
+  "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
+  "ANNOUNCEMENT",
+]);
+
+/** System/platform-generated notifications that should show the brand logo avatar (not a generic emoji). */
+const BRAND_NOTIF_TYPES = new Set([
+  "ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM",
+  "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
 ]);
 
 function navigateFromNotif(notif: GqlNotification) {
@@ -230,6 +243,7 @@ type RowProps = {
   onArchive: (notif: GqlNotification) => void;
   onAccept: (notif: GqlNotification) => void;
   onReject: (notif: GqlNotification) => void;
+  onClaim: (notif: GqlNotification) => void;
 };
 
 function NotifRow({
@@ -242,8 +256,14 @@ function NotifRow({
   onArchive,
   onAccept,
   onReject,
+  onClaim,
 }: RowProps) {
   const isLoading = actionLoadingIds.has(notif.id);
+  const showClaim =
+    notif.type === "VOTE_WINNER" &&
+    notif.title.trim() !== "Prize claim submitted" &&
+    !notif.body.toLowerCase().includes("claim is received") &&
+    Boolean(notif.postId || notif.referenceId);
   const alreadyFriends =
     notif.type === "FRIEND_REQUEST" &&
     !!notif.referenceId &&
@@ -254,6 +274,8 @@ function NotifRow({
   const avatarUrl = notif.latestActorId && notif.latestActorAvatar
     ? normalizeProfileImageUrl(notif.latestActorAvatar)
     : null;
+  // Platform/system notifications use the brand logo avatar instead of a generic emoji.
+  const useBrandAvatar = !avatarUrl && BRAND_NOTIF_TYPES.has(notif.type);
 
   // ── Swipe RIGHT to archive ────────────────────────────────────────────────
   const translateX = useRef(new Animated.Value(0)).current;
@@ -301,10 +323,17 @@ function NotifRow({
       {!notif.read && <View style={st.unreadBar} />}
 
       <View style={st.rowInner}>
-        {/* Avatar with type badge, or plain emoji */}
+        {/* Avatar (actor or brand logo) with type badge, or plain emoji */}
         {avatarUrl ? (
           <View style={st.iconWrapOuter}>
             <Image source={{ uri: avatarUrl }} style={st.avatarImg} contentFit="cover" cachePolicy="memory-disk" />
+            <View style={st.typeBadge}>
+              <Text style={st.typeBadgeText}>{notifIcon(notif.type)}</Text>
+            </View>
+          </View>
+        ) : useBrandAvatar ? (
+          <View style={st.iconWrapOuter}>
+            <Image source={logoAsset} style={st.avatarImg} contentFit="cover" cachePolicy="memory-disk" />
             <View style={st.typeBadge}>
               <Text style={st.typeBadgeText}>{notifIcon(notif.type)}</Text>
             </View>
@@ -365,6 +394,22 @@ function NotifRow({
             disabled={isLoading}
           >
             <Text style={st.friendBtnDeclineText}>✕ Decline</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Winner claim-prize action */}
+      {showClaim && (
+        <View style={st.friendActions}>
+          <Pressable
+            style={[st.friendBtnAccept, isLoading && { opacity: 0.6 }]}
+            onPress={(e) => { e.stopPropagation?.(); onClaim(notif); }}
+            disabled={isLoading}
+          >
+            {isLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={st.friendBtnAcceptText}>🏆 Claim prize</Text>
+            }
           </Pressable>
         </View>
       )}
@@ -435,6 +480,7 @@ export default function NotificationsScreen() {
   const [respondMut] = useMutation(RESPOND_FRIEND_REQUEST, {
     refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
   });
+  const [claimMut] = useMutation(CLAIM_POST_VOTE_PRIZE);
 
   // Sound is played by the global subscription in _layout.tsx — only update list here.
   useSubscription(NEW_NOTIFICATION_SUB, {
@@ -515,6 +561,36 @@ export default function NotificationsScreen() {
     }
   }, [respondMut]);
 
+  const handleClaim = useCallback(async (notif: GqlNotification) => {
+    const postId = notif.postId ?? notif.referenceId;
+    if (!postId) return;
+    const rollback = { title: notif.title, body: notif.body, read: notif.read };
+    setActionLoadingIds((prev) => new Set([...prev, notif.id]));
+    try {
+      await claimMut({ variables: { postId } });
+      // Server is source of truth; reflect submitted state and hide the button.
+      setItems((prev) =>
+        prev.map((n) =>
+          n.id === notif.id
+            ? {
+                ...n,
+                read: true,
+                title: "Prize claim submitted",
+                body: "Your claim is received. A moderator will connect with you soon.",
+              }
+            : n,
+        ),
+      );
+      void markRead({ variables: { id: notif.id } }).catch(() => {});
+    } catch {
+      setItems((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, ...rollback } : n)),
+      );
+    } finally {
+      setActionLoadingIds((prev) => { const s = new Set(prev); s.delete(notif.id); return s; });
+    }
+  }, [claimMut, markRead]);
+
   async function handleMarkAll() {
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     try { await markAll(); } catch { /* silent */ }
@@ -582,6 +658,7 @@ export default function NotificationsScreen() {
               onArchive={handleArchive}
               onAccept={handleAccept}
               onReject={handleReject}
+              onClaim={handleClaim}
             />
           )}
           ListFooterComponent={

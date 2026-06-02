@@ -26,6 +26,8 @@ export type FeedPostView = {
   createdAt: string | null;
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
+  /** Lead time (minutes) before deadline to show the "ending soon" banner. Default 5 (Phase 25). */
+  endingSoonLeadMinutes?: number | null;
   upvoteCount: number;
   downvoteCount: number;
   hypeCount?: number;
@@ -53,10 +55,38 @@ export type FeedPostView = {
   mySelectedOptionIndex?: number | null;
   /** Per-option counts/percentages from API when present. */
   optionStats?: VoteOptionStatView[] | null;
-  /** Option titles from API `options` (same order as voting indices / compare columns). */
-  postOptions?: { label: string }[] | null;
+  /** Option titles + per-option image focal from API `options` (same order as voting indices / compare columns). */
+  postOptions?: {
+    label: string;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  /** Campaign this compare is linked to (Phase 22). */
+  campaign?: FeedPostCampaignView | null;
+  /** Random prize-draw winner after voting closes (Phase 24). */
+  voteWinner?: FeedPostVoteWinnerView | null;
+};
+
+export type FeedPostCampaignView = {
+  id: string;
+  name: string;
+  slug: string;
+  bannerText?: string | null;
+  bannerImageUrl?: string | null;
+  prizePerWinner: number;
+};
+
+export type FeedPostVoteWinnerView = {
+  selectedOptionIndex?: number | null;
+  pickedAt?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
 };
 
 export type VoteOptionStatView = {

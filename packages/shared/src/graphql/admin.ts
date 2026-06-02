@@ -301,12 +301,26 @@ export const ADMIN_PLATFORM_POSTS = gql`
       scheduledAt
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       hypeCount
       saveCount
       totalVotes
       upvoteCount
       downvoteCount
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+      voteWinner {
+        selectedOptionIndex
+        pickedAt
+        user {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       authorId
       authorUsername
       authorDisplayName

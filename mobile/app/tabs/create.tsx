@@ -23,9 +23,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "@ctrend/shared/graphql/feed";
+import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
 import { CREATE_SYSTEM_POST } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
+import { ImagePositionEditor } from "../../components/ImagePositionEditor";
+import { hasCustomFocal, DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -35,6 +38,9 @@ const { width: SW } = Dimensions.get("window");
 
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
+type CampaignOption = { id: string; name: string; isActive?: boolean | null; isDefault?: boolean | null };
+type ActiveCampaignsData = { activeCampaigns: CampaignOption[] };
+type AdminCampaignsData = { campaigns: CampaignOption[] };
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 
 type Slot = {
@@ -45,6 +51,8 @@ type Slot = {
   uploading: boolean;
   error: string | null;
   label: string;
+  imageFocalX: number;
+  imageFocalY: number;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,7 +60,10 @@ type Slot = {
 const SLOT_LABELS = ["A", "B", "C", "D"];
 
 function makeSlot(id: string): Slot {
-  return { id, localUri: null, publicUrl: null, pasteUrl: "", uploading: false, error: null, label: "" };
+  return {
+    id, localUri: null, publicUrl: null, pasteUrl: "", uploading: false, error: null, label: "",
+    imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL,
+  };
 }
 
 const QUICK_PRESETS = [
@@ -210,6 +221,9 @@ export default function CreateScreen() {
   const [platformWide, setPlatformWide] = useState(platformParam === "1");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
+  const [campaignId, setCampaignId] = useState("");
+  const [campaignModal, setCampaignModal] = useState(false);
+  const [positionSlotId, setPositionSlotId] = useState<string | null>(null);
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
@@ -243,6 +257,21 @@ export default function CreateScreen() {
   });
   const categories = catData?.categories ?? [];
   const selectedCat = categories.find((c) => c.id === categoryId);
+
+  // Campaigns — admin sees all (with inactive flagged), users see active only.
+  const { data: activeCampData } = useQuery<ActiveCampaignsData>(ACTIVE_CAMPAIGNS, {
+    fetchPolicy: "cache-first", skip: !isAuthenticated || isAdmin,
+  });
+  const { data: adminCampData } = useQuery<AdminCampaignsData>(CAMPAIGNS_ADMIN, {
+    fetchPolicy: "cache-first", skip: !isAuthenticated || !isAdmin,
+  });
+  const campaigns: CampaignOption[] = [
+    ...(isAdmin ? adminCampData?.campaigns ?? [] : activeCampData?.activeCampaigns ?? []),
+  ].sort((a, b) => {
+    if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
+    return (a.name ?? "").localeCompare(b.name ?? "");
+  });
+  const selectedCampaign = campaigns.find((c) => c.id === campaignId);
 
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [createPost, { loading: submitting }] = useMutation(CREATE_POST);
@@ -340,9 +369,12 @@ export default function CreateScreen() {
     const options = readySlots.map((s, i) => ({
       label: s.label.trim() || `Option ${SLOT_LABELS[i] ?? i + 1}`,
       imageUrl: s.publicUrl as string,
+      imageFocalX: s.imageFocalX,
+      imageFocalY: s.imageFocalY,
     }));
     const input: Record<string, unknown> = { categoryId, imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
+    if (campaignId) input.campaignId = campaignId;
 
     if (deadlineEnabled) {
       input.votingEndsAt = deadlinePreset !== null ? hoursFromNow(deadlinePreset) : deadlineCustom.toISOString();
@@ -432,6 +464,17 @@ export default function CreateScreen() {
                     )}
                   </Pressable>
                   {slot.error ? <Text style={st.slotError}>{slot.error}</Text> : null}
+                  {/* Position editor trigger */}
+                  {hasImage && (slot.localUri || slot.publicUrl) ? (
+                    <Pressable
+                      style={[st.positionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
+                      onPress={() => setPositionSlotId(slot.id)}
+                    >
+                      <Text style={[st.positionBtnText, { color: colors.subtext }]}>
+                        ⊹ Position{hasCustomFocal(slot.imageFocalX, slot.imageFocalY) ? " ·" : ""}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   {/* Paste URL */}
                   <TextInput
                     style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
@@ -506,6 +549,23 @@ export default function CreateScreen() {
               <Text style={[st.catChevron, { color: colors.muted }]}>▼</Text>
             </View>
           </Pressable>
+
+          {/* Campaign (optional) */}
+          {campaigns.length > 0 && (
+            <Pressable style={[st.settingRow, { borderBottomColor: colors.border }]} onPress={() => setCampaignModal(true)}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 14 }}>🎯</Text>
+                <Text style={[st.settingKey, { color: colors.text }]}>Campaign</Text>
+                <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
+              </View>
+              <View style={[st.catPicker, { backgroundColor: colors.section, borderColor: colors.border }]}>
+                <Text style={[st.catPickerText, { color: selectedCampaign ? colors.text : colors.muted }]} numberOfLines={1}>
+                  {selectedCampaign?.name?.trim() || "No campaign"}
+                </Text>
+                <Text style={[st.catChevron, { color: colors.muted }]}>▼</Text>
+              </View>
+            </Pressable>
+          )}
 
           {/* Caption */}
           <View style={[st.settingCol, { borderBottomColor: colors.border }]}>
@@ -641,6 +701,64 @@ export default function CreateScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Campaign modal */}
+      <Modal visible={campaignModal} transparent animationType="slide" onRequestClose={() => setCampaignModal(false)}>
+        <Pressable style={st.modalOverlay} onPress={() => setCampaignModal(false)}>
+          <View style={[st.modalSheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[st.modalHandle, { backgroundColor: colors.border }]} />
+            <Text style={[st.modalTitle, { color: colors.text }]}>Attach a campaign</Text>
+            <ScrollView>
+              <Pressable
+                style={[st.modalRow, { borderBottomColor: colors.border }, !campaignId && { backgroundColor: colors.section }]}
+                onPress={() => { setCampaignId(""); setCampaignModal(false); }}
+              >
+                <Text style={[st.modalRowText, { color: !campaignId ? colors.accent : colors.text }, !campaignId && { fontWeight: "700" }]}>
+                  No campaign
+                </Text>
+                {!campaignId && <Text style={[{ color: colors.accent, fontSize: 16, fontWeight: "700" }]}>✓</Text>}
+              </Pressable>
+              {campaigns.map((camp) => {
+                const active = camp.id === campaignId;
+                const inactive = camp.isActive === false;
+                const suffix = `${camp.isDefault ? "  (default)" : ""}${inactive ? "  (inactive)" : ""}`;
+                return (
+                  <Pressable
+                    key={camp.id}
+                    style={[st.modalRow, { borderBottomColor: colors.border }, active && { backgroundColor: colors.section }]}
+                    onPress={() => { setCampaignId(camp.id); setCampaignModal(false); }}
+                  >
+                    <Text style={[st.modalRowText, { color: active ? colors.accent : colors.text }, active && { fontWeight: "700" }]}>
+                      {camp.name?.trim() || camp.id}{suffix}
+                    </Text>
+                    {active && <Text style={[{ color: colors.accent, fontSize: 16, fontWeight: "700" }]}>✓</Text>}
+                  </Pressable>
+                );
+              })}
+              {campaigns.length === 0 && <Text style={[st.modalEmpty, { color: colors.muted }]}>No campaigns available.</Text>}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Image position editor */}
+      {(() => {
+        const slot = slots.find((s) => s.id === positionSlotId);
+        const src = slot ? (slot.localUri ?? slot.publicUrl) : null;
+        if (!slot || !src) return null;
+        const idx = slots.indexOf(slot);
+        return (
+          <ImagePositionEditor
+            visible
+            src={src}
+            label={slot.label.trim() || `Option ${SLOT_LABELS[idx] ?? idx + 1}`}
+            focalX={slot.imageFocalX}
+            focalY={slot.imageFocalY}
+            onChange={(x, y) => patchSlot(slot.id, { imageFocalX: x, imageFocalY: y })}
+            onClose={() => setPositionSlotId(null)}
+          />
+        );
+      })()}
     </KeyboardAvoidingView>
   );
 }
@@ -671,6 +789,8 @@ const st = StyleSheet.create({
   slotRemoveText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   slotError: { color: "#f87171", fontSize: 10, textAlign: "center" },
   slotInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12 },
+  positionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignItems: "center" },
+  positionBtnText: { fontSize: 12, fontWeight: "700" },
 
   addSlotBtn: { borderWidth: 1.5, borderStyle: "dashed", borderRadius: 12, paddingVertical: 13, alignItems: "center" },
   addSlotText: { fontSize: 14, fontWeight: "700" },

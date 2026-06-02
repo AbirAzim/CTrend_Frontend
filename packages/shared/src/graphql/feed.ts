@@ -1,9 +1,35 @@
 import { gql } from "@apollo/client";
 
+/** Campaign link summary attached to a compare post (Phase 22). */
+export const POST_CAMPAIGN_FIELDS = `
+  campaign {
+    id
+    name
+    slug
+    bannerText
+    bannerImageUrl
+    prizePerWinner
+  }
+`;
+
+/** Random prize-draw winner drawn after voting closes (Phase 24). */
+export const POST_VOTE_WINNER_FIELDS = `
+  voteWinner {
+    selectedOptionIndex
+    pickedAt
+    user {
+      id
+      username
+      displayName
+      profileImageUrl
+    }
+  }
+`;
+
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
-  query FeedPosts {
-    feedPosts {
+  query FeedPosts($campaignId: ID) {
+    feedPosts(campaignId: $campaignId) {
       id
       type
       authorId
@@ -13,11 +39,13 @@ export const FEED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       likeCount
       hypeCount
@@ -34,7 +62,11 @@ export const FEED_POSTS = gql`
       }
       options {
         label
+        imageFocalX
+        imageFocalY
       }
+      ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;
@@ -53,11 +85,13 @@ export const GET_POST_BY_ID = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       likeCount
       hypeCount
@@ -74,7 +108,11 @@ export const GET_POST_BY_ID = gql`
       }
       options {
         label
+        imageFocalX
+        imageFocalY
       }
+      ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;
@@ -128,11 +166,13 @@ export const MY_SAVED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       likeCount
       hypeCount
@@ -149,6 +189,8 @@ export const MY_SAVED_POSTS = gql`
       }
       options {
         label
+        imageFocalX
+        imageFocalY
       }
     }
   }
@@ -193,6 +235,7 @@ export const CREATE_POST = gql`
       authorDisplayName
       authorEmail
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -272,6 +315,18 @@ export const POST_VOTE_UPDATED = gql`
 export const DELETE_POST = gql`
   mutation DeletePost($postId: ID!) {
     deletePost(postId: $postId)
+  }
+`;
+
+/** Winner claims their post vote prize (friend/system posts) — Phase 26. */
+export const CLAIM_POST_VOTE_PRIZE = gql`
+  mutation ClaimPostVotePrize($postId: ID!) {
+    claimPostVotePrize(postId: $postId) {
+      id
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+    }
   }
 `;
 

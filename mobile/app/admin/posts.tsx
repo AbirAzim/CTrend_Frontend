@@ -60,6 +60,12 @@ type PlatformPost = {
   authorUsername?: string | null;
   authorDisplayName?: string | null;
   authorProfileImageUrl?: string | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
+  voteWinner?: {
+    user?: { id: string; username?: string | null; displayName?: string | null; profileImageUrl?: string | null } | null;
+  } | null;
   category?: { id: string; name: string } | null;
   options?: Array<{ label: string }> | null;
   editedBy?: Person[] | null;
@@ -383,6 +389,33 @@ export default function AdminPostsScreen() {
                     ) : null}
                   </View>
 
+                  {/* Winner + claim status (after voting closes) */}
+                  {closed && p.voteWinner?.user ? (
+                    <View style={st.byRow}>
+                      <Text style={[st.winnerLabel, { color: colors.muted }]}>🏆 Winner</Text>
+                      <PersonLink
+                        person={{
+                          id: p.voteWinner.user.id,
+                          displayName: p.voteWinner.user.displayName,
+                          username: p.voteWinner.user.username,
+                          profileImageUrl: p.voteWinner.user.profileImageUrl,
+                        }}
+                        colors={colors}
+                      />
+                      {p.isPrizeClaimed ? (
+                        <View style={[st.pill, { backgroundColor: "rgba(34,197,94,0.12)" }]}>
+                          <Text style={[st.pillText, { color: "#22c55e" }]}>
+                            ✅ CLAIMED{p.votePrizeClaimedAt ? ` · ${formatRelativeTime(p.votePrizeClaimedAt)}` : ""}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={[st.pill, { backgroundColor: "rgba(245,158,11,0.14)" }]}>
+                          <Text style={[st.pillText, { color: "#f59e0b" }]}>UNCLAIMED</Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : null}
+
                   {/* Author + last edited */}
                   <View style={st.byRow}>
                     {p.authorId ? (
@@ -477,6 +510,7 @@ const st = StyleSheet.create({
     byRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 2 },
     editedWrap: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
     editedLabel: { fontSize: 11 },
+    winnerLabel: { fontSize: 11, fontWeight: "700" },
 
     personLink: { flexDirection: "row", alignItems: "center", gap: 5 },
     personAvatar: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", overflow: "hidden" },
