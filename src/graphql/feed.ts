@@ -1,5 +1,15 @@
 import { gql } from "@apollo/client";
 
+/** Per-compare-column image framing (object-position). */
+export const POST_OPTION_FIELDS = `
+  options {
+    label
+    imageUrl
+    imageFocalX
+    imageFocalY
+  }
+`;
+
 /** Campaign link + post-vote prize draw winner (shared across feed queries). */
 export const POST_CAMPAIGN_WINNER_FIELDS = `
   campaign {
@@ -54,9 +64,7 @@ export const FEED_POSTS = gql`
         count
         percentage
       }
-      options {
-        label
-      }
+      ${POST_OPTION_FIELDS}
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
@@ -94,9 +102,7 @@ export const GET_POST_BY_ID = gql`
         count
         percentage
       }
-      options {
-        label
-      }
+      ${POST_OPTION_FIELDS}
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
@@ -195,10 +201,7 @@ export const UPDATE_POST = gql`
       id
       imageUrls
       caption
-      options {
-        label
-        imageUrl
-      }
+      ${POST_OPTION_FIELDS}
       category {
         id
         name
