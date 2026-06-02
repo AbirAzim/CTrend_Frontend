@@ -308,6 +308,18 @@ export const DELETE_POST = gql`
   }
 `;
 
+/** Winner claims their post vote prize (friend/system posts) — Phase 26. */
+export const CLAIM_POST_VOTE_PRIZE = gql`
+  mutation ClaimPostVotePrize($postId: ID!) {
+    claimPostVotePrize(postId: $postId) {
+      id
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+    }
+  }
+`;
+
 export const NEW_POSTS = gql`
   subscription NewPosts {
     newPosts {

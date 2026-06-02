@@ -795,16 +795,16 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 26 — Vote-End Notifications + Winner Claim Action
+### ⏳ PHASE 26 — Vote-End Notifications + Winner Claim Action — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-02_vote-end-winner-claim-and-filter-ux.md`, `2026-06-02_scheduled-time-and-brand-notification-fixes.md` (notification parts)
 
 **Goal:** Handle the new vote-lifecycle notification types and let a winner claim their prize from the notification.
 
-- [ ] **Shared GraphQL** — map notification types `VOTE_ENDED`, `VOTE_WINNER`, `VOTE_PRIZE_CLAIMED` in the notifications screen; add `claimPostVotePrize(postId: ID!)` mutation to `packages/shared/src/graphql/feed.ts` (returns `isPrizeClaimed votePrizeClaimedAt canClaimPrize`).
-- [ ] **Notifications screen** (`app/notifications/index.tsx`) — render icons/copy for the 3 new types; `VOTE_WINNER` rows show a **"Claim prize"** button.
-- [ ] **Claim flow** — button calls `claimPostVotePrize(postId)`; on success the row text switches to **"Prize claim submitted — a moderator will connect with you soon"** and the button is **hidden** (prevent duplicate claims). Treat server state as source of truth.
-- [ ] **Winner copy** — friend-post winners get claim-focused copy; non-friend winners get celebration copy (no claim CTA) — driven by `canClaimPrize`.
+- [x] **Shared GraphQL** — added `CLAIM_POST_VOTE_PRIZE(postId)` mutation to `feed.ts` (returns `id isPrizeClaimed votePrizeClaimedAt canClaimPrize`).
+- [x] **Notifications screen** (`app/notifications/index.tsx`) — `notifIcon`: `VOTE_ENDED`→⏱️, `VOTE_WINNER`→🏆, `VOTE_PRIZE_CLAIMED`→🎁; added all three (+`POST_WINNER`) to `POST_NOTIF_TYPES` so tapping opens the post; `VOTE_WINNER` rows show a **"🏆 Claim prize"** button.
+- [x] **Claim flow** — `handleClaim` calls `claimPostVotePrize(postId)`; on success the row switches to **"Prize claim submitted"** / "Your claim is received. A moderator will connect with you soon." + marks read + **hides** the button (rollback on error). Mirrors web bell condition exactly (`title !== "Prize claim submitted" && !body.includes("claim is received")`).
+- [x] **Winner copy** — backend sends claim-intent vs celebration copy; the button only shows on unclaimed `VOTE_WINNER` rows (matches web behaviour).
 
 **APIs:** `MY_NOTIFICATIONS` (new types), `claimPostVotePrize` — backend deployed.
 
@@ -1087,3 +1087,4 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 23 | Campaign default + feed filter — `FEED_POSTS($campaignId)` arg + `isDefault` on campaign queries; new `FeedCampaignFilter` dock (default-first chips, `?campaign=` route param); `PostCampaignBadge` "See other campaigns" sheet; create picker default-first ordering; admin Campaigns `Default` toggle + pill. APK installed on Pixel 6 — ✅ device-tested |
 | 2026-06-02 | Phase 24 | Vote-draw winner banner — shared `POST_VOTE_WINNER_FIELDS` on feed/detail + `FeedPostVoteWinnerView` type + mapper; new `PostVoteWinnerBanner` gold trophy card in `FeedPostCard` (above action rail, only when closed + winner.user exists, tap → profile). APK installed on Pixel 6 — ✅ device-tested |
 | 2026-06-02 | Phase 25 | Ending-soon banner + admin threshold — `endingSoonLeadMinutes` on feed/detail/saved/admin queries + type + mapper (default 5); amber top banner in `FeedPostCard` when open & within lead window (driven by 1s countdown tick); admin-only lead-time input in `edit-post.tsx` (clamped 1–1440) via `UPDATE_POST`. APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-02 | Phase 26 | Vote-end notifications + winner claim — shared `CLAIM_POST_VOTE_PRIZE` mutation; notifications screen icons + `POST_NOTIF_TYPES` for `VOTE_ENDED`/`VOTE_WINNER`/`VOTE_PRIZE_CLAIMED`; "🏆 Claim prize" button on unclaimed winner rows → optimistic "Prize claim submitted" + hide button (rollback on error). APK installed on Pixel 6 — ⏳ awaiting device test |
