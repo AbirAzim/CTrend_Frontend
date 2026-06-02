@@ -1,5 +1,17 @@
 import { gql } from "@apollo/client";
 
+/** Campaign link summary attached to a compare post (Phase 22). */
+export const POST_CAMPAIGN_FIELDS = `
+  campaign {
+    id
+    name
+    slug
+    bannerText
+    bannerImageUrl
+    prizePerWinner
+  }
+`;
+
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
   query FeedPosts {
@@ -35,6 +47,7 @@ export const FEED_POSTS = gql`
       options {
         label
       }
+      ${POST_CAMPAIGN_FIELDS}
     }
   }
 `;
@@ -75,6 +88,7 @@ export const GET_POST_BY_ID = gql`
       options {
         label
       }
+      ${POST_CAMPAIGN_FIELDS}
     }
   }
 `;

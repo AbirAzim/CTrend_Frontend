@@ -684,6 +684,265 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
+## REACT CHANGE 3 — Mobile Adoption Phases (2026-06-02 web batch)
+
+> Source docs: `react_change_3/` directory. **Web + backend confirmed working & deployed.**
+> Workflow: I (Claude) implement a phase → **you test on device using the "Test cases" block** → if it passes, tell me and I flip the phase header to ✅ COMPLETE and tick the boxes. Phases stay ❌ until you confirm.
+>
+> **Shared-GraphQL gap:** Most react_change_3 fields are NOT yet in `packages/shared/src/graphql/`. Each phase lists the exact additions needed. These are the first sub-task of every phase.
+>
+> **Scope notes (web-only, no mobile work):**
+> - `post-author-email-nullable.md` — backend type tweak; mobile already treats `authorEmail` as optional. No phase.
+> - Safari/iOS keyboard fix in `admin-post-delete-and-safari-chat-keyboard.md` — web-only; mobile already solved via `react-native-keyboard-controller`. No phase.
+> - `admin-post-management-ux-overhaul.md` — web admin **table** redesign; mobile admin already uses a card list (Phase 21). Only the *winner/claim column* data is ported (folded into Phase 27).
+
+---
+
+### ⏳ PHASE 22 — Campaign Attachment (create select + feed ribbon) — IMPLEMENTED, awaiting device test
+
+**Source docs:** `2026-06-01_post-campaign-attachment.md`
+
+**Goal:** Any compare post can optionally link to a Campaign; linked posts show a gold ribbon on the feed card and post detail.
+
+- [x] **Shared GraphQL** — added `POST_CAMPAIGN_FIELDS` (`campaign { id name slug bannerText bannerImageUrl prizePerWinner }`) interpolated into `FEED_POSTS`, `GET_POST_BY_ID`, `MY_SAVED_POSTS` in `packages/shared/src/graphql/feed.ts`. `campaignId` flows through the generic `CREATE_POST` input object (no doc change needed).
+- [x] **types/map** — added `FeedPostCampaignView` + `campaign?` to `FeedPostView`; mapped in `mapGqlPostToFeedView.ts`.
+- [x] **Create screen** (`app/tabs/create.tsx`) — optional "🎯 Campaign" picker + bottom-sheet modal: users see `ACTIVE_CAMPAIGNS`, admin sees `CAMPAIGNS_ADMIN` (inactive flagged); "No campaign" default; sends `campaignId` in the create input when set.
+- [x] **PostCampaignBadge** — new `mobile/components/PostCampaignBadge.tsx`: gold ribbon (banner thumb + CAMPAIGN kicker + name + prize line + ›), tappable → `/campaign/[slug]`.
+- [x] **FeedPostCard** — renders the ribbon under the header when `post.campaign` exists; adds a gold `campaignCard` border to the card container.
+
+**Build note:** `npx tsc` clean for these changes (only pre-existing repo-wide expo-router typed-route casts + an unrelated `chipBadge` Text-style overload at line ~1988 remain).
+
+**APIs:** `ACTIVE_CAMPAIGNS` (exists), `CAMPAIGNS_ADMIN` (exists), `CREATE_POST` (add `campaignId`), feed queries (add `campaign`).
+
+**Test cases (run on device):**
+1. As admin, ensure ≥1 active campaign exists (Admin → Campaigns).
+2. Create a post → pick a campaign → publish. → Post appears in feed with a **gold ribbon** + gold border.
+3. Tap the ribbon → navigates to the campaign screen for that slug.
+4. Create a post **without** a campaign → no ribbon, normal border.
+5. Open the post detail of a campaign post → ribbon shows there too.
+6. As a normal user, the campaign picker only lists **active** campaigns.
+
+---
+
+### ❌ PHASE 23 — Campaign Default + Feed Filter + "See other campaigns"
+
+**Source docs:** `2026-06-02_campaign-default-and-filtering.md`
+
+**Goal:** Support multiple active campaigns with one default; filter the home feed by campaign; jump between campaigns from the ribbon.
+
+- [ ] **Shared GraphQL** — add `isDefault` to `ACTIVE_CAMPAIGNS` / `CAMPAIGNS_ADMIN` selections + `UPDATE_CAMPAIGN`/`CREATE_CAMPAIGN` inputs; add optional `campaignId: ID` argument to `FEED_POSTS`.
+- [ ] **Feed query** — thread a `campaignId` variable into the feed query in `app/tabs/index.tsx`; refetch when the selected filter changes.
+- [ ] **Filter dock** — collapsible filter trigger above the feed (mobile sheet or chip row): "All compares" + each active campaign, **default campaign first / emphasized**. Hidden by default; opens on tap; selected campaign shows as a compact summary line when closed.
+- [ ] **"See other campaigns"** — from `PostCampaignBadge` (Phase 22), an action that opens the active-campaign list (bottom sheet); selecting one applies the feed filter.
+- [ ] **Create screen** — order the campaign picker: default first with `(default)` hint; admin also sees `(inactive)` flagged.
+
+**APIs:** `ACTIVE_CAMPAIGNS` (add `isDefault`), `FEED_POSTS(campaignId)` (backend deployed).
+
+**Test cases (run on device):**
+1. Admin marks 2+ campaigns active and one as **default**.
+2. Open feed filter → "All compares" + each active campaign listed; default appears first / emphasized.
+3. Pick a campaign chip → feed shows **only** posts tagged with that campaign.
+4. Pick "All compares" → full feed returns.
+5. Scroll down → filter dock auto-hides; selected campaign still shown as a summary line.
+6. On a campaign post, tap **"See other campaigns"** → list opens → pick another → feed reloads with that filter.
+7. Create screen: default campaign is listed first with `(default)`; admin sees inactive ones flagged.
+
+---
+
+### ❌ PHASE 24 — Vote-Draw Winner Banner
+
+**Source docs:** `2026-06-01_post-vote-draw-winner.md`
+
+**Goal:** After voting closes, a random non-anonymous winner on the winning side is shown in a trophy banner.
+
+- [ ] **Shared GraphQL** — add `voteWinner { selectedOptionIndex pickedAt user { id displayName username profileImageUrl } }` to `FEED_POSTS` + `GET_POST_BY_ID`.
+- [ ] **types/map** — add `voteWinner?` to view type + map in `mapGqlPostToFeedView.ts`.
+- [ ] **PostVoteWinnerBanner** — new `mobile/components/PostVoteWinnerBanner.tsx`: trophy card with winner avatar + name, tappable → `router.push('/profile/[id]')`.
+- [ ] **FeedPostCard** — render the banner **above the action bar** only when voting is closed AND `voteWinner.user` exists. No banner when closed-with-no-votes or anonymous-only winner.
+
+**APIs:** feed queries (add `voteWinner`) — backend deployed.
+
+**Test cases (run on device):**
+1. Create a post with a voting deadline a couple minutes out; have 2 users vote on the winning side (one anonymous, one not).
+2. After the deadline, refresh feed → **trophy banner** names the **non-anonymous** voter on the winning side.
+3. Tap the winner → opens their profile.
+4. A closed post with **zero votes** → no banner.
+5. A 50/50 tie → winner may come from either side, still non-anonymous only.
+6. An open (not-yet-closed) post → no banner.
+
+---
+
+### ❌ PHASE 25 — Poll Ending-Soon Banner + Admin Threshold
+
+**Source docs:** `2026-06-02_poll-ending-soon-configurable-threshold.md`
+
+**Goal:** Per-post "Poll ending soon, vote now!" urgency banner with an admin-configurable lead-time threshold.
+
+- [ ] **Shared GraphQL** — add `endingSoonLeadMinutes` to `FEED_POSTS`, `GET_POST_BY_ID`, and the admin post query; add it to the `UPDATE_POST` input.
+- [ ] **types/map** — add `endingSoonLeadMinutes?` (default 5) to view type + map.
+- [ ] **FeedPostCard** — compute remaining voting time; when open AND `remaining <= endingSoonLeadMinutes`, show a top warning banner **"Poll ending soon, vote now!"** (light + dark styles). Hide once closed.
+- [ ] **Edit post** (`app/edit-post.tsx`) — admin-only number input **"Ending-soon alert lead time (minutes)"** (min 1, max 1440); send in `UPDATE_POST`.
+
+**APIs:** feed/admin queries (add `endingSoonLeadMinutes`), `UPDATE_POST` (add field) — backend deployed.
+
+**Test cases (run on device):**
+1. Admin edits a post, sets ending-soon threshold = `5`.
+2. Set the voting deadline so remaining time is within 5 min → feed card shows the **"Poll ending soon, vote now!"** banner.
+3. Change threshold to `30` → banner appears earlier (when ≤30 min remain).
+4. Once the deadline passes (voting closed) → banner disappears.
+5. Banner is readable in both light and dark theme.
+6. Threshold input rejects values <1 or >1440.
+
+---
+
+### ❌ PHASE 26 — Vote-End Notifications + Winner Claim Action
+
+**Source docs:** `2026-06-02_vote-end-winner-claim-and-filter-ux.md`, `2026-06-02_scheduled-time-and-brand-notification-fixes.md` (notification parts)
+
+**Goal:** Handle the new vote-lifecycle notification types and let a winner claim their prize from the notification.
+
+- [ ] **Shared GraphQL** — map notification types `VOTE_ENDED`, `VOTE_WINNER`, `VOTE_PRIZE_CLAIMED` in the notifications screen; add `claimPostVotePrize(postId: ID!)` mutation to `packages/shared/src/graphql/feed.ts` (returns `isPrizeClaimed votePrizeClaimedAt canClaimPrize`).
+- [ ] **Notifications screen** (`app/notifications/index.tsx`) — render icons/copy for the 3 new types; `VOTE_WINNER` rows show a **"Claim prize"** button.
+- [ ] **Claim flow** — button calls `claimPostVotePrize(postId)`; on success the row text switches to **"Prize claim submitted — a moderator will connect with you soon"** and the button is **hidden** (prevent duplicate claims). Treat server state as source of truth.
+- [ ] **Winner copy** — friend-post winners get claim-focused copy; non-friend winners get celebration copy (no claim CTA) — driven by `canClaimPrize`.
+
+**APIs:** `MY_NOTIFICATIONS` (new types), `claimPostVotePrize` — backend deployed.
+
+**Test cases (run on device):**
+1. End a vote that has a winner. As a **participant/creator**, you receive a `VOTE_ENDED` notification ("Vote has ended. Check out the winner.").
+2. As the **winner on a friend post**, you receive a `VOTE_WINNER` notification with a **"Claim prize"** button.
+3. Tap **Claim prize** → row updates to "Prize claim submitted…" and the button disappears.
+4. Re-open the bell → the claimed row still shows the submitted state (no button, no double-claim).
+5. As a winner on a **non-friend / platform** post → celebration copy; claim CTA only appears where `canClaimPrize` is true.
+6. A `VOTE_PRIZE_CLAIMED` notification renders with correct icon/copy.
+
+---
+
+### ❌ PHASE 27 — Winner/Claim Visibility (Profile + Admin) + Filter UX Polish
+
+**Source docs:** `2026-06-02_vote-end-winner-claim-and-filter-ux.md` (visibility parts), `2026-06-02_admin-post-management-ux-overhaul.md` (winner column data only)
+
+**Goal:** Surface winner identity + claim status on profile drops cards and the admin posts list; polish the feed campaign-filter trigger.
+
+- [ ] **Shared GraphQL** — add winner/claim fields (`voteWinner { user {…} }`, `isPrizeClaimed`, `votePrizeClaimedAt`, `canClaimPrize`) to profile drops/voted queries and to the admin posts query.
+- [ ] **ProfileCompareCard** (`mobile/components/ProfileCompareCard.tsx`) — drops/voted cards show winner identity + **claimed** badge + a **"claimable"** hint when applicable.
+- [ ] **Admin posts** (`app/admin/posts.tsx`) — each row shows winner avatar/name (tappable → profile) + prize-claimed status/time.
+- [ ] **Feed filter trigger polish** — stronger hierarchy on the Phase-23 filter trigger: kicker label + active value + helper text; improved dark-mode contrast.
+
+**APIs:** profile + admin post queries (add winner/claim fields) — backend deployed.
+
+**Test cases (run on device):**
+1. After a vote you won closes, open your profile **Drops** → the card shows winner identity + a claim badge/hint.
+2. After claiming, the card shows a **"claimed"** badge (not "claimable").
+3. Admin → Posts list → a closed post with a winner shows the **winner avatar/name** + claimed status/time; tapping the winner opens their profile.
+4. Voted tab cards reflect winner/claim state where relevant.
+5. Feed filter trigger shows kicker + selected campaign value + helper text; readable in dark mode.
+
+---
+
+### ❌ PHASE 28 — Per-Option Image Focal Position Editor
+
+**Source docs:** `2026-06-02_image-focal-position-editor.md`
+
+**Goal:** Authors set a per-option focal point (0–100) so compare images frame consistently; feed renders with that focal as `object-position`.
+
+- [ ] **Shared GraphQL** — extend the post `options` selection to `options { label imageUrl imageFocalX imageFocalY }` (a `POST_OPTION_FIELDS` fragment) across feed + detail; include focal in `CREATE_POST` option input.
+- [ ] **types/map** — add `imageFocalX`/`imageFocalY` to the `postOptions` view type + map (default 50/50).
+- [ ] **imageFocal helper** — port `lib/imageFocal.ts` (focal → `contentPosition`/`{x%,y%}` for `expo-image` `contentPosition`).
+- [ ] **ImagePositionEditor** — new `mobile/components/ImagePositionEditor.tsx`: modal to drag the image (`PanResponder`/gesture) and/or sliders to set focal; "Done" returns 0–100 values.
+- [ ] **Create screen** — each draft option gets focal defaults 50/50; a **"Position"** button opens the editor; show a "Position ·" indicator when customized.
+- [ ] **FeedPostCard** — apply `contentPosition` per option image from the focal values.
+
+**APIs:** post `options.imageFocalX/Y` (backend deployed); `CREATE_POST` option focal input.
+
+**Test cases (run on device):**
+1. Create a post, upload images for option A/B.
+2. Tap **Position** on an option → drag so the subject is centered → Done.
+3. The "Position ·" indicator shows the option was customized.
+4. Publish → feed/detail render that option framed per your focal (not center-cropped).
+5. An option left at default still center-crops, unchanged.
+6. Both options can have independent focal points.
+
+---
+
+### ❌ PHASE 29 — Facebook-Style Comment Reactions
+
+**Source docs:** `2026-06-02_comment-reactions-fb-style.md`
+
+**Goal:** Comments get a reaction tray + bubble summary (separate from the Phase-18 *message* reactions).
+
+- [ ] **Shared GraphQL** — confirm comment reaction shape (`reactions { emoji count }` + viewer reaction) is in `comments.ts`; add the react-comment mutation if missing. (Doc says reuses existing data shape.)
+- [ ] **Comment UI** (in `FeedPostCard.tsx` discuss panel + `app/post/[id].tsx`):
+  - [ ] **Quick Like** toggles the default reaction (first of `COMMENT_REACTION_EMOJIS`); tapping again removes it.
+  - [ ] **Long-press Like** opens an emoji tray to pick a specific reaction (RN long-press replaces web hover).
+  - [ ] **Bubble summary** under each comment: top emojis + total count.
+  - [ ] Signed-out: show "Sign in to react", reactions disabled.
+
+**APIs:** existing comment reaction data shape (no backend change per doc).
+
+**Test cases (run on device):**
+1. Open a post → comments.
+2. Tap **Like** on a comment → default reaction added; tap again → removed.
+3. **Long-press Like** → tray opens → pick another emoji → that reaction is set.
+4. Bubble summary updates (top emojis + count) immediately.
+5. Signed-out → "Sign in to react", cannot react.
+6. Works on both top-level comments and replies.
+
+---
+
+### ❌ PHASE 30 — Platform Brand Avatar + Announcement Nav + Scheduled Time
+
+**Source docs:** `2026-06-02_platform-brand-avatar-and-announcement-nav.md`, `2026-06-02_scheduled-time-and-brand-notification-fixes.md`
+
+**Goal:** Make official/platform content feel consistent — brand-logo avatars, tappable announcements, correct scheduled-post timestamps.
+
+- [ ] **Shared GraphQL** — ensure `scheduledAt` is selected in `FEED_POSTS` + `GET_POST_BY_ID` (line 220 has it in feed; verify detail).
+- [ ] **Brand constant** — add `PLATFORM_BRAND_LOGO_URL` to a mobile lib (e.g. `lib/moderatorBrand`), pointing at the bundled logo asset.
+- [ ] **FeedPostCard** — platform/SYSTEM post header uses the brand logo constant (replace any hardcoded logo path).
+- [ ] **Feed meta time** — for scheduled posts, the card timestamp uses `scheduledAt` (go-live time) instead of createdAt.
+- [ ] **Notifications screen** — `ANNOUNCEMENT` notifications with a `postId`/`referenceId` navigate to `/post/[id]` on tap; platform announcements + system-generated types (`VOTE_ENDED`, etc.) use the **brand-logo avatar** instead of the generic emoji icon.
+
+**APIs:** `scheduledAt` on feed/detail (backend deployed); UI-only otherwise.
+
+**Test cases (run on device):**
+1. Schedule a SYSTEM/platform post; after it goes live, its feed card timestamp reflects the **scheduled go-live time**.
+2. All users receive the scheduled platform announcement notification.
+3. Tap an `ANNOUNCEMENT` notification that references a post → opens that post.
+4. Platform announcement rows show the **brand logo** avatar (not a generic emoji).
+5. System-generated rows (e.g. `VOTE_ENDED`) show the brand logo, not a clock/emoji icon.
+6. Normal (user-actor) notifications are unchanged.
+
+---
+
+## PHASE PRIORITY ORDER (react_change_3)
+
+| Phase | Priority | Effort | Dependencies (backend deployed ✅) |
+|-------|----------|--------|------------------------------------|
+| 22 — Campaign attachment | 🔴 High | Medium | `campaign` on post, `campaignId` on create |
+| 23 — Campaign default + filter | 🔴 High | Large | `isDefault`, `feedPosts(campaignId)` |
+| 24 — Vote-draw winner banner | 🔴 High | Small | `voteWinner` on post |
+| 25 — Ending-soon banner + threshold | 🟠 Medium | Small | `endingSoonLeadMinutes` |
+| 26 — Vote-end notif + claim | 🟠 Medium | Medium | new notif types, `claimPostVotePrize` |
+| 27 — Winner/claim visibility + filter polish | 🟡 Medium | Medium | winner/claim fields on profile+admin |
+| 28 — Image focal editor | 🟡 Medium | Large | `imageFocalX/Y` on options |
+| 29 — Comment reactions | 🟡 Medium | Medium | existing comment reaction shape |
+| 30 — Brand avatar + announce nav + scheduled time | 🟢 Low | Small | `scheduledAt` (mostly UI-only) |
+
+---
+
+## SHARED GRAPHQL STATUS (react_change_3 additions needed)
+
+| File | Needs |
+|---|---|
+| feed.ts | `campaign {…}` + `campaignId` arg + `voteWinner {…}` + `endingSoonLeadMinutes` + `options.imageFocalX/Y` + `claimPostVotePrize` mutation + `isPrizeClaimed/canClaimPrize/votePrizeClaimedAt` (Phases 22–28) |
+| campaigns.ts | `isDefault` on active/admin reads + create/update inputs (Phase 23) |
+| profile.ts | winner/claim fields on drops + voted (Phase 27) |
+| admin.ts | `endingSoonLeadMinutes` + winner/claim fields on platform posts (Phases 25, 27) |
+| notifications.ts | new types `VOTE_ENDED`/`VOTE_WINNER`/`VOTE_PRIZE_CLAIMED` handling (Phase 26) |
+| comments.ts | verify reaction shape + react-comment mutation (Phase 29) |
+
+---
+
 ## PHASE PRIORITY ORDER (react_change_2)
 
 | Phase | Priority | Effort | Dependencies |
@@ -823,3 +1082,5 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Detail parity | Full-page post now renders the **actual `FeedPostCard`** (`variant="detail"`) for exact feed parity — removed the separate `PostDetailCard`/`VotersPanel`/`ExtendSheet` (~590 lines). Detail variant: skips POST_VOTE_UPDATED sub (avoids dual-mount crash), hides Full-page chip, Comments chip scrolls to comments, delete pops back. — APK ✅ |
 | 2026-06-02 | Icons | Rail icons reworked: Share→**🔗 Copy link** (clipboard + Android toast), Full page→**↗️**, hype fixed from broken `♥`/`♡` dingbat → **❤️** (dim when inactive), VOTED badge `♥`→`✓`. Detail header keeps 🔗 Copy link. |
 | 2026-06-02 | Phase 21 | Admin Platform Posts tab — shared ADMIN_PLATFORM_POSTS(+count) queries, `admin/posts.tsx` (search/status/voting/category/sort chip filters, paginated list, stats, status pills, author + lastEditedBy PersonLinks, View/Edit/Delete, + New platform post → create?platform=1) — APK ✅ |
+| 2026-06-02 | Planning | react_change_3 analyzed — Phases 22–30 added to MOBILE_PROGRESS.md (campaign attach, campaign default+filter, vote-draw winner, ending-soon threshold, vote-end notif+claim, winner/claim visibility, image focal editor, comment reactions, brand avatar+announce nav+scheduled time). Each phase has device test cases; awaiting per-phase testing before marking ✅ |
+| 2026-06-02 | Phase 22 | Campaign attachment implemented — shared `POST_CAMPAIGN_FIELDS` on feed/detail/saved queries + `FeedPostCampaignView` type + mapper; new `PostCampaignBadge` gold ribbon in `FeedPostCard` (+ gold card border); create screen campaign picker modal (active for users / all for admin) sending `campaignId`. ⏳ Awaiting device test |

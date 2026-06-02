@@ -47,6 +47,7 @@ import { postWebUrl } from '../lib/postPermalink';
 import * as Clipboard from 'expo-clipboard';
 import { MODERATOR_PLATFORM_NAME } from '@ctrend/shared/lib/moderatorBrand';
 import logoAsset from '../assets/logo.png';
+import { PostCampaignBadge } from './PostCampaignBadge';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -229,6 +230,10 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: c.accentLight,
 			borderWidth: 1.5,
 			backgroundColor: c.accent + '14',
+		},
+		campaignCard: {
+			borderColor: isDark ? 'rgba(245,158,11,0.5)' : 'rgba(217,160,23,0.55)',
+			borderWidth: 1.5,
 		},
 		timeLabel: { fontSize: 11, color: c.muted, marginTop: 2 },
 		moreBtn: { padding: 8 },
@@ -1506,9 +1511,15 @@ function FeedPostCardComponent({
 		? null
 		: (post.authorProfileImageUrl ?? null);
 	const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
+	const campaign = post.campaign ?? null;
 
 	return (
-		<View style={[st.card, isPlatformPost && st.platformCard]}>
+		<View
+			style={[
+				st.card,
+				isPlatformPost && st.platformCard,
+				campaign && st.campaignCard,
+			]}>
 			{/* Header */}
 			<View style={st.header}>
 				<Pressable
@@ -1560,6 +1571,9 @@ function FeedPostCardComponent({
 					<View style={st.moreBtn} />
 				)}
 			</View>
+
+			{/* Campaign ribbon */}
+			{campaign ? <PostCampaignBadge campaign={campaign} /> : null}
 
 			{/* Caption */}
 			{post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
