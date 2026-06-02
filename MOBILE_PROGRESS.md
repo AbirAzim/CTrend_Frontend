@@ -637,29 +637,28 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 20 — Post Detail Polish + Ke Jitbe Per-Card Branding
+### ✅ PHASE 20 — Post Detail Polish + Ke Jitbe Per-Card Branding (COMPLETE 2026-06-02)
 
 **Source docs:** `post-detail-copy-link-and-layout.md`, `platform-posts-ke-jitbe-branding.md`
 
 #### Post detail
 
-- [ ] **Copy link button** in post detail header (no full URL text input):
-  - Header row: ← Back · "Post link" label · **Copy link** button
-  - Tap: `await Clipboard.setStringAsync(\`https://www.kejitbe.app/post/\${postId}\`)` (use `expo-clipboard`)
-  - Show toast "Copied ✓" for 2s
-  - Install dep if missing: `cd mobile && npx expo install expo-clipboard`
-- [ ] **Full-width compare images** on detail screen: `flexDirection:'row'`, each image `flex:1`, `maxHeight: windowHeight * 0.58`, `resizeMode:'cover'`. Avoid fixed `aspectRatio` that leaves a horizontal gap.
-- [ ] Page `maxWidth:640` centered (or full-width on phone, centered on tablet).
+- [x] **Copy link button** in post detail header (headerRight: "🔗 Copy link")
+  - Tap: `Clipboard.setStringAsync(postWebUrl(id))` → `https://www.kejitbe.app/post/${id}` (via `postWebUrl`, respects `EXPO_PUBLIC_WEB_ORIGIN`)
+  - Shows toast "Copied ✓" via `useToast`
+  - Installed `expo-clipboard ~56.0.3`
+- [x] **Full-width compare images** — cells already full-width (`(SCREEN_W-2)/2` each), added height cap `Math.min(IMG_W*1.55, SCREEN_H*0.58)` so tall images don't dominate; `contentFit="cover"`
+- [x] Phone full-width (mobile single-column; no tablet maxWidth needed)
 
 #### Platform posts (Ke Jitbe branding)
 
-- [ ] Verify `postType` from `mapGqlPostToFeedView` is mapped in `packages/shared/src/lib/mapGqlPostToFeedView.ts` (field `type?.toLowerCase()` → `postType`)
-- [ ] `FeedPostCard` header: when `post.postType === "system"` → show logo asset + name **"Ke Jitbe"** + **"Platform"** pill badge; no profile link tap
-- [ ] Card: accent gradient border / left stripe for platform posts (use accent border + `backgroundColor` gradient on card container)
-- [ ] Post detail header: same logo + badge when `postType === "system"`
-- [ ] **Remove** any Ke Jitbe section banner / Bengali tagline from feed screen if still present
+- [x] `postType` already mapped in shared `mapGqlPostToFeedView.ts` (`type?.toLowerCase()` → `postType`); `type` field present in shared `feed.ts`
+- [x] `FeedPostCard` header: logo + "Ke Jitbe" + "Platform" pill badge already present; **applied** the `platformCard` accent border/bg style to card container (was defined but unused)
+- [x] Card: accent border (1.5px `accentLight`) + tinted bg (`accent + "14"`) for platform posts — both feed card and post detail card
+- [x] Post detail header: logo + "Platform" pill badge added; meta now **time-only** (removed "Platform poll ·" prefix per spec)
+- [x] No Ke Jitbe section banner / Bengali tagline present in mobile (grep clean) — only the legitimate topbar app title
 
-**Deps:** `expo-clipboard` (if not already installed)
+**Deps:** `expo-clipboard ~56.0.3` installed (new native module — required full rebuild)
 
 ---
 
@@ -778,7 +777,7 @@ The specified child already has a parent. You must call removeView() on the chil
 
 **Fixes applied:**
 1. Removed `removeClippedSubviews={true}` from FlatList in `tabs/index.tsx` — caused native view detachment races during navigation.
-2. `PostDetailScreen` uses `PostDetailCard` (inline, subscription-free) instead of `FeedPostCard` — avoids dual-mount subscription conflict.
+2. ~~`PostDetailScreen` uses `PostDetailCard` (inline, subscription-free) instead of `FeedPostCard`~~ **(REVERTED 2026-06-02)** — `PostDetailScreen` now reuses `FeedPostCard` with `variant="detail"` for exact visual parity. The dual-mount subscription conflict is avoided by passing `skip: isDetail` to the `POST_VOTE_UPDATED` `useSubscription` (the detail instance never opens a second sub on the same postId). If the `addViewAt` crash recurs on post detail, re-check this.
 3. `tabs/_layout.tsx`: Added `listeners: { tabPress: guardedTabPress }` to all protected tabs — intercepts press before screen mounts, preventing native view ops on redirect to login.
 4. All protected tab screens (`create`, `profile`, `keeps`, `messages`): moved all hooks before auth check; replaced `<Redirect>` with `useEffect` + `router.replace`.
 
@@ -820,3 +819,5 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Planning | react_change_2 analyzed — Phases 14–21 added to MOBILE_PROGRESS.md (action bar, unvote, comments, notifications, message reactions, profile grid, post detail, admin posts) |
 | 2026-06-02 | Phase 18 | Message reactions — long-press picker (6 emojis), optimistic updates, reaction strip under bubbles, MESSAGE_REACTION_CHANGED sub, works on text + image bubbles |
 | 2026-06-02 | Phase 19 | Profile redesign — ProfileCompareCard component (drops/voted/kept variants), 2-col grid, live pulse dot, stats footer, 3rd Voted tab with All/Anonymous segmented filter — APK ✅ |
+| 2026-06-02 | Phase 20 | Post detail copy-link button (expo-clipboard + postWebUrl), compare image 58% height cap, platform Ke Jitbe branding applied (accent card border/bg + Platform pill badge in detail header, time-only meta) — APK ✅ |
+| 2026-06-02 | Detail parity | Full-page post now renders the **actual `FeedPostCard`** (`variant="detail"`) for exact feed parity — removed the separate `PostDetailCard`/`VotersPanel`/`ExtendSheet` (~590 lines). Detail variant: skips POST_VOTE_UPDATED sub (avoids dual-mount crash), hides Full-page chip, Comments chip scrolls to comments, delete pops back. — APK ✅ |

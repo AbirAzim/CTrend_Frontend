@@ -1,18 +1,14 @@
-import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
-  FlatList,
   Modal,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -26,31 +22,22 @@ import {
   SET_COMMENT_LIKE,
   SET_COMMENT_REACTION,
 } from "@ctrend/shared/graphql/comments";
-import {
-  DELETE_POST,
-  EXTEND_POST_VOTING,
-  GET_POST_BY_ID,
-  REMOVE_VOTE,
-  SET_POST_HYPE,
-  SET_POST_KEEP,
-  VOTERS_BY_POST,
-  VOTE_POST,
-} from "@ctrend/shared/graphql/feed";
+import { GET_POST_BY_ID } from "@ctrend/shared/graphql/feed";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
-import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
-import logoAsset from "../../assets/logo.png";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
-import { useTabBar } from "../../context/TabBarContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
-import { postPermalink } from "../../lib/postPermalink";
+import { postWebUrl } from "../../lib/postPermalink";
+import * as Clipboard from "expo-clipboard";
+import { FeedPostCard } from "../../components/FeedPostCard";
 
-const { width: SCREEN_W } = Dimensions.get("window");
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const IMG_W = (SCREEN_W - 2) / 2;
-const IMG_H = IMG_W * 1.55;
+// Full-width compare cells, capped at 58% of screen height (single-post only)
+const IMG_H = Math.min(IMG_W * 1.55, Math.round(SCREEN_H * 0.58));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -69,28 +56,8 @@ type GqlComment = {
   author: { id: string; username: string; displayName: string | null; profileImageUrl?: string | null };
 };
 
-type GqlVoter = {
-  voteId: string;
-  selectedOptionIndex: number;
-  anonymous: boolean;
-  createdAt: string;
-  user: { id: string; username: string; displayName: string | null; profileImageUrl?: string | null } | null;
-};
-
 type CommentsData = { commentsByPost: GqlComment[] };
 type PostData = { getPostById: unknown };
-// VotersData used as generic for client.query
-type VotersData = { votersByPost: GqlVoter[] };
-
-// ─── Duration options for extend voting ──────────────────────────────────────
-
-const EXTEND_OPTS = [
-  { label: "+1h", ms: 1 * 60 * 60 * 1000 },
-  { label: "+12h", ms: 12 * 60 * 60 * 1000 },
-  { label: "+1d", ms: 24 * 60 * 60 * 1000 },
-  { label: "+3d", ms: 3 * 24 * 60 * 60 * 1000 },
-  { label: "+7d", ms: 7 * 24 * 60 * 60 * 1000 },
-];
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -100,6 +67,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
     scroll: { flex: 1, backgroundColor: c.bg },
     headerBack: { paddingHorizontal: 4 },
     headerBackText: { fontSize: 16, color: c.accent, fontWeight: "700" },
+    headerCopy: { paddingHorizontal: 8, paddingVertical: 4 },
+    headerCopyText: { fontSize: 14, color: c.accent, fontWeight: "700" },
 
     // Comments section
     sectionHeader: {
@@ -465,10 +434,18 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 
     // Inline post card
     postCard: { backgroundColor: c.card, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
+    postCardPlatform: { borderWidth: 1.5, borderColor: c.accentLight, backgroundColor: c.accent + "14" },
     postHeader: { flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
     postAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#312e81", alignItems: "center" as const, justifyContent: "center" as const },
     postAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" as const },
+    postAuthorRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 7 },
     postAuthor: { fontSize: 14, fontWeight: "700" as const, color: c.text },
+    platformBadge: {
+      fontSize: 9, fontWeight: "700" as const, letterSpacing: 0.6,
+      textTransform: "uppercase" as const, color: c.accent,
+      paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+      borderWidth: 1, borderColor: c.accentLight, overflow: "hidden" as const,
+    },
     postTime: { fontSize: 12, color: c.muted, marginTop: 1 },
     postCaption: { paddingHorizontal: 14, paddingBottom: 10, fontSize: 14, color: c.text, lineHeight: 20 },
     postImages: { flexDirection: "row" as const, gap: 2 },
@@ -780,601 +757,6 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
   );
 }
 
-// ─── Voters floating panel (non-blocking, paginated, searchable) ─────────────
-
-const VOTERS_PAGE_SIZE = 10;
-const OPTION_TAG_COLORS = ["#6366f1", "#f97316", "#22c55e", "#a855f7"];
-
-type VotersPanelProps = {
-  postId: string;
-  visible: boolean;
-  onClose: () => void;
-  optionLabels: string[];
-  st: ReturnType<typeof makeStyles>;
-  colors: ColorPalette;
-  bottomOffset: number;
-};
-
-function VotersPanel({ postId, visible, onClose, optionLabels, st, colors, bottomOffset }: VotersPanelProps) {
-  const client = useApolloClient();
-  const [activeTab, setActiveTab] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [voters, setVoters] = useState<GqlVoter[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingInitial, setLoadingInitial] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const reqIdRef = useRef(0);
-  const votersRef = useRef<GqlVoter[]>([]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const fetchVoters = useCallback(async (append: boolean) => {
-    const reqId = ++reqIdRef.current;
-    if (append) setLoadingMore(true);
-    else { setLoadingInitial(true); votersRef.current = []; }
-    try {
-      const base = append ? votersRef.current : [];
-      const { data } = await client.query<VotersData>({
-        query: VOTERS_BY_POST,
-        variables: {
-          postId,
-          optionIndex: activeTab ?? undefined,
-          search: debouncedSearch || null,
-          skip: base.length,
-          take: VOTERS_PAGE_SIZE,
-        },
-        fetchPolicy: "network-only",
-      });
-      if (reqIdRef.current !== reqId) return;
-      const rows: GqlVoter[] = data?.votersByPost ?? [];
-      const next = [...base, ...rows];
-      votersRef.current = next;
-      setVoters(next);
-      setHasMore(rows.length === VOTERS_PAGE_SIZE);
-    } catch { /* silent */ }
-    finally {
-      if (reqIdRef.current === reqId) { setLoadingInitial(false); setLoadingMore(false); }
-    }
-  }, [client, postId, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!visible) return;
-    void fetchVoters(false);
-  }, [visible, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!visible) return null;
-
-  const tabs = [{ label: "All", value: null }, ...optionLabels.map((l, i) => ({ label: l || `Option ${i + 1}`, value: i }))];
-
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <View style={[st.votersPanel, { bottom: bottomOffset }]} pointerEvents="auto">
-        {/* Header */}
-        <View style={st.votersPanelHeader}>
-          <Text style={st.votersPanelTitle}>
-            Voted by {voters.length}{hasMore ? "+" : ""}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={8} style={st.votersPanelClose}>
-            <Text style={st.votersPanelCloseText}>✕</Text>
-          </Pressable>
-        </View>
-
-        {/* Search */}
-        <View style={st.votersPanelSearch}>
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search voters…"
-            placeholderTextColor={colors.muted}
-            style={st.votersPanelSearchInput}
-            autoCapitalize="none"
-          />
-          {search ? (
-            <Pressable onPress={() => setSearch("")} hitSlop={8}>
-              <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        {/* Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={st.votersTabRow}
-        >
-          {tabs.map((t) => (
-            <Pressable
-              key={String(t.value)}
-              style={[st.votersTab, activeTab === t.value && st.votersTabActive]}
-              onPress={() => setActiveTab(t.value)}
-            >
-              <Text style={[st.votersTabText, activeTab === t.value && st.votersTabTextActive]}>
-                {t.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {/* Voter list */}
-        <FlatList
-          data={voters}
-          keyExtractor={(v) => v.voteId}
-          onEndReached={() => { if (hasMore && !loadingMore && !loadingInitial) void fetchVoters(true); }}
-          onEndReachedThreshold={0.3}
-          style={{ height: 340 }}
-          ListEmptyComponent={
-            loadingInitial
-              ? <ActivityIndicator style={{ margin: 24 }} color={colors.accent} />
-              : <Text style={st.voterEmpty}>
-                  {debouncedSearch ? "No voters match your search" : "No voters yet"}
-                </Text>
-          }
-          ListFooterComponent={
-            loadingMore
-              ? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.accent} />
-              : !hasMore && voters.length > 0
-                ? <Text style={[st.voterEmpty, { fontSize: 12, paddingVertical: 12 }]}>That's everyone</Text>
-                : null
-          }
-          renderItem={({ item: v }) => {
-            const name = v.anonymous
-              ? "Anonymous"
-              : v.user?.displayName?.trim() || v.user?.username || "Unknown";
-            const initial = name.slice(0, 1).toUpperCase();
-            const img = !v.anonymous ? normalizeProfileImageUrl(v.user?.profileImageUrl) : null;
-            const tagLabel = optionLabels[v.selectedOptionIndex];
-            const tagColor = OPTION_TAG_COLORS[v.selectedOptionIndex % OPTION_TAG_COLORS.length];
-            return (
-              <Pressable
-                style={st.voterRow}
-                onPress={() => {
-                  if (!v.anonymous && v.user) {
-                    onClose();
-                    router.push(`/profile/${v.user.id}` as `/${string}`);
-                  }
-                }}
-              >
-                <View style={st.voterAvatar}>
-                  {img
-                    ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                    : <Text style={st.voterAvatarText}>{v.anonymous ? "?" : initial}</Text>
-                  }
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.voterName}>{name}</Text>
-                  <Text style={st.voterTime}>{formatRelativeTime(v.createdAt)}</Text>
-                </View>
-                {activeTab === null && tagLabel ? (
-                  <View style={[st.voterOptionTag, { backgroundColor: tagColor + "22", borderColor: tagColor + "44" }]}>
-                    <Text style={[st.voterOptionTagText, { color: tagColor }]}>{tagLabel}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          }}
-        />
-      </View>
-    </View>
-  );
-}
-
-// ─── Extend voting modal ──────────────────────────────────────────────────────
-
-type ExtendSheetProps = {
-  visible: boolean;
-  onClose: () => void;
-  onExtend: (ms: number) => void;
-  extending: boolean;
-  st: ReturnType<typeof makeStyles>;
-  insets: { bottom: number };
-};
-
-function ExtendSheet({ visible, onClose, onExtend, extending, st, insets }: ExtendSheetProps) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={st.extendModal}>
-        <View style={[st.extendSheet, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={st.extendTitle}>Extend voting</Text>
-          <View style={st.extendOptsRow}>
-            {EXTEND_OPTS.map((o) => (
-              <Pressable
-                key={o.label}
-                style={st.extendOpt}
-                onPress={() => onExtend(o.ms)}
-                disabled={extending}
-              >
-                {extending ? (
-                  <ActivityIndicator size="small" />
-                ) : (
-                  <Text style={st.extendOptText}>{o.label}</Text>
-                )}
-              </Pressable>
-            ))}
-          </View>
-          <Pressable style={st.extendCancel} onPress={onClose}>
-            <Text style={st.extendCancelText}>Cancel</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── Inline post card — no subscription, avoids dual-screen native view conflict ─
-
-type PostDetailCardProps = {
-  post: ReturnType<typeof mapGqlPostToFeedView>;
-  st: ReturnType<typeof makeStyles>;
-  colors: ColorPalette;
-  onVoters: () => void;
-};
-
-function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
-  const { isAuthenticated } = useAuth();
-  const { adjustSavedCount } = useTabBar();
-  const [voteMut] = useMutation(VOTE_POST);
-  const [removeVoteMut] = useMutation(REMOVE_VOTE);
-  const [hypeMut] = useMutation(SET_POST_HYPE);
-  const [keepMut] = useMutation(SET_POST_KEEP);
-  const [viewerVote, setViewerVote] = useState(post.viewerVote);
-  const [up, setUp] = useState(post.upvoteCount);
-  const [down, setDown] = useState(post.downvoteCount);
-  const [anonymous, setAnonymous] = useState(Boolean(post.myVoteAnonymous));
-  const [hyped, setHyped] = useState(Boolean(post.viewerHasHyped));
-  const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
-  const [kept, setKept] = useState(Boolean(post.viewerHasSaved));
-  const [saveCount, setSaveCount] = useState(post.saveCount ?? 0);
-  const [detailsOpen, setDetailsOpen] = useState(true);
-
-  const total = up + down;
-  const leftPct = total > 0 ? Math.round((100 * up) / total) : 50;
-  const rightPct = 100 - leftPct;
-  const isVotingClosed = post.isVotingOpen === false;
-  const hasVoted = viewerVote !== null;
-
-  // Countdown timer
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    if (!post.votingEndsAt || isVotingClosed) return;
-    function calc() {
-      const diff = new Date(post.votingEndsAt!).getTime() - Date.now();
-      if (diff <= 0) { setTimeLeft("Voting ended"); return; }
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff % 86400000) / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h ${m}m left` : `${m}m ${s}s left`);
-    }
-    calc();
-    const t = setInterval(calc, 1000);
-    return () => clearInterval(t);
-  }, [post.votingEndsAt, isVotingClosed]);
-
-  function labelFor(i: number) {
-    return post.optionStats?.find((s) => s.index === i)?.label?.trim()
-      || post.postOptions?.[i]?.label?.trim()
-      || `Side ${i + 1}`;
-  }
-
-  async function castVote(idx: number) {
-    if (isVotingClosed) return;
-    if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const prev = viewerVote;
-    const newVote: "UP" | "DOWN" = idx === 0 ? "UP" : "DOWN";
-
-    if (prev === newVote) {
-      // Same option tapped — withdraw
-      setViewerVote(null);
-      setUp((n) => n - (idx === 0 ? 1 : 0));
-      setDown((n) => n - (idx === 1 ? 1 : 0));
-      try {
-        await removeVoteMut({ variables: { postId: post.id } });
-      } catch {
-        setViewerVote(prev);
-        setUp(post.upvoteCount);
-        setDown(post.downvoteCount);
-      }
-      return;
-    }
-
-    // New or switched vote
-    setViewerVote(newVote);
-    setUp((n) => n + (idx === 0 ? 1 : 0) - (prev === "UP" ? 1 : 0));
-    setDown((n) => n + (idx === 1 ? 1 : 0) - (prev === "DOWN" ? 1 : 0));
-    try {
-      await voteMut({ variables: { postId: post.id, selectedOptionIndex: idx, anonymous } });
-    } catch {
-      setViewerVote(prev);
-      setUp(post.upvoteCount);
-      setDown(post.downvoteCount);
-    }
-  }
-
-  async function handleAnonymousToggle(val: boolean) {
-    setAnonymous(val);
-    const curIdx = viewerVote === "UP" ? 0 : viewerVote === "DOWN" ? 1 : null;
-    if (hasVoted && curIdx !== null) {
-      try { await voteMut({ variables: { postId: post.id, selectedOptionIndex: curIdx, anonymous: val } }); }
-      catch { setAnonymous(!val); }
-    }
-  }
-
-  async function handleHype() {
-    if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const next = !hyped;
-    setHyped(next);
-    setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
-    try { await hypeMut({ variables: { postId: post.id, active: next } }); }
-    catch { setHyped(!next); setHypeCount((n) => Math.max(0, n + (next ? -1 : 1))); }
-  }
-
-  async function handleKeep() {
-    if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const next = !kept;
-    setKept(next);
-    setSaveCount((n) => Math.max(0, n + (next ? 1 : -1)));
-    adjustSavedCount(next ? 1 : -1);
-    try { await keepMut({ variables: { postId: post.id, keep: next } }); }
-    catch {
-      setKept(!next);
-      setSaveCount((n) => Math.max(0, n + (next ? -1 : 1)));
-      adjustSavedCount(next ? -1 : 1);
-    }
-  }
-
-  async function handleShare() {
-    try {
-      await Share.share({ url: postPermalink(post.id), message: post.caption ?? "Check out this comparison!" });
-    } catch { /* ignore */ }
-  }
-
-  const isPlatformPost = post.postType === "system";
-  const authorName = isPlatformPost
-    ? MODERATOR_PLATFORM_NAME
-    : post.authorDisplayName?.trim() || post.authorUsername;
-  const initial = authorName.slice(0, 1).toUpperCase();
-  const authorAvatarUrl = isPlatformPost ? null : post.authorProfileImageUrl ?? null;
-  const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls.slice(0, 2) : null;
-
-  return (
-    <View style={st.postCard}>
-      <Pressable
-        style={st.postHeader}
-        onPress={() =>
-          !isPlatformPost &&
-          post.authorId &&
-          router.push(`/profile/${post.authorId}` as `/${string}`)
-        }
-        disabled={isPlatformPost}
-      >
-        <View style={[st.postAvatar, { overflow: "hidden" }]}>
-          {isPlatformPost ? (
-            <Image
-              source={logoAsset}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : authorAvatarUrl ? (
-            <Image source={{ uri: authorAvatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-          ) : (
-            <Text style={st.postAvatarText}>{initial}</Text>
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={st.postAuthor}>{authorName}</Text>
-          <Text style={st.postTime}>
-            {isPlatformPost
-              ? `Platform poll · ${formatRelativeTime(post.createdAt)}`
-              : formatRelativeTime(post.createdAt)}
-          </Text>
-        </View>
-      </Pressable>
-
-      {post.caption ? <Text style={st.postCaption}>{post.caption}</Text> : null}
-
-      {compareUrls ? (
-        <View style={st.postImages}>
-          {compareUrls.map((url, i) => {
-            const picked = (i === 0 && viewerVote === "UP") || (i === 1 && viewerVote === "DOWN");
-            return (
-              <Pressable
-                key={i}
-                style={[st.postImgCell, isVotingClosed && { opacity: 0.85 }]}
-                onPress={() => void castVote(i)}
-                disabled={isVotingClosed}
-              >
-                <Image source={{ uri: url }} style={st.postImg} contentFit="cover" cachePolicy="memory-disk" />
-                <View style={st.postPctOverlay}>
-                  <Text style={st.postPctText}>{i === 0 ? leftPct : rightPct}%</Text>
-                  <Text style={st.postPctLabel} numberOfLines={1}>{labelFor(i)}</Text>
-                </View>
-                {picked && !isVotingClosed && (
-                  <View style={st.postVotedBadge}>
-                    <View style={st.postVotedBadgeInner}>
-                      <Text style={st.postVotedBadgeText}>♥ VOTED</Text>
-                    </View>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : post.imageUrls[0] ? (
-        <Image source={{ uri: post.imageUrls[0] }} style={{ width: "100%", height: 280 }} contentFit="cover" cachePolicy="memory-disk" />
-      ) : null}
-
-      {compareUrls ? (
-        <View style={st.postSplitBar}>
-          <View style={{ flex: up || 1, backgroundColor: "#22c55e" }} />
-          <View style={{ flex: down || 1, backgroundColor: "#f97316" }} />
-        </View>
-      ) : null}
-
-      {/* Vote hint */}
-      {compareUrls && !isVotingClosed && (
-        <View style={st.postVoteHint}>
-          <Text style={[st.postVoteHintText, hasVoted && st.postVoteHintVoted]}>
-            {hasVoted ? "✓ Voted — tap again to unvote · tap other to switch" : "👆 Tap an image to vote"}
-          </Text>
-          {timeLeft ? (
-            <Text style={[st.postVoteHintText, { marginTop: 4, color: "#f59e0b", fontWeight: "700" }]}>
-              ⏱ {timeLeft}
-            </Text>
-          ) : null}
-        </View>
-      )}
-
-      {/* Anonymous toggle — same Switch as feed card */}
-      {compareUrls && !isVotingClosed && (
-        <View style={{
-          flexDirection: "row", alignItems: "center",
-          paddingHorizontal: 14, paddingVertical: 8, gap: 8,
-          backgroundColor: colors.section,
-        }}>
-          <Text style={{ fontSize: 13 }}>👻</Text>
-          <Text style={{ flex: 1, fontSize: 12, color: colors.subtext, fontWeight: "500" }}>
-            Vote anonymously
-          </Text>
-          <Switch
-            value={anonymous}
-            onValueChange={(val) => void handleAnonymousToggle(val)}
-            trackColor={{ false: colors.border, true: "#8b5cf6" }}
-            thumbColor="#ffffff"
-          />
-        </View>
-      )}
-
-      {isVotingClosed && (
-        <View style={st.postVoteHint}>
-          <Text style={st.postVoteHintText}>{total} votes · Voting closed</Text>
-        </View>
-      )}
-
-      {/* LIVE SPLIT section */}
-      {compareUrls && detailsOpen && (
-        <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <Text style={{ fontSize: 12, fontWeight: "800", color: colors.accent, letterSpacing: 1 }}>LIVE SPLIT</Text>
-            <Text style={{ fontSize: 12, color: colors.muted }}>{total} vote{total !== 1 ? "s" : ""}</Text>
-          </View>
-          {[0, 1].map((i) => {
-            const count = i === 0 ? up : down;
-            const pct = total > 0 ? Math.round((100 * count) / total) : 50;
-            const barColor = i === 0 ? "#22c55e" : "#f97316";
-            return (
-              <View key={i} style={{ marginBottom: 10 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text, flex: 1 }} numberOfLines={1}>
-                    {labelFor(i)}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.subtext, marginLeft: 8 }}>{count} · {pct}%</Text>
-                </View>
-                <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.section }}>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${pct}%` }} />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* ── Two-zone action rail ── */}
-      {(() => {
-        const commentCount = post.commentCount ?? 0;
-        const total = up + down;
-        const isVotingClosedCard = post.isVotingOpen === false;
-        const statusText = compareUrls
-          ? isVotingClosedCard
-            ? (() => {
-                if (total === 0) return "🏆 No votes were cast";
-                if (up === down) return "🏆 Tie · 50% each";
-                const wLabel = up > down
-                  ? (post.optionStats?.find((s) => s.index === 0)?.label?.trim() || "Side 1")
-                  : (post.optionStats?.find((s) => s.index === 1)?.label?.trim() || "Side 2");
-                const pct = Math.round((100 * Math.max(up, down)) / total);
-                return `🏆 ${wLabel} won · ${pct}% (${total.toLocaleString()} votes)`;
-              })()
-            : timeLeft
-              ? `⏳ ${timeLeft}`
-              : "Voting open"
-          : null;
-
-        type ChipDef = { i: number; icon: string; label: string; onPress: () => void; count?: number; isHype?: boolean; isSave?: boolean; active?: boolean };
-        const chips: ChipDef[] = [
-          { i: 0, icon: "💬", label: "Comments", onPress: () => {}, count: commentCount },
-          { i: 1, icon: "📤", label: "Share", onPress: () => void handleShare() },
-          { i: 2, icon: hyped ? "♥" : "♡", label: "Hype", onPress: () => void handleHype(), count: hypeCount, isHype: true, active: hyped },
-          { i: 3, icon: "🔖", label: "Keep", onPress: () => void handleKeep(), count: saveCount, isSave: true, active: kept },
-          { i: 4, icon: "👥", label: "Voters", onPress: onVoters, count: total },
-        ];
-
-        return (
-          <View style={st.actionRail}>
-            <View style={st.actionRailIcons}>
-              {chips.map(({ i, icon, label, onPress, count, isHype, isSave, active }) => (
-                <Pressable
-                  key={i}
-                  style={[
-                    st.actionChipFlat,
-                    isHype && active && st.actionChipFlatHypeActive,
-                    isSave && active && st.actionChipFlatSaveActive,
-                  ]}
-                  onPress={onPress}
-                  accessibilityLabel={label}
-                  hitSlop={4}
-                >
-                  <Text style={[
-                    st.actionChipFlatIcon,
-                    isHype && active && st.actionChipFlatIconHype,
-                    isSave && active && st.actionChipFlatIconSave,
-                  ]}>
-                    {icon}
-                  </Text>
-                  {count != null && count > 0 ? (
-                    <View style={[
-                      st.actionChipBadge,
-                      isHype && st.actionChipBadgeRose,
-                      isSave && st.actionChipBadgeAmber,
-                    ]}>
-                      <Text style={[
-                        st.actionChipBadgeText,
-                        isHype && st.actionChipBadgeTextRose,
-                        isSave && st.actionChipBadgeTextAmber,
-                      ]}>
-                        {count}
-                      </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-              ))}
-            </View>
-            {statusText ? (
-              <View style={st.actionRailContext}>
-                <Text
-                  style={[st.actionStatusText, isVotingClosedCard && st.actionStatusTextResult]}
-                  numberOfLines={1}
-                >
-                  {statusText}
-                </Text>
-                <Pressable style={st.seeDetailsBtn2} onPress={() => setDetailsOpen((v) => !v)}>
-                  <Text style={st.seeDetailsBtnText2}>
-                    {detailsOpen ? "Hide ‹" : "See details ›"}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-        );
-      })()}
-    </View>
-  );
-}
-
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PostDetailScreen() {
@@ -1392,7 +774,6 @@ export default function PostDetailScreen() {
   const post = postData?.getPostById
     ? mapGqlPostToFeedView(postData.getPostById as Parameters<typeof mapGqlPostToFeedView>[0])
     : null;
-  const isOwner = !!user && !!post?.authorId && user.id === post.authorId;
 
   const {
     data: commentsData,
@@ -1426,8 +807,6 @@ export default function PostDetailScreen() {
 
   const [commentMut, { loading: commentSending }] = useMutation(COMMENT_POST);
   const [likeMut] = useMutation(SET_COMMENT_LIKE);
-  const [deleteMut, { loading: deleting }] = useMutation(DELETE_POST);
-  const [extendMut, { loading: extending }] = useMutation(EXTEND_POST_VOTING);
 
   const { showToast, ToastView } = useToast();
 
@@ -1435,7 +814,6 @@ export default function PostDetailScreen() {
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
   const scrollRef = useRef<typeof ScrollView>(null);
-  const [votersVisible, setVotersVisible] = useState(false);
   const [optimisticComments, setOptimisticComments] = useState<GqlComment[]>([]);
   const [showAllComments, setShowAllComments] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -1459,18 +837,13 @@ export default function PostDetailScreen() {
     const highlightTimer = setTimeout(() => setHighlightedCommentId(null), 4000);
     return () => { clearTimeout(scrollTimer); clearTimeout(highlightTimer); };
   }, [deepLinkCommentId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [extendVisible, setExtendVisible] = useState(false);
 
-  const optionLabels = useMemo(() => {
-    if (!post) return ["Option A", "Option B"];
-    if (post.optionStats && post.optionStats.length > 0) {
-      return post.optionStats.map((s) => s.label || `Option ${s.index + 1}`);
-    }
-    if (post.postOptions && post.postOptions.length > 0) {
-      return post.postOptions.map((o, i) => o.label || `Option ${i + 1}`);
-    }
-    return ["Option A", "Option B"];
-  }, [post]);
+  // Scroll to the comments section — used by the post card's Comments chip
+  const scrollToComments = useCallback(() => {
+    const y = Math.max(0, commentsSectionY.current - 60);
+    (scrollRef.current as unknown as { scrollTo: (opts: { y: number; animated: boolean }) => void })
+      ?.scrollTo({ y, animated: true });
+  }, []);
 
   const handleReply = useCallback((commentId: string, name: string) => {
     setReplyTo({ id: commentId, name });
@@ -1562,34 +935,12 @@ export default function PostDetailScreen() {
     }
   }
 
-  async function handleDelete() {
-    Alert.alert("Delete post", "This cannot be undone. Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteMut({ variables: { postId: id } });
-            router.replace("/tabs" as `/${string}`);
-          } catch (e: unknown) {
-            Alert.alert("Error", e instanceof Error ? e.message : "Could not delete post");
-          }
-        },
-      },
-    ]);
-  }
-
-  async function handleExtend(addMs: number) {
+  async function copyLink() {
+    if (!id) return;
     try {
-      const base = post?.votingEndsAt ? new Date(post.votingEndsAt).getTime() : Date.now();
-      const newEndsAt = new Date(base + addMs).toISOString();
-      await extendMut({ variables: { postId: id, newVotingEndsAt: newEndsAt } });
-      setExtendVisible(false);
-      showToast("Voting extended ✓", "success");
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : "Could not extend voting", "error");
-    }
+      await Clipboard.setStringAsync(postWebUrl(id));
+      showToast("Copied ✓", "success");
+    } catch { /* ignore */ }
   }
 
   return (
@@ -1605,6 +956,11 @@ export default function PostDetailScreen() {
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={st.headerBack}>
               <Text style={st.headerBackText}>← Back</Text>
+            </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <TouchableOpacity onPress={() => void copyLink()} style={st.headerCopy} accessibilityLabel="Copy link">
+              <Text style={st.headerCopyText}>🔗 Copy link</Text>
             </TouchableOpacity>
           ),
         }}
@@ -1626,32 +982,7 @@ export default function PostDetailScreen() {
               <Text style={st.errorText}>Could not load post.</Text>
             </View>
           ) : post ? (
-            <PostDetailCard post={post} st={st} colors={colors} onVoters={() => setVotersVisible(true)} />
-          ) : null}
-
-          {/* Owner actions */}
-          {isOwner && post ? (
-            <View style={st.ownerActions}>
-              {post.isVotingOpen ? (
-                <Pressable
-                  style={st.ownerBtn}
-                  onPress={() => setExtendVisible(true)}
-                >
-                  <Text style={st.ownerBtnText}>⏱ Extend voting</Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                style={[st.ownerBtn, st.ownerBtnDelete]}
-                onPress={() => void handleDelete()}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <ActivityIndicator size="small" color="#f87171" />
-                ) : (
-                  <Text style={st.ownerBtnDeleteText}>🗑 Delete post</Text>
-                )}
-              </Pressable>
-            </View>
+            <FeedPostCard post={post} variant="detail" onCommentsPress={scrollToComments} />
           ) : null}
 
           {/* Comments — onLayout tracks section Y for deep-link scrolling */}
@@ -1772,27 +1103,6 @@ export default function PostDetailScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-
-      {/* Voters non-blocking floating panel */}
-      {post ? (
-        <VotersPanel
-          postId={id ?? ""}
-          visible={votersVisible}
-          onClose={() => setVotersVisible(false)}
-          optionLabels={optionLabels}
-          st={st}
-          colors={colors}
-          bottomOffset={insets.bottom + 70}
-        />
-      ) : null}
-      <ExtendSheet
-        visible={extendVisible}
-        onClose={() => setExtendVisible(false)}
-        onExtend={(ms) => void handleExtend(ms)}
-        extending={extending}
-        st={st}
-        insets={insets}
-      />
     </View>
   );
 }

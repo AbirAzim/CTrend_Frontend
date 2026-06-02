@@ -10,12 +10,13 @@ import {
   Easing,
   FlatList,
   Modal,
+  Platform,
   Pressable,
-  Share,
   StyleSheet,
   Switch,
   Text,
   TextInput,
+  ToastAndroid,
   Vibration,
   View,
 } from "react-native";
@@ -38,7 +39,8 @@ import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 import { useSounds } from "../context/SoundContext";
 import { useTabBar } from "../context/TabBarContext";
-import { postPermalink } from "../lib/postPermalink";
+import { postWebUrl } from "../lib/postPermalink";
+import * as Clipboard from "expo-clipboard";
 import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
 import logoAsset from "../assets/logo.png";
 
@@ -49,7 +51,13 @@ const IMG_H = IMG_W * 1.55;
 const GREEN = "#22c55e";
 const ORANGE = "#f97316";
 
-type Props = { post: FeedPostView };
+type Props = {
+  post: FeedPostView;
+  /** "detail" = rendered on the full-page post screen (skips live sub, hides Full-page chip). */
+  variant?: "feed" | "detail";
+  /** On the detail page, the Comments chip scrolls to the comments section instead of navigating. */
+  onCommentsPress?: () => void;
+};
 
 type VoteLiveState = {
   upvoteCount: number;
@@ -279,6 +287,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
     actionChipFlatIcon: { fontSize: 18, lineHeight: 21, color: c.subtext },
     actionChipFlatIconHype: { color: "#fb7185" },
     actionChipFlatIconSave: { color: "#f59e0b" },
+    // Emoji ignore text color — dim inactive emoji icons so the active state reads clearly
+    actionChipFlatIconDim: { opacity: 0.4 },
     // Superscript notification badge
     chipBadge: {
       position: "absolute" as const, top: -5, right: -7,
@@ -401,7 +411,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
   };
 }
 
-function FeedPostCardComponent({ post }: Props) {
+function FeedPostCardComponent({ post, variant = "feed", onCommentsPress }: Props) {
+  const isDetail = variant === "detail";
   const { user, isAuthenticated } = useAuth();
   const { colors, isDark } = useTheme();
   const { playTick } = useSounds();
@@ -496,6 +507,7 @@ function FeedPostCardComponent({ post }: Props) {
 
   useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
     variables: { postId: post.id },
+    skip: isDetail,
     onData: ({ data }) => {
       const next = data.data?.postVoteUpdated;
       if (!next || next.id !== post.id) return;
@@ -803,9 +815,11 @@ function FeedPostCardComponent({ post }: Props) {
     }
   }
 
-  async function handleShare() {
-    try { await Share.share({ url: postPermalink(post.id), title: "Ke Jitbe post" }); }
-    catch { /* cancelled */ }
+  async function copyLink() {
+    try {
+      await Clipboard.setStringAsync(postWebUrl(post.id));
+      if (Platform.OS === "android") ToastAndroid.show("Link copied ✓", ToastAndroid.SHORT);
+    } catch { /* ignore */ }
   }
 
   function handleMore() {
@@ -823,6 +837,7 @@ function FeedPostCardComponent({ post }: Props) {
         onPress: async () => {
           try {
             await deleteMut({ variables: { postId: post.id }, refetchQueries: [{ query: FEED_POSTS }] });
+            if (isDetail) router.back();
           } catch {
             Alert.alert("Error", "Could not delete the post.");
           }
@@ -850,7 +865,7 @@ function FeedPostCardComponent({ post }: Props) {
   const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 
   return (
-    <View style={st.card}>
+    <View style={[st.card, isPlatformPost && st.platformCard]}>
       {/* Header */}
       <View style={st.header}>
         <Pressable
@@ -928,7 +943,7 @@ function FeedPostCardComponent({ post }: Props) {
                   {isVoted && !isVotingClosed && (
                     <Animated.View style={[st.votedBadgeRow, { transform: [{ scale: badgeScale[i] }] }]}>
                       <View style={st.votedBadge}>
-                        <Text style={st.votedBadgeText}>♥ VOTED</Text>
+                        <Text style={st.votedBadgeText}>✓ VOTED</Text>
                       </View>
                     </Animated.View>
                   )}
@@ -972,7 +987,7 @@ function FeedPostCardComponent({ post }: Props) {
                     {picked && !isVotingClosed && (
                       <Animated.View style={[st.votedBadgeRow, { transform: [{ scale: badgeScale[i] }] }]}>
                         <View style={st.votedBadge}>
-                          <Text style={st.votedBadgeText}>♥ VOTED</Text>
+                          <Text style={st.votedBadgeText}>✓ VOTED</Text>
                         </View>
                       </Animated.View>
                     )}
@@ -1110,10 +1125,11 @@ function FeedPostCardComponent({ post }: Props) {
           count?: number; isHype?: boolean; isSave?: boolean; isVoters?: boolean; active?: boolean;
         };
         const chips: ChipDef[] = [
-          { i: 0, icon: "💬", accessLabel: "Comments", onPress: goToPost, count: commentCount },
-          { i: 1, icon: "📤", accessLabel: "Share", onPress: () => void handleShare() },
-          { i: 2, icon: "🔗", accessLabel: "Full page", onPress: goToPost },
-          { i: 3, icon: liked ? "♥" : "♡", accessLabel: "Hype", onPress: () => void handleHype(), count: hypeCount, isHype: true, active: liked },
+          { i: 0, icon: "💬", accessLabel: "Comments", onPress: isDetail ? (onCommentsPress ?? goToPost) : goToPost, count: commentCount },
+          { i: 1, icon: "🔗", accessLabel: "Copy link", onPress: () => void copyLink() },
+          // "Full page" chip is hidden on the detail screen — we're already there
+          ...(isDetail ? [] : [{ i: 2, icon: "↗️", accessLabel: "Full page", onPress: goToPost } as ChipDef]),
+          { i: 3, icon: "❤️", accessLabel: "Hype", onPress: () => void handleHype(), count: hypeCount, isHype: true, active: liked },
           { i: 4, icon: "🔖", accessLabel: "Keep", onPress: () => void handleSave(), count: saveCount, isSave: true, active: saved },
           { i: 5, icon: "👥", accessLabel: "Voters", onPress: () => openVoters(null), count: votersTotal, isVoters: true },
         ];
@@ -1141,6 +1157,7 @@ function FeedPostCardComponent({ post }: Props) {
                         st.actionChipFlatIcon,
                         isHype && active && st.actionChipFlatIconHype,
                         isSave && active && st.actionChipFlatIconSave,
+                        isHype && !active && st.actionChipFlatIconDim,
                       ]}>
                         {icon}
                       </Text>
