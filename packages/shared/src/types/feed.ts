@@ -26,6 +26,8 @@ export type FeedPostView = {
   createdAt: string | null;
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
+  /** Lead time (minutes) before deadline to show the "ending soon" banner. Default 5 (Phase 25). */
+  endingSoonLeadMinutes?: number | null;
   upvoteCount: number;
   downvoteCount: number;
   hypeCount?: number;

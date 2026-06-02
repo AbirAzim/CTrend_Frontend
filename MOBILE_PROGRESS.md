@@ -749,7 +749,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⏳ PHASE 24 — Vote-Draw Winner Banner — IMPLEMENTED, awaiting device test
+### ✅ PHASE 24 — Vote-Draw Winner Banner — COMPLETE 2026-06-02 (device-tested)
 
 **Source docs:** `2026-06-01_post-vote-draw-winner.md`
 
@@ -772,16 +772,16 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 25 — Poll Ending-Soon Banner + Admin Threshold
+### ⏳ PHASE 25 — Poll Ending-Soon Banner + Admin Threshold — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-02_poll-ending-soon-configurable-threshold.md`
 
 **Goal:** Per-post "Poll ending soon, vote now!" urgency banner with an admin-configurable lead-time threshold.
 
-- [ ] **Shared GraphQL** — add `endingSoonLeadMinutes` to `FEED_POSTS`, `GET_POST_BY_ID`, and the admin post query; add it to the `UPDATE_POST` input.
-- [ ] **types/map** — add `endingSoonLeadMinutes?` (default 5) to view type + map.
-- [ ] **FeedPostCard** — compute remaining voting time; when open AND `remaining <= endingSoonLeadMinutes`, show a top warning banner **"Poll ending soon, vote now!"** (light + dark styles). Hide once closed.
-- [ ] **Edit post** (`app/edit-post.tsx`) — admin-only number input **"Ending-soon alert lead time (minutes)"** (min 1, max 1440); send in `UPDATE_POST`.
+- [x] **Shared GraphQL** — added `endingSoonLeadMinutes` to `FEED_POSTS`, `GET_POST_BY_ID`, `MY_SAVED_POSTS`, and `ADMIN_PLATFORM_POSTS`; flows through generic `UPDATE_POST` input.
+- [x] **types/map** — added `endingSoonLeadMinutes?` to `FeedPostView`; mapped with default `5` in `mapGqlPostToFeedView.ts`.
+- [x] **FeedPostCard** — computes `endingSoonRemainingMs` each render (driven by the existing 1s countdown tick); when `!isVotingClosed && 0 < remaining <= lead*60s`, shows a top amber banner **"⏳ Poll ending soon, vote now! {countdown}"** (light + dark). Hidden once closed.
+- [x] **Edit post** (`app/edit-post.tsx`) — admin-only number input **"Ending-soon alert lead time"** (clamped 1–1440), pre-filled from post, sent in `UPDATE_POST` only when admin. Added `useAuth` admin gate.
 
 **APIs:** feed/admin queries (add `endingSoonLeadMinutes`), `UPDATE_POST` (add field) — backend deployed.
 
@@ -1085,4 +1085,5 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Planning | react_change_3 analyzed — Phases 22–30 added to MOBILE_PROGRESS.md (campaign attach, campaign default+filter, vote-draw winner, ending-soon threshold, vote-end notif+claim, winner/claim visibility, image focal editor, comment reactions, brand avatar+announce nav+scheduled time). Each phase has device test cases; awaiting per-phase testing before marking ✅ |
 | 2026-06-02 | Phase 22 | Campaign attachment — shared `POST_CAMPAIGN_FIELDS` on feed/detail/saved queries + `FeedPostCampaignView` type + mapper; new `PostCampaignBadge` gold ribbon in `FeedPostCard` (+ gold card border); create screen campaign picker modal (active for users / all for admin) sending `campaignId`. APK built + installed on Pixel 6 — ✅ device-tested |
 | 2026-06-02 | Phase 23 | Campaign default + feed filter — `FEED_POSTS($campaignId)` arg + `isDefault` on campaign queries; new `FeedCampaignFilter` dock (default-first chips, `?campaign=` route param); `PostCampaignBadge` "See other campaigns" sheet; create picker default-first ordering; admin Campaigns `Default` toggle + pill. APK installed on Pixel 6 — ✅ device-tested |
-| 2026-06-02 | Phase 24 | Vote-draw winner banner — shared `POST_VOTE_WINNER_FIELDS` on feed/detail + `FeedPostVoteWinnerView` type + mapper; new `PostVoteWinnerBanner` gold trophy card in `FeedPostCard` (above action rail, only when closed + winner.user exists, tap → profile). APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-02 | Phase 24 | Vote-draw winner banner — shared `POST_VOTE_WINNER_FIELDS` on feed/detail + `FeedPostVoteWinnerView` type + mapper; new `PostVoteWinnerBanner` gold trophy card in `FeedPostCard` (above action rail, only when closed + winner.user exists, tap → profile). APK installed on Pixel 6 — ✅ device-tested |
+| 2026-06-02 | Phase 25 | Ending-soon banner + admin threshold — `endingSoonLeadMinutes` on feed/detail/saved/admin queries + type + mapper (default 5); amber top banner in `FeedPostCard` when open & within lead window (driven by 1s countdown tick); admin-only lead-time input in `edit-post.tsx` (clamped 1–1440) via `UPDATE_POST`. APK installed on Pixel 6 — ⏳ awaiting device test |

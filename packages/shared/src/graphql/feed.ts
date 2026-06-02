@@ -44,6 +44,7 @@ export const FEED_POSTS = gql`
       viewerVote
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       likeCount
       hypeCount
@@ -86,6 +87,7 @@ export const GET_POST_BY_ID = gql`
       viewerVote
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       likeCount
       hypeCount
@@ -163,6 +165,7 @@ export const MY_SAVED_POSTS = gql`
       viewerVote
       votingEndsAt
       isVotingOpen
+      endingSoonLeadMinutes
       commentCount
       likeCount
       hypeCount
