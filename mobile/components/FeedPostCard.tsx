@@ -47,6 +47,9 @@ import { postWebUrl } from '../lib/postPermalink';
 import * as Clipboard from 'expo-clipboard';
 import { MODERATOR_PLATFORM_NAME } from '@ctrend/shared/lib/moderatorBrand';
 import logoAsset from '../assets/logo.png';
+import { PostCampaignBadge } from './PostCampaignBadge';
+import { PostVoteWinnerBanner } from './PostVoteWinnerBanner';
+import { imageContentPosition } from '../lib/imageFocal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -230,6 +233,28 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderWidth: 1.5,
 			backgroundColor: c.accent + '14',
 		},
+		campaignCard: {
+			borderColor: isDark ? 'rgba(245,158,11,0.5)' : 'rgba(217,160,23,0.55)',
+			borderWidth: 1.5,
+		},
+		endingSoonBanner: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 8,
+			paddingHorizontal: 14,
+			paddingVertical: 9,
+			backgroundColor: isDark ? 'rgba(245,158,11,0.16)' : 'rgba(245,158,11,0.15)',
+			borderBottomWidth: 1,
+			borderBottomColor: isDark ? 'rgba(245,158,11,0.32)' : 'rgba(217,160,23,0.32)',
+		},
+		endingSoonIcon: { fontSize: 14 },
+		endingSoonText: {
+			flex: 1,
+			fontSize: 12.5,
+			fontWeight: '700' as const,
+			color: isDark ? '#fcd34d' : '#b45309',
+		},
+		endingSoonStrong: { fontWeight: '800' as const },
 		timeLabel: { fontSize: 11, color: c.muted, marginTop: 2 },
 		moreBtn: { padding: 8 },
 		moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
@@ -874,6 +899,21 @@ function FeedPostCardComponent({
 	const activeVotingEndsAt =
 		optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
 
+	// Ending-soon urgency banner (Phase 25) — re-evaluated each render; the 1s
+	// countdown interval below keeps re-rendering while voting is open.
+	const endingSoonLeadMinutes = Math.max(
+		1,
+		Math.round(post.endingSoonLeadMinutes ?? 5),
+	);
+	const endingSoonRemainingMs = activeVotingEndsAt
+		? new Date(activeVotingEndsAt).getTime() - Date.now()
+		: null;
+	const isEndingSoon =
+		!isVotingClosed &&
+		endingSoonRemainingMs !== null &&
+		endingSoonRemainingMs > 0 &&
+		endingSoonRemainingMs <= endingSoonLeadMinutes * 60_000;
+
 	const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls : null;
 	const isBinary = compareUrls?.length === 2;
 
@@ -1506,9 +1546,28 @@ function FeedPostCardComponent({
 		? null
 		: (post.authorProfileImageUrl ?? null);
 	const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
+	const campaign = post.campaign ?? null;
 
 	return (
-		<View style={[st.card, isPlatformPost && st.platformCard]}>
+		<View
+			style={[
+				st.card,
+				isPlatformPost && st.platformCard,
+				campaign && st.campaignCard,
+			]}>
+			{/* Ending-soon urgency banner */}
+			{isEndingSoon ? (
+				<View style={st.endingSoonBanner}>
+					<Text style={st.endingSoonIcon}>⏳</Text>
+					<Text style={st.endingSoonText} numberOfLines={1}>
+						Poll ending soon, vote now!{' '}
+						<Text style={st.endingSoonStrong}>
+							{countdownStr || 'Time is running out'}
+						</Text>
+					</Text>
+				</View>
+			) : null}
+
 			{/* Header */}
 			<View style={st.header}>
 				<Pressable
@@ -1561,6 +1620,9 @@ function FeedPostCardComponent({
 				)}
 			</View>
 
+			{/* Campaign ribbon */}
+			{campaign ? <PostCampaignBadge campaign={campaign} /> : null}
+
 			{/* Caption */}
 			{post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
 
@@ -1598,6 +1660,10 @@ function FeedPostCardComponent({
 										source={{ uri: url }}
 										style={styles.multiImg}
 										contentFit='cover'
+										contentPosition={imageContentPosition(
+											post.postOptions?.[i]?.imageFocalX,
+											post.postOptions?.[i]?.imageFocalY,
+										)}
 										cachePolicy='memory-disk'
 									/>
 									<View style={st.pctOverlay}>
@@ -1667,6 +1733,10 @@ function FeedPostCardComponent({
 											source={{ uri: url }}
 											style={st.compareImg}
 											contentFit='cover'
+											contentPosition={imageContentPosition(
+												post.postOptions?.[i]?.imageFocalX,
+												post.postOptions?.[i]?.imageFocalY,
+											)}
 											cachePolicy='memory-disk'
 										/>
 										<View style={st.pctOverlay}>
@@ -1840,6 +1910,17 @@ function FeedPostCardComponent({
 			) : null}
 
 			{/* ── Two-zone action rail ── */}
+			{isVotingClosed && post.voteWinner?.user ? (
+				<PostVoteWinnerBanner
+					winner={post.voteWinner}
+					optionLabel={
+						post.voteWinner.selectedOptionIndex != null
+							? compareLabel(post, post.voteWinner.selectedOptionIndex)
+							: null
+					}
+				/>
+			) : null}
+
 			{(() => {
 				const commentCount = post.commentCount ?? 0;
 				const votersTotal = isBinary ? binaryTotal : multiTotal;

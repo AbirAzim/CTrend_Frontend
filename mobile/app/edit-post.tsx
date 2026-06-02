@@ -20,6 +20,7 @@ import { GET_POST_BY_ID, UPDATE_POST, CATEGORIES } from "@ctrend/shared/graphql/
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
@@ -29,6 +30,8 @@ export default function EditPostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const { data: postData, loading: postLoading } = useQuery<PostData>(GET_POST_BY_ID, {
     variables: { id: postId },
@@ -44,6 +47,7 @@ export default function EditPostScreen() {
   const [options, setOptions] = useState<Array<{ label: string; imageUrl: string }>>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
+  const [endingSoonLead, setEndingSoonLead] = useState("5");
   const [initialized, setInitialized] = useState(false);
 
   // Pre-fill form when post loads
@@ -51,6 +55,7 @@ export default function EditPostScreen() {
     if (!postData?.getPostById || initialized) return;
     const post = mapGqlPostToFeedView(postData.getPostById as Parameters<typeof mapGqlPostToFeedView>[0]);
     setCaption(post.caption ?? "");
+    setEndingSoonLead(String(post.endingSoonLeadMinutes ?? 5));
     setOptions(
       post.imageUrls.map((url, i) => ({
         imageUrl: url,
@@ -78,6 +83,14 @@ export default function EditPostScreen() {
             categoryId,
             options: options.map((o) => ({ label: o.label, imageUrl: o.imageUrl })),
             imageUrls: options.map((o) => o.imageUrl),
+            ...(isAdmin
+              ? {
+                  endingSoonLeadMinutes: Math.max(
+                    1,
+                    Math.min(1440, Math.round(Number(endingSoonLead) || 5)),
+                  ),
+                }
+              : {}),
           },
         },
       });
@@ -175,6 +188,27 @@ export default function EditPostScreen() {
               maxLength={300}
             />
           </View>
+
+          {/* Ending-soon threshold (admin only) */}
+          {isAdmin ? (
+            <View style={{ gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Text style={[st.rowKey, { color: colors.text }]}>
+                Ending-soon alert lead time  <Text style={{ fontSize: 12, fontWeight: "400", color: colors.muted }}>admin · minutes</Text>
+              </Text>
+              <TextInput
+                style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text, minHeight: 0 }]}
+                value={endingSoonLead}
+                onChangeText={(v) => setEndingSoonLead(v.replace(/[^0-9]/g, ""))}
+                placeholder="5"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+              <Text style={{ fontSize: 12, color: colors.muted }}>
+                Show "Poll ending soon, vote now!" within this many minutes before the deadline (1–1440).
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Error */}

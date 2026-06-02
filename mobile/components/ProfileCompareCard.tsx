@@ -18,6 +18,16 @@ export type ProfileCompareCardPost = {
   saveCount?: number | null;
   isVotingOpen?: boolean | null;
   votingEndsAt?: string | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
+  voteWinner?: {
+    user?: {
+      id: string;
+      username: string;
+      displayName?: string | null;
+    } | null;
+  } | null;
   options?: Array<{ label: string }> | null;
   category?: { name: string } | null;
 };
@@ -64,6 +74,16 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
   const liveTextColor = isDark ? "#86efac" : "#15803d";
   const liveBgColor = isDark ? "rgba(34,197,94,0.14)" : "rgba(34,197,94,0.12)";
   const liveBorderColor = isDark ? "rgba(34,197,94,0.38)" : "rgba(34,197,94,0.28)";
+
+  // Winner / claim pill palette (gold + claimed-green)
+  const winner = post.voteWinner?.user ?? null;
+  const winnerName = winner ? (winner.displayName?.trim() || `@${winner.username}`) : null;
+  const goldText = isDark ? "#fcd34d" : "#b45309";
+  const goldBg = isDark ? "rgba(245,158,11,0.14)" : "rgba(245,158,11,0.13)";
+  const goldBorder = isDark ? "rgba(245,158,11,0.4)" : "rgba(217,160,23,0.4)";
+  const claimedText = isDark ? "#86efac" : "#15803d";
+  const claimedBg = isDark ? "rgba(34,197,94,0.14)" : "rgba(34,197,94,0.12)";
+  const claimedBorder = isDark ? "rgba(34,197,94,0.38)" : "rgba(34,197,94,0.28)";
 
   return (
     <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -155,6 +175,27 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
               </Text>
               {ended ? <Text style={st.lockIcon}>🔒</Text> : null}
             </View>
+
+            {/* Winner / claim pills (drops + voted, after voting closes) */}
+            {showRichMeta && ended && winnerName ? (
+              <View style={[st.metaPill, { backgroundColor: goldBg, borderColor: goldBorder }]}>
+                <Text style={[st.metaPillText, { color: goldText }]} numberOfLines={1}>
+                  🏆 {winnerName}
+                </Text>
+              </View>
+            ) : null}
+            {showRichMeta && ended && post.isPrizeClaimed ? (
+              <View style={[st.metaPill, { backgroundColor: claimedBg, borderColor: claimedBorder }]}>
+                <Text style={[st.metaPillText, { color: claimedText }]}>✅ Prize claimed</Text>
+              </View>
+            ) : null}
+            {showRichMeta && ended && post.voteWinner?.user && post.canClaimPrize && !post.isPrizeClaimed ? (
+              <View style={[st.metaPill, { backgroundColor: goldBg, borderColor: goldBorder }]}>
+                <Text style={[st.metaPillText, { color: goldText }]} numberOfLines={1}>
+                  🎁 Claim from notifications
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -256,6 +297,10 @@ const st = StyleSheet.create({
   },
   statusRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
   },
   statusPill: {
     flexDirection: "row",
@@ -265,6 +310,18 @@ const st = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 3,
+  },
+  metaPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: "100%",
+  },
+  metaPillText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
   },
   liveDot: {
     width: 6,
