@@ -806,8 +806,8 @@ body.capacitor .ig-post-media {
 }
 
 .ig-bottom-nav--hidden {
-  opacity: 0.08;
-  transform: translate(-50%, 84px) scale(0.96);
+  opacity: 0;
+  transform: translate(-50%, calc(100% + 24px)) scale(0.92);
   pointer-events: none;
 }
 
@@ -916,6 +916,201 @@ body.capacitor .ig-bottom-nav {
     rgb(var(--cx-accent-rgb) / 0.12) 0%,
     var(--ig-white) 40%
   );
+}
+
+/* Campaign-linked compare posts */
+.ig-post--campaign {
+  border-color: rgb(234 179 8 / 0.35);
+  box-shadow:
+    0 1px 2px rgb(234 179 8 / 0.08),
+    0 8px 24px rgb(234 179 8 / 0.12);
+}
+
+.cx-post-campaign-ribbon {
+  position: relative;
+  display: block;
+  margin: 0 10px 10px;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  text-decoration: none;
+  border: 1px solid rgb(234 179 8 / 0.4);
+  background: linear-gradient(
+    105deg,
+    rgb(254 243 199 / 0.95) 0%,
+    rgb(255 255 255 / 0.92) 55%
+  );
+  box-shadow: 0 6px 18px rgb(180 130 0 / 0.12);
+  transition:
+    transform 0.2s var(--cx-ease-out),
+    box-shadow 0.2s var(--cx-ease-out);
+}
+
+.cx-post-campaign-ribbon:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgb(180 130 0 / 0.18);
+}
+
+.cx-post-campaign-ribbon-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.cx-post-campaign-ribbon-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.cx-post-campaign-ribbon-kicker {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(146 64 14);
+}
+
+.cx-post-campaign-ribbon-name {
+  font-family: var(--cx-font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: rgb(120 53 15);
+  line-height: 1.2;
+}
+
+.cx-post-campaign-ribbon-prize {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgb(146 64 14);
+  opacity: 0.9;
+}
+
+/* Random vote-draw winner (after voting ends) */
+.cx-post-vote-winner {
+  position: relative;
+  margin: 0 10px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.cx-post-vote-winner-glow {
+  position: absolute;
+  inset: -20% -10%;
+  background: radial-gradient(
+    ellipse 70% 80% at 50% 0%,
+    rgb(234 179 8 / 0.35),
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: cx-winner-glow 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes cx-winner-glow {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cx-post-vote-winner-inner {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgb(234 179 8 / 0.45);
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    rgb(255 251 235 / 0.98) 0%,
+    rgb(254 243 199 / 0.92) 100%
+  );
+  box-shadow: 0 8px 22px rgb(180 130 0 / 0.14);
+}
+
+.cx-post-vote-winner-crown {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgb(180 130 0 / 0.25));
+}
+
+.cx-post-vote-winner-kicker {
+  margin: 0 0 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(146 64 14);
+}
+
+.cx-post-vote-winner-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cx-post-vote-winner-name {
+  font-family: var(--cx-font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(120 53 15);
+  text-decoration: none;
+}
+
+.cx-post-vote-winner-name:hover {
+  text-decoration: underline;
+}
+
+.cx-post-vote-winner-meta {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: rgb(120 53 15 / 0.85);
+}
+
+:root[data-theme="dark"] .ig-post--campaign {
+  border-color: rgb(250 204 21 / 0.28);
+}
+
+:root[data-theme="dark"] .cx-post-campaign-ribbon {
+  background: linear-gradient(
+    105deg,
+    rgb(66 48 8 / 0.85) 0%,
+    rgb(15 23 42 / 0.9) 55%
+  );
+  border-color: rgb(250 204 21 / 0.32);
+}
+
+:root[data-theme="dark"] .cx-post-campaign-ribbon-kicker,
+:root[data-theme="dark"] .cx-post-campaign-ribbon-name,
+:root[data-theme="dark"] .cx-post-campaign-ribbon-prize {
+  color: #fde68a;
+}
+
+:root[data-theme="dark"] .cx-post-vote-winner-inner {
+  background: linear-gradient(
+    135deg,
+    rgb(66 48 8 / 0.75) 0%,
+    rgb(30 27 20 / 0.9) 100%
+  );
+  border-color: rgb(250 204 21 / 0.35);
+}
+
+:root[data-theme="dark"] .cx-post-vote-winner-kicker,
+:root[data-theme="dark"] .cx-post-vote-winner-name,
+:root[data-theme="dark"] .cx-post-vote-winner-meta {
+  color: #fde68a;
+}
+
+.ig-create-campaign-hint {
+  margin: 4px 0 0;
 }
 
 .ig-post-username-row {

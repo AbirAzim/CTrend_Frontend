@@ -58,6 +58,8 @@ export type FeedPostView = {
   postOptions?: { label: string }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  campaign?: FeedPostCampaignView | null;
+  voteWinner?: FeedPostVoteWinnerView | null;
 };
 
 export type VoteOptionStatView = {
@@ -65,6 +67,26 @@ export type VoteOptionStatView = {
   label: string;
   count: number;
   percentage: number;
+};
+
+export type FeedPostCampaignView = {
+  id: string;
+  name: string;
+  slug: string;
+  bannerText?: string | null;
+  bannerImageUrl?: string | null;
+  prizePerWinner: number;
+};
+
+export type FeedPostVoteWinnerView = {
+  selectedOptionIndex?: number | null;
+  pickedAt?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
 };
 
 export type VoteDirectionGql = "UP" | "DOWN" | "NONE";

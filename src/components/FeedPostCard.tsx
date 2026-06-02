@@ -34,6 +34,8 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { playVoteSound } from "../lib/notificationSound";
 import type { FeedPostView, VoteDirectionGql } from "../types/feed";
 import { MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
+import { PostCampaignBadge } from "./PostCampaignBadge";
+import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -1287,9 +1289,25 @@ function FeedPostCardComponent({
   }, [post.id]);
 
   const isPlatformPost = post.postType === "system";
+  const hasCampaign = Boolean(post.campaign);
+  const showVoteWinner =
+    post.isVotingOpen === false &&
+    post.voteWinner?.user &&
+    (post.upvoteCount + post.downvoteCount > 0 ||
+      (post.optionStats?.reduce((s, o) => s + o.count, 0) ?? 0) > 0);
+  const winnerOptionLabel =
+    post.voteWinner?.selectedOptionIndex != null
+      ? post.postOptions?.[post.voteWinner.selectedOptionIndex]?.label ??
+        post.optionStats?.find(
+          (s) => s.index === post.voteWinner?.selectedOptionIndex,
+        )?.label ??
+        null
+      : null;
 
   return (
-    <article className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}`}>
+    <article
+      className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
+    >
       <header className="ig-post-header">
         {isPlatformPost ? (
           <div className="ig-post-user cx-platform-post-user">
@@ -1416,6 +1434,8 @@ function FeedPostCardComponent({
           )}
         </div>
       </header>
+
+      {post.campaign ? <PostCampaignBadge campaign={post.campaign} /> : null}
 
       {/* Caption — always visible above the compare images */}
       {post.caption && (
@@ -1637,6 +1657,13 @@ function FeedPostCardComponent({
           <p className="ig-post-media-placeholder">No image URL</p>
         </div>
       )}
+
+      {showVoteWinner && post.voteWinner ? (
+        <PostVoteWinnerBanner
+          winner={post.voteWinner}
+          optionLabel={winnerOptionLabel}
+        />
+      ) : null}
 
       <div className="cx-post-footer">
         {detailsOpen ? (

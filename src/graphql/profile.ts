@@ -94,6 +94,11 @@ export const USER_POSTS = gql`
         name
         slug
       }
+      campaign {
+        id
+        name
+        slug
+      }
     }
   }
 `;

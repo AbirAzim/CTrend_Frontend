@@ -203,6 +203,7 @@ export function ProfilePage() {
     votingEndsAt?: string | null;
     options?: Array<{ label?: string | null }> | null;
     category?: { id: string; name?: string | null; slug?: string | null } | null;
+    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   }>;
 
   const playgroundPosts = useMemo(() => {
@@ -227,6 +228,7 @@ export function ProfilePage() {
     votingEndsAt?: string | null;
     options?: Array<{ label?: string | null }> | null;
     category?: { id: string; name?: string | null; slug?: string | null } | null;
+    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   }> = useMockFeed
     ? playgroundPosts
     : apiPosts;
@@ -268,6 +270,7 @@ export function ProfilePage() {
     imageUrls: string[];
     options?: Array<{ label?: string | null }> | null;
     category?: { id: string; name?: string | null } | null;
+    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
     votingEndsAt?: string | null;
     isVotingOpen?: boolean | null;
   } | null>(null);

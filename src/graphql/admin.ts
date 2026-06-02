@@ -222,6 +222,11 @@ export const ADMIN_PLATFORM_POSTS = gql`
         name
         slug
       }
+      campaign {
+        id
+        name
+        slug
+      }
       options {
         label
         imageUrl
