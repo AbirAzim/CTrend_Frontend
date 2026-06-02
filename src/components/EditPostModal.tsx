@@ -1,9 +1,11 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client";
 import { CATEGORIES, EXTEND_POST_VOTING, UPDATE_POST } from "../graphql/feed";
+import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "./DateTimePicker";
 import { useImageUpload } from "../lib/useImageUpload";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { useAuth } from "../context/AuthContext";
 
 type CompareItem = { imageUrl: string; label: string };
 
@@ -13,6 +15,7 @@ type EditablePost = {
   imageUrls: string[];
   options?: Array<{ label?: string | null }> | null;
   category?: { id: string; name?: string | null } | null;
+  campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
 };
@@ -50,6 +53,9 @@ function formatDeadline(iso?: string | null): string {
 }
 
 export function EditPostModal({ post, onClose, onSaved }: Props) {
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
+
   const initialItems: CompareItem[] = post.imageUrls.map((url, i) => ({
     imageUrl: url,
     label: post.options?.[i]?.label ?? `Option ${i + 1}`,
@@ -58,6 +64,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const [caption, setCaption] = useState(post.caption ?? "");
   const [items, setItems] = useState<CompareItem[]>(initialItems);
   const [categoryId, setCategoryId] = useState(post.category?.id ?? "");
+  const [campaignId, setCampaignId] = useState(post.campaign?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [extendError, setExtendError] = useState<string | null>(null);
   const [extendPreset, setExtendPreset] = useState("");
@@ -73,6 +80,29 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
 
   const { data: catsData } = useQuery(CATEGORIES);
   const categories: Array<{ id: string; name: string }> = catsData?.categories ?? [];
+
+  const { data: activeCampaignsData } = useQuery<{
+    activeCampaigns: Array<{ id: string; name: string; slug: string }>;
+  }>(ACTIVE_CAMPAIGNS, { fetchPolicy: "cache-first", errorPolicy: "all" });
+  const { data: adminCampaignsData } = useQuery<{
+    campaigns: Array<{ id: string; name: string; slug: string; isActive: boolean }>;
+  }>(CAMPAIGNS_ADMIN, { skip: !isAdmin, fetchPolicy: "cache-first", errorPolicy: "all" });
+  const campaignOptions = isAdmin
+    ? (adminCampaignsData?.campaigns ?? [])
+    : (activeCampaignsData?.activeCampaigns ?? []);
+  const campaignOptionsMerged = useMemo(() => {
+    const list = [...campaignOptions];
+    const cur = post.campaign;
+    if (cur?.id && !list.some((c) => c.id === cur.id)) {
+      list.unshift({
+        id: cur.id,
+        name: cur.name ?? "Linked campaign",
+        slug: cur.slug ?? "",
+        ...(isAdmin ? { isActive: true } : {}),
+      });
+    }
+    return list;
+  }, [campaignOptions, isAdmin, post.campaign]);
 
   const [updatePostMut, { loading }] = useMutation(UPDATE_POST);
   const [extendVotingMut, { loading: extending }] = useMutation(EXTEND_POST_VOTING);
@@ -155,6 +185,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             imageUrls: items.map((it) => it.imageUrl.trim()),
             options: items.map((it) => ({ label: it.label.trim() || "Option" })),
             categoryId: categoryId || undefined,
+            campaignId: campaignId.trim(),
           },
         },
       });
@@ -205,6 +236,28 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+            </label>
+          )}
+
+          {(campaignOptionsMerged.length > 0 || post.campaign) && (
+            <label className="cx-edit-label">
+              Campaign
+              <select
+                className="cx-edit-select"
+                value={campaignId}
+                onChange={(e) => setCampaignId(e.target.value)}
+              >
+                <option value="">No campaign</option>
+                {campaignOptionsMerged.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {isAdmin && "isActive" in c && !c.isActive ? " (inactive)" : ""}
+                  </option>
+                ))}
+              </select>
+              {post.campaign?.name && campaignId === post.campaign.id ? (
+                <span className="muted small">Currently linked to {post.campaign.name}</span>
+              ) : null}
             </label>
           )}
 

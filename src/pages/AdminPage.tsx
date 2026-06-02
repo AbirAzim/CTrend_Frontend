@@ -1969,6 +1969,7 @@ type PlatformPostRow = {
   authorEmail?: string | null;
   authorProfileImageUrl?: string | null;
   category?: { id: string; name: string; slug?: string | null } | null;
+  campaign?: { id: string; name: string; slug?: string | null } | null;
   options?: Array<{ label: string; imageUrl?: string | null }> | null;
   editedBy?: PlatformPostEditor[] | null;
   lastEditedBy?: PlatformPostEditor | null;
@@ -2389,6 +2390,7 @@ function PostsTab() {
             imageUrls: editingPost.imageUrls ?? [],
             options: editingPost.options,
             category: editingPost.category,
+            campaign: editingPost.campaign,
             votingEndsAt: editingPost.votingEndsAt,
             isVotingOpen: editingPost.isVotingOpen,
           }}

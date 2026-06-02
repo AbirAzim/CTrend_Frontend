@@ -1,5 +1,27 @@
 import { gql } from "@apollo/client";
 
+/** Campaign link + post-vote prize draw winner (shared across feed queries). */
+export const POST_CAMPAIGN_WINNER_FIELDS = `
+  campaign {
+    id
+    name
+    slug
+    bannerText
+    bannerImageUrl
+    prizePerWinner
+  }
+  voteWinner {
+    selectedOptionIndex
+    pickedAt
+    user {
+      id
+      username
+      displayName
+      profileImageUrl
+    }
+  }
+`;
+
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
   query FeedPosts {
@@ -35,6 +57,7 @@ export const FEED_POSTS = gql`
       options {
         label
       }
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
@@ -74,6 +97,7 @@ export const GET_POST_BY_ID = gql`
       options {
         label
       }
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
@@ -182,6 +206,7 @@ export const UPDATE_POST = gql`
       }
       isVotingOpen
       votingEndsAt
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;

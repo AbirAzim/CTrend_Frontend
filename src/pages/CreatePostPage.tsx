@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { CREATE_SYSTEM_POST } from "../graphql/admin";
+import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
@@ -67,6 +68,7 @@ export function CreatePostPage() {
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [campaignId, setCampaignId] = useState("");
 
   async function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
@@ -112,6 +114,19 @@ export function CreatePostPage() {
       fetchPolicy: "cache-first",
       errorPolicy: "all",
     });
+
+  const { data: activeCampaignsData } = useQuery<{ activeCampaigns: Array<{ id: string; name: string; slug: string; isActive?: boolean }> }>(
+    ACTIVE_CAMPAIGNS,
+    { fetchPolicy: "cache-first", errorPolicy: "all" },
+  );
+  const { data: adminCampaignsData } = useQuery<{ campaigns: Array<{ id: string; name: string; slug: string; isActive: boolean }> }>(
+    CAMPAIGNS_ADMIN,
+    { skip: !isAdmin, fetchPolicy: "cache-first", errorPolicy: "all" },
+  );
+
+  const campaignOptions = isAdmin
+    ? (adminCampaignsData?.campaigns ?? [])
+    : (activeCampaignsData?.activeCampaigns ?? []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -177,6 +192,7 @@ export function CreatePostPage() {
       scheduledAt?: string;
       contentText?: string;
       caption?: string;
+      campaignId?: string;
     } = {
       categoryId: category,
       imageUrls,
@@ -192,6 +208,10 @@ export function CreatePostPage() {
     }
     if (scheduledAtIso) {
       input.scheduledAt = scheduledAtIso;
+    }
+    const pickedCampaign = campaignId.trim();
+    if (pickedCampaign) {
+      input.campaignId = pickedCampaign;
     }
 
     try {
@@ -210,6 +230,7 @@ export function CreatePostPage() {
         setCaption("");
         setCategoryId("");
         setVotingEndsAt("");
+        setCampaignId("");
         setScheduledAt("");
         setScheduleEnabled(false);
         setItems([
@@ -422,6 +443,36 @@ export function CreatePostPage() {
               <small className="ig-settings-error">Could not load categories.</small>
             )}
           </div>
+
+          {campaignOptions.length > 0 ? (
+            <div className="ig-settings-row ig-settings-row--col">
+              <label htmlFor="create-campaign-id" className="ig-settings-label">
+                <span className="ig-settings-icon">🎯</span> Campaign
+                <span className="ig-settings-optional">optional</span>
+              </label>
+              <div className="ig-cat-select-wrap">
+                <select
+                  id="create-campaign-id"
+                  name="campaignId"
+                  className="ig-cat-select"
+                  value={campaignId}
+                  onChange={(ev) => setCampaignId(ev.target.value)}
+                >
+                  <option value="">No campaign</option>
+                  {campaignOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {isAdmin && "isActive" in c && !c.isActive ? " (inactive)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="ig-cat-select-chevron" aria-hidden>▾</span>
+              </div>
+              <p className="muted small ig-create-campaign-hint">
+                Link this compare to a promo — it will show a campaign badge on the feed.
+              </p>
+            </div>
+          ) : null}
 
           <div className="ig-settings-divider" />
 
