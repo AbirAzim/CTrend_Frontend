@@ -539,7 +539,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 15 — Unvote + Vote-Status Layout
+### ✅ PHASE 15 — Unvote + Vote-Status Layout (COMPLETE 2026-06-02)
 
 **Source docs:** `phase2-vote-bar-layout-and-unvote.md`
 

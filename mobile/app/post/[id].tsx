@@ -7,9 +7,7 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -20,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   COMMENTS_BY_POST,
@@ -150,46 +149,58 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
     replyBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
     replyBtnText: { fontSize: 12, color: c.accent, fontWeight: "600" },
 
-    // Input area
+    // ── Facebook-style comment input ──
     inputWrap: {
-      borderTopWidth: 1,
-      borderTopColor: c.border,
+      borderTopWidth: 1, borderTopColor: c.border,
       backgroundColor: c.card,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      paddingHorizontal: 12,
-      paddingTop: 10,
-      gap: 10,
+      flexDirection: "row" as const, alignItems: "flex-end" as const,
+      paddingHorizontal: 10, paddingTop: 8, gap: 8,
     },
-    replyingBanner: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
+    inputAvatar: {
+      width: 34, height: 34, borderRadius: 17,
+      backgroundColor: isDark ? "#312e81" : "#6366f1",
+      alignItems: "center" as const, justifyContent: "center" as const,
+      overflow: "hidden" as const,
+      marginBottom: 8,
+    },
+    inputAvatarText: { color: "#fff", fontSize: 13, fontWeight: "700" as const },
+    inputPill: {
+      flex: 1,
+      flexDirection: "row" as const, alignItems: "flex-end" as const,
       backgroundColor: c.section,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      borderRadius: 22, borderWidth: 1, borderColor: c.border,
+      paddingHorizontal: 14, paddingVertical: 0,
+      minHeight: 38,
     },
-    replyingText: { fontSize: 12, color: c.subtext },
-    replyingCancel: { fontSize: 12, color: c.accent, fontWeight: "700" },
     inputBox: {
       flex: 1,
-      backgroundColor: c.inputBg,
-      borderRadius: 20,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      fontSize: 14,
-      color: c.text,
-      maxHeight: 100,
+      fontSize: 14, color: c.text,
+      maxHeight: 120,
+      paddingTop: 9, paddingBottom: 9,
     },
-    sendBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: c.accent,
-      alignItems: "center",
-      justifyContent: "center",
+    postBtn: {
+      paddingVertical: 9, paddingHorizontal: 6,
+      alignSelf: "flex-end" as const,
     },
-    sendBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    postBtnText: { fontSize: 14, fontWeight: "800" as const, color: c.accent },
+    replyingBanner: {
+      paddingHorizontal: 14, paddingVertical: 6,
+      backgroundColor: isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)",
+      flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const,
+      borderTopWidth: 1, borderTopColor: isDark ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.15)",
+    },
+    replyingText: { fontSize: 12, color: isDark ? "#818cf8" : "#4338ca", fontWeight: "500" as const },
+    replyingCancel: { fontSize: 12, color: c.muted, fontWeight: "700" as const },
+    // legacy (keep for reference)
+    sendBtn: { width: 0, height: 0 },
+    sendBtnText: { fontSize: 0 },
+    // "View older comments" button at top of list
+    viewOlderBtn: {
+      paddingVertical: 10, paddingHorizontal: 14,
+      alignItems: "center" as const,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+    },
+    viewOlderText: { fontSize: 13, fontWeight: "700" as const, color: c.accent },
 
     // ── Voters floating panel (non-blocking) ──
     votersPanel: {
@@ -324,6 +335,73 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 
     empty: { paddingVertical: 24, alignItems: "center" },
     emptyText: { fontSize: 13, color: c.muted },
+    showMoreBtn: {
+      paddingVertical: 12, paddingHorizontal: 16,
+      alignItems: "center" as const,
+      borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border,
+    },
+    showMoreText: { fontSize: 13, fontWeight: "700" as const, color: c.accent },
+
+    // ── Emoji reaction picker (Facebook-style floating modal) ──
+    reactionPickerOverlay: {
+      flex: 1, backgroundColor: "rgba(0,0,0,0.35)",
+      justifyContent: "center" as const, alignItems: "center" as const,
+    },
+    reactionPickerPill: {
+      flexDirection: "row" as const, gap: 4,
+      backgroundColor: c.card,
+      borderRadius: 999,
+      paddingVertical: 10, paddingHorizontal: 12,
+      borderWidth: 1, borderColor: c.border,
+      elevation: 24,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.28, shadowRadius: 20,
+    },
+    reactionPickerBtn: {
+      width: 46, height: 46, borderRadius: 23,
+      alignItems: "center" as const, justifyContent: "center" as const,
+    },
+    reactionPickerBtnActive: {
+      backgroundColor: isDark ? "rgba(99,102,241,0.22)" : "rgba(99,102,241,0.12)",
+      transform: [{ scale: 1.18 }] as unknown as never,
+    },
+    reactionPickerEmoji: { fontSize: 28, lineHeight: 34 },
+    // Compact reaction pills (only shown when count > 0)
+    reactionPillsRow: {
+      flexDirection: "row" as const, flexWrap: "wrap" as const,
+      gap: 5, marginTop: 6, marginLeft: 36,
+    },
+    reactionPill: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 3,
+      paddingHorizontal: 8, paddingVertical: 3,
+      borderRadius: 999, borderWidth: 1,
+      backgroundColor: c.section, borderColor: c.border,
+    },
+    reactionPillActive: {
+      backgroundColor: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.1)",
+      borderColor: isDark ? "#6366f1" : "#818cf8",
+    },
+    reactionPillEmoji: { fontSize: 13 },
+    reactionPillCount: { fontSize: 11, fontWeight: "700" as const, color: c.subtext },
+    reactionPillCountActive: { color: isDark ? "#818cf8" : "#4338ca" },
+    // React chip button — labeled pill (replaces invisible 😊)
+    reactChip: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 4,
+      borderWidth: 1, borderColor: c.border,
+      borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3,
+      backgroundColor: c.section,
+    },
+    reactChipActive: {
+      borderColor: isDark ? "#6366f1" : "#818cf8",
+      backgroundColor: isDark ? "rgba(99,102,241,0.14)" : "rgba(99,102,241,0.08)",
+    },
+    reactChipEmoji: { fontSize: 13, lineHeight: 18 },
+    reactChipLabel: { fontSize: 11, fontWeight: "600" as const, color: c.subtext, lineHeight: 16 },
+    reactChipLabelActive: { color: isDark ? "#818cf8" : "#4338ca" },
+    // legacy (unused, kept so existing references compile)
+    reactBtn: { flexDirection: "row" as const, alignItems: "center" as const, gap: 2 },
+    reactBtnText: { fontSize: 13, color: c.subtext },
+    reactBtnActive: { fontSize: 13, color: isDark ? "#818cf8" : "#4338ca", fontWeight: "700" as const },
 
     loadingRow: { paddingVertical: 24, alignItems: "center" },
     errorRow: { paddingHorizontal: 14, paddingVertical: 12 },
@@ -405,6 +483,68 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
   });
 }
 
+// ─── Emoji picker modal (Facebook-style) ─────────────────────────────────────
+
+type EmojiPickerProps = {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (emoji: string) => void;
+  currentReaction: string | null;
+  st: ReturnType<typeof makeStyles>;
+};
+
+function EmojiPickerModal({ visible, onClose, onSelect, currentReaction, st }: EmojiPickerProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={st.reactionPickerOverlay} onPress={onClose}>
+        <Pressable style={st.reactionPickerPill}>
+          {REACTION_EMOJIS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              style={[st.reactionPickerBtn, currentReaction === emoji && st.reactionPickerBtnActive]}
+              onPress={() => { onSelect(emoji); onClose(); }}
+              hitSlop={4}
+            >
+              <Text style={st.reactionPickerEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ─── Shared reaction logic ────────────────────────────────────────────────────
+
+function useReactions(initialReaction: string | null, initialCounts: Array<{ emoji: string; count: number }>, commentId: string) {
+  const [localReaction, setLocalReaction] = useState<string | null>(initialReaction);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
+    Object.fromEntries(initialCounts.map((r) => [r.emoji, r.count])),
+  );
+  const [reactMut] = useMutation(SET_COMMENT_REACTION);
+
+  async function handleReact(emoji: string) {
+    const prev = localReaction;
+    const next = prev === emoji ? null : emoji;
+    setLocalReaction(next);
+    setReactionCounts((c) => {
+      const u = { ...c };
+      if (prev) u[prev] = Math.max(0, (u[prev] ?? 1) - 1);
+      if (next) u[next] = (u[next] ?? 0) + 1;
+      return u;
+    });
+    try {
+      await reactMut({ variables: { commentId, emoji: next } });
+    } catch {
+      setLocalReaction(prev);
+      setReactionCounts(Object.fromEntries(initialCounts.map((r) => [r.emoji, r.count])));
+    }
+  }
+
+  const activeReactions = REACTION_EMOJIS.filter((e) => (reactionCounts[e] ?? 0) > 0);
+  return { localReaction, reactionCounts, activeReactions, handleReact };
+}
+
 // ─── Comment component ────────────────────────────────────────────────────────
 
 type CommentItemProps = {
@@ -414,17 +554,24 @@ type CommentItemProps = {
   st: ReturnType<typeof makeStyles>;
   onReply: (id: string, name: string) => void;
   onLike: (id: string, liked: boolean) => void;
+  forceExpanded?: boolean;
 };
 
-function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps) {
+function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded }: CommentItemProps) {
   const [localLiked, setLocalLiked] = useState(comment.viewerHasLiked);
   const [localCount, setLocalCount] = useState(comment.likeCount);
   const [showReplies, setShowReplies] = useState(false);
-  const [localReaction, setLocalReaction] = useState<string | null>(comment.viewerReaction ?? null);
-  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
-    Object.fromEntries((comment.reactions ?? []).map((r) => [r.emoji, r.count])),
+  const [showPicker, setShowPicker] = useState(false);
+  const { localReaction, reactionCounts, activeReactions, handleReact } = useReactions(
+    comment.viewerReaction ?? null,
+    comment.reactions ?? [],
+    comment.id,
   );
-  const [reactMut] = useMutation(SET_COMMENT_REACTION);
+
+  // Auto-expand replies when a reply was just posted to this comment
+  useEffect(() => {
+    if (forceExpanded) setShowReplies(true);
+  }, [forceExpanded]);
 
   const authorName = comment.author.displayName?.trim() || comment.author.username;
   const initial = authorName.slice(0, 1).toUpperCase();
@@ -435,24 +582,6 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
     setLocalLiked(next);
     setLocalCount((n) => Math.max(0, n + (next ? 1 : -1)));
     onLike(comment.id, next);
-  }
-
-  async function handleReact(emoji: string) {
-    const prev = localReaction;
-    const next = prev === emoji ? null : emoji;
-    setLocalReaction(next);
-    setReactionCounts((c) => {
-      const updated = { ...c };
-      if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 1) - 1);
-      if (next) updated[next] = (updated[next] ?? 0) + 1;
-      return updated;
-    });
-    try {
-      await reactMut({ variables: { commentId: comment.id, emoji: next } });
-    } catch {
-      setLocalReaction(prev);
-      setReactionCounts(Object.fromEntries((comment.reactions ?? []).map((r) => [r.emoji, r.count])));
-    }
   }
 
   return (
@@ -471,42 +600,78 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
           <Text style={st.commentAuthor}>{authorName}</Text>
           <Text style={st.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
         </Pressable>
+
         <Text style={st.commentContent}>{comment.content}</Text>
+
         <View style={st.commentActions}>
-          <Pressable style={st.commentActionBtn} onPress={handleLike} hitSlop={8}>
+          {/* Like — tap to toggle, long-press to open reaction picker */}
+          <Pressable
+            style={st.commentActionBtn}
+            onPress={handleLike}
+            onLongPress={() => setShowPicker(true)}
+            delayLongPress={400}
+            hitSlop={8}
+          >
             <Text style={[st.commentActionText, localLiked && st.commentActionLiked]}>
-              {localLiked ? "♥" : "♡"} {localCount > 0 ? localCount : ""}
+              {localLiked ? "♥" : "♡"}{localCount > 0 ? ` ${localCount}` : ""}
             </Text>
           </Pressable>
+
+          {/* React chip — clearly labeled, opens emoji picker */}
+          <Pressable
+            style={[st.reactChip, localReaction ? st.reactChipActive : null]}
+            onPress={() => setShowPicker(true)}
+            hitSlop={6}
+          >
+            <Text style={st.reactChipEmoji}>{localReaction ?? "❤️"}</Text>
+            <Text style={[st.reactChipLabel, localReaction ? st.reactChipLabelActive : null]}>
+              {localReaction ? "Reacted" : "React"}
+            </Text>
+          </Pressable>
+
           <Pressable style={st.replyBtn} onPress={() => onReply(comment.id, authorName)} hitSlop={8}>
             <Text style={st.replyBtnText}>↩ Reply</Text>
           </Pressable>
+
           {replies.length > 0 && (
             <Pressable onPress={() => setShowReplies((v) => !v)} hitSlop={8}>
               <Text style={st.replyBtnText}>
-                {showReplies ? "Hide" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
+                {showReplies ? "Hide replies" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"} ▸`}
               </Text>
             </Pressable>
           )}
         </View>
-        {/* Emoji reaction strip */}
-        <View style={st.reactionStrip}>
-          {REACTION_EMOJIS.map((emoji) => {
-            const count = reactionCounts[emoji] ?? 0;
-            const isActive = localReaction === emoji;
-            return (
+
+        {/* Compact reaction pills — only those with count > 0 */}
+        {activeReactions.length > 0 && (
+          <View style={st.reactionPillsRow}>
+            {activeReactions.map((emoji) => (
               <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
-                <View style={[st.reactionBtn, isActive && st.reactionBtnActive]}>
-                  <Text style={st.reactionText}>{emoji}{count > 0 ? ` ${count}` : ""}</Text>
+                <View style={[st.reactionPill, localReaction === emoji && st.reactionPillActive]}>
+                  <Text style={st.reactionPillEmoji}>{emoji}</Text>
+                  <Text style={[st.reactionPillCount, localReaction === emoji && st.reactionPillCountActive]}>
+                    {reactionCounts[emoji]}
+                  </Text>
                 </View>
               </Pressable>
-            );
-          })}
-        </View>
+            ))}
+          </View>
+        )}
       </View>
+
+      {/* Replies — shown when expanded */}
       {showReplies && replies.map((r) => (
         <ReplyItem key={r.id} reply={r} st={st} onLike={onLike} />
       ))}
+
+      {/* Emoji picker modal */}
+      <EmojiPickerModal
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={(emoji) => void handleReact(emoji)}
+        currentReaction={localReaction}
+        st={st}
+      />
     </>
   );
 }
@@ -520,11 +685,12 @@ type ReplyItemProps = {
 function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
   const [localLiked, setLocalLiked] = useState(reply.viewerHasLiked);
   const [localCount, setLocalCount] = useState(reply.likeCount);
-  const [localReaction, setLocalReaction] = useState<string | null>(reply.viewerReaction ?? null);
-  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
-    Object.fromEntries((reply.reactions ?? []).map((r) => [r.emoji, r.count])),
+  const [showPicker, setShowPicker] = useState(false);
+  const { localReaction, reactionCounts, activeReactions, handleReact } = useReactions(
+    reply.viewerReaction ?? null,
+    reply.reactions ?? [],
+    reply.id,
   );
-  const [reactMut] = useMutation(SET_COMMENT_REACTION);
 
   const authorName = reply.author.displayName?.trim() || reply.author.username;
   const initial = authorName.slice(0, 1).toUpperCase();
@@ -537,62 +703,74 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
     onLike(reply.id, next);
   }
 
-  async function handleReact(emoji: string) {
-    const prev = localReaction;
-    const next = prev === emoji ? null : emoji;
-    setLocalReaction(next);
-    setReactionCounts((c) => {
-      const updated = { ...c };
-      if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 1) - 1);
-      if (next) updated[next] = (updated[next] ?? 0) + 1;
-      return updated;
-    });
-    try {
-      await reactMut({ variables: { commentId: reply.id, emoji: next } });
-    } catch {
-      setLocalReaction(prev);
-      setReactionCounts(Object.fromEntries((reply.reactions ?? []).map((r) => [r.emoji, r.count])));
-    }
-  }
-
   return (
-    <View style={st.replyRow}>
-      <Pressable
-        style={st.commentHeader}
-        onPress={() => router.push(`/profile/${reply.author.id}` as `/${string}`)}
-      >
-        <View style={[st.commentAvatar, { width: 24, height: 24, borderRadius: 12 }]}>
-          {authorImg
-            ? <Image source={{ uri: authorImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-            : <Text style={[st.commentAvatarText, { fontSize: 9 }]}>{initial}</Text>
-          }
-        </View>
-        <Text style={st.commentAuthor}>{authorName}</Text>
-        <Text style={st.commentTime}>{formatRelativeTime(reply.createdAt)}</Text>
-      </Pressable>
-      <Text style={[st.commentContent, { marginLeft: 32 }]}>{reply.content}</Text>
-      <View style={[st.commentActions, { marginLeft: 32 }]}>
-        <Pressable style={st.commentActionBtn} onPress={handleLike} hitSlop={8}>
-          <Text style={[st.commentActionText, localLiked && st.commentActionLiked]}>
-            {localLiked ? "♥" : "♡"} {localCount > 0 ? localCount : ""}
-          </Text>
+    <>
+      <View style={st.replyRow}>
+        <Pressable
+          style={st.commentHeader}
+          onPress={() => router.push(`/profile/${reply.author.id}` as `/${string}`)}
+        >
+          <View style={[st.commentAvatar, { width: 24, height: 24, borderRadius: 12 }]}>
+            {authorImg
+              ? <Image source={{ uri: authorImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+              : <Text style={[st.commentAvatarText, { fontSize: 9 }]}>{initial}</Text>
+            }
+          </View>
+          <Text style={st.commentAuthor}>{authorName}</Text>
+          <Text style={st.commentTime}>{formatRelativeTime(reply.createdAt)}</Text>
         </Pressable>
+
+        <Text style={[st.commentContent, { marginLeft: 32 }]}>{reply.content}</Text>
+
+        <View style={[st.commentActions, { marginLeft: 32 }]}>
+          <Pressable
+            style={st.commentActionBtn}
+            onPress={handleLike}
+            onLongPress={() => setShowPicker(true)}
+            delayLongPress={400}
+            hitSlop={8}
+          >
+            <Text style={[st.commentActionText, localLiked && st.commentActionLiked]}>
+              {localLiked ? "♥" : "♡"}{localCount > 0 ? ` ${localCount}` : ""}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[st.reactChip, localReaction ? st.reactChipActive : null]}
+            onPress={() => setShowPicker(true)}
+            hitSlop={6}
+          >
+            <Text style={st.reactChipEmoji}>{localReaction ?? "❤️"}</Text>
+            <Text style={[st.reactChipLabel, localReaction ? st.reactChipLabelActive : null]}>
+              {localReaction ? "Reacted" : "React"}
+            </Text>
+          </Pressable>
+        </View>
+
+        {activeReactions.length > 0 && (
+          <View style={[st.reactionPillsRow, { marginLeft: 32 }]}>
+            {activeReactions.map((emoji) => (
+              <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
+                <View style={[st.reactionPill, localReaction === emoji && st.reactionPillActive]}>
+                  <Text style={st.reactionPillEmoji}>{emoji}</Text>
+                  <Text style={[st.reactionPillCount, localReaction === emoji && st.reactionPillCountActive]}>
+                    {reactionCounts[emoji]}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
-      {/* Emoji reactions on replies */}
-      <View style={[st.reactionStrip, { marginLeft: 32 }]}>
-        {REACTION_EMOJIS.map((emoji) => {
-          const count = reactionCounts[emoji] ?? 0;
-          const isActive = localReaction === emoji;
-          return (
-            <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
-              <View style={[st.reactionBtn, isActive && st.reactionBtnActive]}>
-                <Text style={st.reactionText}>{emoji}{count > 0 ? ` ${count}` : ""}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
+
+      <EmojiPickerModal
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={(emoji) => void handleReact(emoji)}
+        currentReaction={localReaction}
+        st={st}
+      />
+
+    </>
   );
 }
 
@@ -1217,10 +1395,17 @@ export default function PostDetailScreen() {
   } = useQuery<CommentsData>(COMMENTS_BY_POST, {
     variables: { postId: id },
     skip: !id || !isAuthenticated,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
   });
   const allComments = commentsData?.commentsByPost ?? [];
-  const topComments = allComments.filter((c) => !c.parentId);
+
+  // Oldest-first (natural conversation order, newest at bottom like Facebook)
+  const topComments = useMemo(
+    () => allComments
+      .filter((c) => !c.parentId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    [allComments],
+  );
   const repliesMap = useMemo(() => {
     const m = new Map<string, GqlComment[]>();
     allComments.filter((c) => c.parentId).forEach((c) => {
@@ -1228,6 +1413,8 @@ export default function PostDetailScreen() {
       arr.push(c);
       m.set(c.parentId!, arr);
     });
+    // Replies oldest-first within each thread
+    m.forEach((arr) => arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
     return m;
   }, [allComments]);
 
@@ -1241,7 +1428,11 @@ export default function PostDetailScreen() {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<typeof ScrollView>(null);
   const [votersVisible, setVotersVisible] = useState(false);
+  const [optimisticComments, setOptimisticComments] = useState<GqlComment[]>([]);
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [extendVisible, setExtendVisible] = useState(false);
 
   const optionLabels = useMemo(() => {
@@ -1287,22 +1478,60 @@ export default function PostDetailScreen() {
     );
   }
 
-  async function handleSend() {
+  async function submitComment() {
     const content = text.trim();
-    if (!content) return;
+    if (!content || commentSending) return;
     if (!isAuthenticated) { router.push("/auth/login"); return; }
+
+    const parentId = replyTo?.id ?? null;
+    const currentReplyTo = replyTo;
+
+    // Optimistic: add comment immediately with timestamp "now"
+    const optimistic: GqlComment = {
+      id: `optimistic-${Date.now()}`,
+      content,
+      postId: id ?? "",
+      parentId,
+      createdAt: new Date().toISOString(),
+      likeCount: 0,
+      viewerHasLiked: false,
+      reactions: [],
+      viewerReaction: null,
+      author: {
+        id: user?.id ?? "",
+        username: user?.username ?? "",
+        displayName: user?.displayName ?? null,
+        profileImageUrl: user?.profileImageUrl ?? null,
+      },
+    };
+    setOptimisticComments((prev) => [optimistic, ...prev]);
+    setText("");
+    setReplyTo(null);
+
+    // If replying to a comment, auto-expand its replies immediately
+    if (currentReplyTo) {
+      setExpandedIds((prev) => new Set([...prev, currentReplyTo.id]));
+    }
+
+    // Scroll to show the new comment (slight delay so optimistic renders first)
+    setTimeout(() => {
+      (scrollRef.current as unknown as { scrollToEnd: (opts: { animated: boolean }) => void })
+        ?.scrollToEnd({ animated: true });
+    }, 80);
+
     try {
       await commentMut({
-        variables: {
-          postId: id,
-          input: { content, parentId: replyTo?.id ?? undefined },
-        },
+        variables: { postId: id, input: { content, parentId: parentId ?? undefined } },
       });
-      setText("");
-      setReplyTo(null);
-      void refetchComments();
+      void refetchComments().then(() => {
+        setOptimisticComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      });
       showToast("Comment posted ✓", "success");
     } catch {
+      setOptimisticComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      if (currentReplyTo) {
+        setExpandedIds((prev) => { const s = new Set(prev); s.delete(currentReplyTo.id); return s; });
+      }
       showToast("Failed to post comment", "error");
     }
   }
@@ -1357,10 +1586,10 @@ export default function PostDetailScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
         keyboardVerticalOffset={insets.top + 56}
       >
-        <ScrollView style={st.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+        <ScrollView ref={scrollRef as never} style={st.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           {/* Post card */}
           {postLoading && !post ? (
             <View style={st.loadingRow}>
@@ -1400,68 +1629,115 @@ export default function PostDetailScreen() {
           ) : null}
 
           {/* Comments */}
-          <View style={st.sectionHeader}>
-            <Text style={st.sectionTitle}>COMMENTS</Text>
-            {allComments.length > 0 ? (
-              <Text style={st.commentCount}>{allComments.length}</Text>
-            ) : null}
-          </View>
+          {(() => {
+            const PREVIEW = 5;
+            // Merge server (oldest-first) + optimistic at end; deduplicate by id
+            const seen = new Set<string>();
+            const merged = [...topComments, ...optimisticComments.filter((c) => !c.parentId)]
+              .filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
+            const totalCount = merged.length;
+            // Show last PREVIEW (most recent); "View older" reveals the rest at top
+            const hiddenCount = Math.max(0, totalCount - PREVIEW);
+            const visible = showAllComments ? merged : merged.slice(hiddenCount);
 
-          {commentsLoading ? (
-            <View style={st.loadingRow}>
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          ) : topComments.length === 0 ? (
-            <View style={st.empty}>
-              <Text style={st.emptyText}>No comments yet — be the first!</Text>
-            </View>
-          ) : (
-            topComments.map((c) => (
-              <CommentItem
-                key={c.id}
-                comment={c}
-                replies={repliesMap.get(c.id) ?? []}
-                colors={colors}
-                st={st}
-                onReply={handleReply}
-                onLike={handleLike}
-              />
-            ))
-          )}
+            return (
+              <>
+                <View style={st.sectionHeader}>
+                  <Text style={st.sectionTitle}>COMMENTS</Text>
+                  {totalCount > 0 ? <Text style={st.commentCount}>{totalCount}</Text> : null}
+                </View>
+
+                {commentsLoading && totalCount === 0 ? (
+                  <View style={st.loadingRow}>
+                    <ActivityIndicator color={colors.accent} />
+                  </View>
+                ) : totalCount === 0 ? (
+                  <View style={st.empty}>
+                    <Text style={st.emptyText}>No comments yet — be the first!</Text>
+                  </View>
+                ) : (
+                  <>
+                    {/* "View older" at the TOP — reveals older comments */}
+                    {!showAllComments && hiddenCount > 0 && (
+                      <Pressable style={st.viewOlderBtn} onPress={() => setShowAllComments(true)}>
+                        <Text style={st.viewOlderText}>
+                          View {hiddenCount} older comment{hiddenCount !== 1 ? "s" : ""} ▴
+                        </Text>
+                      </Pressable>
+                    )}
+                    {showAllComments && totalCount > PREVIEW && (
+                      <Pressable style={st.viewOlderBtn} onPress={() => setShowAllComments(false)}>
+                        <Text style={st.viewOlderText}>Show fewer ▾</Text>
+                      </Pressable>
+                    )}
+
+                    {visible.map((c) => (
+                      <CommentItem
+                        key={c.id}
+                        comment={c}
+                        replies={repliesMap.get(c.id) ?? []}
+                        colors={colors}
+                        st={st}
+                        onReply={handleReply}
+                        onLike={handleLike}
+                        forceExpanded={expandedIds.has(c.id)}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </ScrollView>
 
-        {/* Comment input */}
+        {/* Comment input — Facebook-style */}
         <View style={{ backgroundColor: colors.card }}>
           {replyTo ? (
             <View style={st.replyingBanner}>
-              <Text style={st.replyingText}>Replying to {replyTo.name}</Text>
-              <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
-                <Text style={st.replyingCancel}>✕ Cancel</Text>
+              <Text style={st.replyingText}>↩ Replying to {replyTo.name}</Text>
+              <Pressable onPress={() => setReplyTo(null)} hitSlop={12}>
+                <Text style={st.replyingCancel}>✕</Text>
               </Pressable>
             </View>
           ) : null}
-          <View style={[st.inputWrap, { paddingBottom: insets.bottom + 10 }]}>
-            <TextInput
-              ref={inputRef}
-              style={st.inputBox}
-              value={text}
-              onChangeText={setText}
-              placeholder={replyTo ? `Reply to ${replyTo.name}…` : "Write a comment…"}
-              placeholderTextColor={colors.muted}
-              multiline
-              returnKeyType="default"
-            />
-            <Pressable
-              style={[st.sendBtn, (!text.trim() || commentSending) && { opacity: 0.5 }]}
-              onPress={() => void handleSend()}
-              disabled={!text.trim() || commentSending}
-            >
-              {commentSending ? (
-                <ActivityIndicator size="small" color="#fff" />
+          <View style={[st.inputWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            {/* User avatar */}
+            <View style={st.inputAvatar}>
+              {user?.profileImageUrl ? (
+                <Image source={{ uri: normalizeProfileImageUrl(user.profileImageUrl) ?? "" }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
-                <Text style={st.sendBtnText}>↑</Text>
+                <Text style={st.inputAvatarText}>
+                  {(user?.displayName ?? user?.username ?? "?").slice(0, 1).toUpperCase()}
+                </Text>
               )}
-            </Pressable>
+            </View>
+            {/* Pill input + Post button */}
+            <View style={st.inputPill}>
+              <TextInput
+                ref={inputRef}
+                style={st.inputBox}
+                value={text}
+                onChangeText={setText}
+                placeholder={replyTo ? `Reply to ${replyTo.name}…` : "Write a comment…"}
+                placeholderTextColor={colors.muted}
+                multiline
+                returnKeyType="send"
+                blurOnSubmit={false}
+                onSubmitEditing={() => void submitComment()}
+              />
+              {(text.trim() || commentSending) ? (
+                <Pressable
+                  style={st.postBtn}
+                  onPress={() => void submitComment()}
+                  disabled={!text.trim() || commentSending}
+                >
+                  {commentSending
+                    ? <ActivityIndicator size="small" color={colors.accent} />
+                    : <Text style={st.postBtnText}>Post</Text>
+                  }
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
