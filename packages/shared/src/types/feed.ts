@@ -57,6 +57,17 @@ export type FeedPostView = {
   postOptions?: { label: string }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  /** Campaign this compare is linked to (Phase 22). */
+  campaign?: FeedPostCampaignView | null;
+};
+
+export type FeedPostCampaignView = {
+  id: string;
+  name: string;
+  slug: string;
+  bannerText?: string | null;
+  bannerImageUrl?: string | null;
+  prizePerWinner: number;
 };
 
 export type VoteOptionStatView = {

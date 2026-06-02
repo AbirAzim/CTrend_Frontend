@@ -64,6 +64,14 @@ export function mapGqlPostToFeedView(p: {
   options?: Array<{ label: string }> | null;
   status?: string | null;
   scheduledAt?: string | null;
+  campaign?: {
+    id: string;
+    name: string;
+    slug: string;
+    bannerText?: string | null;
+    bannerImageUrl?: string | null;
+    prizePerWinner: number;
+  } | null;
 }): FeedPostView {
   const imageUrls = (p.imageUrls ?? []).filter(
     (u) => typeof u === "string" && u.trim().length > 0,
@@ -117,5 +125,15 @@ export function mapGqlPostToFeedView(p: {
     optionStats,
     postOptions,
     compareOptionLabels: null,
+    campaign: p.campaign
+      ? {
+          id: p.campaign.id,
+          name: p.campaign.name,
+          slug: p.campaign.slug,
+          bannerText: p.campaign.bannerText ?? null,
+          bannerImageUrl: p.campaign.bannerImageUrl ?? null,
+          prizePerWinner: p.campaign.prizePerWinner,
+        }
+      : null,
   };
 }

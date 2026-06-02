@@ -23,6 +23,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "@ctrend/shared/graphql/feed";
+import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
 import { CREATE_SYSTEM_POST } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
@@ -35,6 +36,9 @@ const { width: SW } = Dimensions.get("window");
 
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
+type CampaignOption = { id: string; name: string; isActive?: boolean | null };
+type ActiveCampaignsData = { activeCampaigns: CampaignOption[] };
+type AdminCampaignsData = { campaigns: CampaignOption[] };
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 
 type Slot = {
@@ -210,6 +214,8 @@ export default function CreateScreen() {
   const [platformWide, setPlatformWide] = useState(platformParam === "1");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
+  const [campaignId, setCampaignId] = useState("");
+  const [campaignModal, setCampaignModal] = useState(false);
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
@@ -243,6 +249,18 @@ export default function CreateScreen() {
   });
   const categories = catData?.categories ?? [];
   const selectedCat = categories.find((c) => c.id === categoryId);
+
+  // Campaigns — admin sees all (with inactive flagged), users see active only.
+  const { data: activeCampData } = useQuery<ActiveCampaignsData>(ACTIVE_CAMPAIGNS, {
+    fetchPolicy: "cache-first", skip: !isAuthenticated || isAdmin,
+  });
+  const { data: adminCampData } = useQuery<AdminCampaignsData>(CAMPAIGNS_ADMIN, {
+    fetchPolicy: "cache-first", skip: !isAuthenticated || !isAdmin,
+  });
+  const campaigns: CampaignOption[] = isAdmin
+    ? adminCampData?.campaigns ?? []
+    : activeCampData?.activeCampaigns ?? [];
+  const selectedCampaign = campaigns.find((c) => c.id === campaignId);
 
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [createPost, { loading: submitting }] = useMutation(CREATE_POST);
@@ -343,6 +361,7 @@ export default function CreateScreen() {
     }));
     const input: Record<string, unknown> = { categoryId, imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
+    if (campaignId) input.campaignId = campaignId;
 
     if (deadlineEnabled) {
       input.votingEndsAt = deadlinePreset !== null ? hoursFromNow(deadlinePreset) : deadlineCustom.toISOString();
@@ -507,6 +526,23 @@ export default function CreateScreen() {
             </View>
           </Pressable>
 
+          {/* Campaign (optional) */}
+          {campaigns.length > 0 && (
+            <Pressable style={[st.settingRow, { borderBottomColor: colors.border }]} onPress={() => setCampaignModal(true)}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 14 }}>🎯</Text>
+                <Text style={[st.settingKey, { color: colors.text }]}>Campaign</Text>
+                <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
+              </View>
+              <View style={[st.catPicker, { backgroundColor: colors.section, borderColor: colors.border }]}>
+                <Text style={[st.catPickerText, { color: selectedCampaign ? colors.text : colors.muted }]} numberOfLines={1}>
+                  {selectedCampaign?.name?.trim() || "No campaign"}
+                </Text>
+                <Text style={[st.catChevron, { color: colors.muted }]}>▼</Text>
+              </View>
+            </Pressable>
+          )}
+
           {/* Caption */}
           <View style={[st.settingCol, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -637,6 +673,44 @@ export default function CreateScreen() {
               })}
               {categories.length === 0 && !catLoading && <Text style={[st.modalEmpty, { color: colors.muted }]}>No categories available.</Text>}
               {catLoading && <ActivityIndicator style={{ marginVertical: 20 }} color={colors.accent} />}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Campaign modal */}
+      <Modal visible={campaignModal} transparent animationType="slide" onRequestClose={() => setCampaignModal(false)}>
+        <Pressable style={st.modalOverlay} onPress={() => setCampaignModal(false)}>
+          <View style={[st.modalSheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[st.modalHandle, { backgroundColor: colors.border }]} />
+            <Text style={[st.modalTitle, { color: colors.text }]}>Attach a campaign</Text>
+            <ScrollView>
+              <Pressable
+                style={[st.modalRow, { borderBottomColor: colors.border }, !campaignId && { backgroundColor: colors.section }]}
+                onPress={() => { setCampaignId(""); setCampaignModal(false); }}
+              >
+                <Text style={[st.modalRowText, { color: !campaignId ? colors.accent : colors.text }, !campaignId && { fontWeight: "700" }]}>
+                  No campaign
+                </Text>
+                {!campaignId && <Text style={[{ color: colors.accent, fontSize: 16, fontWeight: "700" }]}>✓</Text>}
+              </Pressable>
+              {campaigns.map((camp) => {
+                const active = camp.id === campaignId;
+                const inactive = camp.isActive === false;
+                return (
+                  <Pressable
+                    key={camp.id}
+                    style={[st.modalRow, { borderBottomColor: colors.border }, active && { backgroundColor: colors.section }]}
+                    onPress={() => { setCampaignId(camp.id); setCampaignModal(false); }}
+                  >
+                    <Text style={[st.modalRowText, { color: active ? colors.accent : colors.text }, active && { fontWeight: "700" }]}>
+                      {camp.name?.trim() || camp.id}{inactive ? "  (inactive)" : ""}
+                    </Text>
+                    {active && <Text style={[{ color: colors.accent, fontSize: 16, fontWeight: "700" }]}>✓</Text>}
+                  </Pressable>
+                );
+              })}
+              {campaigns.length === 0 && <Text style={[st.modalEmpty, { color: colors.muted }]}>No campaigns available.</Text>}
             </ScrollView>
           </View>
         </Pressable>
