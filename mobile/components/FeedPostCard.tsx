@@ -1,19 +1,21 @@
-import { useMutation, useSubscription } from "@apollo/client/react";
+import { useApolloClient, useMutation, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
   Easing,
+  FlatList,
   Modal,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   Vibration,
   View,
 } from "react-native";
@@ -25,7 +27,9 @@ import {
   DELETE_POST,
   EXTEND_POST_VOTING,
   FEED_POSTS,
+  VOTERS_BY_POST,
 } from "@ctrend/shared/graphql/feed";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { useAuth } from "../context/AuthContext";
@@ -99,7 +103,35 @@ function calcCountdown(endsAt: string | null | undefined): string | null {
   return `${m}M ${pad(s)}S`;
 }
 
-function makeStyles(c: ColorPalette) {
+function computeWinnerSummary(
+  isMulti: boolean,
+  up: number, down: number,
+  stats: Array<{ index: number; label: string; count: number; percentage: number }> | null | undefined,
+  getLabel: (i: number) => string,
+): string {
+  if (isMulti && stats && stats.length > 0) {
+    const total = stats.reduce((s, o) => s + o.count, 0);
+    if (total === 0) return "No votes were cast";
+    const maxCount = Math.max(...stats.map((s) => s.count));
+    const winners = stats.filter((s) => s.count === maxCount);
+    if (winners.length > 1) {
+      const pct = Math.round((100 * maxCount) / total);
+      return `Tie at ${pct}%`;
+    }
+    const w = winners[0];
+    const pct = Math.round(w.percentage);
+    return `${w.label?.trim() || getLabel(w.index)} won · ${pct}% (${total.toLocaleString()} votes)`;
+  }
+  const total = up + down;
+  if (total === 0) return "No votes were cast";
+  if (up === down) return "Tie · 50% each";
+  const winner = up > down ? getLabel(0) : getLabel(1);
+  const winCount = Math.max(up, down);
+  const pct = Math.round((100 * winCount) / total);
+  return `${winner} won · ${pct}% (${total.toLocaleString()} votes)`;
+}
+
+function makeStyles(c: ColorPalette, isDark: boolean) {
   return {
     card: {
       backgroundColor: c.card, marginBottom: 12,
@@ -217,29 +249,122 @@ function makeStyles(c: ColorPalette) {
     },
     anonIcon: { fontSize: 13 },
     anonLabel: { flex: 1, fontSize: 12, color: c.subtext, fontWeight: "500" as const },
-    actionsScroll: {},
-    actionsContent: {
-      flexDirection: "row" as const,
-      paddingHorizontal: 14, paddingVertical: 10, gap: 8,
-      alignItems: "center" as const,
+    // ── Two-zone action rail ──
+    actionRail: {
+      marginHorizontal: 12, marginBottom: 12, borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(148,163,184,0.24)" : "rgba(67,56,202,0.14)",
+      backgroundColor: isDark ? "rgba(15,23,42,0.64)" : "rgba(255,255,255,0.72)",
+      overflow: "hidden" as const,
     },
-    actionChip: {
-      flexDirection: "row" as const, alignItems: "center" as const, gap: 5,
-      borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14,
-      borderWidth: 1, borderColor: c.border,
-      backgroundColor: c.section,
+    actionRailIcons: {
+      flexDirection: "row" as const, justifyContent: "space-evenly" as const,
+      alignItems: "center" as const, flexWrap: "wrap" as const,
+      paddingVertical: 7, paddingHorizontal: 8, gap: 2,
     },
-    actionChipHypeActive: { borderColor: "#fb7185", backgroundColor: "rgba(251,113,133,0.14)" },
-    actionChipSaveActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.14)" },
-    actionChipIcon: { fontSize: 13, lineHeight: 18, color: c.subtext },
-    actionChipLabel: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 0.4, color: c.subtext },
-    // legacy (kept for reference, unused)
-    actions: {
-      flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: c.border,
-      paddingVertical: 10, paddingHorizontal: 4,
+    actionChipFlat: {
+      alignItems: "center" as const, justifyContent: "center" as const,
+      borderRadius: 999, padding: 10,
     },
-    actionBtn: { flex: 1, alignItems: "center" as const, justifyContent: "center" as const, paddingVertical: 4, gap: 5 },
-    actionLabel: { fontSize: 9, color: c.subtext, fontWeight: "700" as const, letterSpacing: 0.3 },
+    actionChipFlatHypeActive: { backgroundColor: isDark ? "rgba(251,113,133,0.14)" : "rgba(159,23,77,0.1)" },
+    actionChipFlatSaveActive: { backgroundColor: isDark ? "rgba(245,158,11,0.14)" : "rgba(245,158,11,0.1)" },
+    // Icon + superscript badge wrapper
+    chipIconWrap: {
+      position: "relative" as const,
+      width: 26, height: 26,
+      alignItems: "center" as const, justifyContent: "center" as const,
+    },
+    actionChipFlatIcon: { fontSize: 18, lineHeight: 21, color: c.subtext },
+    actionChipFlatIconHype: { color: "#fb7185" },
+    actionChipFlatIconSave: { color: "#f59e0b" },
+    // Superscript notification badge
+    chipBadge: {
+      position: "absolute" as const, top: -5, right: -7,
+      minWidth: 15, height: 15, borderRadius: 8,
+      alignItems: "center" as const, justifyContent: "center" as const,
+      paddingHorizontal: 3,
+      borderWidth: 1.5, borderColor: c.card,
+      backgroundColor: isDark ? "#4338ca" : "#4338ca",
+    },
+    chipBadgeRose: { backgroundColor: isDark ? "#e11d48" : "#be123c" },
+    chipBadgeAmber: { backgroundColor: isDark ? "#d97706" : "#b45309" },
+    chipBadgeVoters: { backgroundColor: isDark ? "#0e7490" : "#0369a1" },
+    chipBadgeText: {
+      fontSize: 8, fontWeight: "900" as const, color: "#ffffff",
+      lineHeight: 11, fontVariant: ["tabular-nums"] as const,
+    },
+    // Voters sheet
+    votersOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" as const },
+    votersSheet: {
+      borderTopLeftRadius: 22, borderTopRightRadius: 22,
+      borderWidth: 1, borderBottomWidth: 0,
+      borderColor: isDark ? "rgba(148,163,184,0.24)" : "rgba(67,56,202,0.14)",
+      backgroundColor: c.card,
+      maxHeight: Math.round(Dimensions.get("window").height * 0.82),
+    },
+    votersHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, alignSelf: "center" as const, marginTop: 10 },
+    votersHeader: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    votersTitle: { fontSize: 15, fontWeight: "800" as const, color: c.text },
+    votersCloseBtn: { padding: 4 },
+    votersCloseText: { fontSize: 16, color: c.muted, fontWeight: "700" as const },
+    votersSearch: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 8,
+      paddingHorizontal: 12, paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+    },
+    votersSearchInput: {
+      flex: 1, fontSize: 14, color: c.text,
+      backgroundColor: c.section, borderRadius: 12,
+      paddingHorizontal: 12, paddingVertical: 7,
+    },
+    votersTabRow: { flexDirection: "row" as const, gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
+    votersTab: {
+      paddingHorizontal: 12, paddingVertical: 5,
+      borderRadius: 999, borderWidth: 1, borderColor: c.border,
+    },
+    votersTabActive: { backgroundColor: c.accent, borderColor: c.accent },
+    votersTabText: { fontSize: 11, fontWeight: "700" as const, color: c.subtext },
+    votersTabTextActive: { color: "#fff" },
+    voterRow: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+    },
+    voterAvatar: {
+      width: 36, height: 36, borderRadius: 18,
+      backgroundColor: "#312e81",
+      alignItems: "center" as const, justifyContent: "center" as const, overflow: "hidden" as const,
+    },
+    voterAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" as const },
+    voterName: { fontSize: 13, fontWeight: "700" as const, color: c.text },
+    voterTime: { fontSize: 11, color: c.muted, marginTop: 1 },
+    voterOptionTag: {
+      paddingHorizontal: 7, paddingVertical: 3,
+      borderRadius: 999, borderWidth: 1,
+    },
+    voterOptionTagText: { fontSize: 10, fontWeight: "700" as const },
+    voterEmpty: { textAlign: "center" as const, paddingVertical: 24, color: c.muted, fontSize: 13 },
+    // Zone 2 — context line
+    actionRailContext: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      gap: 10, paddingVertical: 8, paddingHorizontal: 14,
+      borderTopWidth: 1 as const,
+      borderTopColor: isDark ? "rgba(148,163,184,0.18)" : "rgba(67,56,202,0.12)",
+      backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(21,20,27,0.025)",
+    },
+    actionStatusText: {
+      flex: 1, fontSize: 12, fontWeight: "700" as const, letterSpacing: 0.01,
+      color: isDark ? "#818cf8" : "#312e81",
+    },
+    actionStatusTextResult: { color: isDark ? "#fcd34d" : "#b45309" },
+    seeDetailsBtn2: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 6, flexShrink: 0 },
+    seeDetailsBtnText2: { fontSize: 12, fontWeight: "800" as const, color: isDark ? "#818cf8" : "#312e81" },
     iconDiscussOuter: { width: 20, height: 19 },
     iconDiscussBubble: { width: 18, height: 15, borderWidth: 1.5, borderColor: c.subtext, borderRadius: 8 },
     iconDiscussTail: {
@@ -276,16 +401,17 @@ function makeStyles(c: ColorPalette) {
 
 function FeedPostCardComponent({ post }: Props) {
   const { user, isAuthenticated } = useAuth();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { playTick } = useSounds();
   const { adjustSavedCount } = useTabBar();
-  const st = useMemo(() => makeStyles(colors), [colors]);
+  const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
   const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(null);
   const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
   const [anon, setAnon] = useState(Boolean(post.myVoteAnonymous));
   const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
+  const [saveCount, setSaveCount] = useState(post.saveCount ?? 0);
   const [countdownStr, setCountdownStr] = useState(() => calcCountdown(post.votingEndsAt));
   const voteInFlight = useRef(false);
   const voteGuardUntil = useRef(0);
@@ -293,6 +419,8 @@ function FeedPostCardComponent({ post }: Props) {
 
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [extendMenuVisible, setExtendMenuVisible] = useState(false);
+  const [votersVisible, setVotersVisible] = useState(false);
+  const client = useApolloClient();
 
   // Animation values — pre-allocated for up to 4 options
   const cellScale = useRef([0, 1, 2, 3].map(() => new Animated.Value(1))).current;
@@ -307,6 +435,14 @@ function FeedPostCardComponent({ post }: Props) {
   const chipScales = useRef([1, 1, 1, 1, 1, 1].map(() => new Animated.Value(1))).current;
 
   const isOwner = !!user && !!post.authorId && user.id === post.authorId;
+
+  const optionLabels = useMemo(() => {
+    if (activeStats && activeStats.length > 0)
+      return activeStats.map((s) => s.label?.trim() || `Option ${s.index + 1}`);
+    if (post.postOptions && post.postOptions.length > 0)
+      return post.postOptions.map((o, i) => o.label?.trim() || `Option ${i + 1}`);
+    return isBinary ? ["Side A", "Side B"] : [];
+  }, [activeStats, post.postOptions, isBinary]);
 
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
@@ -591,9 +727,14 @@ function FeedPostCardComponent({ post }: Props) {
   async function handleSave() {
     const next = !saved;
     setSaved(next);
+    setSaveCount((n) => Math.max(0, n + (next ? 1 : -1)));
     adjustSavedCount(next ? 1 : -1);
     try { await setKeepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setSaved(!next); adjustSavedCount(next ? -1 : 1); }
+    catch {
+      setSaved(!next);
+      setSaveCount((n) => Math.max(0, n + (next ? -1 : 1)));
+      adjustSavedCount(next ? -1 : 1);
+    }
   }
 
   async function handleShare() {
@@ -815,19 +956,7 @@ function FeedPostCardComponent({ post }: Props) {
         </View>
       ) : null}
 
-      {/* Countdown + SEE DETAILS (shown whenever compare has votes or is closed) */}
-      {compareUrls && (countdownStr || binaryTotal > 0 || multiTotal > 0 || isVotingClosed) ? (
-        <View style={st.countdownRow}>
-          {countdownStr && !isVotingClosed ? (
-            <View style={st.countdownPill}>
-              <Text style={st.countdownText}>{countdownStr} LEFT</Text>
-            </View>
-          ) : <View />}
-          <Pressable style={st.seeDetailsBtn} onPress={() => setDetailsExpanded(v => !v)}>
-            <Text style={st.seeDetailsBtnText}>{detailsExpanded ? "HIDE DETAILS" : "SEE DETAILS"}</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {/* spacer removed — status now lives in action rail zone 2 */}
 
       {/* Live Split — only shown when expanded */}
       {detailsExpanded && isBinary && binaryTotal > 0 ? (
@@ -887,58 +1016,111 @@ function FeedPostCardComponent({ post }: Props) {
         </View>
       ) : null}
 
-      {/* Action chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[st.actionsScroll, { borderTopWidth: 1, borderTopColor: colors.border }]}
-        contentContainerStyle={st.actionsContent}
-      >
-        {(([
-          { i: 0, label: `DISCUSS${(post.commentCount ?? 0) > 0 ? " " + String(post.commentCount) : ""}`, icon: "💬", onPress: goToPost },
-          { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
-          { i: 2, label: "FULL PAGE", icon: "⛶", onPress: goToPost },
-          {
-            i: 3,
-            label: `${liked ? "UNHYPE" : "HYPE"}${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
-            icon: liked ? "♥" : "♡",
-            onPress: () => void handleHype(),
-            active: liked,
-            activeStyle: st.actionChipHypeActive,
-            activeTextColor: "#fb7185",
-          },
-          {
-            i: 4,
-            label: "KEEP",
-            icon: "🔖",
-            onPress: () => void handleSave(),
-            active: saved,
-            activeStyle: st.actionChipSaveActive,
-            activeTextColor: "#f59e0b",
-          },
-          { i: 5, label: "VOTERS", icon: "👥", onPress: goToPost },
-        ]) as Array<{
-          i: number; label: string; icon: string; onPress: () => void;
-          active?: boolean; activeStyle?: object; activeTextColor?: string;
-        }>).map(({ i, label, icon, onPress, active, activeStyle, activeTextColor }) => (
-          <Animated.View key={i} style={{ transform: [{ scale: chipScales[i] }] }}>
-            <Pressable
-              style={[st.actionChip, active && activeStyle]}
-              onPressIn={() => chipPressIn(i)}
-              onPressOut={() => chipPressOut(i)}
-              onPress={onPress}
-              hitSlop={4}
-            >
-              <Text style={[st.actionChipIcon, active && activeTextColor ? { color: activeTextColor } : null]}>
-                {icon}
-              </Text>
-              <Text style={[st.actionChipLabel, active && activeTextColor ? { color: activeTextColor } : null]}>
-                {label}
-              </Text>
-            </Pressable>
-          </Animated.View>
-        ))}
-      </ScrollView>
+      {/* ── Two-zone action rail ── */}
+      {(() => {
+        const commentCount = post.commentCount ?? 0;
+        const votersTotal = isBinary ? binaryTotal : multiTotal;
+        const hasCompare = Boolean(compareUrls);
+
+        const statusText = (() => {
+          if (!hasCompare) return null;
+          if (isVotingClosed) {
+            return "🏆 " + computeWinnerSummary(
+              !isBinary, up, down, activeStats,
+              (i) => compareLabel(post, i),
+            );
+          }
+          if (countdownStr) return "⏳ " + countdownStr;
+          return "Voting open";
+        })();
+
+        type ChipDef = {
+          i: number; icon: string; accessLabel: string; onPress: () => void;
+          count?: number; isHype?: boolean; isSave?: boolean; isVoters?: boolean; active?: boolean;
+        };
+        const chips: ChipDef[] = [
+          { i: 0, icon: "💬", accessLabel: "Comments", onPress: goToPost, count: commentCount },
+          { i: 1, icon: "📤", accessLabel: "Share", onPress: () => void handleShare() },
+          { i: 2, icon: "🔗", accessLabel: "Full page", onPress: goToPost },
+          { i: 3, icon: liked ? "♥" : "♡", accessLabel: "Hype", onPress: () => void handleHype(), count: hypeCount, isHype: true, active: liked },
+          { i: 4, icon: "🔖", accessLabel: "Keep", onPress: () => void handleSave(), count: saveCount, isSave: true, active: saved },
+          { i: 5, icon: "👥", accessLabel: "Voters", onPress: () => setVotersVisible(true), count: votersTotal, isVoters: true },
+        ];
+
+        return (
+          <View style={st.actionRail}>
+            {/* Zone 1 — icon chips */}
+            <View style={st.actionRailIcons}>
+              {chips.map(({ i, icon, accessLabel, onPress, count, isHype, isSave, isVoters, active }) => (
+                <Animated.View key={i} style={{ transform: [{ scale: chipScales[i] }] }}>
+                  <Pressable
+                    style={[
+                      st.actionChipFlat,
+                      isHype && active && st.actionChipFlatHypeActive,
+                      isSave && active && st.actionChipFlatSaveActive,
+                    ]}
+                    onPressIn={() => chipPressIn(i)}
+                    onPressOut={() => chipPressOut(i)}
+                    onPress={onPress}
+                    accessibilityLabel={accessLabel}
+                    hitSlop={4}
+                  >
+                    <View style={st.chipIconWrap}>
+                      <Text style={[
+                        st.actionChipFlatIcon,
+                        isHype && active && st.actionChipFlatIconHype,
+                        isSave && active && st.actionChipFlatIconSave,
+                      ]}>
+                        {icon}
+                      </Text>
+                      {count != null && count > 0 ? (
+                        <View style={[
+                          st.chipBadge,
+                          isHype && st.chipBadgeRose,
+                          isSave && st.chipBadgeAmber,
+                          isVoters && st.chipBadgeVoters,
+                        ]}>
+                          <Text style={st.chipBadgeText}>
+                            {count > 99 ? "99+" : count}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                </Animated.View>
+              ))}
+            </View>
+
+            {/* Zone 2 — status + see details (compare posts only) */}
+            {statusText ? (
+              <View style={st.actionRailContext}>
+                <Text
+                  style={[st.actionStatusText, isVotingClosed && st.actionStatusTextResult]}
+                  numberOfLines={1}
+                >
+                  {statusText}
+                </Text>
+                <Pressable style={st.seeDetailsBtn2} onPress={() => setDetailsExpanded((v) => !v)}>
+                  <Text style={st.seeDetailsBtnText2}>
+                    {detailsExpanded ? "Hide ‹" : "See details ›"}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        );
+      })()}
+
+      {/* ── Voters panel ── */}
+      <FeedVotersPanel
+        visible={votersVisible}
+        onClose={() => setVotersVisible(false)}
+        postId={post.id}
+        optionLabels={optionLabels}
+        colors={colors}
+        st={st}
+        client={client}
+      />
 
       {/* ── More menu (owner actions) ── */}
       <Modal visible={moreMenuVisible} transparent animationType="fade" onRequestClose={() => setMoreMenuVisible(false)}>
@@ -984,6 +1166,201 @@ function FeedPostCardComponent({ post }: Props) {
         </Pressable>
       </Modal>
     </View>
+  );
+}
+
+// ── Voters panel (modal sheet) ────────────────────────────────────────────────
+
+const VOTERS_PAGE = 10;
+const VOTER_TAG_COLORS = ["#6366f1", "#f97316", "#22c55e", "#a855f7"];
+
+type FeedGqlVoter = {
+  voteId: string;
+  selectedOptionIndex: number;
+  anonymous: boolean;
+  createdAt: string;
+  user?: { id: string; username: string; displayName?: string | null; profileImageUrl?: string | null } | null;
+};
+
+type FeedVotersPanelProps = {
+  visible: boolean;
+  onClose: () => void;
+  postId: string;
+  optionLabels: string[];
+  colors: ColorPalette;
+  st: ReturnType<typeof makeStyles>;
+  client: ReturnType<typeof useApolloClient>;
+};
+
+function FeedVotersPanel({ visible, onClose, postId, optionLabels, colors, st, client }: FeedVotersPanelProps) {
+  const [activeTab, setActiveTab] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [voters, setVoters] = useState<FeedGqlVoter[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const reqIdRef = useRef(0);
+  const votersRef = useRef<FeedGqlVoter[]>([]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const fetchVoters = useCallback(async (append: boolean) => {
+    const reqId = ++reqIdRef.current;
+    if (append) setLoadingMore(true);
+    else { setLoadingInitial(true); votersRef.current = []; }
+    try {
+      const base = append ? votersRef.current : [];
+      const { data } = await client.query<{ votersByPost: FeedGqlVoter[] }>({
+        query: VOTERS_BY_POST,
+        variables: {
+          postId, optionIndex: activeTab ?? undefined,
+          search: debouncedSearch || null, skip: base.length, take: VOTERS_PAGE,
+        },
+        fetchPolicy: "network-only",
+      });
+      if (reqIdRef.current !== reqId) return;
+      const rows = data?.votersByPost ?? [];
+      const next = [...base, ...rows];
+      votersRef.current = next;
+      setVoters(next);
+      setHasMore(rows.length === VOTERS_PAGE);
+    } catch { /* silent */ }
+    finally {
+      if (reqIdRef.current === reqId) { setLoadingInitial(false); setLoadingMore(false); }
+    }
+  }, [client, postId, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!visible) return;
+    void fetchVoters(false);
+  }, [visible, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleClose() {
+    setVoters([]); setSearch(""); setActiveTab(null);
+    setHasMore(true); reqIdRef.current++;
+    onClose();
+  }
+
+  const tabs = [
+    { label: "All", value: null },
+    ...optionLabels.map((l, i) => ({ label: l || `Option ${i + 1}`, value: i })),
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <Pressable style={st.votersOverlay} onPress={handleClose}>
+        <View style={st.votersSheet} onStartShouldSetResponder={() => true}>
+          <View style={st.votersHandle} />
+
+          {/* Header */}
+          <View style={st.votersHeader}>
+            <Text style={st.votersTitle}>
+              Voted by {voters.length}{hasMore ? "+" : ""}
+            </Text>
+            <Pressable onPress={handleClose} hitSlop={8} style={st.votersCloseBtn}>
+              <Text style={st.votersCloseText}>✕</Text>
+            </Pressable>
+          </View>
+
+          {/* Search */}
+          <View style={st.votersSearch}>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search voters…"
+              placeholderTextColor={colors.muted}
+              style={st.votersSearchInput}
+              autoCapitalize="none"
+            />
+            {search ? (
+              <Pressable onPress={() => setSearch("")} hitSlop={8}>
+                <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Tabs */}
+          {tabs.length > 1 && (
+            <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
+              {tabs.map((t) => (
+                <Pressable
+                  key={String(t.value)}
+                  style={[st.votersTab, activeTab === t.value && st.votersTabActive]}
+                  onPress={() => setActiveTab(t.value)}
+                >
+                  <Text style={[st.votersTabText, activeTab === t.value && st.votersTabTextActive]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {/* Voter list */}
+          <FlatList
+            data={voters}
+            keyExtractor={(v) => v.voteId}
+            onEndReached={() => { if (hasMore && !loadingMore && !loadingInitial) void fetchVoters(true); }}
+            onEndReachedThreshold={0.3}
+            style={{ height: 340 }}
+            ListEmptyComponent={
+              loadingInitial
+                ? <ActivityIndicator style={{ margin: 24 }} color={colors.accent} />
+                : <Text style={st.voterEmpty}>
+                    {debouncedSearch ? "No voters match" : "No voters yet"}
+                  </Text>
+            }
+            ListFooterComponent={
+              loadingMore
+                ? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.accent} />
+                : !hasMore && voters.length > 0
+                  ? <Text style={[st.voterEmpty, { fontSize: 11, paddingVertical: 10 }]}>That's everyone</Text>
+                  : null
+            }
+            renderItem={({ item: v }) => {
+              const name = v.anonymous
+                ? "Anonymous"
+                : v.user?.displayName?.trim() || v.user?.username || "Unknown";
+              const initial = name.slice(0, 1).toUpperCase();
+              const img = !v.anonymous ? normalizeProfileImageUrl(v.user?.profileImageUrl) : null;
+              const tagLabel = optionLabels[v.selectedOptionIndex];
+              const tagColor = VOTER_TAG_COLORS[v.selectedOptionIndex % VOTER_TAG_COLORS.length];
+              return (
+                <Pressable
+                  style={st.voterRow}
+                  onPress={() => {
+                    if (!v.anonymous && v.user) {
+                      handleClose();
+                      router.push(`/profile/${v.user.id}` as `/${string}`);
+                    }
+                  }}
+                >
+                  <View style={st.voterAvatar}>
+                    {img
+                      ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                      : <Text style={st.voterAvatarText}>{v.anonymous ? "?" : initial}</Text>
+                    }
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.voterName}>{name}</Text>
+                    <Text style={st.voterTime}>{formatRelativeTime(v.createdAt)}</Text>
+                  </View>
+                  {activeTab === null && tagLabel ? (
+                    <View style={[st.voterOptionTag, { backgroundColor: tagColor + "22", borderColor: tagColor + "44" }]}>
+                      <Text style={[st.voterOptionTagText, { color: tagColor }]}>{tagLabel}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
 
