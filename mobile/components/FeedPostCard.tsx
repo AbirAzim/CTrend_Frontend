@@ -423,7 +423,13 @@ function FeedPostCardComponent({ post }: Props) {
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [extendMenuVisible, setExtendMenuVisible] = useState(false);
   const [votersVisible, setVotersVisible] = useState(false);
+  const [votersInitialTab, setVotersInitialTab] = useState<number | null>(null);
   const client = useApolloClient();
+
+  function openVoters(tab: number | null = null) {
+    setVotersInitialTab(tab);
+    setVotersVisible(true);
+  }
 
   // Animation values — pre-allocated for up to 4 options
   const cellScale = useRef([0, 1, 2, 3].map(() => new Animated.Value(1))).current;
@@ -1036,7 +1042,7 @@ function FeedPostCardComponent({ post }: Props) {
                   <Text style={st.splitOptionLabel} numberOfLines={1}>{label}</Text>
                   <View style={st.splitOptionRight}>
                     <Text style={st.splitOptionCount}>{count} · {pct}%</Text>
-                    <Pressable style={st.seeVotersBtn} onPress={() => goToPost()}>
+                    <Pressable style={st.seeVotersBtn} onPress={() => openVoters(i)}>
                       <Text style={st.seeVotersBtnText}>SEE VOTERS</Text>
                     </Pressable>
                   </View>
@@ -1064,7 +1070,12 @@ function FeedPostCardComponent({ post }: Props) {
               <View key={stat.index} style={st.splitOptionRow}>
                 <View style={st.splitOptionMeta}>
                   <Text style={st.splitOptionLabel} numberOfLines={1}>{stat.label}</Text>
-                  <Text style={st.splitOptionCount}>{stat.count} · {pct}%</Text>
+                  <View style={st.splitOptionRight}>
+                    <Text style={st.splitOptionCount}>{stat.count} · {pct}%</Text>
+                    <Pressable style={st.seeVotersBtn} onPress={() => openVoters(stat.index)}>
+                      <Text style={st.seeVotersBtnText}>SEE VOTERS</Text>
+                    </Pressable>
+                  </View>
                 </View>
                 <View style={st.optionBarTrack}>
                   <View style={[st.optionBarFill, { flex: pct || 1, backgroundColor: "#8b5cf6" }]} />
@@ -1104,7 +1115,7 @@ function FeedPostCardComponent({ post }: Props) {
           { i: 2, icon: "🔗", accessLabel: "Full page", onPress: goToPost },
           { i: 3, icon: liked ? "♥" : "♡", accessLabel: "Hype", onPress: () => void handleHype(), count: hypeCount, isHype: true, active: liked },
           { i: 4, icon: "🔖", accessLabel: "Keep", onPress: () => void handleSave(), count: saveCount, isSave: true, active: saved },
-          { i: 5, icon: "👥", accessLabel: "Voters", onPress: () => setVotersVisible(true), count: votersTotal, isVoters: true },
+          { i: 5, icon: "👥", accessLabel: "Voters", onPress: () => openVoters(null), count: votersTotal, isVoters: true },
         ];
 
         return (
@@ -1177,6 +1188,7 @@ function FeedPostCardComponent({ post }: Props) {
         onClose={() => setVotersVisible(false)}
         postId={post.id}
         optionLabels={optionLabels}
+        initialTab={votersInitialTab}
         colors={colors}
         st={st}
         client={client}
@@ -1247,13 +1259,19 @@ type FeedVotersPanelProps = {
   onClose: () => void;
   postId: string;
   optionLabels: string[];
+  initialTab?: number | null;
   colors: ColorPalette;
   st: ReturnType<typeof makeStyles>;
   client: ReturnType<typeof useApolloClient>;
 };
 
-function FeedVotersPanel({ visible, onClose, postId, optionLabels, colors, st, client }: FeedVotersPanelProps) {
-  const [activeTab, setActiveTab] = useState<number | null>(null);
+function FeedVotersPanel({ visible, onClose, postId, optionLabels, initialTab, colors, st, client }: FeedVotersPanelProps) {
+  const [activeTab, setActiveTab] = useState<number | null>(initialTab ?? null);
+
+  // Sync tab whenever the panel is opened (may open with different initialTab each time)
+  useEffect(() => {
+    if (visible) setActiveTab(initialTab ?? null);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [voters, setVoters] = useState<FeedGqlVoter[]>([]);
@@ -1300,7 +1318,7 @@ function FeedVotersPanel({ visible, onClose, postId, optionLabels, colors, st, c
   }, [visible, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleClose() {
-    setVoters([]); setSearch(""); setActiveTab(null);
+    setVoters([]); setSearch(""); setActiveTab(initialTab ?? null);
     setHasMore(true); reqIdRef.current++;
     onClose();
   }
