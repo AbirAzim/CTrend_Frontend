@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ME, USER_POSTS } from "@ctrend/shared/graphql/profile";
+import { ME, MY_VOTED_POSTS, USER_POSTS } from "@ctrend/shared/graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "@ctrend/shared/graphql/auth";
 import {
   MY_FRIENDS,
@@ -28,18 +28,18 @@ import {
   RESPOND_FRIEND_REQUEST,
   CANCEL_FRIEND_REQUEST,
 } from "@ctrend/shared/graphql/friends";
-import { MY_SAVED_POSTS, EXTEND_POST_VOTING } from "@ctrend/shared/graphql/feed";
+import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
 import { START_DIRECT_CONVERSATION } from "@ctrend/shared/graphql/messages";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
+import ProfileCompareCard from "../../components/ProfileCompareCard";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const KEPT_CARD_W = (SCREEN_W - 48) / 2;
+const CARD_W = Math.floor((SCREEN_W - 38) / 2); // 2×14 padding + 10 gap
 const TAB_BAR_H = 64 + 14;
-// Fixed heights for nested scroll sections
-const SECTION_H = Math.round(SCREEN_H * 0.42);
+const SECTION_H = Math.round(SCREEN_H * 0.55);
 const PEOPLE_H = Math.round(SCREEN_H * 0.38);
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -66,6 +66,8 @@ type UserPost = {
   upvoteCount: number;
   downvoteCount: number;
   commentCount?: number | null;
+  hypeCount?: number | null;
+  saveCount?: number | null;
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
   options?: Array<{ label: string }> | null;
@@ -88,149 +90,7 @@ type Person = {
   profileImageUrl?: string | null;
 };
 
-// ─── Skeleton drop row ─────────────────────────────────────────────────────────
-
-function SkeletonDropRow({ colors }: { colors: ReturnType<typeof useTheme>["colors"] }) {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.7, duration: 600, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 600, useNativeDriver: true }),
-      ]),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <Animated.View style={[st.dropRow, { borderColor: colors.border, opacity }]}>
-      <View style={[st.dropThumbWrap, { backgroundColor: colors.border, borderRadius: 8 }]} />
-      <View style={{ flex: 1, gap: 6 }}>
-        <View style={{ height: 13, backgroundColor: colors.border, borderRadius: 4, width: "70%" }} />
-        <View style={{ height: 10, backgroundColor: colors.border, borderRadius: 4, width: "45%" }} />
-        <View style={{ height: 10, backgroundColor: colors.border, borderRadius: 4, width: "55%" }} />
-      </View>
-    </Animated.View>
-  );
-}
-
-// ─── Drop list row (web-style) ─────────────────────────────────────────────────
-
-function DropRow({ post, colors, onExtend }: {
-  post: UserPost;
-  colors: ReturnType<typeof useTheme>["colors"];
-  onExtend: (id: string, hours: number) => void;
-}) {
-  const img0 = post.imageUrls?.[0];
-  const img1 = post.imageUrls?.[1];
-  const totalVotes = post.totalVotes ?? (post.upvoteCount + post.downvoteCount);
-  const isOpen = post.isVotingOpen !== false;
-  const options = post.options?.slice(0, 4) ?? [];
-  const category = post.category?.name;
-
-  return (
-    <Pressable
-      style={[st.dropRow, { borderColor: colors.border }]}
-      onPress={() => router.push(`/post/${post.id}` as `/${string}`)}
-    >
-      {/* Thumbnails */}
-      <View style={st.dropThumbWrap}>
-        {img0 ? (
-          <Image source={{ uri: img0 }} style={[st.dropThumb, img1 ? st.dropThumbLeft : {}]} contentFit="cover" cachePolicy="memory-disk" />
-        ) : (
-          <View style={[st.dropThumb, { backgroundColor: colors.border }]} />
-        )}
-        {img1 ? (
-          <Image source={{ uri: img1 }} style={st.dropThumb} contentFit="cover" cachePolicy="memory-disk" />
-        ) : null}
-      </View>
-
-      {/* Meta */}
-      <View style={st.dropMeta}>
-        <Text style={[st.dropTitle, { color: colors.text }]} numberOfLines={1}>
-          {post.caption || "Compare"}
-        </Text>
-        <Text style={[st.dropSub, { color: colors.muted }]}>
-          {[category, `${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`].filter(Boolean).join("  ·  ")}
-        </Text>
-        {options.length > 0 && (
-          <View style={st.chipRow}>
-            {options.map((o, i) => (
-              <View key={i} style={[st.optionChip, { backgroundColor: colors.section, borderColor: colors.border }]}>
-                <Text style={[st.optionChipText, { color: colors.subtext }]} numberOfLines={1}>{o.label}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-        <View style={st.dropStatusRow}>
-          <View style={[st.dot, { backgroundColor: isOpen ? "#22c55e" : colors.muted }]} />
-          <Text style={[st.dropStatusText, { color: isOpen ? "#22c55e" : colors.muted }]}>
-            {isOpen ? "Open" : "Closed"}
-          </Text>
-        </View>
-      </View>
-
-      {/* Action icons */}
-      <View style={st.dropActions}>
-        <Pressable
-          hitSlop={8}
-          onPress={(e) => { e.stopPropagation?.(); router.push(`/edit-post?postId=${post.id}` as `/${string}`); }}
-        >
-          <Text style={[st.dropActionIcon, { color: colors.subtext }]}>✏️</Text>
-        </Pressable>
-        <Pressable hitSlop={8} onPress={(e) => { e.stopPropagation?.(); router.push(`/post/${post.id}` as `/${string}`); }}>
-          <Text style={[st.dropActionIcon, { color: colors.subtext }]}>👁</Text>
-        </Pressable>
-        {isOpen && (
-          <Pressable hitSlop={8} onPress={(e) => { e.stopPropagation?.(); onExtend(post.id, 24); }}>
-            <Text style={[st.dropActionIcon, { color: colors.subtext }]}>⏱</Text>
-          </Pressable>
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-// ─── Compact kept card (2-column grid) ────────────────────────────────────────
-
-function KeptCard({ post, colors }: { post: SavedPost; colors: ReturnType<typeof useTheme>["colors"] }) {
-  const img0 = post.imageUrls?.[0];
-  const img1 = post.imageUrls?.[1];
-  const totalVotes = post.upvoteCount + post.downvoteCount;
-  const isOpen = post.isVotingOpen !== false;
-
-  return (
-    <Pressable
-      style={[st.keptCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => router.push(`/post/${post.id}` as `/${string}`)}
-    >
-      <View style={st.keptImgArea}>
-        {img0 ? (
-          <Image source={{ uri: img0 }} style={[st.keptImg, img1 ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : {}]} contentFit="cover" cachePolicy="memory-disk" />
-        ) : (
-          <View style={[st.keptImg, { backgroundColor: colors.section }]} />
-        )}
-        {img1 ? (
-          <Image source={{ uri: img1 }} style={[st.keptImg, { borderTopLeftRadius: 0, borderBottomLeftRadius: 0, marginLeft: 2 }]} contentFit="cover" cachePolicy="memory-disk" />
-        ) : null}
-      </View>
-      <View style={{ padding: 7, gap: 4 }}>
-        {post.caption ? (
-          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }} numberOfLines={1}>{post.caption}</Text>
-        ) : null}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 11, color: colors.muted }}>{totalVotes}v</Text>
-          <View style={{ borderRadius: 20, borderWidth: 1, paddingHorizontal: 5, paddingVertical: 1, borderColor: isOpen ? "#22c55e" : colors.border, backgroundColor: isOpen ? "#22c55e22" : colors.section }}>
-            <Text style={{ fontSize: 9, fontWeight: "800", color: isOpen ? "#22c55e" : colors.muted }}>{isOpen ? "OPEN" : "CLOSED"}</Text>
-          </View>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-// ─── Person row (Friends / Requests / Suggestions) ────────────────────────────
+// ─── Person row ───────────────────────────────────────────────────────────────
 
 function PersonRow({ person, actionLoading, colors, rightSlot }: {
   person: Person;
@@ -290,12 +150,10 @@ export default function ProfileScreen() {
     }
   }
 
-  // Content tab: drops | kept
-  const [contentTab, setContentTab] = useState<"drops" | "kept">("drops");
-  // People sub-tab: friends | requests | suggestions
+  const [contentTab, setContentTab] = useState<"drops" | "kept" | "voted">("drops");
+  const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
   const [peopleTab, setPeopleTab] = useState<"friends" | "requests" | "suggestions">("friends");
   const [search, setSearch] = useState("");
-  // Per-row action loading
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
 
   const setLoading = (id: string, on: boolean) =>
@@ -316,6 +174,12 @@ export default function ProfileScreen() {
     fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated,
   });
 
+  const { data: votedData, loading: votedLoading } = useQuery<{ myVotedPosts: UserPost[] }>(MY_VOTED_POSTS, {
+    fetchPolicy: "cache-and-network",
+    variables: { anonymousOnly: votedFilter === "anonymous" },
+    skip: !isAuthenticated,
+  });
+
   const { data: friendsData, refetch: refetchFriends } = useQuery<{ myFriends: Person[] }>(MY_FRIENDS, {
     fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated,
   });
@@ -328,7 +192,6 @@ export default function ProfileScreen() {
     FRIEND_SUGGESTIONS, { fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", variables: { limit: 50 }, skip: !isAuthenticated },
   );
 
-  // Debounce suggestions search — server-side when on Suggestions tab
   useEffect(() => {
     if (peopleTab !== "suggestions") return;
     const timer = setTimeout(() => {
@@ -337,7 +200,6 @@ export default function ProfileScreen() {
     return () => clearTimeout(timer);
   }, [search, peopleTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [extendVoting] = useMutation(EXTEND_POST_VOTING);
   const [startDm] = useMutation<{ startDirectConversation: { id: string } }>(START_DIRECT_CONVERSATION);
   const [switchRole, { loading: roleLoading }] = useMutation<{ switchActiveRole: { accessToken: string; user: { id: string; role: string } } }>(SWITCH_ACTIVE_ROLE);
   const [addFriendMut] = useMutation(ADD_FRIEND);
@@ -357,6 +219,7 @@ export default function ProfileScreen() {
 
   const posts = postsData?.getPostsByUser ?? [];
   const savedPosts = savedData?.mySavedPosts ?? [];
+  const votedPosts = votedData?.myVotedPosts ?? [];
   const friends = friendsData?.myFriends ?? [];
   const requestedMe = requestsData?.friendRequests?.requestedMe ?? [];
   const requestedByMe = requestsData?.friendRequests?.requestedByMe ?? [];
@@ -366,16 +229,8 @@ export default function ProfileScreen() {
   const votesCount = posts.reduce((s, p) => s + (p.totalVotes ?? (p.upvoteCount + p.downvoteCount)), 0);
   const openCount = posts.filter((p) => p.isVotingOpen).length;
 
-  // Friends: client-side filter (small list). Suggestions: server-side via refetch.
   const q = search.toLowerCase();
   const filteredFriends = friends.filter((f) => !q || (f.displayName || f.username).toLowerCase().includes(q));
-  const filteredSuggestions = suggestions; // server already filtered via refetch
-
-  async function handleExtend(postId: string, hours: number) {
-    const newDate = new Date(Date.now() + hours * 3600 * 1000).toISOString();
-    try { await extendVoting({ variables: { postId, newVotingEndsAt: newDate } }); }
-    catch { Alert.alert("Error", "Could not extend voting deadline."); }
-  }
 
   async function handleDm(friendId: string) {
     try {
@@ -551,26 +406,42 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
-          {/* ── Drops / Kept tab row ── */}
+          {/* ── Drops / Kept / Voted tab row ── */}
           <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
-            <Pressable style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]} onPress={() => setContentTab("drops")}>
+            <Pressable
+              style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+              onPress={() => setContentTab("drops")}
+            >
               <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
-                ✦ Your drops{posts.length > 0 ? ` (${posts.length})` : ""}
+                ✦ Drops{posts.length > 0 ? ` (${posts.length})` : ""}
               </Text>
             </Pressable>
-            <Pressable style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]} onPress={() => setContentTab("kept")}>
+            <Pressable
+              style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+              onPress={() => setContentTab("kept")}
+            >
               <Text style={[st.tabBtnText, { color: contentTab === "kept" ? colors.accent : colors.muted }]}>
                 🔖 Kept{savedPosts.length > 0 ? ` (${savedPosts.length})` : ""}
               </Text>
             </Pressable>
+            <Pressable
+              style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+              onPress={() => setContentTab("voted")}
+            >
+              <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
+                🗳️ Voted
+              </Text>
+            </Pressable>
           </View>
 
-          {/* ── Drops / Kept content — fixed height, nested scroll ── */}
+          {/* ── Content section (fixed height, nested scroll) ── */}
           <View style={{ height: SECTION_H }}>
+
+            {/* ── Drops grid ── */}
             {contentTab === "drops" && (
               postsLoading && posts.length === 0 ? (
-                <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-                  {[0, 1, 2].map((i) => <SkeletonDropRow key={i} colors={colors} />)}
+                <View style={st.centerBox}>
+                  <ActivityIndicator color={colors.accent} />
                 </View>
               ) : posts.length === 0 ? (
                 <View style={[st.emptyBox, { borderColor: colors.border }]}>
@@ -580,15 +451,24 @@ export default function ProfileScreen() {
                 <ScrollView
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}
+                  contentContainerStyle={st.gridContainer}
                 >
-                  {posts.map((p) => (
-                    <DropRow key={p.id} post={p} colors={colors} onExtend={handleExtend} />
-                  ))}
+                  <View style={st.grid}>
+                    {posts.map((p) => (
+                      <View key={p.id} style={{ width: CARD_W }}>
+                        <ProfileCompareCard
+                          post={p}
+                          variant="drops"
+                          onEdit={() => router.push(`/post/${p.id}` as `/${string}`)}
+                        />
+                      </View>
+                    ))}
+                  </View>
                 </ScrollView>
               )
             )}
 
+            {/* ── Kept grid ── */}
             {contentTab === "kept" && (
               savedPosts.length === 0 ? (
                 <View style={[st.emptyBox, { borderColor: colors.border }]}>
@@ -598,17 +478,69 @@ export default function ProfileScreen() {
                 <ScrollView
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 8 }}
+                  contentContainerStyle={st.gridContainer}
                 >
-                  <View style={st.keptGrid}>
-                    {savedPosts.map((p, idx) => (
-                      <View key={p.id} style={idx % 2 === 0 ? { marginRight: 8 } : { marginLeft: 8 }}>
-                        <KeptCard post={p} colors={colors} />
+                  <View style={st.grid}>
+                    {savedPosts.map((p) => (
+                      <View key={p.id} style={{ width: CARD_W }}>
+                        <ProfileCompareCard post={p} variant="kept" />
                       </View>
                     ))}
                   </View>
                 </ScrollView>
               )
+            )}
+
+            {/* ── Voted tab ── */}
+            {contentTab === "voted" && (
+              <View style={{ flex: 1 }}>
+                {/* Segmented All / Anonymous filter */}
+                <View style={[st.votedFilterWrap, { backgroundColor: colors.section }]}>
+                  {(["all", "anonymous"] as const).map((f) => (
+                    <Pressable
+                      key={f}
+                      style={[
+                        st.votedFilterBtn,
+                        votedFilter === f && [st.votedFilterBtnActive, { backgroundColor: colors.card }],
+                      ]}
+                      onPress={() => setVotedFilter(f)}
+                    >
+                      <Text style={[st.votedFilterText, { color: votedFilter === f ? colors.accent : colors.muted }]}>
+                        {f === "all" ? "All votes" : "👻 Anonymous"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {votedLoading && votedPosts.length === 0 ? (
+                  <View style={st.centerBox}>
+                    <ActivityIndicator color={colors.accent} />
+                  </View>
+                ) : votedPosts.length === 0 ? (
+                  <View style={[st.emptyBox, { borderColor: colors.border }]}>
+                    <Text style={[st.emptyText, { color: colors.muted }]}>
+                      {votedFilter === "anonymous"
+                        ? "You haven't voted anonymously on any posts yet."
+                        : "You haven't voted on any posts yet."}
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={st.gridContainer}
+                    style={{ flex: 1 }}
+                  >
+                    <View style={st.grid}>
+                      {votedPosts.map((p) => (
+                        <View key={p.id} style={{ width: CARD_W }}>
+                          <ProfileCompareCard post={p} variant="voted" />
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+              </View>
             )}
           </View>
 
@@ -651,7 +583,7 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          {/* People tab content — fixed height, nested scroll */}
+          {/* People tab content */}
           <ScrollView
             nestedScrollEnabled
             showsVerticalScrollIndicator={false}
@@ -733,11 +665,11 @@ export default function ProfileScreen() {
             )}
 
             {peopleTab === "suggestions" && (
-              filteredSuggestions.length === 0 ? (
+              suggestions.length === 0 ? (
                 <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>
                   {search ? "No suggestions match." : "No suggestions"}
                 </Text>
-              ) : filteredSuggestions.map((f) => (
+              ) : suggestions.map((f) => (
                 <PersonRow
                   key={f.id} person={f} colors={colors}
                   actionLoading={actionLoadingIds.has(f.id)}
@@ -779,7 +711,7 @@ const st = StyleSheet.create({
   interestTag: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 2 },
   interestTagText: { fontSize: 12, fontWeight: "600" },
 
-  // Edit + logout row
+  // Edit + logout
   editRow: { flexDirection: "row", paddingHorizontal: 16, gap: 10, marginBottom: 16 },
   editBtn: { flex: 1, borderRadius: 10, paddingVertical: 9, borderWidth: 1, alignItems: "center" },
   editBtnText: { fontSize: 13, fontWeight: "700" },
@@ -793,7 +725,7 @@ const st = StyleSheet.create({
   statLabel: { fontSize: 9, fontWeight: "600", letterSpacing: 0.5, marginTop: 2 },
   statDivider: { width: StyleSheet.hairlineWidth },
 
-  // Admin row
+  // Admin
   adminRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 8, marginBottom: 12 },
   adminRowLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1 },
   adminTab: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
@@ -801,41 +733,45 @@ const st = StyleSheet.create({
   roleChip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
   roleChipText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
 
-  // Drops / Kept tab row
+  // Content tabs (drops/kept/voted)
   tabRow: { flexDirection: "row", borderBottomWidth: 1, marginHorizontal: 16, marginBottom: 4 },
   tabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabBtnActive: {},
-  tabBtnText: { fontSize: 13, fontWeight: "700" },
+  tabBtnText: { fontSize: 12, fontWeight: "700" },
 
-  // Drop list row
-  dropRow: {
-    flexDirection: "row", alignItems: "flex-start", gap: 12,
-    paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth,
+  // Grid layout
+  gridContainer: { padding: 14, paddingBottom: 8 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+
+  // Voted filter (segmented control)
+  votedFilterWrap: {
+    flexDirection: "row",
+    marginHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 999,
+    padding: 4,
+    gap: 2,
   },
-  dropThumbWrap: { flexDirection: "row", width: 84, height: 60, borderRadius: 8, overflow: "hidden", flexShrink: 0 },
-  dropThumb: { flex: 1, height: 60 },
-  dropThumbLeft: {},
-  dropMeta: { flex: 1, gap: 3 },
-  dropTitle: { fontSize: 14, fontWeight: "700", lineHeight: 19 },
-  dropSub: { fontSize: 11 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
-  optionChip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, maxWidth: 130 },
-  optionChipText: { fontSize: 11 },
-  dropStatusRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  dropStatusText: { fontSize: 11, fontWeight: "600" },
-  dropActions: { gap: 8, alignItems: "center", paddingTop: 2 },
-  dropActionIcon: { fontSize: 16 },
+  votedFilterBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  votedFilterBtnActive: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  votedFilterText: { fontSize: 12, fontWeight: "700" },
 
-  // Kept grid
-  keptGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, paddingTop: 8, marginBottom: 4 },
-  keptCard: { width: KEPT_CARD_W, borderRadius: 12, borderWidth: 1, overflow: "hidden", marginBottom: 16 },
-  keptImgArea: { flexDirection: "row", height: 100 },
-  keptImg: { flex: 1, height: 100 },
-
-  // Empty state
-  emptyBox: { marginHorizontal: 16, borderRadius: 10, borderWidth: 1, padding: 18, alignItems: "center", marginBottom: 12 },
-  emptyText: { fontSize: 13 },
+  // Empty / loading states
+  centerBox: { flex: 1, alignItems: "center", justifyContent: "center" },
+  emptyBox: { marginHorizontal: 16, borderRadius: 10, borderWidth: 1, padding: 18, alignItems: "center", marginTop: 12 },
+  emptyText: { fontSize: 13, textAlign: "center" },
 
   // People section
   peopleSectionHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderTopWidth: 1, marginTop: 8 },
@@ -846,7 +782,6 @@ const st = StyleSheet.create({
   peopleTabBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderBottomWidth: 2, borderBottomColor: "transparent" },
   peopleTabBtnActive: {},
   peopleTabText: { fontSize: 12, fontWeight: "700" },
-  peopleList: { paddingHorizontal: 16, paddingBottom: 8 },
   requestsHeader: { fontSize: 10, fontWeight: "700", letterSpacing: 1, paddingTop: 10, paddingBottom: 6 },
 
   // Person row

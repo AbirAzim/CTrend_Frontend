@@ -605,13 +605,13 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 19 — Profile Redesign (Grid Cards + Voted Tab)
+### ✅ PHASE 19 — Profile Redesign (Grid Cards + Voted Tab) (COMPLETE 2026-06-02)
 
 **Source docs:** `profile-drops-grid-and-search-thumbs.md`, `profile-stats-voted-tab-compact-post.md`
 
 #### Profile grid card component
 
-- [ ] Create `mobile/components/ProfileCompareCard.tsx` — variants: `'drops' | 'voted' | 'kept'`
+- [x] Create `mobile/components/ProfileCompareCard.tsx` — variants: `'drops' | 'voted' | 'kept'`
   - **Media strip:** `height:120`, flex row, up to 4 `Image`s each `flex:1` `resizeMode="cover"`, `+N` badge absolute bottom-right (`rgba(0,0,0,0.55)` pill)
   - **Title:** single-line ellipsis, 0.78rem bold, fallback "Untitled compare"
   - **Category + option chips** (drops/voted only): muted text + accent tint pill chips
@@ -620,20 +620,20 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
   - **Status positioned** at **bottom-left under the stats row** (not on image, not beside stats)
   - **Edit button** (drops only, `canEdit`): absolute top-right `34×34` `borderRadius:10`; `Pressable` with `stopPropagation` so it doesn't navigate
   - Kept variant: lighter footer — only `{n} votes` muted text + Open/Closed pill (no full stats)
-- [ ] **Grid layout:** `FlatList numColumns={2}`, `columnWrapperStyle={{ gap:10 }}`, `contentContainerStyle={{ padding:14, gap:10 }}`
-- [ ] Replace current drop list rows with grid cards on **Your drops** tab
-- [ ] Replace current kept list rows with grid cards on **Kept** tab
+- [x] **Grid layout:** `flexWrap:'wrap'` 2-column View inside nested ScrollView, `gap:10`, `padding:14`
+- [x] Replace current drop list rows with grid cards on **Drops** tab (edit button → navigates to post)
+- [x] Replace current kept list rows with grid cards on **Kept** tab
 
 #### Voted tab
 
-- [ ] Add **"Voted"** third tab to own profile screen
-- [ ] Add `MY_VOTED_POSTS(anonymousOnly: Boolean)` query to `packages/shared/src/graphql/profile.ts`
-- [ ] Segmented filter **All / 👻 Anonymous** above the grid (pill container, two `Pressable`s)
-- [ ] Filter drives `anonymousOnly` variable; Apollo `fetchPolicy: 'cache-and-network'`; refetch on toggle
-- [ ] Voted cards: same `ProfileCompareCard variant="voted"`, no edit affordance
-- [ ] Empty states: "You haven't voted on any posts yet." / "You haven't voted anonymously on any posts yet."
+- [x] Add **"Voted"** third tab to own profile screen (tabs: ✦ Drops / 🔖 Kept / 🗳️ Voted)
+- [x] Add `MY_VOTED_POSTS(anonymousOnly: Boolean)` query to `packages/shared/src/graphql/profile.ts`
+- [x] Segmented filter **All votes / 👻 Anonymous** above the grid (pill container, two `Pressable`s)
+- [x] Filter drives `anonymousOnly` variable; Apollo `fetchPolicy: 'cache-and-network'`; refetches on toggle
+- [x] Voted cards: same `ProfileCompareCard variant="voted"`, no edit affordance
+- [x] Empty states differentiated for all vs anonymous filter
 
-**APIs:** `MY_VOTED_POSTS(anonymousOnly)` — new backend query
+**APIs:** `MY_VOTED_POSTS(anonymousOnly)` — backend deployed
 
 ---
 
@@ -819,3 +819,4 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-05-30 | Phase 13 | Polish — multi-option (3+) voting grid in FeedPostCard, ⋯ menu (delete + extend voting), post scheduling toggle in Create screen, role switching chips in profile — APK ✅ |
 | 2026-06-02 | Planning | react_change_2 analyzed — Phases 14–21 added to MOBILE_PROGRESS.md (action bar, unvote, comments, notifications, message reactions, profile grid, post detail, admin posts) |
 | 2026-06-02 | Phase 18 | Message reactions — long-press picker (6 emojis), optimistic updates, reaction strip under bubbles, MESSAGE_REACTION_CHANGED sub, works on text + image bubbles |
+| 2026-06-02 | Phase 19 | Profile redesign — ProfileCompareCard component (drops/voted/kept variants), 2-col grid, live pulse dot, stats footer, 3rd Voted tab with All/Anonymous segmented filter — APK ✅ |

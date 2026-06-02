@@ -32,6 +32,33 @@ export const UPDATE_PROFILE = gql`
   }
 `;
 
+export const MY_VOTED_POSTS = gql`
+  query MyVotedPosts($anonymousOnly: Boolean) {
+    myVotedPosts(anonymousOnly: $anonymousOnly) {
+      id
+      imageUrls
+      caption
+      createdAt
+      totalVotes
+      upvoteCount
+      downvoteCount
+      commentCount
+      hypeCount
+      saveCount
+      votingEndsAt
+      isVotingOpen
+      options {
+        label
+      }
+      category {
+        id
+        name
+        slug
+      }
+    }
+  }
+`;
+
 /** Thumbnail grid — includes `category` for schema completeness. */
 export const USER_POSTS = gql`
   query UserPosts($userId: ID!) {
