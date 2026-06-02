@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { GET_POST_BY_ID } from "../graphql/feed";
@@ -44,6 +44,20 @@ export function PostDetailPage() {
     !showError &&
     ((!useMockFeed && postId && !post) || (useMockFeed && postId && !mockPost));
 
+  const permalink = postId ? postPermalink(postId) : "";
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyPermalink = useCallback(async () => {
+    if (!permalink) return;
+    try {
+      await navigator.clipboard.writeText(permalink);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }, [permalink]);
+
   return (
     <div className="ig-post-detail">
       <div className="ig-post-detail-bar">
@@ -56,9 +70,18 @@ export function PostDetailPage() {
           ← Back
         </button>
         {postId ? (
-          <span className="ig-post-detail-url" title={postPermalink(postId)}>
-            {postPermalink(postId)}
-          </span>
+          <div className="ig-post-detail-link-wrap">
+            <span className="ig-post-detail-url" title={permalink}>
+              Post link
+            </span>
+            <button
+              type="button"
+              className="ig-post-detail-copy"
+              onClick={() => void copyPermalink()}
+            >
+              {linkCopied ? "Copied ✓" : "Copy link"}
+            </button>
+          </div>
         ) : null}
       </div>
 

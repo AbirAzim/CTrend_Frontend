@@ -106,6 +106,7 @@ type MessengerContextValue = {
   ensureConversation: (convo: Conversation) => void;
   refetchConversations: () => void;
   startDirectConversation: (userId: string) => Promise<void>;
+  closeAllMessenger: () => void;
 };
 
 const MessengerContext = createContext<MessengerContextValue | null>(null);
@@ -472,6 +473,11 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const closeAllMessenger = useCallback(() => {
+    setPanelOpen(false);
+    setOpenWindowIds([]);
+  }, []);
+
   const startDirectConversation = useCallback(async (userId: string) => {
     const { data } = await startDirectMut({ variables: { userId } });
     const convo = data?.startDirectConversation as Conversation | undefined;
@@ -510,6 +516,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       ensureConversation,
       refetchConversations,
       startDirectConversation,
+      closeAllMessenger,
     }),
     [
       conversations,
@@ -520,6 +527,7 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       panelOpen,
       openChat,
       closeChat,
+      closeAllMessenger,
       sendMessage,
       reactMessage,
       markRead,

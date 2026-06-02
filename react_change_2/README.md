@@ -43,11 +43,18 @@ Use this table when porting the **current web work** to mobile or reviewing with
 | [phase4-notifications.md](./2026-06-01_phase4-notifications.md) | Notification bell avatars, grouped (earlier) |
 | [profile-drops-grid-and-search-thumbs.md](./2026-06-01_profile-drops-grid-and-search-thumbs.md) | Profile grid + search thumbs |
 | [profile-stats-voted-tab-compact-post.md](./2026-06-01_profile-stats-voted-tab-compact-post.md) | Profile voted tab |
+| [post-detail-copy-link-and-layout.md](./2026-06-01_post-detail-copy-link-and-layout.md) | `/post/:id` Copy link + full-width compare |
 | [phase1-action-bar-and-notification-darkmode.md](./2026-06-01_phase1-action-bar-and-notification-darkmode.md) | Action bar + dark mode |
 
 **Bold** = this interstitial session (web done, port to mobile when ready).
 
 Earlier phases (1–4, profile): see rows without bold in the table above.
+
+### Web-only (do not port to native app)
+
+| Doc | Topic |
+|-----|--------|
+| [admin-mobile-redesign.md](./2026-06-01_admin-mobile-redesign.md) | Admin responsive **browser** layout (select/chips, stacked tables). Native admin UI is separate. |
 
 ---
 
@@ -60,6 +67,7 @@ Earlier phases (1–4, profile): see rows without bold in the table above.
 | Admin posts | `AdminPage.tsx` (`PostsTab`), `graphql/admin.ts`, `EditPostModal.tsx` |
 | Notifications | `NotificationBell.tsx` |
 | GraphQL feed | `graphql/feed.ts` (`type` on posts) |
+| Post detail | `PostDetailPage.tsx`, `postPermalink.ts`, `index.css` (`.ig-post-detail*`) |
 
 **Backend (separate repo `CTrend`):** `comments.service.ts`, `votes.service.ts`, `notifications/*`, `posts.service.ts`, `post.schema.ts`.
 
@@ -67,4 +75,4 @@ Earlier phases (1–4, profile): see rows without bold in the table above.
 
 ## Recent highlight
 
-**Admin Post management** uses a **scrollable table** + compact toolbar (same pattern as Users tab), with **clickable avatars** for creator and editors → profile. See [admin-post-management.md](./2026-06-01_admin-post-management.md).
+**Single post page** — **Copy link** in the top bar (no long URL string); compare images full width. See [post-detail-copy-link-and-layout.md](./2026-06-01_post-detail-copy-link-and-layout.md).

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, Link, useLocation } from "react-router-dom";
+import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
@@ -92,10 +92,17 @@ function MessageButton({ userId }: { userId: string }) {
   );
 }
 
+function profileTabSearch(tab: "drops" | "kept" | "voted"): string {
+  if (tab === "kept") return "?tab=kept";
+  if (tab === "voted") return "?tab=voted";
+  return "";
+}
+
 export function ProfilePage() {
   const { user, patchUser } = useAuth();
   const { onlineUserIds } = useMessenger();
   const location = useLocation();
+  const navigate = useNavigate();
   const initialTab = new URLSearchParams(location.search).get("tab");
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
@@ -231,15 +238,27 @@ export function ProfilePage() {
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
   const [connectionsTab, setConnectionsTab] = useState<"friends" | "requests" | "suggestions">("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
-  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept" | "voted">(
-    initialTab === "kept" ? "kept" : "drops",
-  );
+  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept" | "voted">(() => {
+    if (initialTab === "kept") return "kept";
+    if (initialTab === "voted") return "voted";
+    return "drops";
+  });
+
+  function selectProfileContentTab(tab: "drops" | "kept" | "voted") {
+    setProfileContentTab(tab);
+    const nextSearch = profileTabSearch(tab);
+    if (location.pathname === "/profile" && location.search !== nextSearch) {
+      navigate({ pathname: "/profile", search: nextSearch }, { replace: true });
+    }
+  }
 
   // React to URL changes (e.g. clicking the Keep bottom-nav button while already on profile)
   useEffect(() => {
     if (initialTab === "kept") {
       setProfileContentTab("kept");
-    } else if (initialTab === "drops") {
+    } else if (initialTab === "voted") {
+      setProfileContentTab("voted");
+    } else {
       setProfileContentTab("drops");
     }
   }, [initialTab]);
@@ -660,7 +679,7 @@ export function ProfilePage() {
             role="tab"
             aria-selected={profileContentTab === "drops"}
             className={`cx-conn-tab${profileContentTab === "drops" ? " cx-conn-tab--active" : ""}`}
-            onClick={() => setProfileContentTab("drops")}
+            onClick={() => selectProfileContentTab("drops")}
           >
             ✨ Your drops
             {gridPosts.length > 0 && <span className="cx-conn-tab-badge">{gridPosts.length}</span>}
@@ -670,7 +689,7 @@ export function ProfilePage() {
             role="tab"
             aria-selected={profileContentTab === "kept"}
             className={`cx-conn-tab${profileContentTab === "kept" ? " cx-conn-tab--active" : ""}`}
-            onClick={() => setProfileContentTab("kept")}
+            onClick={() => selectProfileContentTab("kept")}
           >
             🔖 Kept
             {savedPosts.length > 0 && <span className="cx-conn-tab-badge">{savedPosts.length}</span>}
@@ -680,7 +699,7 @@ export function ProfilePage() {
             role="tab"
             aria-selected={profileContentTab === "voted"}
             className={`cx-conn-tab${profileContentTab === "voted" ? " cx-conn-tab--active" : ""}`}
-            onClick={() => setProfileContentTab("voted")}
+            onClick={() => selectProfileContentTab("voted")}
           >
             🗳️ Voted
             {votedPosts.length > 0 && <span className="cx-conn-tab-badge">{votedPosts.length}</span>}

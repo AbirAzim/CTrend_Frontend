@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
+import { AdminTabNav, type AdminTabId } from "../components/admin/AdminTabNav";
 import { AdminMessagesTab } from "./AdminMessagesTab";
 import {
   CANCEL_INVITATION,
@@ -204,7 +205,7 @@ function AdminActionsCell({
   children: React.ReactNode;
 }) {
   return (
-    <td className="admin-table-actions">
+    <td className="admin-table-actions" data-label="Actions">
       <div className="admin-action-stack">
         {message ? <div className="admin-action-msg-row">{message}</div> : null}
         <div className="admin-action-links-row">{children}</div>
@@ -592,7 +593,7 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
 
       {users.length > 0 && (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--stack">
             <thead>
               <tr>
                 <th>Name</th>
@@ -607,15 +608,15 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="admin-table-row">
-                  <td>
+                  <td data-label="Name">
                     <div className="admin-user-cell">
                       <AdminAvatar user={user} />
                       <span>{user.displayName || user.username || <span className="muted">No name</span>}</span>
                     </div>
                   </td>
-                  <td className="admin-table-email">{user.email}</td>
-                  <td><UserStatusBadge user={user} /></td>
-                  <td className="admin-table-joined">
+                  <td className="admin-table-email" data-label="Email">{user.email}</td>
+                  <td data-label="Status"><UserStatusBadge user={user} /></td>
+                  <td className="admin-table-joined" data-label="Joined">
                     <span title={user.createdAt ?? undefined}>{formatJoinedAt(user.createdAt)}</span>
                     {user.createdAt ? (
                       <span className="muted small admin-joined-relative">
@@ -623,8 +624,8 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
                       </span>
                     ) : null}
                   </td>
-                  <td><RoleBadges user={user} /></td>
-                  <td><UserStats userId={user.id} /></td>
+                  <td data-label="Roles"><RoleBadges user={user} /></td>
+                  <td data-label="Engagement"><UserStats userId={user.id} /></td>
                   <AdminActionsCell
                     message={
                       <AdminUserMessageButton
@@ -841,7 +842,7 @@ function AdminsTab({ onComposeMessage }: { onComposeMessage: (userId: string) =>
 
       {admins.length > 0 && (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--stack">
             <thead>
               <tr>
                 <th>Name</th>
@@ -858,15 +859,15 @@ function AdminsTab({ onComposeMessage }: { onComposeMessage: (userId: string) =>
                 const isSystemAdmin = user.email === SYSTEM_ADMIN_EMAIL;
                 return (
                   <tr key={user.id} className="admin-table-row">
-                    <td>
+                    <td data-label="Name">
                       <div className="admin-user-cell">
                         <AdminAvatar user={user} adminStyle />
                         <span>{user.displayName || <span className="muted">No name</span>}</span>
                       </div>
                     </td>
-                    <td className="admin-table-email">{user.email}</td>
-                    <td><UserStatusBadge user={user} /></td>
-                    <td className="admin-table-joined">
+                    <td className="admin-table-email" data-label="Email">{user.email}</td>
+                    <td data-label="Status"><UserStatusBadge user={user} /></td>
+                    <td className="admin-table-joined" data-label="Joined">
                       <span title={user.createdAt ?? undefined}>{formatJoinedAt(user.createdAt)}</span>
                       {user.createdAt ? (
                         <span className="muted small admin-joined-relative">
@@ -874,8 +875,8 @@ function AdminsTab({ onComposeMessage }: { onComposeMessage: (userId: string) =>
                         </span>
                       ) : null}
                     </td>
-                    <td><RoleBadges user={user} /></td>
-                    <td><UserStats userId={user.id} /></td>
+                    <td data-label="Roles"><RoleBadges user={user} /></td>
+                    <td data-label="Engagement"><UserStats userId={user.id} /></td>
                     <AdminActionsCell
                       message={
                         <AdminUserMessageButton
@@ -1101,7 +1102,7 @@ function CampaignsTab() {
 
       {campaigns.length > 0 && (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--stack">
             <thead>
               <tr>
                 <th>Name</th>
@@ -1115,11 +1116,11 @@ function CampaignsTab() {
             <tbody>
               {campaigns.map((c) => (
                 <tr key={c.id} className="admin-table-row">
-                  <td><strong>{c.name}</strong></td>
-                  <td className="muted small">{c.slug}</td>
-                  <td className="muted small">{c.ctaLabel} → {c.ctaUrl}</td>
-                  <td><span className="admin-stat-chip">{c.prizePerWinner} BDT</span></td>
-                  <td>
+                  <td data-label="Name"><strong>{c.name}</strong></td>
+                  <td className="muted small" data-label="Slug">{c.slug}</td>
+                  <td className="muted small" data-label="CTA">{c.ctaLabel} → {c.ctaUrl}</td>
+                  <td data-label="Prize"><span className="admin-stat-chip">{c.prizePerWinner} BDT</span></td>
+                  <td data-label="Status">
                     <span className={`admin-stat-chip${c.isActive ? " admin-stat-chip--active" : ""}`}>
                       {c.isActive ? "Active" : "Inactive"}
                     </span>
@@ -1263,7 +1264,7 @@ function WorldCupTab() {
       {fixtures.length > 0 && (
         <div style={{ marginBottom: 32 }}>
           <div className="admin-table-wrap">
-            <table className="admin-table">
+            <table className="admin-table admin-table--stack">
               <thead>
                 <tr>
                   <th style={{ minWidth: 200 }}>Match</th>
@@ -1300,7 +1301,7 @@ function WorldCupTab() {
 
                   return (
                     <tr key={f.id} className="admin-table-row">
-                      <td>
+                      <td data-label="Match">
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <span>
                             {f.homeTeam.crest && (
@@ -1316,7 +1317,7 @@ function WorldCupTab() {
                           <span className="muted" style={{ fontSize: 11 }}>{groupLabel}</span>
                         </div>
                       </td>
-                      <td className="muted small">
+                      <td className="muted small" data-label="Kickoff">
                         {kickoff.toLocaleString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -1324,10 +1325,10 @@ function WorldCupTab() {
                           minute: "2-digit",
                         })}
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <span className={statusChipClass}>{statusLabel}</span>
                       </td>
-                      <td>
+                      <td data-label="Campaign post">
                         {f.campaignPostId ? (
                           <span className="wc-admin-chip wc-admin-chip--done">✓ Created</span>
                         ) : (
@@ -1346,7 +1347,7 @@ function WorldCupTab() {
                           </div>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Result">
                         {winner ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                             <span className="wc-admin-chip wc-admin-chip--done">
@@ -1386,7 +1387,7 @@ function WorldCupTab() {
             Campaign Winners
           </h2>
           <div className="admin-table-wrap">
-            <table className="admin-table">
+            <table className="admin-table admin-table--stack">
               <thead>
                 <tr>
                   <th>Winner</th>
@@ -1399,7 +1400,7 @@ function WorldCupTab() {
               <tbody>
                 {winners.map((w) => (
                   <tr key={w.id} className="admin-table-row">
-                    <td>
+                    <td data-label="Winner">
                       {w.user ? (
                         <span>
                           <strong>@{w.user.username}</strong>
@@ -1411,11 +1412,11 @@ function WorldCupTab() {
                         <span className="muted small">—</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Prize">
                       <span className="admin-stat-chip">{w.prize} BDT</span>
                     </td>
-                    <td className="muted small">{w.note ?? "—"}</td>
-                    <td className="muted small">
+                    <td className="muted small" data-label="Note">{w.note ?? "—"}</td>
+                    <td className="muted small" data-label="Date">
                       {new Date(w.createdAt).toLocaleDateString()}
                     </td>
                     <AdminActionsCell>
@@ -1683,7 +1684,7 @@ function InvitationsTab() {
 
       {invitations.length > 0 && (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--stack">
             <thead>
               <tr>
                 <th>Email</th>
@@ -1703,23 +1704,23 @@ function InvitationsTab() {
                 const expired = status === "expired";
                 return (
                   <tr key={inv.id} className="admin-table-row">
-                    <td className="admin-table-email">{inv.email}</td>
-                    <td>
+                    <td className="admin-table-email" data-label="Email">{inv.email}</td>
+                    <td data-label="Role">
                       <span className={`admin-role-badge ${inv.role === "ADMIN" || inv.role === "admin" ? "admin-role-badge--admin" : "admin-role-badge--user"}`}>
                         {inv.role.toLowerCase()}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Invited by">
                       {inv.invitedBy
                         ? <InviterPopover user={inv.invitedBy} />
                         : <span className="muted small">—</span>}
                     </td>
-                    <td>{formatDate(inv.createdAt)}</td>
-                    <td style={{ color: expired ? "#dc2626" : undefined }}>
+                    <td data-label="Sent">{formatDate(inv.createdAt)}</td>
+                    <td data-label="Expires" style={{ color: expired ? "#dc2626" : undefined }}>
                       {formatDate(inv.expiresAt)}
                       {expired && <span style={{ marginLeft: 4, fontSize: "0.75rem" }}>(expired)</span>}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`wc-admin-chip wc-admin-chip--${isAccepted ? "done" : expired ? "live" : "sched"}`}>
                         {isAccepted ? "Accepted" : expired ? "Expired" : "Pending"}
                       </span>
@@ -1863,7 +1864,7 @@ function CategoriesTab() {
 
       {categories.length > 0 && (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--stack">
             <thead>
               <tr>
                 <th>Name</th>
@@ -1876,7 +1877,7 @@ function CategoriesTab() {
                 const isEditing = editing?.id === cat.id;
                 return (
                   <tr key={cat.id} className="admin-table-row">
-                    <td>
+                    <td data-label="Name">
                       {isEditing ? (
                         <input
                           type="text"
@@ -1890,7 +1891,7 @@ function CategoriesTab() {
                         <strong>{cat.name}</strong>
                       )}
                     </td>
-                    <td className="admin-table-email">{cat.slug}</td>
+                    <td className="admin-table-email" data-label="Slug">{cat.slug}</td>
                     <AdminActionsCell>
                       {isEditing ? (
                         <>
@@ -2154,7 +2155,7 @@ function PostsTab() {
 
       {posts.length > 0 ? (
         <div className="admin-table-wrap admin-table-wrap--posts">
-          <table className="admin-table admin-table--posts">
+          <table className="admin-table admin-table--stack admin-table--posts">
             <thead>
               <tr>
                 <th>Post</th>
@@ -2213,7 +2214,7 @@ function PostsTab() {
                     role="link"
                     aria-label={`Open post: ${caption}`}
                   >
-                    <td className="admin-post-cell">
+                    <td className="admin-post-cell" data-label="Post">
                       <div className="admin-post-cell-main">
                         {post.imageUrls?.[0] ? (
                           <img
@@ -2234,6 +2235,7 @@ function PostsTab() {
                     </td>
                     <td
                       className="admin-post-compare-cell"
+                      data-label="Compare"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <ul className="admin-post-compare-list admin-post-compare-list--table">
@@ -2262,6 +2264,7 @@ function PostsTab() {
                     </td>
                     <td
                       className="admin-post-person-cell"
+                      data-label="Created by"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {creator ? (
@@ -2270,12 +2273,12 @@ function PostsTab() {
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td>{post.category?.name ?? "—"}</td>
-                    <td className="admin-table-num">{votes.toLocaleString()}</td>
-                    <td className="admin-table-num">{(post.commentCount ?? 0).toLocaleString()}</td>
-                    <td className="admin-table-num">{(post.hypeCount ?? 0).toLocaleString()}</td>
-                    <td className="admin-table-num">{(post.saveCount ?? 0).toLocaleString()}</td>
-                    <td>
+                    <td data-label="Category">{post.category?.name ?? "—"}</td>
+                    <td className="admin-table-num" data-label="Votes">{votes.toLocaleString()}</td>
+                    <td className="admin-table-num" data-label="Comments">{(post.commentCount ?? 0).toLocaleString()}</td>
+                    <td className="admin-table-num" data-label="Hype">{(post.hypeCount ?? 0).toLocaleString()}</td>
+                    <td className="admin-table-num" data-label="Saves">{(post.saveCount ?? 0).toLocaleString()}</td>
+                    <td data-label="Status">
                       <span
                         className={`admin-user-status admin-user-status--${post.isVotingOpen ? "verified" : "unverified"}`}
                       >
@@ -2290,6 +2293,7 @@ function PostsTab() {
                     </td>
                     <td
                       className="admin-post-editors-cell"
+                      data-label="Edited by"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {editors.length === 0 ? (
@@ -2309,6 +2313,7 @@ function PostsTab() {
                     </td>
                     <td
                       className="admin-table-joined admin-post-person-cell"
+                      data-label="Last edited"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {post.lastEditedBy ? (
@@ -2328,7 +2333,7 @@ function PostsTab() {
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td className="admin-table-joined">
+                    <td className="admin-table-joined" data-label="Created">
                       {formatJoinedAt(post.createdAt)}
                       {post.scheduledAt ? (
                         <span className="muted small">Scheduled</span>
@@ -2336,6 +2341,7 @@ function PostsTab() {
                     </td>
                     <td
                       className="admin-table-actions"
+                      data-label="Actions"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
@@ -2400,16 +2406,7 @@ function PostsTab() {
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<
-    | "users"
-    | "admins"
-    | "invitations"
-    | "campaigns"
-    | "categories"
-    | "posts"
-    | "worldcup"
-    | "admin-messages"
-  >("users");
+  const [activeTab, setActiveTab] = useState<AdminTabId>("users");
   const [messagesTargetUserId, setMessagesTargetUserId] = useState<string | null>(null);
 
   function openAdminMessagesForUser(userId: string) {
@@ -2431,64 +2428,7 @@ export function AdminPage() {
         <span className="admin-role-badge admin-role-badge--admin">admin</span>
       </div>
 
-      <div className="admin-tabs">
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "users" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("users")}
-        >
-          Users
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "admins" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("admins")}
-        >
-          Admin Management
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "invitations" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("invitations")}
-        >
-          Invitations
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "campaigns" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("campaigns")}
-        >
-          Campaigns
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "categories" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("categories")}
-        >
-          Categories
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "posts" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("posts")}
-        >
-          Post management
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "admin-messages" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("admin-messages")}
-        >
-          Admin Messages
-        </button>
-        <button
-          type="button"
-          className={`admin-tab${activeTab === "worldcup" ? " admin-tab--active" : ""}`}
-          onClick={() => setActiveTab("worldcup")}
-        >
-          🏆 World Cup
-        </button>
-      </div>
+      <AdminTabNav activeTab={activeTab} onChange={setActiveTab} />
 
       <div className="admin-section">
         {activeTab === "users" && <UsersTab onComposeMessage={openAdminMessagesForUser} />}
