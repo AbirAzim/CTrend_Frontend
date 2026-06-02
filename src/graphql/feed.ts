@@ -34,8 +34,8 @@ export const POST_CAMPAIGN_WINNER_FIELDS = `
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
-  query FeedPosts {
-    feedPosts {
+  query FeedPosts($campaignId: ID) {
+    feedPosts(campaignId: $campaignId) {
       id
       type
       authorId
@@ -49,6 +49,7 @@ export const FEED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
       commentCount
       likeCount
@@ -87,6 +88,7 @@ export const GET_POST_BY_ID = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
       commentCount
       likeCount
@@ -173,6 +175,7 @@ export const MY_SAVED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
       commentCount
       likeCount
@@ -209,6 +212,7 @@ export const UPDATE_POST = gql`
       }
       isVotingOpen
       votingEndsAt
+      endingSoonLeadMinutes
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }

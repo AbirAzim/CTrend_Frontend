@@ -205,6 +205,7 @@ export const ADMIN_PLATFORM_POSTS = gql`
       status
       scheduledAt
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
       commentCount
       hypeCount

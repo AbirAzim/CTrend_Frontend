@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { CREATE_SYSTEM_POST } from "../graphql/admin";
@@ -124,18 +124,25 @@ export function CreatePostPage() {
       errorPolicy: "all",
     });
 
-  const { data: activeCampaignsData } = useQuery<{ activeCampaigns: Array<{ id: string; name: string; slug: string; isActive?: boolean }> }>(
+  const { data: activeCampaignsData } = useQuery<{ activeCampaigns: Array<{ id: string; name: string; slug: string; isActive?: boolean; isDefault?: boolean | null }> }>(
     ACTIVE_CAMPAIGNS,
     { fetchPolicy: "cache-first", errorPolicy: "all" },
   );
-  const { data: adminCampaignsData } = useQuery<{ campaigns: Array<{ id: string; name: string; slug: string; isActive: boolean }> }>(
+  const { data: adminCampaignsData } = useQuery<{ campaigns: Array<{ id: string; name: string; slug: string; isActive: boolean; isDefault?: boolean | null }> }>(
     CAMPAIGNS_ADMIN,
     { skip: !isAdmin, fetchPolicy: "cache-first", errorPolicy: "all" },
   );
 
-  const campaignOptions = isAdmin
-    ? (adminCampaignsData?.campaigns ?? [])
-    : (activeCampaignsData?.activeCampaigns ?? []);
+  const campaignOptions = useMemo(() => {
+    const raw = isAdmin
+      ? (adminCampaignsData?.campaigns ?? [])
+      : (activeCampaignsData?.activeCampaigns ?? []);
+    return [...raw].sort((a, b) => {
+      if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
+      if (isAdmin && !!a.isActive !== !!b.isActive) return a.isActive ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [isAdmin, adminCampaignsData?.campaigns, activeCampaignsData?.activeCampaigns]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -525,6 +532,7 @@ export function CreatePostPage() {
                   {campaignOptions.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
+                      {c.isDefault ? " (default)" : ""}
                       {isAdmin && "isActive" in c && !c.isActive ? " (inactive)" : ""}
                     </option>
                   ))}

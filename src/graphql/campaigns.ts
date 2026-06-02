@@ -6,6 +6,7 @@ export const ACTIVE_CAMPAIGNS = gql`
       id
       name
       slug
+      isDefault
       bannerText
       bannerImageUrl
       ctaLabel
@@ -44,6 +45,7 @@ export const CAMPAIGNS_ADMIN = gql`
       id
       name
       slug
+      isDefault
       description
       bannerText
       bannerImageUrl
@@ -87,6 +89,7 @@ export const UPDATE_CAMPAIGN = gql`
       ctaLabel
       ctaUrl
       isActive
+      isDefault
     }
   }
 `;
