@@ -1,15 +1,24 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { useMutation, useQuery } from "@apollo/client";
-import { IconBookmark, IconHome, IconLogout, IconPlusSquare, IconShield, IconUser } from "../components/IgIcons";
+import { IconBookmark, IconHome, IconLogout, IconMessages, IconPlusSquare, IconShield, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
+import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
 import { ME } from "../graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
 import { NotificationBell } from "../components/NotificationBell";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { MessengerPanel } from "../components/MessengerPanel";
+import {
+  isBottomNavAdmin,
+  isBottomNavCreate,
+  isBottomNavHome,
+  isBottomNavKeeps,
+  isBottomNavProfile,
+} from "../lib/bottomNavActive";
+import { useMobileShell } from "../lib/useMobileShell";
 
 type ThemeMode = "light" | "dark";
 
@@ -56,8 +65,8 @@ export function AppShell() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
+  const mobileShell = useMobileShell();
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [theme, setTheme] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") {
@@ -76,6 +85,56 @@ export function AppShell() {
     fetchPolicy: "cache-and-network",
   });
   const savedCount = (savedPostsData?.mySavedPosts?.length as number | undefined) ?? 0;
+
+  const {
+    panelOpen,
+    setPanelOpen,
+    openWindowIds,
+    totalUnread,
+    refetchConversations,
+    closeAllMessenger,
+  } = useMessenger();
+
+  const messengerOpen = panelOpen || openWindowIds.length > 0;
+
+  const bottomNavActive = useMemo(() => {
+    if (isAuthenticated && messengerOpen) {
+      return {
+        home: false,
+        create: false,
+        messages: true,
+        keeps: false,
+        profile: false,
+        admin: false,
+      };
+    }
+    return {
+      home: isBottomNavHome(location),
+      create: isAuthenticated && isBottomNavCreate(location),
+      messages: false,
+      keeps: isAuthenticated && isBottomNavKeeps(location),
+      profile: isAuthenticated && isBottomNavProfile(location),
+      admin: isBottomNavAdmin(location),
+    };
+  }, [location, isAuthenticated, messengerOpen]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !messengerOpen) return;
+    closeAllMessenger();
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function onMessagesNavClick() {
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: location.pathname } });
+      return;
+    }
+    if (messengerOpen) {
+      closeAllMessenger();
+      return;
+    }
+    setPanelOpen(true);
+    refetchConversations();
+  }
 
   function onHomeClick(event: MouseEvent<HTMLAnchorElement>) {
     if (location.pathname !== "/") {
@@ -100,6 +159,12 @@ export function AppShell() {
   }
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+    lastYRef.current = 0;
+    setTopbarHidden(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
     lastYRef.current = window.scrollY;
     function onScroll() {
       if (scrollRafRef.current != null) {
@@ -114,16 +179,13 @@ export function AppShell() {
         }
         lastYRef.current = y;
         if (y < 60) {
-          setNavHidden(false);
           setTopbarHidden(false);
           return;
         }
         if (delta > 0) {
-          setNavHidden(true);
           setTopbarHidden(false);
         } else {
-          setNavHidden(false);
-          setTopbarHidden(true);
+          if (!mobileShell) setTopbarHidden(true);
         }
       });
     }
@@ -135,7 +197,7 @@ export function AppShell() {
         scrollRafRef.current = null;
       }
     };
-  }, []);
+  }, [mobileShell]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -220,68 +282,79 @@ export function AppShell() {
       <MessengerPanel />
 
       <nav
-        className={`ig-bottom-nav ig-bottom-nav--${isAdmin ? "five" : "four"}${navHidden ? " ig-bottom-nav--hidden" : ""}`}
+        className={`ig-bottom-nav ig-bottom-nav--${isAdmin ? "six" : "five"}`}
         aria-label="Main"
       >
-        <NavLink
+        <Link
           to="/"
-          end
           onClick={onHomeClick}
-          className={({ isActive }) =>
-            `ig-nav-item${isActive ? " ig-nav-item--active" : ""}`
-          }
+          className={`ig-nav-item${bottomNavActive.home ? " ig-nav-item--active" : ""}`}
           aria-label="Home"
+          aria-current={bottomNavActive.home ? "page" : undefined}
         >
-          {({ isActive }) => <IconHome active={isActive} />}
-        </NavLink>
-        <NavLink
+          <IconHome active={bottomNavActive.home} />
+        </Link>
+        <Link
           to={isAuthenticated ? "/create" : "/login"}
           state={!isAuthenticated ? { from: location.pathname } : undefined}
-          className={({ isActive }) =>
-            `ig-nav-item ig-nav-item--fab${isActive ? " ig-nav-item--active" : ""}`
-          }
+          className={`ig-nav-item ig-nav-item--fab${bottomNavActive.create ? " ig-nav-item--active" : ""}`}
           title="Create compare"
           aria-label="Create compare"
+          aria-current={bottomNavActive.create ? "page" : undefined}
         >
           <IconPlusSquare />
-        </NavLink>
-        <NavLink
+        </Link>
+        <button
+          type="button"
+          className={`ig-nav-item ig-nav-item--messages${bottomNavActive.messages ? " ig-nav-item--active" : ""}`}
+          aria-label={`Messages${totalUnread > 0 ? `, ${totalUnread} unread` : ""}`}
+          aria-current={bottomNavActive.messages ? "page" : undefined}
+          aria-expanded={messengerOpen}
+          onClick={onMessagesNavClick}
+        >
+          <span className="ig-nav-messages-wrap">
+            <IconMessages active={bottomNavActive.messages} />
+            {totalUnread > 0 ? (
+              <span className="ig-nav-msg-badge">
+                {totalUnread > 99 ? "99+" : totalUnread}
+              </span>
+            ) : null}
+          </span>
+        </button>
+        <Link
           to={isAuthenticated ? "/profile?tab=kept" : "/login"}
           state={!isAuthenticated ? { from: "/profile?tab=kept" } : undefined}
-          className={({ isActive }) =>
-            `ig-nav-item ig-nav-item--keeps${isActive ? " ig-nav-item--active" : ""}`
-          }
+          className={`ig-nav-item ig-nav-item--keeps${bottomNavActive.keeps ? " ig-nav-item--active" : ""}`}
           aria-label="View all keeps"
           title="View all keeps"
+          aria-current={bottomNavActive.keeps ? "page" : undefined}
         >
-          {({ isActive }) => (
-            <span className="ig-nav-keeps-wrap">
-              <IconBookmark filled={isActive} />
-              <span className="ig-nav-keeps-badge">{savedCount}</span>
-            </span>
-          )}
-        </NavLink>
-        <NavLink
+          <span className="ig-nav-keeps-wrap">
+            <IconBookmark filled={bottomNavActive.keeps} />
+            {savedCount > 0 ? (
+              <span className="ig-nav-keeps-badge">{savedCount > 99 ? "99+" : savedCount}</span>
+            ) : null}
+          </span>
+        </Link>
+        <Link
           to={isAuthenticated ? "/profile" : "/login"}
           state={!isAuthenticated ? { from: "/profile" } : undefined}
-          className={({ isActive }) =>
-            `ig-nav-item${isActive ? " ig-nav-item--active" : ""}`
-          }
+          className={`ig-nav-item${bottomNavActive.profile ? " ig-nav-item--active" : ""}`}
           aria-label="Profile"
+          aria-current={bottomNavActive.profile ? "page" : undefined}
         >
-          {({ isActive }) => <IconUser active={isActive} />}
-        </NavLink>
+          <IconUser active={bottomNavActive.profile} />
+        </Link>
         {isAdmin && (
-          <NavLink
+          <Link
             to="/admin"
-            className={({ isActive }) =>
-              `ig-nav-item ig-nav-item--admin${isActive ? " ig-nav-item--active" : ""}`
-            }
+            className={`ig-nav-item ig-nav-item--admin${bottomNavActive.admin ? " ig-nav-item--active" : ""}`}
             aria-label="Admin dashboard"
             title="Admin dashboard"
+            aria-current={bottomNavActive.admin ? "page" : undefined}
           >
-            {({ isActive }) => <IconShield active={isActive} />}
-          </NavLink>
+            <IconShield active={bottomNavActive.admin} />
+          </Link>
         )}
       </nav>
     </div>
