@@ -447,6 +447,7 @@ a:hover {
   padding-top: max(10px, env(safe-area-inset-top));
   padding-bottom: max(88px, calc(74px + env(safe-area-inset-bottom)));
   box-sizing: border-box;
+  overflow-x: clip;
 }
 
 .ig-app::before {
@@ -718,6 +719,15 @@ body.capacitor .ig-logo {
 .ig-main-scroll {
   min-height: calc(100dvh - 160px);
   padding-bottom: max(4px, env(safe-area-inset-bottom));
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+:root {
+  --ig-bottom-nav-height: 62px;
+  --ig-bottom-nav-stack: calc(
+    var(--ig-bottom-nav-height) + max(10px, env(safe-area-inset-bottom, 0px)) + 8px
+  );
 }
 
 .ig-bottom-nav {
@@ -727,7 +737,7 @@ body.capacitor .ig-logo {
   transform: translateX(-50%);
   width: calc(100% - 36px);
   max-width: 408px;
-  height: 62px;
+  height: var(--ig-bottom-nav-height);
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -740,7 +750,7 @@ body.capacitor .ig-logo {
   box-shadow:
     0 12px 40px rgb(15 23 42 / 0.12),
     0 2px 8px rgb(var(--cx-accent-rgb) / 0.1);
-  z-index: 50;
+  z-index: 100;
   box-sizing: border-box;
   transition:
     transform 0.4s var(--cx-ease-spring),
@@ -2920,14 +2930,14 @@ a.cx-friend-avatar:hover {
   overflow: hidden;
 }
 
-/* Zone 1 — action icons spread evenly across the bar */
+/* Zone 1 — action icons in a single row (never wrap to a second line) */
 .cx-action-rail-icons {
   display: flex;
   align-items: center;
-  justify-content: space-evenly;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 7px 8px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: 7px 6px;
 }
 
 /* Flat icon buttons inside the rail — the container groups them, so the
@@ -2936,7 +2946,10 @@ a.cx-friend-avatar:hover {
   border: none;
   background: transparent;
   box-shadow: none;
-  padding: 8px 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 4px;
+  gap: 3px;
 }
 .cx-action-rail-icons .cx-action-chip:hover {
   background: rgb(var(--cx-accent-rgb) / 0.08);
@@ -3099,6 +3112,43 @@ a.cx-friend-avatar:hover {
 
 .cx-action-chip--discuss-open .cx-action-chip-label {
   font-weight: 800;
+}
+
+/* Mobile browser: compact action rail — icon + count only, one row */
+@media (max-width: 768px), ((hover: none) and (pointer: coarse)) {
+  .cx-action-rail-icons {
+    padding: 6px 2px;
+  }
+
+  .cx-action-rail-icons .cx-action-chip {
+    padding: 6px 2px;
+    gap: 2px;
+  }
+
+  .cx-action-rail-icons .cx-action-chip-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .cx-action-rail-icons .cx-action-chip svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .cx-action-rail-icons .cx-action-chip-count {
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    margin-left: 0;
+    font-size: 0.6rem;
+  }
 }
 
 .cx-discuss-slot {
@@ -4811,7 +4861,8 @@ a.cx-friend-avatar:hover {
 }
 
 @media (max-width: 720px) {
-  .cx-gsearch {
+  /* Only hide the inline topbar field — not .cx-gsearch--mobile in the full-screen overlay */
+  .cx-gsearch.cx-gsearch--bar {
     display: none;
   }
   .cx-gsearch-mobile-btn {
@@ -4851,9 +4902,11 @@ a.cx-friend-avatar:hover {
 }
 
 .cx-gsearch--mobile {
+  display: flex;
   flex: 1;
   margin: 0;
   max-width: none;
+  min-width: 0;
 }
 
 .cx-gsearch-overlay-body {
@@ -7632,12 +7685,29 @@ a.cx-action-chip {
   gap: 8px;
 }
 
-/* Five-item variant — appears only for admins (adds an Admin shield icon at the end) */
+/* Five / six tabs — wider pill for messages + keeps + profile */
 .ig-bottom-nav--five {
-  max-width: 440px;
+  max-width: min(480px, calc(100% - 24px));
   justify-content: space-between;
-  padding: 0 12px;
-  gap: 6px;
+  padding: 0 10px;
+  gap: 4px;
+}
+
+.ig-bottom-nav--six {
+  max-width: min(520px, calc(100% - 20px));
+  justify-content: space-between;
+  padding: 0 8px;
+  gap: 2px;
+}
+
+.ig-bottom-nav .ig-nav-keeps-wrap,
+.ig-bottom-nav .ig-nav-messages-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 /* Admin shield icon: subtle accent tint so it reads as a "privileged" slot
@@ -7662,6 +7732,36 @@ a.cx-action-chip {
 
 .ig-nav-item--admin.ig-nav-item--active {
   color: var(--cx-accent-deep);
+}
+
+.ig-nav-item--messages {
+  position: relative;
+}
+
+.ig-nav-messages-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ig-nav-msg-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  border: 2px solid var(--ig-card, #fff);
+  box-shadow: 0 2px 8px rgb(244 63 94 / 0.35);
+  pointer-events: none;
 }
 
 .ig-nav-item--keeps {
@@ -7693,44 +7793,11 @@ a.cx-action-chip {
   box-shadow: 0 4px 12px rgb(var(--cx-accent-rgb) / 0.35);
 }
 
+/* Create — same idle look as other nav items; accent only when --active */
 .ig-nav-item--fab {
   width: 46px;
   height: 46px;
   margin-top: 0;
-  border-radius: 50%;
-  background: linear-gradient(
-    145deg,
-    rgb(var(--cx-accent-rgb) / 0.2),
-    rgb(var(--cx-accent-rgb) / 0.1)
-  );
-  color: #fff !important;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.34);
-  box-shadow:
-    0 8px 22px rgb(var(--cx-accent-rgb) / 0.2),
-    inset 0 0 0 1px rgb(255 255 255 / 0.14);
-}
-
-.ig-nav-item--fab:hover:not(:disabled) {
-  background: linear-gradient(
-    145deg,
-    rgb(var(--cx-accent-rgb) / 0.24),
-    rgb(var(--cx-accent-rgb) / 0.14)
-  );
-  color: var(--cx-accent) !important;
-  transform: translateY(-1px);
-}
-
-.ig-nav-item--fab.ig-nav-item--active {
-  color: var(--cx-accent) !important;
-  background: linear-gradient(
-    145deg,
-    rgb(var(--cx-accent-rgb) / 0.2),
-    rgb(var(--cx-accent-rgb) / 0.1)
-  );
-  border-color: rgb(var(--cx-accent-rgb) / 0.34);
-  box-shadow:
-    0 8px 22px rgb(var(--cx-accent-rgb) / 0.2),
-    inset 0 0 0 1px rgb(255 255 255 / 0.14);
 }
 
 .ig-nav-item--fab svg {
@@ -7743,6 +7810,8 @@ a.cx-action-chip {
 .cx-profile {
   margin: 0 12px 28px;
   padding: 0 0 8px;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .cx-profile-hero {
@@ -7954,14 +8023,16 @@ a.cx-action-chip {
 }
 
 .cx-profile-stats-row {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   margin: 14px 0;
+  max-width: 100%;
 }
 
 .cx-profile-stat {
-  flex: 1;
-  padding: 12px 14px;
+  min-width: 0;
+  padding: 10px 6px;
   border-radius: var(--cx-radius-lg);
   background: rgb(255 255 255 / 0.75);
   border: 1px solid var(--ig-border);
@@ -7972,17 +8043,22 @@ a.cx-action-chip {
 .cx-profile-stat strong {
   display: block;
   font-family: var(--cx-font-display);
-  font-size: 1.35rem;
+  font-size: clamp(0.95rem, 3.8vw, 1.35rem);
   font-weight: 800;
   color: var(--cx-accent);
+  line-height: 1.15;
 }
 
 .cx-profile-stat span {
-  font-size: 0.72rem;
+  display: block;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--ig-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cx-profile-stat--ghost {
@@ -12277,6 +12353,366 @@ a.cx-profile-btn-accent {
   border-bottom-color: #7c3aed;
 }
 
+/* Admin nav — mobile vs desktop */
+.admin-nav {
+  margin-bottom: 16px;
+}
+
+.admin-nav-mobile {
+  display: none;
+}
+
+.admin-nav-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.admin-nav-select {
+  width: 100%;
+  font-size: 16px;
+}
+
+.admin-nav-chips {
+  display: none;
+}
+
+.admin-tabs--desktop {
+  display: flex;
+}
+
+.admin-nav-chip {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.2);
+  background: rgb(255 255 255 / 0.72);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.admin-nav-chip--active {
+  background: rgb(var(--cx-accent-rgb) / 0.12);
+  border-color: rgb(var(--cx-accent-rgb) / 0.38);
+  color: var(--cx-accent-deep);
+}
+
+:root[data-theme="dark"] .admin-nav-chip {
+  background: rgb(15 23 42 / 0.72);
+  border-color: rgb(148 163 184 / 0.22);
+}
+
+/* Admin panel — mobile browser (≤768px) */
+@media (max-width: 768px) {
+  .admin-tabs--desktop {
+    display: none;
+  }
+
+  .admin-nav-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .admin-nav-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .admin-nav-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-page {
+    padding: 14px 12px 72px;
+  }
+
+  .admin-header {
+    margin-bottom: 18px;
+    gap: 8px;
+  }
+
+  .admin-title {
+    font-size: 1.28rem;
+  }
+
+  .admin-section {
+    padding: 14px 12px;
+    border-radius: 12px;
+  }
+
+  .admin-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-section-actions {
+    width: 100%;
+  }
+
+  .admin-section-actions .admin-btn-cta {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-toolbar {
+    padding: 12px;
+  }
+
+  .admin-toolbar--inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-toolbar-controls,
+  .admin-toolbar-controls--wide,
+  .admin-toolbar-controls--chips {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .admin-toolbar-field,
+  .admin-toolbar-search-wrap,
+  .admin-toolbar-search--grow,
+  .admin-toolbar-search--half {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-toolbar-select {
+    width: 100%;
+  }
+
+  .admin-toolbar-reset {
+    width: 100%;
+    text-align: center;
+  }
+
+  .admin-cat-create {
+    flex-direction: column;
+  }
+
+  .admin-cat-create .ig-btn {
+    width: 100%;
+  }
+
+  .inv-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inv-filter-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-table-wrap {
+    overflow-x: visible;
+    border: none;
+    padding-right: 0;
+    background: transparent;
+  }
+
+  .admin-table--stack {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+  }
+
+  .admin-table--stack thead {
+    display: none;
+  }
+
+  .admin-table--stack tbody {
+    display: block;
+  }
+
+  .admin-table--stack tbody tr {
+    display: block;
+    padding: 12px 14px;
+    border: 1px solid var(--ig-border, #e5e7eb);
+    border-radius: 12px;
+    background: var(--ig-card, var(--ig-surface, #fff));
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.04);
+  }
+
+  .admin-table--stack tbody tr.admin-table-row--clickable:active {
+    background: rgb(var(--cx-accent-rgb) / 0.06);
+  }
+
+  .admin-table--stack td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid rgb(var(--cx-ink-rgb) / 0.07);
+    text-align: right;
+    min-width: 0;
+  }
+
+  .admin-table--stack td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .admin-table--stack td:first-child {
+    padding-top: 0;
+  }
+
+  .admin-table--stack td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ig-muted);
+    flex: 0 0 36%;
+    max-width: 40%;
+    text-align: left;
+    line-height: 1.35;
+    padding-top: 2px;
+  }
+
+  .admin-table--stack td:not([data-label])::before {
+    display: none;
+  }
+
+  .admin-table--stack td > * {
+    flex: 1;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .admin-table--stack td.admin-post-cell,
+  .admin-table--stack td.admin-post-compare-cell,
+  .admin-table--stack td.admin-post-editors-cell,
+  .admin-table--stack td.admin-post-person-cell,
+  .admin-table--stack td.admin-mod-log-text {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  .admin-table--stack td.admin-post-cell::before,
+  .admin-table--stack td.admin-post-compare-cell::before,
+  .admin-table--stack td.admin-post-editors-cell::before,
+  .admin-table--stack td.admin-post-person-cell::before,
+  .admin-table--stack td.admin-mod-log-text::before,
+  .admin-table--stack td.admin-table-actions::before {
+    flex: none;
+    max-width: none;
+    margin-bottom: 4px;
+  }
+
+  .admin-table--stack td.admin-table-actions {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+    min-width: 0;
+    width: auto;
+    padding-right: 0;
+  }
+
+  .admin-table--stack .admin-action-stack {
+    align-items: stretch;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-table--stack .admin-action-msg-row {
+    justify-content: stretch;
+  }
+
+  .admin-table--stack .admin-action-links-row,
+  .admin-table--stack .admin-action-links {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .admin-table--stack .admin-action-link {
+    width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+  }
+
+  .admin-table--stack .admin-table-num {
+    text-align: right;
+  }
+
+  .admin-table--stack .admin-user-cell {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .admin-table--posts .admin-post-cell-main {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-post-compare-list--table {
+    max-width: 100%;
+  }
+
+  .admin-table--posts .admin-table-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .admin-table--posts .admin-link-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 8px 0;
+  }
+
+  .admin-mod-log-text {
+    max-width: none;
+    white-space: pre-wrap;
+  }
+
+  .admin-mod-layout {
+    min-height: 0;
+  }
+
+  .admin-mod-chat-body {
+    max-height: min(50dvh, 360px);
+  }
+
+  .admin-mod-composer-row {
+    flex-wrap: wrap;
+  }
+
+  .admin-mod-composer-input {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .admin-pagination {
+    gap: 10px;
+  }
+
+  .admin-page-btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 /* User avatar cell */
 .admin-user-cell {
   display: flex;
@@ -14570,9 +15006,9 @@ a.cx-profile-btn-accent {
 /* ── Root container ───────────────────────────────────────────────── */
 .mp-root {
   position: fixed;
-  bottom: 72px;
+  bottom: var(--ig-bottom-nav-stack);
   right: 16px;
-  z-index: 900;
+  z-index: 90;
   display: flex;
   flex-direction: row;
   align-items: flex-end;
@@ -14638,8 +15074,8 @@ a.cx-profile-btn-accent {
 /* ── Conversation list panel ──────────────────────────────────────── */
 .mp-panel {
   position: fixed;
-  bottom: 136px; /* mp-root(72px) + FAB clearance(64px) */
-  right: 16px;   /* matches mp-root right offset */
+  bottom: var(--ig-bottom-nav-stack);
+  right: 16px;
   width: 320px;
   max-height: calc(100vh - 160px); /* never taller than the visible viewport */
   display: flex;
@@ -15731,123 +16167,109 @@ a.cx-profile-btn-accent {
 .cw-lightbox-close:hover { background: rgba(255,255,255,.28); }
 
 /* ═══════════════════════════════════════════════════════════════════
-   MESSENGER — MOBILE LAYOUT  (≤ 640 px)
+   MESSENGER — MOBILE BROWSER (touch / ≤768px)
+   Full-screen sheet + FAB above bottom nav
    ═══════════════════════════════════════════════════════════════════ */
-@media (max-width: 640px) {
-
-  /* ── Root: nudge up to clear the pill-shaped bottom nav ─────────── */
-  .mp-root {
-    bottom: 90px;   /* nav bottom(14) + nav height(62) + gap(14) */
-    right: 12px;
-    gap: 0;
-  }
-
-  /* ── Chat windows: escape the flex row, become a fixed bottom sheet */
-  .mp-windows {
+@media (max-width: 768px), ((hover: none) and (pointer: coarse)) {
+  /* Messenger sheet sits above the footer — footer stays visible & tappable */
+  .mp-mobile-shell {
     position: fixed;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
-    width: 100%;
-    /* override desktop row-reverse */
+    bottom: var(--ig-bottom-nav-stack);
+    z-index: 90;
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    z-index: 960; /* above nav (50) and mp-root (900) */
-    pointer-events: auto;
+    background: var(--ig-surface, #fff);
+    padding-top: env(safe-area-inset-top, 0px);
+    animation: mp-slidein 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* Only show the most-recently opened window on mobile */
-  .mp-windows .cw-window ~ .cw-window { display: none; }
+  [data-theme="dark"] .mp-mobile-shell {
+    background: #0f172a;
+  }
 
-  /* ── Chat window: full-width bottom sheet ───────────────────────── */
-  .cw-window {
+  .mp-panel--mobile-full {
+    position: static;
     width: 100%;
-    /* dvh adjusts when the keyboard slides up (iOS 15.4+, Chrome 108+);
-       vh is a safe fallback for older browsers */
-    height: 78vh;
-    height: 78dvh;
-    max-height: 78vh;
-    max-height: 78dvh;
-    border-radius: 20px 20px 0 0;
-    /* shadow only upward — matches bottom-sheet convention */
-    box-shadow: 0 -8px 40px rgba(0,0,0,.18);
-  }
-  [data-theme="dark"] .cw-window {
-    box-shadow: 0 -8px 40px rgba(0,0,0,.55);
-  }
-
-  /* Drag-handle indicator at top of bottom sheet */
-  .cw-header::before {
-    content: '';
-    position: absolute;
-    top: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255,255,255,.35);
-    pointer-events: none;
-  }
-  .cw-header { position: relative; }
-
-  /* Minimised: show just the header bar above the nav */
-  .cw-window--min {
-    height: auto;
+    max-width: none;
     max-height: none;
-    border-radius: 20px 20px 0 0;
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
   }
 
-  /* Smooth touch-scroll in the message list */
-  .cw-body {
+  .mp-panel--mobile-full .mp-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cw-window--mobile-full {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .cw-window--mobile-full .cw-body {
+    flex: 1;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
 
-  /* Footer: add space for iOS home indicator */
+  .cw-header-btn--back {
+    width: 34px;
+    height: 34px;
+  }
+
   .cw-footer {
     padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
 
-  /* Composer: 16px avoids focus zoom when keyboard opens */
   .cw-input {
     font-size: 16px;
     line-height: 1.45;
     padding: 10px 14px;
   }
 
-  /* Image preview bar: same safe-area padding */
   .cw-img-preview-bar {
     padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
   }
 
-  /* ── Conversation list panel: fill most of the screen width ─────── */
-  .mp-panel {
-    width: min(320px, calc(100vw - 24px));
-    right: 12px;
-    bottom: 130px;
-    max-height: min(65vh, calc(100vh - 145px));
-  }
-
-  /* ── Emoji picker: scrollable grid on small screens ─────────────── */
   .msg-emoji-picker {
     max-height: 130px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* ── Bubble images: cap width tighter on small screens ──────────── */
   .cw-bubble-img {
-    max-width: min(220px, calc(100vw - 100px));
+    max-width: min(240px, calc(100vw - 88px));
   }
 
-  /* ── Lightbox: full-screen tap-to-close on mobile ───────────────── */
+  .cw-lightbox {
+    z-index: 980;
+  }
+
   .cw-lightbox-img {
     max-width: 96vw;
     max-height: 88dvh;
     max-height: 88vh;
     border-radius: 8px;
+  }
+
+  .mp-search-input {
+    font-size: 16px;
   }
 }
 
@@ -15934,6 +16356,30 @@ a.cx-profile-btn-accent {
   .auth-form .field input {
     min-height: 44px;
     padding: 0.65rem 0.75rem;
+  }
+
+  .cx-profile-stats-row {
+    gap: 6px;
+  }
+
+  .cx-profile-stat {
+    padding: 8px 4px;
+  }
+
+  .cx-profile-stat span {
+    font-size: 0.58rem;
+  }
+
+  .ig-create-page {
+    padding-bottom: max(56px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .admin-page {
+    padding-bottom: max(88px, calc(72px + env(safe-area-inset-bottom, 0px)));
+  }
+
+  .cx-profile {
+    margin-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
 }
 

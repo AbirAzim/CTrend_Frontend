@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useMobileShell } from "../lib/useMobileShell";
 import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
@@ -170,8 +172,20 @@ function MessageBubble({
   );
 }
 
+type ChatWindowProps = {
+  conversation: Conversation;
+  mobileFullscreen?: boolean;
+  onMobileBack?: () => void;
+  onMobileClose?: () => void;
+};
+
 // ── Chat Window ──────────────────────────────────────────────────────
-function ChatWindow({ conversation }: { conversation: Conversation }) {
+function ChatWindow({
+  conversation,
+  mobileFullscreen = false,
+  onMobileBack,
+  onMobileClose,
+}: ChatWindowProps) {
   const { user } = useAuth();
   const {
     messagesByConvo,
@@ -363,9 +377,20 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
   const canSend = (text.trim().length > 0 || pendingImage !== null) && !uploading;
 
   return (
-    <div className={`cw-window${minimized ? " cw-window--min" : ""}${isModeratorConvo ? " cw-window--moderator" : ""}`} onPaste={handlePaste}>
+    <div
+      className={[
+        "cw-window",
+        minimized && !mobileFullscreen ? " cw-window--min" : "",
+        isModeratorConvo ? " cw-window--moderator" : "",
+        mobileFullscreen ? " cw-window--mobile-full" : "",
+      ].filter(Boolean).join("")}
+      onPaste={handlePaste}
+    >
       {/* Header */}
-      <div className="cw-header" onClick={() => setMinimized((v) => !v)}>
+      <div
+        className="cw-header"
+        onClick={mobileFullscreen ? undefined : () => setMinimized((v) => !v)}
+      >
         <div className="cw-header-avatar-wrap">
           <div className={`cw-header-avatar${isModeratorConvo ? " cw-header-avatar--official" : ""}`}>
             {isModeratorConvo ? (
@@ -389,21 +414,44 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
           </span>
         </div>
         <div className="cw-header-actions">
-          <button
-            type="button"
-            className="cw-header-btn"
-            aria-label={minimized ? "Expand" : "Minimise"}
-            onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="13" height="13" aria-hidden>
-              {minimized ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
-            </svg>
-          </button>
+          {mobileFullscreen ? (
+            <button
+              type="button"
+              className="cw-header-btn cw-header-btn--back"
+              aria-label="Back to messages"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMobileBack?.();
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16" aria-hidden>
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="cw-header-btn"
+              aria-label={minimized ? "Expand" : "Minimise"}
+              onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="13" height="13" aria-hidden>
+                {minimized ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             className="cw-header-btn cw-header-btn--close"
-            aria-label="Close chat"
-            onClick={(e) => { e.stopPropagation(); closeChat(conversation.id); }}
+            aria-label={mobileFullscreen ? "Close messages" : "Close chat"}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (mobileFullscreen) {
+                onMobileClose?.();
+              } else {
+                closeChat(conversation.id);
+              }
+            }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="13" height="13" aria-hidden>
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -412,7 +460,7 @@ function ChatWindow({ conversation }: { conversation: Conversation }) {
         </div>
       </div>
 
-      {!minimized && (
+      {(!minimized || mobileFullscreen) && (
         <>
           {/* Message list */}
           <div
@@ -676,6 +724,7 @@ type FriendRow = {
 
 export function MessengerPanel() {
   const { isAuthenticated, user } = useAuth();
+  const isMobile = useMobileShell();
   const {
     conversations,
     openWindowIds,
@@ -683,9 +732,10 @@ export function MessengerPanel() {
     totalUnread,
     panelOpen,
     setPanelOpen,
-    refetchConversations,
     startDirectConversation,
     openChat,
+    closeChat,
+    closeAllMessenger,
   } = useMessenger();
 
   const [search, setSearch] = useState("");
@@ -757,44 +807,33 @@ export function MessengerPanel() {
     }
   }
 
-  function handleTogglePanel() {
-    if (panelOpen) {
-      setPanelOpen(false);
-      setSearch("");
-    } else {
-      setPanelOpen(true);
-      refetchConversations();
-    }
+  const activeChat = openConversations[0] ?? null;
+  const mobileSheetOpen = isMobile && (panelOpen || Boolean(activeChat));
+  const showMobileChat = isMobile && Boolean(activeChat);
+  const showMobileList = isMobile && panelOpen && !activeChat;
+
+  function closeMobileMessenger() {
+    setSearch("");
+    closeAllMessenger();
   }
 
-  return (
-    <div className="mp-root">
-      {/* Open chat windows */}
-      <div className="mp-windows">
-        {openConversations.map((convo) => (
-          <ChatWindow key={convo.id} conversation={convo} />
-        ))}
-      </div>
+  function mobileBackToList() {
+    if (activeChat) closeChat(activeChat.id);
+    setPanelOpen(true);
+    setSearch("");
+  }
 
-      {/* FAB + conversation panel */}
-      <div className="mp-panel-wrap">
-        {/* FAB toggle */}
-        <button
-          type="button"
-          className={`mp-toggle-btn${panelOpen ? " mp-toggle-btn--open" : ""}`}
-          aria-label={`Messenger${totalUnread > 0 ? `, ${totalUnread} unread` : ""}`}
-          onClick={handleTogglePanel}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22" aria-hidden>
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          {totalUnread > 0 && (
-            <span className="mp-badge">{totalUnread > 99 ? "99+" : totalUnread}</span>
-          )}
-        </button>
+  useEffect(() => {
+    if (!mobileSheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileSheetOpen]);
 
-        {panelOpen && (
-          <div className="mp-panel">
+  const listPanel = panelOpen || showMobileList ? (
+          <div className={`mp-panel${isMobile ? " mp-panel--mobile-full" : ""}`}>
             {/* Panel header */}
             <div className="mp-panel-header">
               <span className="mp-panel-title">Messages</span>
@@ -806,7 +845,13 @@ export function MessengerPanel() {
                   type="button"
                   className="mp-panel-close-btn"
                   aria-label="Close"
-                  onClick={() => { setPanelOpen(false); setSearch(""); }}
+                  onClick={() => {
+                    if (isMobile) closeMobileMessenger();
+                    else {
+                      setPanelOpen(false);
+                      setSearch("");
+                    }
+                  }}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="14" height="14" aria-hidden>
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -937,8 +982,44 @@ export function MessengerPanel() {
               </ul>
             )}
           </div>
-        )}
-      </div>
-    </div>
+  ) : null;
+
+  const mobileSheet =
+    mobileSheetOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="mp-mobile-shell" role="dialog" aria-modal="false" aria-label="Messages">
+            {showMobileChat && activeChat ? (
+              <ChatWindow
+                conversation={activeChat}
+                mobileFullscreen
+                onMobileBack={mobileBackToList}
+                onMobileClose={closeMobileMessenger}
+              />
+            ) : (
+              listPanel
+            )}
+          </div>,
+          document.body,
+        )
+      : null;
+
+  if (!isMobile && !panelOpen && openConversations.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {mobileSheet}
+      {!isMobile && (
+        <div className="mp-root">
+          <div className="mp-windows">
+            {openConversations.map((convo) => (
+              <ChatWindow key={convo.id} conversation={convo} />
+            ))}
+          </div>
+          {listPanel}
+        </div>
+      )}
+    </>
   );
 }

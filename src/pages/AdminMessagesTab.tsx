@@ -658,7 +658,7 @@ export function AdminMessagesTab({
             <p className="muted small">No messages found.</p>
           ) : (
             <div className="admin-table-wrap">
-              <table className="admin-table">
+              <table className="admin-table admin-table--stack">
                 <thead>
                   <tr>
                     <th>To</th>
@@ -674,16 +674,16 @@ export function AdminMessagesTab({
                       className="admin-table-row admin-mod-log-row"
                       onClick={() => openThread(msg.recipientUserId)}
                     >
-                      <td>
+                      <td data-label="To">
                         <strong>{msg.recipientName}</strong>
                         <span className="admin-table-email">{msg.recipientEmail}</span>
                       </td>
-                      <td className="admin-mod-log-text">
+                      <td className="admin-mod-log-text" data-label="Message">
                         {msg.imageUrl ? "📷 " : ""}
                         {msg.text || (msg.imageUrl ? "Image" : "")}
                       </td>
-                      <td className="muted small">{formatRelativeTime(msg.createdAt)}</td>
-                      <td>
+                      <td className="muted small" data-label="Sent">{formatRelativeTime(msg.createdAt)}</td>
+                      <td data-label="Sent by">
                         <button
                           type="button"
                           className="admin-mod-admin-chip admin-mod-admin-chip--link"
