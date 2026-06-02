@@ -18,6 +18,15 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 | [post-campaign-attachment.md](./2026-06-01_post-campaign-attachment.md) | Optional `campaignId` on create post + feed UI ribbon |
 | [post-vote-draw-winner.md](./2026-06-01_post-vote-draw-winner.md) | Random winner after voting ends (non-anonymous, winning side / tie) |
 
+## Index — 2026-06-02
+
+| Doc | Topic |
+|-----|--------|
+| [post-author-email-nullable.md](./2026-06-02_post-author-email-nullable.md) | Make `PostGql.authorEmail` nullable for `SYSTEM` posts |
+| [image-focal-position-editor.md](./2026-06-02_image-focal-position-editor.md) | Per-option `imageFocalX/Y` + position editor on create post |
+| [comment-reactions-fb-style.md](./2026-06-02_comment-reactions-fb-style.md) | Facebook-style comment reactions tray + bubble summary |
+| [platform-brand-avatar-and-announcement-nav.md](./2026-06-02_platform-brand-avatar-and-announcement-nav.md) | Brand logo avatar + announcement notification navigation |
+
 ## Backend (CTrend repo)
 
 - `posts/post.schema.ts` — `campaignId`, `voteWinnerUserId`, `voteWinnerOptionIndex`, `voteWinnerPickedAt`
@@ -25,6 +34,7 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 - `posts/posts.service.ts` — attach campaign, `ensureVoteWinnerDrawn`
 - `votes/votes.service.ts` — `drawRandomEligibleVoter`
 - `schema.gql` — `PostCampaignSummaryGql`, `PostVoteWinnerGql` on `PostGql`
+ - `posts/graphql/post.types.ts` — make `PostGql.authorEmail` nullable
 
 ## Web (this repo)
 

@@ -17,7 +17,7 @@ import {
   isResolvedFriendRequest,
 } from "../lib/friendRequestNotification";
 import { IconArchive, IconMarkRead } from "./IgIcons";
-import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
+import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME, PLATFORM_BRAND_LOGO_URL } from "../lib/moderatorBrand";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 
 function timeAgo(iso: string): string {
@@ -171,6 +171,10 @@ export function NotificationBell() {
       navigate(`/post/${n.postId}#comment-${n.commentId}`);
       return;
     }
+    if (n.type === "ANNOUNCEMENT" && (n.postId || n.referenceId)) {
+      navigate(`/post/${n.postId ?? n.referenceId}`);
+      return;
+    }
     if (n.postId) {
       navigate(`/post/${n.postId}`);
       return;
@@ -197,7 +201,6 @@ export function NotificationBell() {
       navigate(`/profile/${n.referenceId}`);
       return;
     }
-    // ANNOUNCEMENT (admin broadcast / campaign) — no navigation
   }
 
   async function handleAcceptRequest(n: NotificationItem, e: React.MouseEvent) {
@@ -303,9 +306,15 @@ export function NotificationBell() {
                   (!n.latestActorId ||
                     n.latestActorName === "Someone" ||
                     !n.latestActorAvatar?.trim());
+                const isPlatformAnnouncement =
+                  n.type === "ANNOUNCEMENT" &&
+                  (n.latestActorName === MODERATOR_PLATFORM_NAME ||
+                    n.title.includes(MODERATOR_PLATFORM_NAME));
                 const avatarUrl = hideVoteActor
                   ? null
-                  : normalizeProfileImageUrl(n.latestActorAvatar);
+                  : isPlatformAnnouncement
+                    ? PLATFORM_BRAND_LOGO_URL
+                    : normalizeProfileImageUrl(n.latestActorAvatar);
                 return (
                   <li
                     key={n.id}

@@ -8,11 +8,15 @@ import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
 import { useAuth } from "../context/AuthContext";
+import { ImagePositionEditor } from "../components/ImagePositionEditor";
+import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
 
 type DraftCompareItem = {
   id: string;
   imageUrl: string;
   title: string;
+  imageFocalX: number;
+  imageFocalY: number;
   localPreview?: string;
 };
 
@@ -60,10 +64,11 @@ export function CreatePostPage() {
   const [votingEndEnabled, setVotingEndEnabled] = useState(false);
   const [postType, setPostType] = useState<"regular" | "system">("regular");
   const [items, setItems] = useState<DraftCompareItem[]>([
-    { id: "1", imageUrl: "", title: "" },
-    { id: "2", imageUrl: "", title: "" },
+    { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
+    { id: "2", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
   ]);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [positionEditId, setPositionEditId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -75,7 +80,11 @@ export function CreatePostPage() {
     // Show local preview immediately so user sees feedback before upload finishes
     const localPreview = URL.createObjectURL(file);
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, localPreview } : it)),
+      prev.map((it) =>
+        it.id === id
+          ? { ...it, localPreview, imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL }
+          : it,
+      ),
     );
     setUploadingId(id);
     setError(null);
@@ -166,10 +175,14 @@ export function CreatePostPage() {
     }
 
     const imageUrls = normalized.map((it) => it.imageUrl);
-    const options = normalized.map((it, idx) => ({
-      label: it.title || `Option ${idx + 1}`,
-      imageUrl: it.imageUrl,
-    }));
+    const options = items
+      .filter((it) => it.imageUrl.trim().length > 0)
+      .map((it, idx) => ({
+        label: it.title.trim() || `Option ${idx + 1}`,
+        imageUrl: it.imageUrl.trim(),
+        imageFocalX: it.imageFocalX,
+        imageFocalY: it.imageFocalY,
+      }));
 
     // Validate schedule time if enabled
     const scheduledAtIso = scheduleEnabled ? localInputToUtcIso(scheduledAt) : null;
@@ -187,7 +200,7 @@ export function CreatePostPage() {
     const input: {
       categoryId: string;
       imageUrls: string[];
-      options: Array<{ label: string; imageUrl: string }>;
+      options: Array<{ label: string; imageUrl: string; imageFocalX: number; imageFocalY: number }>;
       votingEndsAt?: string;
       scheduledAt?: string;
       contentText?: string;
@@ -234,8 +247,8 @@ export function CreatePostPage() {
         setScheduledAt("");
         setScheduleEnabled(false);
         setItems([
-          { id: "1", imageUrl: "", title: "" },
-          { id: "2", imageUrl: "", title: "" },
+          { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
+          { id: "2", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
         ]);
         setTimeout(() => setSuccessToast(null), 5000);
         return;
@@ -265,7 +278,13 @@ export function CreatePostPage() {
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { id: String(Date.now()), imageUrl: "", title: "" },
+      {
+        id: String(Date.now()),
+        imageUrl: "",
+        title: "",
+        imageFocalX: DEFAULT_IMAGE_FOCAL,
+        imageFocalY: DEFAULT_IMAGE_FOCAL,
+      },
     ]);
   }
 
@@ -280,9 +299,24 @@ export function CreatePostPage() {
 
   function updateItem(id: string, key: "imageUrl" | "title", value: string) {
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, [key]: value } : it)),
+      prev.map((it) => {
+        if (it.id !== id) return it;
+        if (key === "imageUrl" && value.trim() !== it.imageUrl.trim()) {
+          return {
+            ...it,
+            imageUrl: value,
+            imageFocalX: DEFAULT_IMAGE_FOCAL,
+            imageFocalY: DEFAULT_IMAGE_FOCAL,
+          };
+        }
+        return { ...it, [key]: value };
+      }),
     );
   }
+
+  const positionEditItem = positionEditId
+    ? items.find((it) => it.id === positionEditId)
+    : null;
 
   const LABELS = ["A", "B", "C", "D"];
 
@@ -343,31 +377,60 @@ export function CreatePostPage() {
                     void handleFileChange(item.id, ev.target.files?.[0])
                   }
                 />
-                <button
-                  type="button"
-                  className={`ig-compare-zone${item.imageUrl || item.localPreview ? " ig-compare-zone--filled" : ""}`}
-                  style={item.imageUrl || item.localPreview
-                    ? { backgroundImage: `url(${item.imageUrl || item.localPreview})` }
-                    : undefined}
-                  onClick={() => fileInputRefs.current[item.id]?.click()}
-                  disabled={uploadingId === item.id}
-                  aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
+                <div
+                  className={`ig-compare-zone-wrap${item.imageUrl || item.localPreview ? " ig-compare-zone-wrap--filled" : ""}`}
                 >
-                  {uploadingId === item.id ? (
-                    <span className="ig-compare-zone-uploading">
-                      <span className="ig-compare-spinner" />
-                      Uploading…
-                    </span>
-                  ) : item.imageUrl ? (
-                    <span className="ig-compare-zone-change">Change</span>
-                  ) : (
-                    <span className="ig-compare-zone-empty">
-                      <span className="ig-compare-zone-icon">↑</span>
-                      <span className="ig-compare-zone-label">Option {LABELS[idx] ?? idx + 1}</span>
-                      <span className="ig-compare-zone-hint">Tap to add</span>
-                    </span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    className={`ig-compare-zone${item.imageUrl || item.localPreview ? " ig-compare-zone--filled" : ""}`}
+                    style={
+                      item.imageUrl || item.localPreview
+                        ? {
+                            backgroundImage: `url(${item.imageUrl || item.localPreview})`,
+                            backgroundPosition: imageObjectPosition(
+                              item.imageFocalX,
+                              item.imageFocalY,
+                            ),
+                          }
+                        : undefined
+                    }
+                    onClick={() => fileInputRefs.current[item.id]?.click()}
+                    disabled={uploadingId === item.id}
+                    aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
+                  >
+                    {uploadingId === item.id ? (
+                      <span className="ig-compare-zone-uploading">
+                        <span className="ig-compare-spinner" />
+                        Uploading…
+                      </span>
+                    ) : item.imageUrl || item.localPreview ? null : (
+                      <span className="ig-compare-zone-empty">
+                        <span className="ig-compare-zone-icon">↑</span>
+                        <span className="ig-compare-zone-label">Option {LABELS[idx] ?? idx + 1}</span>
+                        <span className="ig-compare-zone-hint">Tap to add</span>
+                      </span>
+                    )}
+                  </button>
+                  {(item.imageUrl || item.localPreview) && uploadingId !== item.id ? (
+                    <div className="ig-compare-zone-actions">
+                      <button
+                        type="button"
+                        className="ig-compare-zone-action"
+                        onClick={() => setPositionEditId(item.id)}
+                      >
+                        Position
+                        {hasCustomFocal(item.imageFocalX, item.imageFocalY) ? " ·" : ""}
+                      </button>
+                      <button
+                        type="button"
+                        className="ig-compare-zone-action"
+                        onClick={() => fileInputRefs.current[item.id]?.click()}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
                 <input
                   type="url"
@@ -590,6 +653,23 @@ export function CreatePostPage() {
           <Link to="/">Cancel</Link>
         </p>
       </form>
+
+      {positionEditItem && (positionEditItem.imageUrl || positionEditItem.localPreview) ? (
+        <ImagePositionEditor
+          src={positionEditItem.imageUrl || positionEditItem.localPreview!}
+          label={`Option ${LABELS[items.findIndex((it) => it.id === positionEditItem.id)] ?? ""}`}
+          focalX={positionEditItem.imageFocalX}
+          focalY={positionEditItem.imageFocalY}
+          onChange={(imageFocalX, imageFocalY) => {
+            setItems((prev) =>
+              prev.map((it) =>
+                it.id === positionEditItem.id ? { ...it, imageFocalX, imageFocalY } : it,
+              ),
+            );
+          }}
+          onClose={() => setPositionEditId(null)}
+        />
+      ) : null}
     </div>
   );
 }
