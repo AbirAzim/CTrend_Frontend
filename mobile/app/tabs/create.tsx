@@ -27,6 +27,8 @@ import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campai
 import { CREATE_SYSTEM_POST } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
+import { ImagePositionEditor } from "../../components/ImagePositionEditor";
+import { hasCustomFocal, DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -49,6 +51,8 @@ type Slot = {
   uploading: boolean;
   error: string | null;
   label: string;
+  imageFocalX: number;
+  imageFocalY: number;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,7 +60,10 @@ type Slot = {
 const SLOT_LABELS = ["A", "B", "C", "D"];
 
 function makeSlot(id: string): Slot {
-  return { id, localUri: null, publicUrl: null, pasteUrl: "", uploading: false, error: null, label: "" };
+  return {
+    id, localUri: null, publicUrl: null, pasteUrl: "", uploading: false, error: null, label: "",
+    imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL,
+  };
 }
 
 const QUICK_PRESETS = [
@@ -216,6 +223,7 @@ export default function CreateScreen() {
   const [categoryModal, setCategoryModal] = useState(false);
   const [campaignId, setCampaignId] = useState("");
   const [campaignModal, setCampaignModal] = useState(false);
+  const [positionSlotId, setPositionSlotId] = useState<string | null>(null);
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
@@ -361,6 +369,8 @@ export default function CreateScreen() {
     const options = readySlots.map((s, i) => ({
       label: s.label.trim() || `Option ${SLOT_LABELS[i] ?? i + 1}`,
       imageUrl: s.publicUrl as string,
+      imageFocalX: s.imageFocalX,
+      imageFocalY: s.imageFocalY,
     }));
     const input: Record<string, unknown> = { categoryId, imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
@@ -454,6 +464,17 @@ export default function CreateScreen() {
                     )}
                   </Pressable>
                   {slot.error ? <Text style={st.slotError}>{slot.error}</Text> : null}
+                  {/* Position editor trigger */}
+                  {hasImage && (slot.localUri || slot.publicUrl) ? (
+                    <Pressable
+                      style={[st.positionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
+                      onPress={() => setPositionSlotId(slot.id)}
+                    >
+                      <Text style={[st.positionBtnText, { color: colors.subtext }]}>
+                        ⊹ Position{hasCustomFocal(slot.imageFocalX, slot.imageFocalY) ? " ·" : ""}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   {/* Paste URL */}
                   <TextInput
                     style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
@@ -719,6 +740,25 @@ export default function CreateScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Image position editor */}
+      {(() => {
+        const slot = slots.find((s) => s.id === positionSlotId);
+        const src = slot ? (slot.localUri ?? slot.publicUrl) : null;
+        if (!slot || !src) return null;
+        const idx = slots.indexOf(slot);
+        return (
+          <ImagePositionEditor
+            visible
+            src={src}
+            label={slot.label.trim() || `Option ${SLOT_LABELS[idx] ?? idx + 1}`}
+            focalX={slot.imageFocalX}
+            focalY={slot.imageFocalY}
+            onChange={(x, y) => patchSlot(slot.id, { imageFocalX: x, imageFocalY: y })}
+            onClose={() => setPositionSlotId(null)}
+          />
+        );
+      })()}
     </KeyboardAvoidingView>
   );
 }
@@ -749,6 +789,8 @@ const st = StyleSheet.create({
   slotRemoveText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   slotError: { color: "#f87171", fontSize: 10, textAlign: "center" },
   slotInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12 },
+  positionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignItems: "center" },
+  positionBtnText: { fontSize: 12, fontWeight: "700" },
 
   addSlotBtn: { borderWidth: 1.5, borderStyle: "dashed", borderRadius: 12, paddingVertical: 13, alignItems: "center" },
   addSlotText: { fontSize: 14, fontWeight: "700" },

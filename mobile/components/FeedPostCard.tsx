@@ -49,6 +49,7 @@ import { MODERATOR_PLATFORM_NAME } from '@ctrend/shared/lib/moderatorBrand';
 import logoAsset from '../assets/logo.png';
 import { PostCampaignBadge } from './PostCampaignBadge';
 import { PostVoteWinnerBanner } from './PostVoteWinnerBanner';
+import { imageContentPosition } from '../lib/imageFocal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -1659,6 +1660,10 @@ function FeedPostCardComponent({
 										source={{ uri: url }}
 										style={styles.multiImg}
 										contentFit='cover'
+										contentPosition={imageContentPosition(
+											post.postOptions?.[i]?.imageFocalX,
+											post.postOptions?.[i]?.imageFocalY,
+										)}
 										cachePolicy='memory-disk'
 									/>
 									<View style={st.pctOverlay}>
@@ -1728,6 +1733,10 @@ function FeedPostCardComponent({
 											source={{ uri: url }}
 											style={st.compareImg}
 											contentFit='cover'
+											contentPosition={imageContentPosition(
+												post.postOptions?.[i]?.imageFocalX,
+												post.postOptions?.[i]?.imageFocalY,
+											)}
 											cachePolicy='memory-disk'
 										/>
 										<View style={st.pctOverlay}>
