@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import {
   VOTE_POST,
+  REMOVE_VOTE,
   SET_POST_HYPE,
   SET_POST_KEEP,
   POST_VOTE_UPDATED,
@@ -73,14 +74,15 @@ type PostVoteUpdatedData = {
   };
 };
 
-type VotePostData = {
-  votePost?: {
-    postId: string;
-    totalVotes: number;
-    countsPerOption: number[];
-    percentages: number[];
-  } | null;
-};
+type VoteResultPayload = {
+  postId: string;
+  totalVotes: number;
+  countsPerOption: number[];
+  percentages: number[];
+} | null | undefined;
+
+type VotePostData = { votePost?: VoteResultPayload };
+type RemoveVoteData = { removeVote?: VoteResultPayload };
 
 function compareLabel(post: FeedPostView, idx: number): string {
   const stat = post.optionStats?.find((s) => s.index === idx)?.label?.trim();
@@ -415,7 +417,8 @@ function FeedPostCardComponent({ post }: Props) {
   const [countdownStr, setCountdownStr] = useState(() => calcCountdown(post.votingEndsAt));
   const voteInFlight = useRef(false);
   const voteGuardUntil = useRef(0);
-  const pendingVote = useRef<{ idx: number } | null>(null);
+  // intent >= 0 = vote that option; intent < 0 = withdraw
+  const pendingVote = useRef<{ intent: number } | null>(null);
 
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [extendMenuVisible, setExtendMenuVisible] = useState(false);
@@ -453,11 +456,12 @@ function FeedPostCardComponent({ post }: Props) {
 
   const up = optimisticVote?.upvoteCount ?? post.upvoteCount;
   const down = optimisticVote?.downvoteCount ?? post.downvoteCount;
-  const viewer = optimisticVote?.viewerVote ?? post.viewerVote;
+  // Use ternary (not ??) so optimistic null (withdraw state) isn't overridden by stale server value
+  const viewer = optimisticVote !== null ? optimisticVote.viewerVote : post.viewerVote;
   const activeStats = optimisticVote?.optionStats ?? post.optionStats;
   const activeIsVotingOpen = optimisticVote?.isVotingOpen ?? post.isVotingOpen ?? null;
   const isVotingClosed = activeIsVotingOpen === false;
-  const activeMyIdx = optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex ?? null;
+  const activeMyIdx = optimisticVote !== null ? optimisticVote.mySelectedOptionIndex : (post.mySelectedOptionIndex ?? null);
   const activeVotingEndsAt = optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
 
   const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls : null;
@@ -467,7 +471,7 @@ function FeedPostCardComponent({ post }: Props) {
   const rightPct = binaryTotal > 0 ? Math.round((100 * down) / binaryTotal) : 50;
   const binaryWinner: 0 | 1 | null = isVotingClosed && binaryTotal > 0
     ? up > down ? 0 : down > up ? 1 : null : null;
-  const hasVoted = viewer !== null || (optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex) !== null;
+  const hasVoted = viewer !== null || activeMyIdx !== null;
 
   // Multi-compare grid sizing — 3 cols for 3/5+ items, 2×2 for exactly 4 items
   const numCols = !isBinary && compareUrls && compareUrls.length === 4 ? 2 : 3;
@@ -547,15 +551,26 @@ function FeedPostCardComponent({ post }: Props) {
       Animated.timing(cellOpacity[0], { toValue: 0.55, duration: 280, useNativeDriver: true }).start();
       Animated.timing(cellOpacity[1], { toValue: 1, duration: 150, useNativeDriver: true }).start();
     } else if (prev !== undefined) {
+      // Withdraw: restore both cells + collapse badges
       Animated.timing(cellOpacity[0], { toValue: 1, duration: 200, useNativeDriver: true }).start();
       Animated.timing(cellOpacity[1], { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      Animated.spring(badgeScale[0], { toValue: 0, useNativeDriver: true, tension: 200, friction: 10 }).start();
+      Animated.spring(badgeScale[1], { toValue: 0, useNativeDriver: true, tension: 200, friction: 10 }).start();
     }
   }, [viewer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Multi-option: badge + dim when mySelectedOptionIndex changes
+  // Multi-option: badge + dim when mySelectedOptionIndex changes (null = withdraw)
   useEffect(() => {
-    if (isBinary || activeMyIdx === null || activeMyIdx === undefined) return;
+    if (isBinary) return;
     const n = compareUrls?.length ?? 0;
+    if (activeMyIdx === null) {
+      // Withdraw: restore all cells, hide all badges
+      for (let i = 0; i < n; i++) {
+        Animated.timing(cellOpacity[i], { toValue: 1, duration: 200, useNativeDriver: true }).start();
+        Animated.spring(badgeScale[i], { toValue: 0, useNativeDriver: true, tension: 200, friction: 10 }).start();
+      }
+      return;
+    }
     for (let i = 0; i < n; i++) {
       if (i === activeMyIdx) {
         badgeScale[i].setValue(0);
@@ -583,6 +598,7 @@ function FeedPostCardComponent({ post }: Props) {
   }, [leftPct, rightPct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [voteMut] = useMutation<VotePostData>(VOTE_POST);
+  const [removeVoteMut] = useMutation<RemoveVoteData>(REMOVE_VOTE);
   const [setHypeMut] = useMutation(SET_POST_HYPE);
   const [setKeepMut] = useMutation(SET_POST_KEEP);
   const [deleteMut] = useMutation(DELETE_POST);
@@ -610,102 +626,146 @@ function FeedPostCardComponent({ post }: Props) {
     Animated.spring(chipScales[i], { toValue: 1, useNativeDriver: true, tension: 180, friction: 12 }).start();
   }
 
-  async function castVote(idx: number) {
+  // intent >= 0 = vote that option; intent = -1 = withdraw current vote
+  async function processVoteIntent(intent: number) {
     if (isVotingClosed) return;
     if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const curVote = optimisticVote?.viewerVote ?? post.viewerVote;
-    // Binary early return
-    if ((idx === 0 && curVote === "UP") || (idx === 1 && curVote === "DOWN")) return;
-    // Multi-option early return
-    const curIdx = optimisticVote?.mySelectedOptionIndex ?? post.mySelectedOptionIndex;
-    if (!isBinary && curIdx !== null && curIdx !== undefined && curIdx === idx) return;
-    triggerVotePop(idx);
 
+    // Snapshot live state (ternary so explicit null withdraw is honoured)
+    const curVote = optimisticVote !== null ? optimisticVote.viewerVote : post.viewerVote;
+    const curMyIdx = optimisticVote !== null ? optimisticVote.mySelectedOptionIndex : (post.mySelectedOptionIndex ?? null);
+    const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
+    const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
     const curStats = optimisticVote?.optionStats ?? post.optionStats ?? null;
-    let newOptimistic: VoteLiveState;
 
-    if (isBinary) {
-      const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
-      const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
-      let newUp = curUp; let newDown = curDown;
-      if (idx === 0) { newUp += 1; if (curVote === "DOWN") newDown = Math.max(0, newDown - 1); }
-      else { newDown += 1; if (curVote === "UP") newUp = Math.max(0, newUp - 1); }
-      const total = newUp + newDown;
-      const newStats = curStats?.map((s) => {
-        const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
-        return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
-      }) ?? null;
-      newOptimistic = {
-        upvoteCount: newUp, downvoteCount: newDown,
-        viewerVote: idx === 0 ? "UP" : "DOWN",
-        mySelectedOptionIndex: idx,
-        optionStats: newStats,
-        isVotingOpen: activeIsVotingOpen,
-        votingEndsAt: activeVotingEndsAt,
-      };
+    // Apply optimistic update immediately
+    if (intent >= 0) {
+      triggerVotePop(intent);
+      if (isBinary) {
+        let newUp = curUp; let newDown = curDown;
+        if (intent === 0) { newUp += 1; if (curVote === "DOWN") newDown = Math.max(0, newDown - 1); }
+        else { newDown += 1; if (curVote === "UP") newUp = Math.max(0, newUp - 1); }
+        const total = newUp + newDown;
+        setOptimisticVote({
+          upvoteCount: newUp, downvoteCount: newDown,
+          viewerVote: intent === 0 ? "UP" : "DOWN", mySelectedOptionIndex: intent,
+          optionStats: curStats?.map((s) => {
+            const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
+            return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
+          }) ?? null,
+          isVotingOpen: activeIsVotingOpen, votingEndsAt: activeVotingEndsAt,
+        });
+      } else {
+        const rawCounts = (curStats ?? []).map((s) => {
+          let c = s.count;
+          if (s.index === intent) c += 1;
+          if (curMyIdx !== null && s.index === curMyIdx && curMyIdx !== intent) c = Math.max(0, c - 1);
+          return { ...s, count: c };
+        });
+        const newTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
+        setOptimisticVote({
+          upvoteCount: curUp, downvoteCount: curDown,
+          viewerVote: null, mySelectedOptionIndex: intent,
+          optionStats: rawCounts.map((s) => ({ ...s, percentage: newTotal > 0 ? (s.count / newTotal) * 100 : 0 })),
+          isVotingOpen: activeIsVotingOpen, votingEndsAt: activeVotingEndsAt,
+        });
+      }
     } else {
-      // Multi-compare: increment selected option, decrement previous selection
-      const prevIdx = curIdx;
-      const rawCounts = (curStats ?? []).map((s) => {
-        let c = s.count;
-        if (s.index === idx) c += 1;
-        if (prevIdx !== null && prevIdx !== undefined && s.index === prevIdx && prevIdx !== idx)
-          c = Math.max(0, c - 1);
-        return { ...s, count: c };
-      });
-      const newMultiTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
-      const newStats = rawCounts.map((s) => ({
-        ...s,
-        percentage: newMultiTotal > 0 ? (s.count / newMultiTotal) * 100 : 0,
-      }));
-      newOptimistic = {
-        upvoteCount: optimisticVote?.upvoteCount ?? post.upvoteCount,
-        downvoteCount: optimisticVote?.downvoteCount ?? post.downvoteCount,
-        viewerVote: null,
-        mySelectedOptionIndex: idx,
-        optionStats: newStats,
-        isVotingOpen: activeIsVotingOpen,
-        votingEndsAt: activeVotingEndsAt,
-      };
+      // Withdraw — decrement current pick's count, clear vote
+      if (isBinary) {
+        let newUp = curUp; let newDown = curDown;
+        if (curVote === "UP") newUp = Math.max(0, newUp - 1);
+        else if (curVote === "DOWN") newDown = Math.max(0, newDown - 1);
+        const total = newUp + newDown;
+        setOptimisticVote({
+          upvoteCount: newUp, downvoteCount: newDown,
+          viewerVote: null, mySelectedOptionIndex: null,
+          optionStats: curStats?.map((s) => {
+            const c = s.index === 0 ? newUp : s.index === 1 ? newDown : s.count;
+            return { ...s, count: c, percentage: total > 0 ? (c / total) * 100 : 0 };
+          }) ?? null,
+          isVotingOpen: activeIsVotingOpen, votingEndsAt: activeVotingEndsAt,
+        });
+      } else {
+        const rawCounts = (curStats ?? []).map((s) => ({
+          ...s, count: s.index === curMyIdx ? Math.max(0, s.count - 1) : s.count,
+        }));
+        const newTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
+        setOptimisticVote({
+          upvoteCount: curUp, downvoteCount: curDown,
+          viewerVote: null, mySelectedOptionIndex: null,
+          optionStats: rawCounts.map((s) => ({ ...s, percentage: newTotal > 0 ? (s.count / newTotal) * 100 : 0 })),
+          isVotingOpen: activeIsVotingOpen, votingEndsAt: activeVotingEndsAt,
+        });
+      }
     }
 
-    setOptimisticVote(newOptimistic);
     setDetailsExpanded(true);
     voteGuardUntil.current = Date.now() + 2000;
 
-    if (voteInFlight.current) { pendingVote.current = { idx }; return; }
+    if (voteInFlight.current) { pendingVote.current = { intent }; return; }
     voteInFlight.current = true;
-    let currentIdx = idx;
+    let currentIntent = intent;
+
     while (true) {
       try {
-        const result = await voteMut({ variables: { postId: post.id, selectedOptionIndex: currentIdx, anonymous: anon } });
-        const payload = result.data?.votePost;
-        if (payload?.countsPerOption && payload.countsPerOption.length >= 2) {
-          const counts = payload.countsPerOption.map((n) => Math.max(0, Math.round(n)));
-          const pcts = payload.percentages ?? [];
-          const st2 = counts.reduce((a, b) => a + b, 0);
-          setOptimisticVote((prev) => ({
-            upvoteCount: counts[0] ?? (prev?.upvoteCount ?? 0),
-            downvoteCount: counts[1] ?? (prev?.downvoteCount ?? 0),
-            viewerVote: currentIdx === 0 ? "UP" : "DOWN",
-            mySelectedOptionIndex: currentIdx,
-            optionStats: prev?.optionStats?.map((s, i) => ({
-              ...s, count: counts[i] ?? s.count,
-              percentage: pcts[i] ?? (st2 > 0 ? ((counts[i] ?? 0) / st2) * 100 : 0),
-            })) ?? null,
-            isVotingOpen: prev?.isVotingOpen ?? null,
-            votingEndsAt: prev?.votingEndsAt ?? null,
-          }));
-          voteGuardUntil.current = Date.now() + 500;
+        if (currentIntent < 0) {
+          const result = await removeVoteMut({ variables: { postId: post.id } });
+          const payload = result.data?.removeVote;
+          if (payload?.countsPerOption?.length) {
+            const counts = payload.countsPerOption.map((n) => Math.max(0, Math.round(n)));
+            const pcts = payload.percentages ?? [];
+            const total = counts.reduce((a, b) => a + b, 0);
+            setOptimisticVote((prev) => ({
+              upvoteCount: counts[0] ?? (prev?.upvoteCount ?? 0),
+              downvoteCount: counts[1] ?? (prev?.downvoteCount ?? 0),
+              viewerVote: null, mySelectedOptionIndex: null,
+              optionStats: prev?.optionStats?.map((s, i) => ({
+                ...s, count: counts[i] ?? s.count,
+                percentage: pcts[i] ?? (total > 0 ? ((counts[i] ?? 0) / total) * 100 : 0),
+              })) ?? null,
+              isVotingOpen: prev?.isVotingOpen ?? null, votingEndsAt: prev?.votingEndsAt ?? null,
+            }));
+            voteGuardUntil.current = Date.now() + 500;
+          }
+        } else {
+          const result = await voteMut({ variables: { postId: post.id, selectedOptionIndex: currentIntent, anonymous: anon } });
+          const payload = result.data?.votePost;
+          if (payload?.countsPerOption?.length) {
+            const counts = payload.countsPerOption.map((n) => Math.max(0, Math.round(n)));
+            const pcts = payload.percentages ?? [];
+            const total = counts.reduce((a, b) => a + b, 0);
+            setOptimisticVote((prev) => ({
+              upvoteCount: counts[0] ?? (prev?.upvoteCount ?? 0),
+              downvoteCount: counts[1] ?? (prev?.downvoteCount ?? 0),
+              viewerVote: currentIntent === 0 ? "UP" : "DOWN", mySelectedOptionIndex: currentIntent,
+              optionStats: prev?.optionStats?.map((s, i) => ({
+                ...s, count: counts[i] ?? s.count,
+                percentage: pcts[i] ?? (total > 0 ? ((counts[i] ?? 0) / total) * 100 : 0),
+              })) ?? null,
+              isVotingOpen: prev?.isVotingOpen ?? null, votingEndsAt: prev?.votingEndsAt ?? null,
+            }));
+            voteGuardUntil.current = Date.now() + 500;
+          }
         }
         const pending = pendingVote.current; pendingVote.current = null;
         if (!pending) break;
-        currentIdx = pending.idx;
+        currentIntent = pending.intent;
       } catch {
         pendingVote.current = null; setOptimisticVote(null); break;
       }
     }
     voteInFlight.current = false;
+  }
+
+  function handleCellTap(idx: number) {
+    // Ternary (not ??) so withdraw null state is not masked by stale server value
+    const curVote = optimisticVote !== null ? optimisticVote.viewerVote : post.viewerVote;
+    const curMyIdx = optimisticVote !== null ? optimisticVote.mySelectedOptionIndex : (post.mySelectedOptionIndex ?? null);
+    const isCurrentChoice = isBinary
+      ? (idx === 0 && curVote === "UP") || (idx === 1 && curVote === "DOWN")
+      : curMyIdx === idx;
+    void processVoteIntent(isCurrentChoice ? -1 : idx);
   }
 
   async function handleHype() {
@@ -852,7 +912,7 @@ function FeedPostCardComponent({ post }: Props) {
                   { transform: [{ scale: cellScale[i] }] },
                 ]}
               >
-                <Pressable style={styles.fill} onPress={() => void castVote(i)} disabled={isVotingClosed}>
+                <Pressable style={styles.fill} onPress={() => handleCellTap(i)} disabled={isVotingClosed}>
                   <Image source={{ uri: url }} style={styles.multiImg} contentFit="cover" cachePolicy="memory-disk" />
                   <View style={st.pctOverlay}>
                     <Text style={st.pctText}>{pct}%</Text>
@@ -895,7 +955,7 @@ function FeedPostCardComponent({ post }: Props) {
                     { transform: [{ scale: cellScale[i] }], opacity: cellOpacity[i] },
                   ]}
                 >
-                  <Pressable style={styles.fill} onPress={() => void castVote(i)} disabled={isVotingClosed}>
+                  <Pressable style={styles.fill} onPress={() => handleCellTap(i)} disabled={isVotingClosed}>
                     <Image source={{ uri: url }} style={st.compareImg} contentFit="cover" cachePolicy="memory-disk" />
                     <View style={st.pctOverlay}>
                       <Text style={st.pctText}>{pct}%</Text>
@@ -951,7 +1011,7 @@ function FeedPostCardComponent({ post }: Props) {
       {compareUrls && !isVotingClosed ? (
         <View style={st.voteHintRow}>
           <Text style={[st.voteHintText, hasVoted && st.voteHintRecorded]}>
-            {hasVoted ? "✓ Vote recorded — tap to change" : "👆 Tap an image to cast your vote"}
+            {hasVoted ? "✓ Voted — tap again to unvote · tap other to switch" : "👆 Tap an image to cast your vote"}
           </Text>
         </View>
       ) : null}

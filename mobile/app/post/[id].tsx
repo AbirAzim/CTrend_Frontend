@@ -31,6 +31,7 @@ import {
   DELETE_POST,
   EXTEND_POST_VOTING,
   GET_POST_BY_ID,
+  REMOVE_VOTE,
   SET_POST_HYPE,
   SET_POST_KEEP,
   VOTERS_BY_POST,
@@ -832,6 +833,7 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const { isAuthenticated } = useAuth();
   const { adjustSavedCount } = useTabBar();
   const [voteMut] = useMutation(VOTE_POST);
+  const [removeVoteMut] = useMutation(REMOVE_VOTE);
   const [hypeMut] = useMutation(SET_POST_HYPE);
   const [keepMut] = useMutation(SET_POST_KEEP);
   const [viewerVote, setViewerVote] = useState(post.viewerVote);
@@ -848,6 +850,7 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const leftPct = total > 0 ? Math.round((100 * up) / total) : 50;
   const rightPct = 100 - leftPct;
   const isVotingClosed = post.isVotingOpen === false;
+  const hasVoted = viewerVote !== null;
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState("");
@@ -877,9 +880,25 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     if (isVotingClosed) return;
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     const prev = viewerVote;
-    const newVote = idx === 0 ? "UP" : "DOWN";
-    if (prev === newVote) return;
-    setViewerVote(newVote as "UP" | "DOWN");
+    const newVote: "UP" | "DOWN" = idx === 0 ? "UP" : "DOWN";
+
+    if (prev === newVote) {
+      // Same option tapped — withdraw
+      setViewerVote(null);
+      setUp((n) => n - (idx === 0 ? 1 : 0));
+      setDown((n) => n - (idx === 1 ? 1 : 0));
+      try {
+        await removeVoteMut({ variables: { postId: post.id } });
+      } catch {
+        setViewerVote(prev);
+        setUp(post.upvoteCount);
+        setDown(post.downvoteCount);
+      }
+      return;
+    }
+
+    // New or switched vote
+    setViewerVote(newVote);
     setUp((n) => n + (idx === 0 ? 1 : 0) - (prev === "UP" ? 1 : 0));
     setDown((n) => n + (idx === 1 ? 1 : 0) - (prev === "DOWN" ? 1 : 0));
     try {
@@ -936,7 +955,6 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const initial = authorName.slice(0, 1).toUpperCase();
   const authorAvatarUrl = isPlatformPost ? null : post.authorProfileImageUrl ?? null;
   const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls.slice(0, 2) : null;
-  const hasVoted = viewerVote !== null;
 
   return (
     <View style={st.postCard}>
@@ -1017,7 +1035,7 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
       {compareUrls && !isVotingClosed && (
         <View style={st.postVoteHint}>
           <Text style={[st.postVoteHintText, hasVoted && st.postVoteHintVoted]}>
-            {hasVoted ? "✓ Vote recorded — tap to change" : "👆 Tap an image to vote"}
+            {hasVoted ? "✓ Voted — tap again to unvote · tap other to switch" : "👆 Tap an image to vote"}
           </Text>
           {timeLeft ? (
             <Text style={[st.postVoteHintText, { marginTop: 4, color: "#f59e0b", fontWeight: "700" }]}>

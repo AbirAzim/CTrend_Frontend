@@ -491,7 +491,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 14 — Two-Zone Action Bar + Voters Modal Redesign
+### ✅ PHASE 14 — Two-Zone Action Bar + Voters Modal Redesign (COMPLETE 2026-06-02)
 
 **Source docs:** `phase1-action-bar-and-notification-darkmode.md`, `phase2b-two-zone-action-bar-redesign.md`, `phase1-voters-modal-redesign.md`
 
