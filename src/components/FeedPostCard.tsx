@@ -1,5 +1,13 @@
 import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { PostCommentsPanel } from "./PostCommentsPanel";
@@ -33,7 +41,10 @@ import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { playVoteSound } from "../lib/notificationSound";
 import type { FeedPostView, VoteDirectionGql } from "../types/feed";
-import { MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
+import { MODERATOR_PLATFORM_NAME, PLATFORM_BRAND_LOGO_URL } from "../lib/moderatorBrand";
+import { PostCampaignBadge } from "./PostCampaignBadge";
+import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
+import { imageObjectPosition } from "../lib/imageFocal";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -68,6 +79,16 @@ function nextDirection(
 }
 
 /** Title for a compare column: API stats → options → demo labels → minimal fallback. */
+function compareImageStyle(
+  post: FeedPostView,
+  index: number,
+): CSSProperties | undefined {
+  const opt = post.postOptions?.[index];
+  if (!opt) return undefined;
+  if (opt.imageFocalX == null && opt.imageFocalY == null) return undefined;
+  return { objectPosition: imageObjectPosition(opt.imageFocalX, opt.imageFocalY) };
+}
+
 function compareOptionLabel(post: FeedPostView, index: number): string {
   const stat = post.optionStats
     ?.find((s) => s.index === index)
@@ -728,6 +749,14 @@ function FeedPostCardComponent({
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
   const votingEndedByTime =
     votingHasEndDate && votingEndsDate.getTime() <= nowMs;
+  const votingRemainingMs =
+    votingHasEndDate && votingEndsDate ? Math.max(0, votingEndsDate.getTime() - nowMs) : null;
+  const endingSoonLeadMinutes = Math.max(1, Math.round(post.endingSoonLeadMinutes ?? 5));
+  const isEndingSoon =
+    !votingEndedByTime &&
+    activeIsVotingOpen !== false &&
+    votingRemainingMs !== null &&
+    votingRemainingMs <= endingSoonLeadMinutes * 60_000;
   const isVotingClosed = activeIsVotingOpen === false || votingEndedByTime;
   const countdownLabel =
     votingHasEndDate && activeVotingEndsAt && !isVotingClosed
@@ -1287,14 +1316,40 @@ function FeedPostCardComponent({
   }, [post.id]);
 
   const isPlatformPost = post.postType === "system";
+  const hasCampaign = Boolean(post.campaign);
+  const showVoteWinner =
+    post.isVotingOpen === false &&
+    post.voteWinner?.user &&
+    (post.upvoteCount + post.downvoteCount > 0 ||
+      (post.optionStats?.reduce((s, o) => s + o.count, 0) ?? 0) > 0);
+  const winnerOptionLabel =
+    post.voteWinner?.selectedOptionIndex != null
+      ? post.postOptions?.[post.voteWinner.selectedOptionIndex]?.label ??
+        post.optionStats?.find(
+          (s) => s.index === post.voteWinner?.selectedOptionIndex,
+        )?.label ??
+        null
+      : null;
 
   return (
-    <article className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}`}>
+    <article
+      className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
+    >
+      {isEndingSoon ? (
+        <div className="cx-vote-ending-soon-banner" role="status" aria-live="polite">
+          <span className="cx-vote-ending-soon-icon" aria-hidden>
+            ⏳
+          </span>
+          <span>
+            Poll ending soon, vote now! <strong>{countdownLabel || "Time is running out"}</strong>
+          </span>
+        </div>
+      ) : null}
       <header className="ig-post-header">
         {isPlatformPost ? (
           <div className="ig-post-user cx-platform-post-user">
             <span className="ig-avatar sm cx-platform-post-avatar">
-              <img src="/logo.png" alt="" decoding="async" />
+              <img src={PLATFORM_BRAND_LOGO_URL} alt="" decoding="async" />
             </span>
             <div>
               <span className="ig-post-username-row">
@@ -1417,6 +1472,8 @@ function FeedPostCardComponent({
         </div>
       </header>
 
+      {post.campaign ? <PostCampaignBadge campaign={post.campaign} /> : null}
+
       {/* Caption — always visible above the compare images */}
       {post.caption && (
         <div className="cx-post-caption-bar">
@@ -1498,7 +1555,15 @@ function FeedPostCardComponent({
                     }
                     onClick={() => handleBinaryCompareTap(side)}
                   >
-                    <img src={url} alt="" width={1080} height={1080} loading="lazy" decoding="async" />
+                    <img
+                      src={url}
+                      alt=""
+                      width={1080}
+                      height={1080}
+                      loading="lazy"
+                      decoding="async"
+                      style={compareImageStyle(post, side)}
+                    />
                     {/* Permanent "your pick" seal — top-right corner pin */}
                     {picked && !isVotingClosed && (
                       <span className="cx-voted-pin" aria-label="Your choice">
@@ -1552,7 +1617,15 @@ function FeedPostCardComponent({
                   }
                   onClick={() => void handleMultiCompareTap(i)}
                 >
-                  <img src={url} alt="" width={1080} height={1080} loading="lazy" decoding="async" />
+                  <img
+                    src={url}
+                    alt=""
+                    width={1080}
+                    height={1080}
+                    loading="lazy"
+                    decoding="async"
+                    style={compareImageStyle(post, i)}
+                  />
                   {picked && !isVotingClosed && (
                     <span className="cx-voted-pin" aria-label="Your choice">
                       <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
@@ -1637,6 +1710,13 @@ function FeedPostCardComponent({
           <p className="ig-post-media-placeholder">No image URL</p>
         </div>
       )}
+
+      {showVoteWinner && post.voteWinner ? (
+        <PostVoteWinnerBanner
+          winner={post.voteWinner}
+          optionLabel={winnerOptionLabel}
+        />
+      ) : null}
 
       <div className="cx-post-footer">
         {detailsOpen ? (
@@ -2100,7 +2180,8 @@ function areFeedPostCardPropsEqual(prev: Props, next: Props): boolean {
     prev.post.viewerHasHyped === next.post.viewerHasHyped &&
     prev.post.mySelectedOptionIndex === next.post.mySelectedOptionIndex &&
     prev.post.isVotingOpen === next.post.isVotingOpen &&
-    prev.post.votingEndsAt === next.post.votingEndsAt
+    prev.post.votingEndsAt === next.post.votingEndsAt &&
+    prev.post.endingSoonLeadMinutes === next.post.endingSoonLeadMinutes
   );
 }
 

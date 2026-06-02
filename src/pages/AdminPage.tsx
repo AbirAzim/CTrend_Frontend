@@ -19,7 +19,7 @@ import {
   RESEND_INVITATION,
   UPDATE_CATEGORY,
 } from "../graphql/admin";
-import { CATEGORIES } from "../graphql/feed";
+import { CATEGORIES, DELETE_POST } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -36,6 +36,7 @@ import {
   CAMPAIGNS_ADMIN,
   CREATE_CAMPAIGN,
   TOGGLE_CAMPAIGN,
+  UPDATE_CAMPAIGN,
 } from "../graphql/campaigns";
 
 const SYSTEM_ADMIN_EMAIL = "systemadminctrend@gmail.com";
@@ -961,6 +962,7 @@ type CampaignRow = {
   ctaLabel: string;
   ctaUrl: string;
   isActive: boolean;
+  isDefault?: boolean | null;
   prizePerWinner: number;
   startDate: string | null;
   endDate: string | null;
@@ -986,6 +988,7 @@ function CampaignsTab() {
 
   const [createCampaign, { loading: creating }] = useMutation(CREATE_CAMPAIGN);
   const [toggleCampaign] = useMutation(TOGGLE_CAMPAIGN);
+  const [updateCampaign, { loading: updatingCampaign }] = useMutation(UPDATE_CAMPAIGN);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -1010,6 +1013,15 @@ function CampaignsTab() {
   async function handleToggle(id: string, current: boolean) {
     try {
       await toggleCampaign({ variables: { id, isActive: !current } });
+      void refetch();
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleMakeDefault(id: string) {
+    try {
+      await updateCampaign({ variables: { id, input: { isDefault: true } } });
       void refetch();
     } catch {
       // silent
@@ -1110,6 +1122,7 @@ function CampaignsTab() {
                 <th>CTA</th>
                 <th>Prize</th>
                 <th>Status</th>
+                <th>Default</th>
                 <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
@@ -1125,7 +1138,25 @@ function CampaignsTab() {
                       {c.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
+                  <td data-label="Default">
+                    {c.isDefault ? (
+                      <span className="admin-stat-chip admin-stat-chip--active">Default</span>
+                    ) : (
+                      <span className="muted small">—</span>
+                    )}
+                  </td>
                   <AdminActionsCell>
+                    {!c.isDefault ? (
+                      <button
+                        type="button"
+                        className="admin-action-link admin-action-link--success"
+                        onClick={() => void handleMakeDefault(c.id)}
+                        disabled={!c.isActive || updatingCampaign}
+                        title={!c.isActive ? "Activate campaign first to make it default" : "Make this campaign default"}
+                      >
+                        Make Default
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className={`admin-action-link${c.isActive ? " admin-action-link--danger" : " admin-action-link--success"}`}
@@ -1956,7 +1987,11 @@ type PlatformPostRow = {
   status?: string | null;
   scheduledAt?: string | null;
   votingEndsAt?: string | null;
+  endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
   commentCount?: number | null;
   hypeCount?: number | null;
   saveCount?: number | null;
@@ -1968,8 +2003,26 @@ type PlatformPostRow = {
   authorUsername?: string | null;
   authorEmail?: string | null;
   authorProfileImageUrl?: string | null;
+  author?: {
+    id: string;
+    username?: string | null;
+    displayName?: string | null;
+    email?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
   category?: { id: string; name: string; slug?: string | null } | null;
+  campaign?: { id: string; name: string; slug?: string | null } | null;
   options?: Array<{ label: string; imageUrl?: string | null }> | null;
+  voteWinner?: {
+    selectedOptionIndex?: number | null;
+    pickedAt?: string | null;
+    user?: {
+      id: string;
+      username?: string | null;
+      displayName?: string | null;
+      profileImageUrl?: string | null;
+    } | null;
+  } | null;
   editedBy?: PlatformPostEditor[] | null;
   lastEditedBy?: PlatformPostEditor | null;
 };
@@ -1989,6 +2042,8 @@ function PostsTab() {
   const [sortBy, setSortBy] = useState<PostSortBy>("createdAt");
   const [sortOrder, setSortOrder] = useState<PostSortOrder>("desc");
   const [editingPost, setEditingPost] = useState<PlatformPostRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PlatformPostRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: catsData } = useQuery<{ categories: Array<{ id: string; name: string }> }>(
     CATEGORIES,
@@ -2032,19 +2087,44 @@ function PostsTab() {
     fetchPolicy: "network-only",
   });
 
-  const { data: countData } = useQuery<{ adminPlatformPostsCount: number }>(
+  const { data: countData, refetch: refetchCount } = useQuery<{ adminPlatformPostsCount: number }>(
     ADMIN_PLATFORM_POSTS_COUNT,
     {
       variables: { filter: countFilter },
       fetchPolicy: "cache-and-network",
     },
   );
+  const [deletePostMut, { loading: deletingPost }] = useMutation(DELETE_POST);
 
   const posts = data?.adminPlatformPosts ?? [];
   const total = countData?.adminPlatformPostsCount ?? posts.length;
+  const visibleLiveCount = posts.filter((p) => p.isVotingOpen).length;
+  const visibleClosedCount = posts.length - visibleLiveCount;
+  const visibleScheduledCount = posts.filter((p) => p.status === "SCHEDULED").length;
+  const visibleTotalVotes = posts.reduce(
+    (sum, p) => sum + (p.totalVotes ?? (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0)),
+    0,
+  );
 
   function openPost(postId: string) {
     navigate(`/post/${postId}`);
+  }
+
+  async function handleDeletePost(post: PlatformPostRow) {
+    setDeleteError(null);
+    try {
+      await deletePostMut({ variables: { postId: post.id } });
+      setDeleteTarget(null);
+      if (posts.length === 1 && skip > 0) {
+        setSkip((s) => Math.max(0, s - PAGE_SIZE));
+      } else {
+        void refetch();
+      }
+      void refetchCount();
+    } catch (err: unknown) {
+      setDeleteError(getApolloErrorMessage(err));
+      setDeleteTarget(null);
+    }
   }
 
   return (
@@ -2060,7 +2140,34 @@ function PostsTab() {
         }
       />
 
-      <div className="admin-toolbar">
+      <div className="admin-posts-summary">
+        <div className="admin-posts-summary-card">
+          <span className="admin-posts-summary-label">Total matches</span>
+          <strong className="admin-posts-summary-value">{total.toLocaleString()}</strong>
+        </div>
+        <div className="admin-posts-summary-card">
+          <span className="admin-posts-summary-label">On this page</span>
+          <strong className="admin-posts-summary-value">{posts.length.toLocaleString()}</strong>
+        </div>
+        <div className="admin-posts-summary-card">
+          <span className="admin-posts-summary-label">Live polls</span>
+          <strong className="admin-posts-summary-value">{visibleLiveCount.toLocaleString()}</strong>
+        </div>
+        <div className="admin-posts-summary-card">
+          <span className="admin-posts-summary-label">Closed polls</span>
+          <strong className="admin-posts-summary-value">{visibleClosedCount.toLocaleString()}</strong>
+        </div>
+        <div className="admin-posts-summary-card">
+          <span className="admin-posts-summary-label">Scheduled</span>
+          <strong className="admin-posts-summary-value">{visibleScheduledCount.toLocaleString()}</strong>
+        </div>
+        <div className="admin-posts-summary-card">
+          <span className="admin-posts-summary-label">Votes shown</span>
+          <strong className="admin-posts-summary-value">{visibleTotalVotes.toLocaleString()}</strong>
+        </div>
+      </div>
+
+      <div className="admin-toolbar admin-toolbar--posts">
         <AdminSearchInput
           value={searchTerm}
           onChange={setSearchTerm}
@@ -2144,6 +2251,11 @@ function PostsTab() {
           {getApolloErrorMessage(error)}
         </p>
       ) : null}
+      {deleteError ? (
+        <p className="error" role="alert">
+          {deleteError}
+        </p>
+      ) : null}
 
       {loading && posts.length === 0 ? (
         <p className="muted">Loading platform posts…</p>
@@ -2159,14 +2271,11 @@ function PostsTab() {
             <thead>
               <tr>
                 <th>Post</th>
-                <th>Compare</th>
                 <th>Created by</th>
                 <th>Category</th>
-                <th>Votes</th>
-                <th className="admin-table-num">Comments</th>
-                <th className="admin-table-num">Hype</th>
-                <th className="admin-table-num">Saves</th>
+                <th>Engagement</th>
                 <th>Status</th>
+                <th>Winner</th>
                 <th>Edited by</th>
                 <th>Last edited</th>
                 <th>Created</th>
@@ -2188,14 +2297,26 @@ function PostsTab() {
                     post.imageUrls?.[i]?.trim() ||
                     "",
                 }));
+                const comparePreviewItems = Array.from({ length: Math.max(2, compareItems.length) })
+                  .map((_, i) => compareItems[i] ?? { label: `Option ${i + 1}`, imageUrl: "" })
+                  .slice(0, 2);
                 const editors = post.editedBy ?? [];
-                const creator: AdminPerson | null = post.authorId
+                const creatorSource = post.author ?? (post.authorId
                   ? {
                       id: post.authorId,
                       displayName: post.authorDisplayName,
-                      username: post.authorUsername ?? "unknown",
+                      username: post.authorUsername,
                       email: post.authorEmail,
                       profileImageUrl: post.authorProfileImageUrl,
+                    }
+                  : null);
+                const creator: AdminPerson | null = creatorSource
+                  ? {
+                      id: creatorSource.id,
+                      displayName: creatorSource.displayName,
+                      username: creatorSource.username ?? "unknown",
+                      email: creatorSource.email,
+                      profileImageUrl: creatorSource.profileImageUrl,
                     }
                   : null;
 
@@ -2216,51 +2337,33 @@ function PostsTab() {
                   >
                     <td className="admin-post-cell" data-label="Post">
                       <div className="admin-post-cell-main">
-                        {post.imageUrls?.[0] ? (
-                          <img
-                            src={post.imageUrls[0]}
-                            alt=""
-                            className="admin-post-thumb"
-                          />
-                        ) : (
-                          <span className="admin-post-thumb admin-post-thumb--empty">🗳</span>
-                        )}
                         <div>
                           <strong className="admin-post-caption">{preview}</strong>
                           <span className="muted small admin-post-id">
                             {post.id.slice(0, 10)}…
                           </span>
+                          <ul className="admin-post-compare-inline-list">
+                            {comparePreviewItems.map((item, i) => (
+                              <li
+                                key={`${post.id}-inline-opt-${i}`}
+                                className="admin-post-compare-inline-item"
+                              >
+                                {item.imageUrl ? (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt=""
+                                    className="admin-post-compare-inline-thumb"
+                                  />
+                                ) : (
+                                  <span className="admin-post-compare-inline-thumb admin-post-compare-inline-thumb--empty">
+                                    ?
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
-                    </td>
-                    <td
-                      className="admin-post-compare-cell"
-                      data-label="Compare"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ul className="admin-post-compare-list admin-post-compare-list--table">
-                        {compareItems.map((item, i) => (
-                          <li
-                            key={`${post.id}-opt-${i}`}
-                            className="admin-post-compare-item"
-                          >
-                            {item.imageUrl ? (
-                              <img
-                                src={item.imageUrl}
-                                alt=""
-                                className="admin-post-compare-thumb"
-                              />
-                            ) : (
-                              <span className="admin-post-compare-thumb admin-post-compare-thumb--empty">
-                                ?
-                              </span>
-                            )}
-                            <span className="admin-post-compare-label" title={item.label}>
-                              {item.label}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
                     </td>
                     <td
                       className="admin-post-person-cell"
@@ -2274,22 +2377,79 @@ function PostsTab() {
                       )}
                     </td>
                     <td data-label="Category">{post.category?.name ?? "—"}</td>
-                    <td className="admin-table-num" data-label="Votes">{votes.toLocaleString()}</td>
-                    <td className="admin-table-num" data-label="Comments">{(post.commentCount ?? 0).toLocaleString()}</td>
-                    <td className="admin-table-num" data-label="Hype">{(post.hypeCount ?? 0).toLocaleString()}</td>
-                    <td className="admin-table-num" data-label="Saves">{(post.saveCount ?? 0).toLocaleString()}</td>
+                    <td data-label="Engagement">
+                      <div className="admin-post-engagement-grid">
+                        <span className="admin-post-engagement-item">
+                          <strong>{votes.toLocaleString()}</strong>
+                          <em>Votes</em>
+                        </span>
+                        <span className="admin-post-engagement-item">
+                          <strong>{(post.commentCount ?? 0).toLocaleString()}</strong>
+                          <em>Comments</em>
+                        </span>
+                        <span className="admin-post-engagement-item">
+                          <strong>{(post.hypeCount ?? 0).toLocaleString()}</strong>
+                          <em>Hype</em>
+                        </span>
+                        <span className="admin-post-engagement-item">
+                          <strong>{(post.saveCount ?? 0).toLocaleString()}</strong>
+                          <em>Keeps</em>
+                        </span>
+                      </div>
+                    </td>
                     <td data-label="Status">
-                      <span
-                        className={`admin-user-status admin-user-status--${post.isVotingOpen ? "verified" : "unverified"}`}
-                      >
-                        {post.status ?? "published"}
-                        {post.isVotingOpen ? " · live" : " · closed"}
-                      </span>
+                      <div className="admin-post-status-chips">
+                        <span className={`admin-post-status-chip admin-post-status-chip--${(post.status ?? "PUBLISHED").toLowerCase()}`}>
+                          {post.status ?? "PUBLISHED"}
+                        </span>
+                        <span className={`admin-post-status-chip admin-post-status-chip--${post.isVotingOpen ? "live" : "closed"}`}>
+                          {post.isVotingOpen ? "Live" : "Closed"}
+                        </span>
+                      </div>
                       {post.votingEndsAt ? (
                         <span className="muted small admin-post-ends">
                           Ends {formatRelativeTime(post.votingEndsAt)}
                         </span>
                       ) : null}
+                      {post.isPrizeClaimed ? (
+                        <span className="muted small admin-post-ends">
+                          Prize claimed {post.votePrizeClaimedAt ? `· ${formatRelativeTime(post.votePrizeClaimedAt)}` : ""}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td
+                      className="admin-post-person-cell"
+                      data-label="Winner"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {post.voteWinner?.user ? (
+                        <NavLink
+                          to={`/profile/${post.voteWinner.user.id}`}
+                          className="admin-post-winner-link"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Open winner profile"
+                        >
+                          {post.voteWinner.user.profileImageUrl ? (
+                            <img
+                              src={post.voteWinner.user.profileImageUrl}
+                              alt=""
+                              className="admin-post-winner-avatar"
+                            />
+                          ) : (
+                            <span className="admin-post-winner-avatar admin-post-winner-avatar--fallback">
+                              {(post.voteWinner.user.displayName?.trim() ||
+                                post.voteWinner.user.username ||
+                                "W")[0]!.toUpperCase()}
+                            </span>
+                          )}
+                          <span className="muted small">
+                            {post.voteWinner.user.displayName?.trim() ||
+                              `@${post.voteWinner.user.username ?? "user"}`}
+                          </span>
+                        </NavLink>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td
                       className="admin-post-editors-cell"
@@ -2334,9 +2494,13 @@ function PostsTab() {
                       )}
                     </td>
                     <td className="admin-table-joined" data-label="Created">
-                      {formatJoinedAt(post.createdAt)}
+                      <span className="admin-post-created-badge">
+                        {formatJoinedAt(post.createdAt)}
+                      </span>
                       {post.scheduledAt ? (
-                        <span className="muted small">Scheduled</span>
+                        <span className="admin-post-created-badge admin-post-created-badge--scheduled">
+                          Scheduled
+                        </span>
                       ) : null}
                     </td>
                     <td
@@ -2357,6 +2521,17 @@ function PostsTab() {
                         onClick={() => setEditingPost(post)}
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-link-btn admin-link-btn--danger"
+                        disabled={deletingPost}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(post);
+                        }}
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -2389,7 +2564,9 @@ function PostsTab() {
             imageUrls: editingPost.imageUrls ?? [],
             options: editingPost.options,
             category: editingPost.category,
+            campaign: editingPost.campaign,
             votingEndsAt: editingPost.votingEndsAt,
+            endingSoonLeadMinutes: editingPost.endingSoonLeadMinutes,
             isVotingOpen: editingPost.isVotingOpen,
           }}
           onClose={() => setEditingPost(null)}
@@ -2397,6 +2574,15 @@ function PostsTab() {
             setEditingPost(null);
             void refetch();
           }}
+        />
+      ) : null}
+      {deleteTarget ? (
+        <ConfirmDialog
+          message={`Delete this post "${(deleteTarget.caption?.trim() || "Untitled post").slice(0, 80)}"? This cannot be undone.`}
+          confirmLabel="Delete post"
+          onConfirm={() => void handleDeletePost(deleteTarget)}
+          onCancel={() => setDeleteTarget(null)}
+          loading={deletingPost}
         />
       ) : null}
     </div>

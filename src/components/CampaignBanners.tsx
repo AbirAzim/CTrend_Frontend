@@ -76,6 +76,9 @@ export function CampaignBanners() {
 
   return (
     <div className="cb-strip">
+      <div className="cb-strip-head">
+        <p className="cb-strip-title">Explore campaigns</p>
+      </div>
       {campaigns.map((c) => (
         <CampaignCard key={c.id} campaign={c} />
       ))}

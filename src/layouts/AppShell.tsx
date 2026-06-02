@@ -65,6 +65,7 @@ export function AppShell() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
   const mobileShell = useMobileShell();
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
@@ -161,8 +162,15 @@ export function AppShell() {
   useEffect(() => {
     window.scrollTo(0, 0);
     lastYRef.current = 0;
+    setNavHidden(false);
     setTopbarHidden(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (mobileShell && messengerOpen) {
+      setNavHidden(false);
+    }
+  }, [mobileShell, messengerOpen]);
 
   useEffect(() => {
     lastYRef.current = window.scrollY;
@@ -179,13 +187,16 @@ export function AppShell() {
         }
         lastYRef.current = y;
         if (y < 60) {
+          setNavHidden(false);
           setTopbarHidden(false);
           return;
         }
         if (delta > 0) {
-          setTopbarHidden(false);
+          setNavHidden(!(mobileShell && messengerOpen));
+          setTopbarHidden(true);
         } else {
-          if (!mobileShell) setTopbarHidden(true);
+          setNavHidden(false);
+          setTopbarHidden(false);
         }
       });
     }
@@ -197,7 +208,7 @@ export function AppShell() {
         scrollRafRef.current = null;
       }
     };
-  }, [mobileShell]);
+  }, [mobileShell, messengerOpen]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -282,7 +293,7 @@ export function AppShell() {
       <MessengerPanel />
 
       <nav
-        className={`ig-bottom-nav ig-bottom-nav--${isAdmin ? "six" : "five"}`}
+        className={`ig-bottom-nav ig-bottom-nav--${isAdmin ? "six" : "five"}${navHidden ? " ig-bottom-nav--hidden" : ""}`}
         aria-label="Main"
       >
         <Link

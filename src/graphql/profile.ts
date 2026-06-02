@@ -55,6 +55,19 @@ export const MY_VOTED_POSTS = gql`
       viewerHasSaved
       votingEndsAt
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+      voteWinner {
+        selectedOptionIndex
+        pickedAt
+        user {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       options {
         label
       }
@@ -86,10 +99,28 @@ export const USER_POSTS = gql`
       viewerHasSaved
       votingEndsAt
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+      voteWinner {
+        selectedOptionIndex
+        pickedAt
+        user {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       options {
         label
       }
       category {
+        id
+        name
+        slug
+      }
+      campaign {
         id
         name
         slug

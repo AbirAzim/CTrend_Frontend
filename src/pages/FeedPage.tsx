@@ -1,6 +1,6 @@
 import { useApolloClient, useLazyQuery, useMutation, useQuery, useSubscription } from "@apollo/client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "../graphql/feed";
 import {
@@ -22,12 +22,18 @@ import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import type { FeedPostView } from "../types/feed";
 import { CampaignBanners } from "../components/CampaignBanners";
+import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
 type FriendRow = {
   id: string;
   username?: string | null;
   displayName?: string | null;
   email?: string | null;
   profileImageUrl?: string | null;
+};
+type CampaignFilterRow = {
+  id: string;
+  name: string;
+  isDefault?: boolean | null;
 };
 
 function friendName(f: FriendRow): string {
@@ -83,6 +89,8 @@ function rotateSlice<T>(items: T[], offset: number, limit: number): T[] {
 }
 
 export function FeedPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCampaignId = searchParams.get("campaign")?.trim() || "";
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
   const { isAuthenticated } = useAuth();
   const { onlineUserIds } = useMessenger();
@@ -96,6 +104,9 @@ export function FeedPage() {
   >(null);
   const [modalSearch, setModalSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(8);
+  const [isCampaignFilterOpen, setIsCampaignFilterOpen] = useState(false);
+  const [isCampaignFilterDockVisible, setIsCampaignFilterDockVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [isWideScreen, setIsWideScreen] = useState(() =>
     typeof window === "undefined"
@@ -104,6 +115,7 @@ export function FeedPage() {
   );
 
   const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
+    variables: { campaignId: activeCampaignId || null },
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
     // 20-second poll fallback so feed stays fresh even when the WS subscription
@@ -112,6 +124,13 @@ export function FeedPage() {
     // updates write to.
     pollInterval: 20_000,
   });
+  const { data: campaignsData } = useQuery<{ activeCampaigns: CampaignFilterRow[] }>(
+    ACTIVE_CAMPAIGNS,
+    {
+      skip: useMockFeed,
+      fetchPolicy: "cache-and-network",
+    },
+  );
   const {
     data: friendsData,
     loading: friendsLoading,
@@ -250,6 +269,14 @@ export function FeedPage() {
       };
     });
   }, [me, friends, suggestions, requestedMe, requestedByMe, postsRaw]);
+  const campaignFilters = useMemo(() => {
+    const items = campaignsData?.activeCampaigns ?? [];
+    return [...items].sort((a, b) => {
+      if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [campaignsData?.activeCampaigns]);
+  const activeCampaign = campaignFilters.find((c) => c.id === activeCampaignId) ?? null;
 
   const visiblePosts = useMemo(
     () => posts.slice(0, visibleCount),
@@ -275,6 +302,8 @@ export function FeedPage() {
         .then(({ data: postData }) => {
           const gqlPost = postData?.getPostById;
           if (!gqlPost) return;
+          const postCampaignId = gqlPost.campaign?.id ?? "";
+          if (activeCampaignId && postCampaignId !== activeCampaignId) return;
           setLiveQueue((prev) => {
             if (prev.some((p) => p.id === postId)) return prev;
             return [mapGqlPostToFeedView(gqlPost), ...prev];
@@ -321,6 +350,28 @@ export function FeedPage() {
   useEffect(() => {
     setVisibleCount((prev) => Math.min(Math.max(8, prev), Math.max(8, posts.length)));
   }, [posts.length]);
+
+  useEffect(() => {
+    setLiveQueue([]);
+    setRemovedIds(new Set());
+    setVisibleCount(8);
+  }, [activeCampaignId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function handleScroll() {
+      const currentY = window.scrollY;
+      const scrollingDown = currentY > lastScrollYRef.current + 6;
+      if (scrollingDown) {
+        setIsCampaignFilterOpen(false);
+      }
+      // Keep filter dock only near top; hide it once user scrolls down.
+      setIsCampaignFilterDockVisible(currentY < 96);
+      lastScrollYRef.current = currentY;
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -394,6 +445,13 @@ export function FeedPage() {
     }
   }
 
+  function setCampaignFilter(campaignId: string) {
+    const next = new URLSearchParams(searchParams);
+    if (campaignId) next.set("campaign", campaignId);
+    else next.delete("campaign");
+    setSearchParams(next, { replace: true });
+  }
+
   return (
     <div className="cx-feed-layout">
       {isWideScreen ? (
@@ -447,6 +505,69 @@ export function FeedPage() {
 
       <div className="ig-feed">
         <CampaignBanners />
+        {!useMockFeed && campaignFilters.length > 0 && isCampaignFilterDockVisible ? (
+          <div className="cx-campaign-filter-dock">
+            <button
+              type="button"
+              className={`cx-campaign-filter-toggle${isCampaignFilterOpen ? " cx-campaign-filter-toggle--active" : ""}`}
+              aria-expanded={isCampaignFilterOpen}
+              onClick={() => setIsCampaignFilterOpen((prev) => !prev)}
+            >
+              <span className="cx-campaign-filter-toggle-kicker">Filter feed</span>
+              <span className="cx-campaign-filter-toggle-value">
+                {activeCampaign ? activeCampaign.name : "All compares"}
+              </span>
+            </button>
+            {isCampaignFilterOpen ? (
+              <div className="cx-campaign-filter-shell">
+                <div className="cx-campaign-filter-head">
+                  <p className="cx-campaign-filter-title">Filter feed</p>
+                  {activeCampaign ? (
+                    <button
+                      type="button"
+                      className="cx-campaign-filter-clear"
+                      onClick={() => setCampaignFilter("")}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <div className="cx-campaign-filter-bar" aria-label="Filter posts by campaign">
+                  <button
+                    type="button"
+                    className={`cx-campaign-filter-chip${!activeCampaignId ? " cx-campaign-filter-chip--active" : ""}`}
+                    onClick={() => setCampaignFilter("")}
+                  >
+                    All compares
+                  </button>
+                  {campaignFilters.map((campaign) => (
+                    <button
+                      key={campaign.id}
+                      type="button"
+                      className={`cx-campaign-filter-chip${activeCampaignId === campaign.id ? " cx-campaign-filter-chip--active" : ""}${campaign.isDefault ? " cx-campaign-filter-chip--default" : ""}`}
+                      onClick={() => setCampaignFilter(campaign.id)}
+                    >
+                      {campaign.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="cx-campaign-filter-help muted small">
+                  Pick one campaign to focus the feed instantly.
+                </p>
+                {activeCampaign ? (
+                  <p className="cx-campaign-filter-note muted small">
+                    Showing <strong>{activeCampaign.name}</strong> posts now.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {activeCampaign ? (
+              <p className="cx-campaign-filter-current muted small">
+                Active: <strong>{activeCampaign.name}</strong>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {loading && !data && !useMockFeed && (
           <p className="ig-feed-status">Loading feed…</p>

@@ -17,8 +17,9 @@ import {
   isResolvedFriendRequest,
 } from "../lib/friendRequestNotification";
 import { IconArchive, IconMarkRead } from "./IgIcons";
-import { MODERATOR_BRAND_NAME } from "../lib/moderatorBrand";
+import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME, PLATFORM_BRAND_LOGO_URL } from "../lib/moderatorBrand";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { CLAIM_POST_VOTE_PRIZE } from "../graphql/feed";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -43,12 +44,25 @@ function typeIcon(type: string, referenceType?: string | null): string {
     case "POST_COMMENT":     return "💭";
     case "COMMENT_REPLY":    return "↩️";
     case "COMMENT_REACTION": return "😊";
+    case "VOTE_ENDED":       return "⏱️";
+    case "VOTE_WINNER":      return "🏆";
+    case "VOTE_PRIZE_CLAIMED": return "🎁";
     default:                 return "🔔";
   }
 }
 
 function isOfficialAdminMessage(n: NotificationItem): boolean {
   return n.type === "MESSAGE" && n.referenceType === "moderator_conversation";
+}
+
+function isSystemGeneratedNotification(n: NotificationItem): boolean {
+  return (
+    n.type === "ANNOUNCEMENT" ||
+    n.type === "VOTE_ENDED" ||
+    n.type === "VOTE_WINNER" ||
+    n.type === "VOTE_PRIZE_CLAIMED" ||
+    n.type === "SYSTEM"
+  );
 }
 
 function notificationTitle(n: NotificationItem): string {
@@ -97,6 +111,7 @@ export function NotificationBell() {
   const [respondFriendMut] = useMutation(RESPOND_FRIEND_REQUEST, {
     refetchQueries: [...FRIEND_SOCIAL_REFETCH_QUERIES],
   });
+  const [claimPrizeMut] = useMutation(CLAIM_POST_VOTE_PRIZE);
 
   useEffect(() => {
     if (!open) return;
@@ -171,6 +186,10 @@ export function NotificationBell() {
       navigate(`/post/${n.postId}#comment-${n.commentId}`);
       return;
     }
+    if (n.type === "ANNOUNCEMENT" && (n.postId || n.referenceId)) {
+      navigate(`/post/${n.postId ?? n.referenceId}`);
+      return;
+    }
     if (n.postId) {
       navigate(`/post/${n.postId}`);
       return;
@@ -197,7 +216,6 @@ export function NotificationBell() {
       navigate(`/profile/${n.referenceId}`);
       return;
     }
-    // ANNOUNCEMENT (admin broadcast / campaign) — no navigation
   }
 
   async function handleAcceptRequest(n: NotificationItem, e: React.MouseEvent) {
@@ -251,6 +269,26 @@ export function NotificationBell() {
     if (!n.read) markRead(n.id);
   }
 
+  async function handleClaimPrize(n: NotificationItem, e: React.MouseEvent) {
+    e.stopPropagation();
+    const postId = n.postId ?? n.referenceId;
+    if (!postId) return;
+    setActionLoading(n.id, true);
+    try {
+      await claimPrizeMut({ variables: { postId } });
+      updateNotification(n.id, {
+        read: true,
+        title: "Prize claim submitted",
+        body: "Your claim is received. A moderator will connect with you soon.",
+      });
+      markRead(n.id);
+    } catch {
+      // keep notification unchanged; user can retry
+    } finally {
+      setActionLoading(n.id, false);
+    }
+  }
+
   function handleArchive(n: NotificationItem, e: React.MouseEvent) {
     e.stopPropagation();
     archiveNotification(n.id);
@@ -298,14 +336,27 @@ export function NotificationBell() {
                   isPendingFriendRequestNotification(n) &&
                   !alreadyFriends &&
                   Boolean(n.referenceId);
+                const canClaimPrize =
+                  n.type === "VOTE_WINNER" &&
+                  n.title.trim() !== "Prize claim submitted" &&
+                  !n.body.toLowerCase().includes("claim is received") &&
+                  Boolean(n.postId || n.referenceId);
                 const hideVoteActor =
                   n.type === "POST_VOTE" &&
                   (!n.latestActorId ||
                     n.latestActorName === "Someone" ||
                     !n.latestActorAvatar?.trim());
+                const isPlatformAnnouncement =
+                  n.type === "ANNOUNCEMENT" &&
+                  (n.latestActorName === MODERATOR_PLATFORM_NAME ||
+                    n.title.includes(MODERATOR_PLATFORM_NAME));
+                const useBrandLogoAvatar =
+                  isPlatformAnnouncement || isSystemGeneratedNotification(n);
                 const avatarUrl = hideVoteActor
                   ? null
-                  : normalizeProfileImageUrl(n.latestActorAvatar);
+                  : useBrandLogoAvatar
+                    ? PLATFORM_BRAND_LOGO_URL
+                    : normalizeProfileImageUrl(n.latestActorAvatar);
                 return (
                   <li
                     key={n.id}
@@ -373,6 +424,18 @@ export function NotificationBell() {
                             onClick={(e) => void handleRejectRequest(n, e)}
                           >
                             Reject
+                          </button>
+                        </div>
+                      ) : null}
+                      {canClaimPrize ? (
+                        <div className="nb-item-actions">
+                          <button
+                            type="button"
+                            className="nb-action-btn nb-action-btn--accept"
+                            disabled={isLoading}
+                            onClick={(e) => void handleClaimPrize(n, e)}
+                          >
+                            {isLoading ? "…" : "Claim prize"}
                           </button>
                         </div>
                       ) : null}

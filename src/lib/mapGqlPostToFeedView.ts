@@ -32,7 +32,11 @@ export function mapGqlPostToFeedView(p: {
   caption?: string | null;
   createdAt?: string | null;
   votingEndsAt?: string | null;
+  endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
   hypeCount?: number;
@@ -61,9 +65,31 @@ export function mapGqlPostToFeedView(p: {
     count: number;
     percentage: number;
   }> | null;
-  options?: Array<{ label: string }> | null;
+  options?: Array<{
+    label: string;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }> | null;
   status?: string | null;
   scheduledAt?: string | null;
+  campaign?: {
+    id: string;
+    name: string;
+    slug: string;
+    bannerText?: string | null;
+    bannerImageUrl?: string | null;
+    prizePerWinner: number;
+  } | null;
+  voteWinner?: {
+    selectedOptionIndex?: number | null;
+    pickedAt?: string | null;
+    user?: {
+      id: string;
+      username: string;
+      displayName?: string | null;
+      profileImageUrl?: string | null;
+    } | null;
+  } | null;
 }): FeedPostView {
   const imageUrls = (p.imageUrls ?? []).filter(
     (u) => typeof u === "string" && u.trim().length > 0,
@@ -77,7 +103,11 @@ export function mapGqlPostToFeedView(p: {
       }))
     : null;
   const postOptions =
-    p.options?.map((o) => ({ label: o.label })) ?? null;
+    p.options?.map((o) => ({
+      label: o.label,
+      imageFocalX: o.imageFocalX ?? null,
+      imageFocalY: o.imageFocalY ?? null,
+    })) ?? null;
   const rawType = p.type?.toLowerCase();
   const postType =
     rawType === "system" || rawType === "org" || rawType === "user"
@@ -94,10 +124,20 @@ export function mapGqlPostToFeedView(p: {
     caption: p.caption ?? null,
     createdAt: p.createdAt ?? null,
     votingEndsAt: p.votingEndsAt ?? null,
+    endingSoonLeadMinutes: p.endingSoonLeadMinutes ?? 5,
     isVotingOpen:
       p.isVotingOpen === undefined || p.isVotingOpen === null
         ? null
         : p.isVotingOpen,
+    isPrizeClaimed:
+      p.isPrizeClaimed === undefined || p.isPrizeClaimed === null
+        ? null
+        : p.isPrizeClaimed,
+    votePrizeClaimedAt: p.votePrizeClaimedAt ?? null,
+    canClaimPrize:
+      p.canClaimPrize === undefined || p.canClaimPrize === null
+        ? null
+        : p.canClaimPrize,
     upvoteCount: p.upvoteCount,
     downvoteCount: p.downvoteCount,
     hypeCount: p.hypeCount ?? 0,
@@ -117,5 +157,22 @@ export function mapGqlPostToFeedView(p: {
     optionStats,
     postOptions,
     compareOptionLabels: null,
+    campaign: p.campaign
+      ? {
+          id: p.campaign.id,
+          name: p.campaign.name,
+          slug: p.campaign.slug,
+          bannerText: p.campaign.bannerText ?? null,
+          bannerImageUrl: p.campaign.bannerImageUrl ?? null,
+          prizePerWinner: p.campaign.prizePerWinner,
+        }
+      : null,
+    voteWinner: p.voteWinner?.user
+      ? {
+          selectedOptionIndex: p.voteWinner.selectedOptionIndex ?? null,
+          pickedAt: p.voteWinner.pickedAt ?? null,
+          user: p.voteWinner.user,
+        }
+      : null,
   };
 }
