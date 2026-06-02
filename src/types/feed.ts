@@ -25,7 +25,11 @@ export type FeedPostView = {
   caption: string | null;
   createdAt: string | null;
   votingEndsAt?: string | null;
+  endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
   hypeCount?: number;
@@ -55,9 +59,15 @@ export type FeedPostView = {
   /** Per-option counts/percentages from API when present. */
   optionStats?: VoteOptionStatView[] | null;
   /** Option titles from API `options` (same order as voting indices / compare columns). */
-  postOptions?: { label: string }[] | null;
+  postOptions?: {
+    label: string;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  campaign?: FeedPostCampaignView | null;
+  voteWinner?: FeedPostVoteWinnerView | null;
 };
 
 export type VoteOptionStatView = {
@@ -65,6 +75,26 @@ export type VoteOptionStatView = {
   label: string;
   count: number;
   percentage: number;
+};
+
+export type FeedPostCampaignView = {
+  id: string;
+  name: string;
+  slug: string;
+  bannerText?: string | null;
+  bannerImageUrl?: string | null;
+  prizePerWinner: number;
+};
+
+export type FeedPostVoteWinnerView = {
+  selectedOptionIndex?: number | null;
+  pickedAt?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
 };
 
 export type VoteDirectionGql = "UP" | "DOWN" | "NONE";

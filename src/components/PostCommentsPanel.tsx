@@ -71,6 +71,14 @@ function commentAvatarSrc(author: CommentAuthor): string | null {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=312e81&color=ffffff&size=96&format=png`;
 }
 
+const DEFAULT_COMMENT_REACTION = COMMENT_REACTION_EMOJIS[0];
+
+function reactionSummary(reactions: CommentRow["reactions"]) {
+  const total = reactions.reduce((sum, r) => sum + r.count, 0);
+  const top = [...reactions].sort((a, b) => b.count - a.count).slice(0, 3);
+  return { total, top };
+}
+
 function buildThreads(comments: CommentRow[]) {
   const topLevel = comments.filter((c) => !c.parentId);
   const repliesByParent = new Map<string, CommentRow[]>();
@@ -211,91 +219,132 @@ function CommentItem({
   const name = commentDisplayName(row.author);
   const pickerOpen = reactionOpenId === row.id;
   const replyOpen = replyTargetId === row.id;
+  const hidePickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { total: reactionTotal, top: topReactions } = reactionSummary(row.reactions);
+
+  function openPicker() {
+    if (hidePickerTimer.current) {
+      clearTimeout(hidePickerTimer.current);
+      hidePickerTimer.current = null;
+    }
+    setReactionOpenId(row.id);
+  }
+
+  function scheduleClosePicker() {
+    if (hidePickerTimer.current) clearTimeout(hidePickerTimer.current);
+    hidePickerTimer.current = setTimeout(() => setReactionOpenId(null), 220);
+  }
+
+  function handleQuickLike() {
+    if (!isAuthenticated) return;
+    if (row.viewerReaction) {
+      onPickReaction(row.id, null);
+      return;
+    }
+    onPickReaction(row.id, DEFAULT_COMMENT_REACTION);
+  }
+
+  function handlePickEmoji(emoji: string) {
+    onPickReaction(row.id, row.viewerReaction === emoji ? null : emoji);
+    setReactionOpenId(null);
+  }
+
+  const likeLabel = row.viewerReaction ?? "Like";
 
   return (
     <article
       id={`comment-${row.id}`}
-      className={`cx-comment-row cx-discuss-comment${isReply ? " cx-comment-row--reply" : ""}${row.viewerReaction ? " cx-discuss-comment--reacted" : ""}`}
+      className={`cx-comment-row cx-discuss-comment cx-fb-comment${isReply ? " cx-comment-row--reply" : ""}${row.viewerReaction ? " cx-discuss-comment--reacted" : ""}`}
     >
       <CommentAvatar author={row.author} />
-      <div className="cx-comment-main cx-discuss-comment-body">
-        <header className="cx-discuss-comment-head">
-          <Link to={`/profile/${row.author.id}`} className="cx-comment-author">
-            {name}
-          </Link>
-          <time className="cx-discuss-comment-time" dateTime={row.createdAt}>
-            {formatRelativeTime(row.createdAt) || "just now"}
-          </time>
-        </header>
-        <p className="cx-comment-body">{row.content}</p>
-
-        {row.reactions.length > 0 ? (
-          <div className="cx-discuss-reaction-strip" aria-label="Reactions">
-            {row.reactions.map((r) => (
-              <button
-                key={r.emoji}
-                type="button"
-                className={`cx-discuss-reaction-chip${row.viewerReaction === r.emoji ? " cx-discuss-reaction-chip--mine" : ""}`}
-                disabled={!isAuthenticated}
-                onClick={() =>
-                  onPickReaction(row.id, row.viewerReaction === r.emoji ? null : r.emoji)
-                }
-              >
-                <span aria-hidden>{r.emoji}</span>
-                <span>{r.count}</span>
-              </button>
-            ))}
+      <div className="cx-comment-main cx-discuss-comment-body cx-fb-comment-col">
+        <div className="cx-fb-bubble">
+          <div className="cx-fb-bubble-inner">
+            <Link to={`/profile/${row.author.id}`} className="cx-fb-bubble-author">
+              {name}
+            </Link>
+            <p className="cx-comment-body cx-fb-bubble-text">{row.content}</p>
           </div>
-        ) : null}
-
-        <div className="cx-discuss-comment-actions">
-          {isAuthenticated ? (
-            <>
-              <button
-                type="button"
-                className={`cx-discuss-action-link${pickerOpen ? " cx-discuss-action-link--active" : ""}${row.viewerReaction ? " cx-discuss-action-link--reacted" : ""}`}
-                aria-expanded={pickerOpen}
-                onClick={() => setReactionOpenId(pickerOpen ? null : row.id)}
-              >
-                {row.viewerReaction ? `${row.viewerReaction} Reacted` : "React"}
-              </button>
-              {!isReply ? (
-                <button
-                  type="button"
-                  className={`cx-discuss-action-link${replyOpen ? " cx-discuss-action-link--active" : ""}`}
-                  aria-expanded={replyOpen}
-                  onClick={() => {
-                    setReplyTargetId(replyOpen ? null : row.id);
-                    setReplyDraft("");
-                  }}
-                >
-                  Reply
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <span className="cx-discuss-signin-hint muted small">Sign in to react or reply</span>
-          )}
+          {reactionTotal > 0 ? (
+            <button
+              type="button"
+              className="cx-fb-bubble-reactions"
+              disabled={!isAuthenticated}
+              aria-label={`${reactionTotal} reactions`}
+              onClick={() => {
+                if (!isAuthenticated) return;
+                openPicker();
+              }}
+            >
+              <span className="cx-fb-bubble-reaction-emojis" aria-hidden>
+                {topReactions.map((r) => (
+                  <span key={r.emoji} className="cx-fb-bubble-reaction-emoji">
+                    {r.emoji}
+                  </span>
+                ))}
+              </span>
+              <span className="cx-fb-bubble-reaction-count">{reactionTotal}</span>
+            </button>
+          ) : null}
         </div>
 
-        {pickerOpen && isAuthenticated ? (
-          <div className="cx-comment-reaction-picker cx-discuss-reaction-picker" role="listbox" aria-label="Pick a reaction">
-            {COMMENT_REACTION_EMOJIS.map((emoji) => (
+        <div className="cx-fb-comment-meta">
+          {isAuthenticated ? (
+            <div
+              className="cx-fb-react-anchor"
+              onMouseEnter={openPicker}
+              onMouseLeave={scheduleClosePicker}
+            >
+              {pickerOpen ? (
+                <div
+                  className="cx-fb-reaction-tray"
+                  role="listbox"
+                  aria-label="Pick a reaction"
+                  onMouseEnter={openPicker}
+                  onMouseLeave={scheduleClosePicker}
+                >
+                  {COMMENT_REACTION_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className={`cx-fb-reaction-tray-btn${row.viewerReaction === emoji ? " cx-fb-reaction-tray-btn--active" : ""}`}
+                      aria-label={`React ${emoji}`}
+                      onClick={() => handlePickEmoji(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <button
-                key={emoji}
                 type="button"
-                className={`cx-comment-reaction-choice${row.viewerReaction === emoji ? " cx-comment-reaction-choice--active" : ""}`}
-                aria-label={`React ${emoji}`}
-                onClick={() => {
-                  onPickReaction(row.id, row.viewerReaction === emoji ? null : emoji);
-                  setReactionOpenId(null);
-                }}
+                className={`cx-fb-meta-btn${row.viewerReaction ? " cx-fb-meta-btn--active" : ""}`}
+                aria-expanded={pickerOpen}
+                onClick={handleQuickLike}
               >
-                {emoji}
+                {likeLabel}
               </button>
-            ))}
-          </div>
-        ) : null}
+            </div>
+          ) : (
+            <span className="cx-discuss-signin-hint muted small">Sign in to react</span>
+          )}
+          {!isReply && isAuthenticated ? (
+            <button
+              type="button"
+              className={`cx-fb-meta-btn${replyOpen ? " cx-fb-meta-btn--active" : ""}`}
+              aria-expanded={replyOpen}
+              onClick={() => {
+                setReplyTargetId(replyOpen ? null : row.id);
+                setReplyDraft("");
+              }}
+            >
+              Reply
+            </button>
+          ) : null}
+          <time className="cx-fb-meta-time" dateTime={row.createdAt}>
+            {formatRelativeTime(row.createdAt) || "just now"}
+          </time>
+        </div>
 
         {replyOpen && isAuthenticated ? (
           <form

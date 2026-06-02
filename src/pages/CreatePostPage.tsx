@@ -1,17 +1,22 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { CREATE_SYSTEM_POST } from "../graphql/admin";
+import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
 import { useAuth } from "../context/AuthContext";
+import { ImagePositionEditor } from "../components/ImagePositionEditor";
+import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
 
 type DraftCompareItem = {
   id: string;
   imageUrl: string;
   title: string;
+  imageFocalX: number;
+  imageFocalY: number;
   localPreview?: string;
 };
 
@@ -59,21 +64,27 @@ export function CreatePostPage() {
   const [votingEndEnabled, setVotingEndEnabled] = useState(false);
   const [postType, setPostType] = useState<"regular" | "system">("regular");
   const [items, setItems] = useState<DraftCompareItem[]>([
-    { id: "1", imageUrl: "", title: "" },
-    { id: "2", imageUrl: "", title: "" },
+    { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
+    { id: "2", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
   ]);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [positionEditId, setPositionEditId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [campaignId, setCampaignId] = useState("");
 
   async function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
     // Show local preview immediately so user sees feedback before upload finishes
     const localPreview = URL.createObjectURL(file);
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, localPreview } : it)),
+      prev.map((it) =>
+        it.id === id
+          ? { ...it, localPreview, imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL }
+          : it,
+      ),
     );
     setUploadingId(id);
     setError(null);
@@ -113,6 +124,26 @@ export function CreatePostPage() {
       errorPolicy: "all",
     });
 
+  const { data: activeCampaignsData } = useQuery<{ activeCampaigns: Array<{ id: string; name: string; slug: string; isActive?: boolean; isDefault?: boolean | null }> }>(
+    ACTIVE_CAMPAIGNS,
+    { fetchPolicy: "cache-first", errorPolicy: "all" },
+  );
+  const { data: adminCampaignsData } = useQuery<{ campaigns: Array<{ id: string; name: string; slug: string; isActive: boolean; isDefault?: boolean | null }> }>(
+    CAMPAIGNS_ADMIN,
+    { skip: !isAdmin, fetchPolicy: "cache-first", errorPolicy: "all" },
+  );
+
+  const campaignOptions = useMemo(() => {
+    const raw = isAdmin
+      ? (adminCampaignsData?.campaigns ?? [])
+      : (activeCampaignsData?.activeCampaigns ?? []);
+    return [...raw].sort((a, b) => {
+      if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
+      if (isAdmin && !!a.isActive !== !!b.isActive) return a.isActive ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [isAdmin, adminCampaignsData?.campaigns, activeCampaignsData?.activeCampaigns]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -151,10 +182,14 @@ export function CreatePostPage() {
     }
 
     const imageUrls = normalized.map((it) => it.imageUrl);
-    const options = normalized.map((it, idx) => ({
-      label: it.title || `Option ${idx + 1}`,
-      imageUrl: it.imageUrl,
-    }));
+    const options = items
+      .filter((it) => it.imageUrl.trim().length > 0)
+      .map((it, idx) => ({
+        label: it.title.trim() || `Option ${idx + 1}`,
+        imageUrl: it.imageUrl.trim(),
+        imageFocalX: it.imageFocalX,
+        imageFocalY: it.imageFocalY,
+      }));
 
     // Validate schedule time if enabled
     const scheduledAtIso = scheduleEnabled ? localInputToUtcIso(scheduledAt) : null;
@@ -172,11 +207,12 @@ export function CreatePostPage() {
     const input: {
       categoryId: string;
       imageUrls: string[];
-      options: Array<{ label: string; imageUrl: string }>;
+      options: Array<{ label: string; imageUrl: string; imageFocalX: number; imageFocalY: number }>;
       votingEndsAt?: string;
       scheduledAt?: string;
       contentText?: string;
       caption?: string;
+      campaignId?: string;
     } = {
       categoryId: category,
       imageUrls,
@@ -192,6 +228,10 @@ export function CreatePostPage() {
     }
     if (scheduledAtIso) {
       input.scheduledAt = scheduledAtIso;
+    }
+    const pickedCampaign = campaignId.trim();
+    if (pickedCampaign) {
+      input.campaignId = pickedCampaign;
     }
 
     try {
@@ -210,11 +250,12 @@ export function CreatePostPage() {
         setCaption("");
         setCategoryId("");
         setVotingEndsAt("");
+        setCampaignId("");
         setScheduledAt("");
         setScheduleEnabled(false);
         setItems([
-          { id: "1", imageUrl: "", title: "" },
-          { id: "2", imageUrl: "", title: "" },
+          { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
+          { id: "2", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
         ]);
         setTimeout(() => setSuccessToast(null), 5000);
         return;
@@ -244,7 +285,13 @@ export function CreatePostPage() {
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { id: String(Date.now()), imageUrl: "", title: "" },
+      {
+        id: String(Date.now()),
+        imageUrl: "",
+        title: "",
+        imageFocalX: DEFAULT_IMAGE_FOCAL,
+        imageFocalY: DEFAULT_IMAGE_FOCAL,
+      },
     ]);
   }
 
@@ -259,9 +306,24 @@ export function CreatePostPage() {
 
   function updateItem(id: string, key: "imageUrl" | "title", value: string) {
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, [key]: value } : it)),
+      prev.map((it) => {
+        if (it.id !== id) return it;
+        if (key === "imageUrl" && value.trim() !== it.imageUrl.trim()) {
+          return {
+            ...it,
+            imageUrl: value,
+            imageFocalX: DEFAULT_IMAGE_FOCAL,
+            imageFocalY: DEFAULT_IMAGE_FOCAL,
+          };
+        }
+        return { ...it, [key]: value };
+      }),
     );
   }
+
+  const positionEditItem = positionEditId
+    ? items.find((it) => it.id === positionEditId)
+    : null;
 
   const LABELS = ["A", "B", "C", "D"];
 
@@ -322,31 +384,60 @@ export function CreatePostPage() {
                     void handleFileChange(item.id, ev.target.files?.[0])
                   }
                 />
-                <button
-                  type="button"
-                  className={`ig-compare-zone${item.imageUrl || item.localPreview ? " ig-compare-zone--filled" : ""}`}
-                  style={item.imageUrl || item.localPreview
-                    ? { backgroundImage: `url(${item.imageUrl || item.localPreview})` }
-                    : undefined}
-                  onClick={() => fileInputRefs.current[item.id]?.click()}
-                  disabled={uploadingId === item.id}
-                  aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
+                <div
+                  className={`ig-compare-zone-wrap${item.imageUrl || item.localPreview ? " ig-compare-zone-wrap--filled" : ""}`}
                 >
-                  {uploadingId === item.id ? (
-                    <span className="ig-compare-zone-uploading">
-                      <span className="ig-compare-spinner" />
-                      Uploading…
-                    </span>
-                  ) : item.imageUrl ? (
-                    <span className="ig-compare-zone-change">Change</span>
-                  ) : (
-                    <span className="ig-compare-zone-empty">
-                      <span className="ig-compare-zone-icon">↑</span>
-                      <span className="ig-compare-zone-label">Option {LABELS[idx] ?? idx + 1}</span>
-                      <span className="ig-compare-zone-hint">Tap to add</span>
-                    </span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    className={`ig-compare-zone${item.imageUrl || item.localPreview ? " ig-compare-zone--filled" : ""}`}
+                    style={
+                      item.imageUrl || item.localPreview
+                        ? {
+                            backgroundImage: `url(${item.imageUrl || item.localPreview})`,
+                            backgroundPosition: imageObjectPosition(
+                              item.imageFocalX,
+                              item.imageFocalY,
+                            ),
+                          }
+                        : undefined
+                    }
+                    onClick={() => fileInputRefs.current[item.id]?.click()}
+                    disabled={uploadingId === item.id}
+                    aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
+                  >
+                    {uploadingId === item.id ? (
+                      <span className="ig-compare-zone-uploading">
+                        <span className="ig-compare-spinner" />
+                        Uploading…
+                      </span>
+                    ) : item.imageUrl || item.localPreview ? null : (
+                      <span className="ig-compare-zone-empty">
+                        <span className="ig-compare-zone-icon">↑</span>
+                        <span className="ig-compare-zone-label">Option {LABELS[idx] ?? idx + 1}</span>
+                        <span className="ig-compare-zone-hint">Tap to add</span>
+                      </span>
+                    )}
+                  </button>
+                  {(item.imageUrl || item.localPreview) && uploadingId !== item.id ? (
+                    <div className="ig-compare-zone-actions">
+                      <button
+                        type="button"
+                        className="ig-compare-zone-action"
+                        onClick={() => setPositionEditId(item.id)}
+                      >
+                        Position
+                        {hasCustomFocal(item.imageFocalX, item.imageFocalY) ? " ·" : ""}
+                      </button>
+                      <button
+                        type="button"
+                        className="ig-compare-zone-action"
+                        onClick={() => fileInputRefs.current[item.id]?.click()}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
                 <input
                   type="url"
@@ -422,6 +513,37 @@ export function CreatePostPage() {
               <small className="ig-settings-error">Could not load categories.</small>
             )}
           </div>
+
+          {campaignOptions.length > 0 ? (
+            <div className="ig-settings-row ig-settings-row--col">
+              <label htmlFor="create-campaign-id" className="ig-settings-label">
+                <span className="ig-settings-icon">🎯</span> Campaign
+                <span className="ig-settings-optional">optional</span>
+              </label>
+              <div className="ig-cat-select-wrap">
+                <select
+                  id="create-campaign-id"
+                  name="campaignId"
+                  className="ig-cat-select"
+                  value={campaignId}
+                  onChange={(ev) => setCampaignId(ev.target.value)}
+                >
+                  <option value="">No campaign</option>
+                  {campaignOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.isDefault ? " (default)" : ""}
+                      {isAdmin && "isActive" in c && !c.isActive ? " (inactive)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="ig-cat-select-chevron" aria-hidden>▾</span>
+              </div>
+              <p className="muted small ig-create-campaign-hint">
+                Link this compare to a promo — it will show a campaign badge on the feed.
+              </p>
+            </div>
+          ) : null}
 
           <div className="ig-settings-divider" />
 
@@ -539,6 +661,23 @@ export function CreatePostPage() {
           <Link to="/">Cancel</Link>
         </p>
       </form>
+
+      {positionEditItem && (positionEditItem.imageUrl || positionEditItem.localPreview) ? (
+        <ImagePositionEditor
+          src={positionEditItem.imageUrl || positionEditItem.localPreview!}
+          label={`Option ${LABELS[items.findIndex((it) => it.id === positionEditItem.id)] ?? ""}`}
+          focalX={positionEditItem.imageFocalX}
+          focalY={positionEditItem.imageFocalY}
+          onChange={(imageFocalX, imageFocalY) => {
+            setItems((prev) =>
+              prev.map((it) =>
+                it.id === positionEditItem.id ? { ...it, imageFocalX, imageFocalY } : it,
+              ),
+            );
+          }}
+          onClose={() => setPositionEditId(null)}
+        />
+      ) : null}
     </div>
   );
 }

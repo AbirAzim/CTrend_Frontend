@@ -1,9 +1,41 @@
 import { gql } from "@apollo/client";
 
+/** Per-compare-column image framing (object-position). */
+export const POST_OPTION_FIELDS = `
+  options {
+    label
+    imageUrl
+    imageFocalX
+    imageFocalY
+  }
+`;
+
+/** Campaign link + post-vote prize draw winner (shared across feed queries). */
+export const POST_CAMPAIGN_WINNER_FIELDS = `
+  campaign {
+    id
+    name
+    slug
+    bannerText
+    bannerImageUrl
+    prizePerWinner
+  }
+  voteWinner {
+    selectedOptionIndex
+    pickedAt
+    user {
+      id
+      username
+      displayName
+      profileImageUrl
+    }
+  }
+`;
+
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
-  query FeedPosts {
-    feedPosts {
+  query FeedPosts($campaignId: ID) {
+    feedPosts(campaignId: $campaignId) {
       id
       type
       authorId
@@ -13,11 +45,16 @@ export const FEED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       likeCount
       hypeCount
@@ -32,9 +69,8 @@ export const FEED_POSTS = gql`
         count
         percentage
       }
-      options {
-        label
-      }
+      ${POST_OPTION_FIELDS}
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
@@ -52,11 +88,16 @@ export const GET_POST_BY_ID = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       likeCount
       hypeCount
@@ -71,9 +112,8 @@ export const GET_POST_BY_ID = gql`
         count
         percentage
       }
-      options {
-        label
-      }
+      ${POST_OPTION_FIELDS}
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
@@ -143,7 +183,11 @@ export const MY_SAVED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       likeCount
       hypeCount
@@ -171,10 +215,7 @@ export const UPDATE_POST = gql`
       id
       imageUrls
       caption
-      options {
-        label
-        imageUrl
-      }
+      ${POST_OPTION_FIELDS}
       category {
         id
         name
@@ -182,6 +223,8 @@ export const UPDATE_POST = gql`
       }
       isVotingOpen
       votingEndsAt
+      endingSoonLeadMinutes
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
@@ -294,6 +337,17 @@ export const POST_VOTE_UPDATED = gql`
 export const DELETE_POST = gql`
   mutation DeletePost($postId: ID!) {
     deletePost(postId: $postId)
+  }
+`;
+
+export const CLAIM_POST_VOTE_PRIZE = gql`
+  mutation ClaimPostVotePrize($postId: ID!) {
+    claimPostVotePrize(postId: $postId) {
+      id
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+    }
   }
 `;
 
