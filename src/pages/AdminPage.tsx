@@ -36,6 +36,7 @@ import {
   CAMPAIGNS_ADMIN,
   CREATE_CAMPAIGN,
   TOGGLE_CAMPAIGN,
+  UPDATE_CAMPAIGN,
 } from "../graphql/campaigns";
 
 const SYSTEM_ADMIN_EMAIL = "systemadminctrend@gmail.com";
@@ -961,6 +962,7 @@ type CampaignRow = {
   ctaLabel: string;
   ctaUrl: string;
   isActive: boolean;
+  isDefault?: boolean | null;
   prizePerWinner: number;
   startDate: string | null;
   endDate: string | null;
@@ -986,6 +988,7 @@ function CampaignsTab() {
 
   const [createCampaign, { loading: creating }] = useMutation(CREATE_CAMPAIGN);
   const [toggleCampaign] = useMutation(TOGGLE_CAMPAIGN);
+  const [updateCampaign, { loading: updatingCampaign }] = useMutation(UPDATE_CAMPAIGN);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -1010,6 +1013,15 @@ function CampaignsTab() {
   async function handleToggle(id: string, current: boolean) {
     try {
       await toggleCampaign({ variables: { id, isActive: !current } });
+      void refetch();
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleMakeDefault(id: string) {
+    try {
+      await updateCampaign({ variables: { id, input: { isDefault: true } } });
       void refetch();
     } catch {
       // silent
@@ -1110,6 +1122,7 @@ function CampaignsTab() {
                 <th>CTA</th>
                 <th>Prize</th>
                 <th>Status</th>
+                <th>Default</th>
                 <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
@@ -1125,7 +1138,25 @@ function CampaignsTab() {
                       {c.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
+                  <td data-label="Default">
+                    {c.isDefault ? (
+                      <span className="admin-stat-chip admin-stat-chip--active">Default</span>
+                    ) : (
+                      <span className="muted small">—</span>
+                    )}
+                  </td>
                   <AdminActionsCell>
+                    {!c.isDefault ? (
+                      <button
+                        type="button"
+                        className="admin-action-link admin-action-link--success"
+                        onClick={() => void handleMakeDefault(c.id)}
+                        disabled={!c.isActive || updatingCampaign}
+                        title={!c.isActive ? "Activate campaign first to make it default" : "Make this campaign default"}
+                      >
+                        Make Default
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className={`admin-action-link${c.isActive ? " admin-action-link--danger" : " admin-action-link--success"}`}
@@ -1956,6 +1987,7 @@ type PlatformPostRow = {
   status?: string | null;
   scheduledAt?: string | null;
   votingEndsAt?: string | null;
+  endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
   commentCount?: number | null;
   hypeCount?: number | null;
@@ -2392,6 +2424,7 @@ function PostsTab() {
             category: editingPost.category,
             campaign: editingPost.campaign,
             votingEndsAt: editingPost.votingEndsAt,
+            endingSoonLeadMinutes: editingPost.endingSoonLeadMinutes,
             isVotingOpen: editingPost.isVotingOpen,
           }}
           onClose={() => setEditingPost(null)}

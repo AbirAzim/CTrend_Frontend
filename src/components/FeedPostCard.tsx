@@ -749,6 +749,14 @@ function FeedPostCardComponent({
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
   const votingEndedByTime =
     votingHasEndDate && votingEndsDate.getTime() <= nowMs;
+  const votingRemainingMs =
+    votingHasEndDate && votingEndsDate ? Math.max(0, votingEndsDate.getTime() - nowMs) : null;
+  const endingSoonLeadMinutes = Math.max(1, Math.round(post.endingSoonLeadMinutes ?? 5));
+  const isEndingSoon =
+    !votingEndedByTime &&
+    activeIsVotingOpen !== false &&
+    votingRemainingMs !== null &&
+    votingRemainingMs <= endingSoonLeadMinutes * 60_000;
   const isVotingClosed = activeIsVotingOpen === false || votingEndedByTime;
   const countdownLabel =
     votingHasEndDate && activeVotingEndsAt && !isVotingClosed
@@ -1327,6 +1335,16 @@ function FeedPostCardComponent({
     <article
       className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
     >
+      {isEndingSoon ? (
+        <div className="cx-vote-ending-soon-banner" role="status" aria-live="polite">
+          <span className="cx-vote-ending-soon-icon" aria-hidden>
+            ⏳
+          </span>
+          <span>
+            Poll ending soon, vote now! <strong>{countdownLabel || "Time is running out"}</strong>
+          </span>
+        </div>
+      ) : null}
       <header className="ig-post-header">
         {isPlatformPost ? (
           <div className="ig-post-user cx-platform-post-user">
@@ -2162,7 +2180,8 @@ function areFeedPostCardPropsEqual(prev: Props, next: Props): boolean {
     prev.post.viewerHasHyped === next.post.viewerHasHyped &&
     prev.post.mySelectedOptionIndex === next.post.mySelectedOptionIndex &&
     prev.post.isVotingOpen === next.post.isVotingOpen &&
-    prev.post.votingEndsAt === next.post.votingEndsAt
+    prev.post.votingEndsAt === next.post.votingEndsAt &&
+    prev.post.endingSoonLeadMinutes === next.post.endingSoonLeadMinutes
   );
 }
 

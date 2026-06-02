@@ -25,6 +25,7 @@ export type FeedPostView = {
   caption: string | null;
   createdAt: string | null;
   votingEndsAt?: string | null;
+  endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;

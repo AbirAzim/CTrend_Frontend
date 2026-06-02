@@ -18,6 +18,7 @@ type EditablePost = {
   campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
+  endingSoonLeadMinutes?: number | null;
 };
 
 type Props = {
@@ -70,6 +71,9 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const [extendPreset, setExtendPreset] = useState("");
   const [extendDraft, setExtendDraft] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState(post.votingEndsAt ?? null);
+  const [endingSoonLeadMinutes, setEndingSoonLeadMinutes] = useState(
+    post.endingSoonLeadMinutes ?? 5,
+  );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { uploadImage } = useImageUpload();
@@ -186,6 +190,9 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             options: items.map((it) => ({ label: it.label.trim() || "Option" })),
             categoryId: categoryId || undefined,
             campaignId: campaignId.trim(),
+            endingSoonLeadMinutes: isAdmin
+              ? Math.max(1, Math.min(1440, Math.round(endingSoonLeadMinutes || 5)))
+              : undefined,
           },
         },
       });
@@ -321,6 +328,27 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
               </div>
             </div>
           )}
+
+          {isAdmin ? (
+            <label className="cx-edit-label">
+              Ending-soon alert lead time (minutes)
+              <input
+                type="number"
+                className="cx-edit-input"
+                min={1}
+                max={1440}
+                value={endingSoonLeadMinutes}
+                onChange={(e) =>
+                  setEndingSoonLeadMinutes(
+                    Math.max(1, Math.min(1440, Number(e.target.value) || 5)),
+                  )
+                }
+              />
+              <span className="muted small">
+                Show "Poll ending soon, vote now" within this many minutes before deadline.
+              </span>
+            </label>
+          ) : null}
 
           <p className="cx-edit-section-label">
             Compare Items
