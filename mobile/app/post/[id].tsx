@@ -335,6 +335,10 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 
     empty: { paddingVertical: 24, alignItems: "center" },
     emptyText: { fontSize: 13, color: c.muted },
+    commentRowHighlighted: {
+      backgroundColor: isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)",
+      borderLeftWidth: 3, borderLeftColor: isDark ? "#6366f1" : "#818cf8",
+    },
     showMoreBtn: {
       paddingVertical: 12, paddingHorizontal: 16,
       alignItems: "center" as const,
@@ -555,9 +559,11 @@ type CommentItemProps = {
   onReply: (id: string, name: string) => void;
   onLike: (id: string, liked: boolean) => void;
   forceExpanded?: boolean;
+  highlightedCommentId?: string | null;
 };
 
-function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded }: CommentItemProps) {
+function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded, highlightedCommentId }: CommentItemProps) {
+  const isHighlighted = highlightedCommentId === comment.id;
   const [localLiked, setLocalLiked] = useState(comment.viewerHasLiked);
   const [localCount, setLocalCount] = useState(comment.likeCount);
   const [showReplies, setShowReplies] = useState(false);
@@ -586,7 +592,7 @@ function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded }: C
 
   return (
     <>
-      <View style={st.commentRow}>
+      <View style={[st.commentRow, isHighlighted && st.commentRowHighlighted]}>
         <Pressable
           style={st.commentHeader}
           onPress={() => router.push(`/profile/${comment.author.id}` as `/${string}`)}
@@ -1373,7 +1379,7 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
 
 export default function PostDetailScreen() {
   // ALL hooks must come before any conditional returns (Rules of Hooks)
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, commentId: deepLinkCommentId } = useLocalSearchParams<{ id: string; commentId?: string }>();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { user, isAuthenticated, hydrated } = useAuth();
@@ -1433,6 +1439,26 @@ export default function PostDetailScreen() {
   const [optimisticComments, setOptimisticComments] = useState<GqlComment[]>([]);
   const [showAllComments, setShowAllComments] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(deepLinkCommentId ?? null);
+
+  // Track Y positions for scroll-to-comment
+  const commentsSectionY = useRef(0);
+  const commentLocalYs = useRef<Record<string, number>>({});
+
+  // When arriving from a comment deep-link: expand all, scroll to exact comment
+  useEffect(() => {
+    if (!deepLinkCommentId) return;
+    setShowAllComments(true);
+    const scrollTimer = setTimeout(() => {
+      const sectionY = commentsSectionY.current;
+      const localY = commentLocalYs.current[deepLinkCommentId] ?? 0;
+      const targetY = Math.max(0, sectionY + localY - 100);
+      (scrollRef.current as unknown as { scrollTo: (opts: { y: number; animated: boolean }) => void })
+        ?.scrollTo({ y: targetY, animated: true });
+    }, 550);
+    const highlightTimer = setTimeout(() => setHighlightedCommentId(null), 4000);
+    return () => { clearTimeout(scrollTimer); clearTimeout(highlightTimer); };
+  }, [deepLinkCommentId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [extendVisible, setExtendVisible] = useState(false);
 
   const optionLabels = useMemo(() => {
@@ -1628,7 +1654,7 @@ export default function PostDetailScreen() {
             </View>
           ) : null}
 
-          {/* Comments */}
+          {/* Comments — onLayout tracks section Y for deep-link scrolling */}
           {(() => {
             const PREVIEW = 5;
             // Merge server (oldest-first) + optimistic at end; deduplicate by id
@@ -1641,7 +1667,7 @@ export default function PostDetailScreen() {
             const visible = showAllComments ? merged : merged.slice(hiddenCount);
 
             return (
-              <>
+              <View onLayout={(e) => { commentsSectionY.current = e.nativeEvent.layout.y; }}>
                 <View style={st.sectionHeader}>
                   <Text style={st.sectionTitle}>COMMENTS</Text>
                   {totalCount > 0 ? <Text style={st.commentCount}>{totalCount}</Text> : null}
@@ -1672,20 +1698,25 @@ export default function PostDetailScreen() {
                     )}
 
                     {visible.map((c) => (
-                      <CommentItem
+                      <View
                         key={c.id}
-                        comment={c}
-                        replies={repliesMap.get(c.id) ?? []}
-                        colors={colors}
-                        st={st}
-                        onReply={handleReply}
-                        onLike={handleLike}
-                        forceExpanded={expandedIds.has(c.id)}
-                      />
+                        onLayout={(e) => { commentLocalYs.current[c.id] = e.nativeEvent.layout.y; }}
+                      >
+                        <CommentItem
+                          comment={c}
+                          replies={repliesMap.get(c.id) ?? []}
+                          colors={colors}
+                          st={st}
+                          onReply={handleReply}
+                          onLike={handleLike}
+                          forceExpanded={expandedIds.has(c.id)}
+                          highlightedCommentId={highlightedCommentId}
+                        />
+                      </View>
                     ))}
                   </>
                 )}
-              </>
+              </View>
             );
           })()}
         </ScrollView>

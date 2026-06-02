@@ -556,7 +556,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 16 — Comments UX + Discuss Panel + Cache Policy
+### ✅ PHASE 16 — Comments UX + Discuss Panel + Cache Policy (COMPLETE 2026-06-02)
 
 **Source docs:** `phase2-comment-ux.md`, `discuss-panel-ux-overhaul.md`, `comment-load-performance.md`
 
