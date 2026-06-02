@@ -48,6 +48,7 @@ import * as Clipboard from 'expo-clipboard';
 import { MODERATOR_PLATFORM_NAME } from '@ctrend/shared/lib/moderatorBrand';
 import logoAsset from '../assets/logo.png';
 import { PostCampaignBadge } from './PostCampaignBadge';
+import { PostVoteWinnerBanner } from './PostVoteWinnerBanner';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -1854,6 +1855,17 @@ function FeedPostCardComponent({
 			) : null}
 
 			{/* ── Two-zone action rail ── */}
+			{isVotingClosed && post.voteWinner?.user ? (
+				<PostVoteWinnerBanner
+					winner={post.voteWinner}
+					optionLabel={
+						post.voteWinner.selectedOptionIndex != null
+							? compareLabel(post, post.voteWinner.selectedOptionIndex)
+							: null
+					}
+				/>
+			) : null}
+
 			{(() => {
 				const commentCount = post.commentCount ?? 0;
 				const votersTotal = isBinary ? binaryTotal : multiTotal;
