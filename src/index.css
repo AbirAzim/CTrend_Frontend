@@ -17269,7 +17269,7 @@ a.cx-profile-btn-accent {
     top: 0;
     left: 0;
     right: 0;
-    bottom: calc(var(--ig-bottom-nav-stack) + var(--mp-keyboard-inset, 0px));
+    bottom: calc(var(--mp-shell-bottom-gap, var(--ig-bottom-nav-stack)) + var(--mp-keyboard-inset, 0px));
     z-index: 90;
     display: flex;
     flex-direction: column;
@@ -17326,7 +17326,7 @@ a.cx-profile-btn-accent {
   }
 
   .cw-footer {
-    padding-bottom: max(10px, calc(env(safe-area-inset-bottom, 10px) + var(--mp-keyboard-inset, 0px)));
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
 
   .cw-input {
