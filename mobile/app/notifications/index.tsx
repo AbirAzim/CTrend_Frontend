@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
-import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -31,6 +34,7 @@ import {
   isPendingFriendRequestNotification,
 } from "@ctrend/shared/lib/friendRequestNotification";
 import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
@@ -48,6 +52,8 @@ type GqlNotification = {
   actorCount: number | null;
   latestActorId: string | null;
   latestActorName: string | null;
+  latestActorAvatar: string | null;
+  commentId: string | null;
   read: boolean;
   archived?: boolean;
   createdAt: string;
@@ -92,7 +98,10 @@ const POST_NOTIF_TYPES = new Set([
 function navigateFromNotif(notif: GqlNotification) {
   if (POST_NOTIF_TYPES.has(notif.type)) {
     const targetId = notif.postId ?? notif.referenceId;
-    if (targetId) router.push(`/post/${targetId}` as `/${string}`);
+    if (targetId) {
+      const suffix = notif.commentId ? `?commentId=${notif.commentId}` : "";
+      router.push(`/post/${targetId}${suffix}` as `/${string}`);
+    }
     return;
   }
   if (notif.type === "FRIEND_REQUEST" || notif.type === "FRIEND_REQUEST_ACCEPTED" || notif.type === "NEW_FOLLOWER") {
@@ -101,7 +110,8 @@ function navigateFromNotif(notif: GqlNotification) {
   }
   if (!notif.referenceId) return;
   if (notif.referenceType === "Post" || notif.referenceType === "POST") {
-    router.push(`/post/${notif.referenceId}` as `/${string}`);
+    const suffix = notif.commentId ? `?commentId=${notif.commentId}` : "";
+    router.push(`/post/${notif.referenceId}${suffix}` as `/${string}`);
   } else if (notif.referenceType === "User" || notif.referenceType === "USER") {
     router.push(`/profile/${notif.referenceId}` as `/${string}`);
   }
@@ -109,48 +119,92 @@ function navigateFromNotif(notif: GqlNotification) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function makeStyles(c: ColorPalette) {
+function makeStyles(c: ColorPalette, isDark: boolean) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: c.bg },
     headerBtn: { paddingHorizontal: 8 },
     headerBtnText: { fontSize: 13, color: c.accent, fontWeight: "700" },
 
+    // ── Notification row ──
     row: {
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
+      paddingHorizontal: 14, paddingVertical: 13,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+      overflow: "hidden",
     },
     rowUnread: { backgroundColor: c.section },
-    rowTop: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-    iconWrap: {
-      width: 40, height: 40, borderRadius: 20,
-      backgroundColor: c.card, borderWidth: 1, borderColor: c.border,
-      alignItems: "center", justifyContent: "center",
+    // Accent bar on the left edge for unread rows
+    unreadBar: {
+      position: "absolute", left: 0, top: 0, bottom: 0,
+      width: 3, backgroundColor: c.accent,
     },
-    iconText: { fontSize: 18 },
-    body: { flex: 1 },
-    title: { fontSize: 14, fontWeight: "700", color: c.text, marginBottom: 2 },
-    bodyText: { fontSize: 13, color: c.subtext, lineHeight: 18 },
-    timeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-    timeText: { fontSize: 11, color: c.muted },
-    unreadDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
+    rowInner: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
 
-    // Friend-request inline actions
-    friendActions: {
-      flexDirection: "row", gap: 8, marginTop: 10, marginLeft: 52,
+    // Icon / avatar area
+    iconWrap: {
+      width: 46, height: 46, borderRadius: 23,
+      backgroundColor: c.card, borderWidth: 1, borderColor: c.border,
+      alignItems: "center", justifyContent: "center", overflow: "hidden",
     },
-    friendBtn: {
-      flex: 1, paddingVertical: 7, borderRadius: 20,
+    iconText: { fontSize: 22 },
+    avatarImg: { width: 46, height: 46, borderRadius: 23 },
+    typeBadge: {
+      position: "absolute", bottom: -1, right: -1,
+      width: 20, height: 20, borderRadius: 10,
+      backgroundColor: c.card, borderWidth: 1.5, borderColor: c.bg,
       alignItems: "center", justifyContent: "center",
-      borderWidth: 1,
     },
-    friendBtnAccept: { backgroundColor: "#22c55e", borderColor: "#22c55e" },
-    friendBtnReject: { backgroundColor: "transparent", borderColor: c.border },
-    friendBtnView: { backgroundColor: "transparent", borderColor: c.border },
-    friendBtnText: { fontSize: 12, fontWeight: "700" },
-    friendBtnTextAccept: { color: "#fff" },
-    friendBtnTextReject: { color: c.subtext },
+    typeBadgeText: { fontSize: 11, lineHeight: 14 },
+    iconWrapOuter: { position: "relative", width: 46, height: 46 },
+
+    // Content column
+    content: { flex: 1 },
+    titleLine: {
+      flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2,
+    },
+    title: { flex: 1, fontSize: 14, fontWeight: "700", color: c.text },
+    unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accent, flexShrink: 0 },
+    bodyText: { fontSize: 13, color: c.subtext, lineHeight: 18 },
+
+    // Bottom meta row: time + inline action buttons
+    metaRow: {
+      flexDirection: "row", alignItems: "center",
+      justifyContent: "space-between", marginTop: 6,
+    },
+    timeText: { fontSize: 11, color: c.muted },
+    metaActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+    metaBtnRead: { fontSize: 11, fontWeight: "700", color: c.accent },
+    // ── Swipe RIGHT to archive — icon always on right edge ──
+    archiveWrap: { overflow: "hidden" as const },
+    // Subtle tinted bg that fades in as you drag right
+    archiveBg: {
+      position: "absolute" as const,
+      top: 0, bottom: 0, left: 0, right: 0,
+      backgroundColor: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.08)",
+    },
+    // Archive icon lives inside the row, always on the right
+    archiveHint: {
+      width: 48, alignItems: "center" as const,
+      justifyContent: "center" as const, gap: 3,
+    },
+    archiveHintIcon: { fontSize: 20 },
+    archiveHintLabel: { fontSize: 9, fontWeight: "800" as const, color: isDark ? "#a5b4fc" : "#6366f1", letterSpacing: 0.5, textTransform: "uppercase" as const },
+
+    // Friend-request actions
+    friendActions: {
+      flexDirection: "row", gap: 8, marginTop: 10, marginLeft: 58,
+    },
+    friendBtnAccept: {
+      flex: 1, paddingVertical: 9, borderRadius: 22,
+      alignItems: "center", justifyContent: "center",
+      backgroundColor: "#22c55e",
+    },
+    friendBtnDecline: {
+      flex: 1, paddingVertical: 9, borderRadius: 22,
+      alignItems: "center", justifyContent: "center",
+      backgroundColor: "transparent", borderWidth: 1, borderColor: c.border,
+    },
+    friendBtnAcceptText: { fontSize: 13, fontWeight: "700", color: "#fff" },
+    friendBtnDeclineText: { fontSize: 13, fontWeight: "600", color: c.subtext },
 
     emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
     emptyText: { fontSize: 15, color: c.muted, textAlign: "center" },
@@ -160,24 +214,6 @@ function makeStyles(c: ColorPalette) {
       borderTopWidth: 1, borderTopColor: c.border,
     },
     loadMoreText: { fontSize: 13, color: c.accent, fontWeight: "700" },
-
-    toolRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-      marginTop: 8,
-      marginLeft: 52,
-    },
-    toolBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: c.border,
-      backgroundColor: c.card,
-      alignItems: "center",
-      justifyContent: "center",
-    },
   });
 }
 
@@ -199,7 +235,6 @@ type RowProps = {
 function NotifRow({
   notif,
   st,
-  colors,
   actionLoadingIds,
   friendIdSet,
   onPress,
@@ -216,77 +251,126 @@ function NotifRow({
   const showFriendActions =
     isPendingFriendRequestNotification(notif) && !!notif.referenceId && !alreadyFriends;
 
+  const avatarUrl = notif.latestActorId && notif.latestActorAvatar
+    ? normalizeProfileImageUrl(notif.latestActorAvatar)
+    : null;
+
+  // ── Swipe RIGHT to archive ────────────────────────────────────────────────
+  const translateX = useRef(new Animated.Value(0)).current;
+  const swipingRef = useRef(false);
+
+  // bg fades in and archive icon scales up as user drags right
+  const bgOpacity = translateX.interpolate({ inputRange: [0, 120], outputRange: [0, 1], extrapolate: "clamp" });
+  const archiveScale = translateX.interpolate({ inputRange: [0, 60, 120], outputRange: [1, 1.15, 1.35], extrapolate: "clamp" });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        !swipingRef.current && dx > 10 && Math.abs(dx) > Math.abs(dy) * 2,
+      onPanResponderMove: (_, { dx }) => {
+        if (dx > 0) translateX.setValue(dx);
+      },
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx > 80) {
+          swipingRef.current = true;
+          Animated.timing(translateX, {
+            toValue: 800, duration: 300,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start(() => onArchive(notif));
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0, useNativeDriver: true, tension: 200, friction: 16,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      },
+    }),
+  ).current;
+
   return (
+    <View style={st.archiveWrap}>
+      {/* Tinted bg fades in behind the row as you drag */}
+      <Animated.View style={[st.archiveBg, { opacity: bgOpacity }]} />
+
+      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
     <Pressable style={[st.row, !notif.read && st.rowUnread]} onPress={() => onPress(notif)}>
-      <View style={st.rowTop}>
-        <View style={st.iconWrap}>
-          <Text style={st.iconText}>{notifIcon(notif.type)}</Text>
-        </View>
-        <View style={st.body}>
-          <Text style={st.title} numberOfLines={1}>{notif.title}</Text>
-          <Text style={st.bodyText} numberOfLines={2}>{notif.body}</Text>
-          <View style={st.timeRow}>
+      {/* Accent left bar for unread */}
+      {!notif.read && <View style={st.unreadBar} />}
+
+      <View style={st.rowInner}>
+        {/* Avatar with type badge, or plain emoji */}
+        {avatarUrl ? (
+          <View style={st.iconWrapOuter}>
+            <Image source={{ uri: avatarUrl }} style={st.avatarImg} contentFit="cover" cachePolicy="memory-disk" />
+            <View style={st.typeBadge}>
+              <Text style={st.typeBadgeText}>{notifIcon(notif.type)}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={st.iconWrap}>
+            <Text style={st.iconText}>{notifIcon(notif.type)}</Text>
+          </View>
+        )}
+
+        {/* Content */}
+        <View style={st.content}>
+          {/* Title + unread dot inline */}
+          <View style={st.titleLine}>
+            <Text style={st.title} numberOfLines={1}>{notif.title}</Text>
             {!notif.read && <View style={st.unreadDot} />}
+          </View>
+
+          <Text style={st.bodyText} numberOfLines={2}>{notif.body}</Text>
+
+          {/* Time + mark-read button on same line (swipe replaces Dismiss) */}
+          <View style={st.metaRow}>
             <Text style={st.timeText}>{formatRelativeTime(notif.createdAt)}</Text>
+            {!notif.read && (
+              <Pressable
+                hitSlop={10}
+                onPress={(e) => { e.stopPropagation?.(); onMarkRead(notif); }}
+              >
+                <Text style={st.metaBtnRead}>✓ Mark read</Text>
+              </Pressable>
+            )}
           </View>
         </View>
+
+        {/* Archive hint — right edge, always visible, scales as you swipe */}
+        <Animated.View style={[st.archiveHint, { transform: [{ scale: archiveScale }] }]}>
+          <Text style={st.archiveHintIcon}>📥</Text>
+          <Text style={st.archiveHintLabel}>Archive</Text>
+        </Animated.View>
       </View>
 
-      <View style={st.toolRow}>
-        {!notif.read ? (
-          <Pressable
-            style={st.toolBtn}
-            accessibilityLabel="Mark as read"
-            accessibilityRole="button"
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onMarkRead(notif);
-            }}
-          >
-            <Feather name="check" size={16} color={colors.subtext} />
-          </Pressable>
-        ) : null}
-        <Pressable
-          style={st.toolBtn}
-          accessibilityLabel="Archive"
-          accessibilityRole="button"
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onArchive(notif);
-          }}
-        >
-          <Feather name="archive" size={16} color={colors.subtext} />
-        </Pressable>
-      </View>
-
+      {/* Friend-request Accept / Decline */}
       {showFriendActions && (
         <View style={st.friendActions}>
           <Pressable
-            style={[st.friendBtn, st.friendBtnAccept, isLoading && { opacity: 0.6 }]}
+            style={[st.friendBtnAccept, isLoading && { opacity: 0.6 }]}
             onPress={(e) => { e.stopPropagation?.(); onAccept(notif); }}
             disabled={isLoading}
           >
             {isLoading
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={[st.friendBtnText, st.friendBtnTextAccept]}>Accept</Text>
+              : <Text style={st.friendBtnAcceptText}>✓ Accept</Text>
             }
           </Pressable>
           <Pressable
-            style={[st.friendBtn, st.friendBtnReject, isLoading && { opacity: 0.6 }]}
+            style={[st.friendBtnDecline, isLoading && { opacity: 0.6 }]}
             onPress={(e) => { e.stopPropagation?.(); onReject(notif); }}
             disabled={isLoading}
           >
-            <Text style={[st.friendBtnText, st.friendBtnTextReject]}>Reject</Text>
-          </Pressable>
-          <Pressable
-            style={[st.friendBtn, st.friendBtnView]}
-            onPress={(e) => { e.stopPropagation?.(); if (notif.referenceId) router.push(`/profile/${notif.referenceId}` as `/${string}`); }}
-          >
-            <Text style={[st.friendBtnText, st.friendBtnTextReject]}>View</Text>
+            <Text style={st.friendBtnDeclineText}>✕ Decline</Text>
           </Pressable>
         </View>
       )}
     </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -296,8 +380,8 @@ const PAGE_SIZE = 20;
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
-  const st = useMemo(() => makeStyles(colors), [colors]);
+  const { colors, isDark } = useTheme();
+  const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
   // Clear app icon badge when user opens the notifications screen
   useEffect(() => {

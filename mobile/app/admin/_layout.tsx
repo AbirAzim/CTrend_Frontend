@@ -1,5 +1,5 @@
 import { router, Tabs } from "expo-router";
-import { Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
@@ -16,6 +16,23 @@ export default function AdminLayout() {
   }, [isAdmin]);
 
   if (!isAdmin) return null;
+
+  // Highlight the active tab: accent pill + full-opacity emoji (dimmed when inactive)
+  const renderIcon = (emoji: string) =>
+    ({ focused }: { focused: boolean }) => (
+      <View
+        style={{
+          width: 36,
+          height: 30,
+          borderRadius: 9,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: focused ? colors.accent + "26" : "transparent",
+        }}
+      >
+        <Text style={{ fontSize: 17, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>
+      </View>
+    );
 
   return (
     <Tabs
@@ -42,31 +59,35 @@ export default function AdminLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: "Users", tabBarLabel: "Users", tabBarIcon: () => <Text>👥</Text> }}
+        options={{ title: "Users", tabBarLabel: "Users", tabBarIcon: renderIcon("👥") }}
       />
       <Tabs.Screen
         name="admin-management"
-        options={{ title: "Admin Management", tabBarLabel: "Admins", tabBarIcon: () => <Text>🛡</Text> }}
+        options={{ title: "Admin Management", tabBarLabel: "Admins", tabBarIcon: renderIcon("🛡") }}
       />
       <Tabs.Screen
         name="invitations"
-        options={{ title: "Invitations", tabBarLabel: "Invites", tabBarIcon: () => <Text>✉️</Text> }}
+        options={{ title: "Invitations", tabBarLabel: "Invites", tabBarIcon: renderIcon("✉️") }}
       />
       <Tabs.Screen
         name="campaigns"
-        options={{ title: "Campaigns", tabBarLabel: "Campaigns", tabBarIcon: () => <Text>📣</Text> }}
+        options={{ title: "Campaigns", tabBarLabel: "Campaigns", tabBarIcon: renderIcon("📣") }}
       />
       <Tabs.Screen
         name="categories"
-        options={{ title: "Categories", tabBarLabel: "Categories", tabBarIcon: () => <Text>🏷</Text> }}
+        options={{ title: "Categories", tabBarLabel: "Categories", tabBarIcon: renderIcon("🏷") }}
+      />
+      <Tabs.Screen
+        name="posts"
+        options={{ title: "Platform Posts", tabBarLabel: "Posts", tabBarIcon: renderIcon("📝") }}
       />
       <Tabs.Screen
         name="messages"
-        options={{ title: "Admin Messages", tabBarLabel: "Messages", tabBarIcon: () => <Text>💬</Text> }}
+        options={{ title: "Admin Messages", tabBarLabel: "Messages", tabBarIcon: renderIcon("💬") }}
       />
       <Tabs.Screen
         name="world-cup"
-        options={{ title: "World Cup", tabBarLabel: "World Cup", tabBarIcon: () => <Text>⚽</Text> }}
+        options={{ title: "World Cup", tabBarLabel: "World Cup", tabBarIcon: renderIcon("⚽") }}
       />
     </Tabs>
   );

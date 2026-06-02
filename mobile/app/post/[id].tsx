@@ -4,21 +4,17 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   COMMENTS_BY_POST,
@@ -26,30 +22,22 @@ import {
   SET_COMMENT_LIKE,
   SET_COMMENT_REACTION,
 } from "@ctrend/shared/graphql/comments";
-import {
-  DELETE_POST,
-  EXTEND_POST_VOTING,
-  GET_POST_BY_ID,
-  SET_POST_HYPE,
-  SET_POST_KEEP,
-  VOTERS_BY_POST,
-  VOTE_POST,
-} from "@ctrend/shared/graphql/feed";
+import { GET_POST_BY_ID } from "@ctrend/shared/graphql/feed";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
-import { MODERATOR_PLATFORM_NAME } from "@ctrend/shared/lib/moderatorBrand";
-import logoAsset from "../../assets/logo.png";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
-import { useTabBar } from "../../context/TabBarContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
-import { postPermalink } from "../../lib/postPermalink";
+import { postWebUrl } from "../../lib/postPermalink";
+import * as Clipboard from "expo-clipboard";
+import { FeedPostCard } from "../../components/FeedPostCard";
 
-const { width: SCREEN_W } = Dimensions.get("window");
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const IMG_W = (SCREEN_W - 2) / 2;
-const IMG_H = IMG_W * 1.55;
+// Full-width compare cells, capped at 58% of screen height (single-post only)
+const IMG_H = Math.min(IMG_W * 1.55, Math.round(SCREEN_H * 0.58));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,36 +56,19 @@ type GqlComment = {
   author: { id: string; username: string; displayName: string | null; profileImageUrl?: string | null };
 };
 
-type GqlVoter = {
-  voteId: string;
-  selectedOptionIndex: number;
-  anonymous: boolean;
-  createdAt: string;
-  user: { id: string; username: string; displayName: string | null; profileImageUrl?: string | null } | null;
-};
-
 type CommentsData = { commentsByPost: GqlComment[] };
 type PostData = { getPostById: unknown };
-type VotersData = { votersByPost: GqlVoter[] };
-
-// ─── Duration options for extend voting ──────────────────────────────────────
-
-const EXTEND_OPTS = [
-  { label: "+1h", ms: 1 * 60 * 60 * 1000 },
-  { label: "+12h", ms: 12 * 60 * 60 * 1000 },
-  { label: "+1d", ms: 24 * 60 * 60 * 1000 },
-  { label: "+3d", ms: 3 * 24 * 60 * 60 * 1000 },
-  { label: "+7d", ms: 7 * 24 * 60 * 60 * 1000 },
-];
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function makeStyles(c: ColorPalette) {
+function makeStyles(c: ColorPalette, isDark: boolean) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: c.bg },
     scroll: { flex: 1, backgroundColor: c.bg },
     headerBack: { paddingHorizontal: 4 },
     headerBackText: { fontSize: 16, color: c.accent, fontWeight: "700" },
+    headerCopy: { paddingHorizontal: 8, paddingVertical: 4 },
+    headerCopyText: { fontSize: 14, color: c.accent, fontWeight: "700" },
 
     // Comments section
     sectionHeader: {
@@ -147,111 +118,122 @@ function makeStyles(c: ColorPalette) {
     replyBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
     replyBtnText: { fontSize: 12, color: c.accent, fontWeight: "600" },
 
-    // Input area
+    // ── Facebook-style comment input ──
     inputWrap: {
-      borderTopWidth: 1,
-      borderTopColor: c.border,
+      borderTopWidth: 1, borderTopColor: c.border,
       backgroundColor: c.card,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      paddingHorizontal: 12,
-      paddingTop: 10,
-      gap: 10,
+      flexDirection: "row" as const, alignItems: "flex-end" as const,
+      paddingHorizontal: 10, paddingTop: 8, gap: 8,
     },
-    replyingBanner: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
+    inputAvatar: {
+      width: 34, height: 34, borderRadius: 17,
+      backgroundColor: isDark ? "#312e81" : "#6366f1",
+      alignItems: "center" as const, justifyContent: "center" as const,
+      overflow: "hidden" as const,
+      marginBottom: 8,
+    },
+    inputAvatarText: { color: "#fff", fontSize: 13, fontWeight: "700" as const },
+    inputPill: {
+      flex: 1,
+      flexDirection: "row" as const, alignItems: "flex-end" as const,
       backgroundColor: c.section,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      borderRadius: 22, borderWidth: 1, borderColor: c.border,
+      paddingHorizontal: 14, paddingVertical: 0,
+      minHeight: 38,
     },
-    replyingText: { fontSize: 12, color: c.subtext },
-    replyingCancel: { fontSize: 12, color: c.accent, fontWeight: "700" },
     inputBox: {
       flex: 1,
-      backgroundColor: c.inputBg,
-      borderRadius: 20,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      fontSize: 14,
-      color: c.text,
-      maxHeight: 100,
+      fontSize: 14, color: c.text,
+      maxHeight: 120,
+      paddingTop: 9, paddingBottom: 9,
     },
-    sendBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: c.accent,
-      alignItems: "center",
-      justifyContent: "center",
+    postBtn: {
+      paddingVertical: 9, paddingHorizontal: 6,
+      alignSelf: "flex-end" as const,
     },
-    sendBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    postBtnText: { fontSize: 14, fontWeight: "800" as const, color: c.accent },
+    replyingBanner: {
+      paddingHorizontal: 14, paddingVertical: 6,
+      backgroundColor: isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)",
+      flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const,
+      borderTopWidth: 1, borderTopColor: isDark ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.15)",
+    },
+    replyingText: { fontSize: 12, color: isDark ? "#818cf8" : "#4338ca", fontWeight: "500" as const },
+    replyingCancel: { fontSize: 12, color: c.muted, fontWeight: "700" as const },
+    // legacy (keep for reference)
+    sendBtn: { width: 0, height: 0 },
+    sendBtnText: { fontSize: 0 },
+    // "View older comments" button at top of list
+    viewOlderBtn: {
+      paddingVertical: 10, paddingHorizontal: 14,
+      alignItems: "center" as const,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+    },
+    viewOlderText: { fontSize: 13, fontWeight: "700" as const, color: c.accent },
 
-    // Voter modal
-    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-    modalSheet: {
-      position: "absolute",
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: c.card,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      maxHeight: "70%",
-    },
-    modalHandle: {
-      width: 36,
-      height: 4,
-      backgroundColor: c.border,
-      borderRadius: 2,
-      alignSelf: "center",
-      marginTop: 10,
-      marginBottom: 6,
-    },
-    modalTitle: {
-      fontSize: 16,
-      fontWeight: "800",
-      color: c.text,
-      textAlign: "center",
-      paddingBottom: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
-      marginHorizontal: 16,
-    },
-    tabRow: { flexDirection: "row", paddingHorizontal: 16, paddingTop: 10, gap: 8 },
-    tabBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
+    // ── Voters floating panel (non-blocking) ──
+    votersPanel: {
+      position: "absolute" as const,
+      left: 12, right: 12,
+      maxHeight: Math.round(Dimensions.get("window").height * 0.72),
       borderRadius: 20,
-      borderWidth: 1,
-      borderColor: c.border,
+      backgroundColor: c.card,
+      borderWidth: 1, borderColor: isDark ? "rgba(148,163,184,0.24)" : "rgba(67,56,202,0.14)",
+      overflow: "hidden" as const,
+      // shadow
+      elevation: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.28,
+      shadowRadius: 20,
+      zIndex: 49,
     },
-    tabBtnActive: { backgroundColor: c.accent, borderColor: c.accent },
-    tabBtnText: { fontSize: 12, fontWeight: "700", color: c.subtext },
-    tabBtnTextActive: { color: "#fff" },
+    votersPanelHeader: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    votersPanelTitle: { fontSize: 15, fontWeight: "800" as const, color: c.text },
+    votersPanelClose: { padding: 4 },
+    votersPanelCloseText: { fontSize: 16, color: c.muted, fontWeight: "700" as const },
+    votersPanelSearch: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      gap: 8, paddingHorizontal: 12, paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+    },
+    votersPanelSearchInput: {
+      flex: 1, fontSize: 14, color: c.text,
+      backgroundColor: c.section, borderRadius: 12,
+      paddingHorizontal: 12, paddingVertical: 8,
+    },
+    votersTabRow: { flexDirection: "row" as const, gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
+    votersTab: {
+      paddingHorizontal: 14, paddingVertical: 5,
+      borderRadius: 999, borderWidth: 1, borderColor: c.border,
+    },
+    votersTabActive: { backgroundColor: c.accent, borderColor: c.accent },
+    votersTabText: { fontSize: 12, fontWeight: "700" as const, color: c.subtext },
+    votersTabTextActive: { color: "#fff" },
     voterRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      gap: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
+      flexDirection: "row" as const, alignItems: "center" as const,
+      paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
     },
     voterAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 36, height: 36, borderRadius: 18,
       backgroundColor: "#312e81",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
+      alignItems: "center" as const, justifyContent: "center" as const, overflow: "hidden" as const,
     },
-    voterAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-    voterName: { fontSize: 14, fontWeight: "700", color: c.text },
+    voterAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" as const },
+    voterName: { fontSize: 14, fontWeight: "700" as const, color: c.text },
     voterTime: { fontSize: 12, color: c.muted },
-    voterEmpty: { textAlign: "center", paddingVertical: 24, color: c.muted, fontSize: 14 },
+    voterOptionTag: {
+      paddingHorizontal: 8, paddingVertical: 3,
+      borderRadius: 999, borderWidth: 1,
+    },
+    voterOptionTagText: { fontSize: 10, fontWeight: "700" as const },
+    voterEmpty: { textAlign: "center" as const, paddingVertical: 24, color: c.muted, fontSize: 14 },
 
     // Owner actions
     ownerActions: {
@@ -322,33 +304,148 @@ function makeStyles(c: ColorPalette) {
 
     empty: { paddingVertical: 24, alignItems: "center" },
     emptyText: { fontSize: 13, color: c.muted },
+    commentRowHighlighted: {
+      backgroundColor: isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)",
+      borderLeftWidth: 3, borderLeftColor: isDark ? "#6366f1" : "#818cf8",
+    },
+    showMoreBtn: {
+      paddingVertical: 12, paddingHorizontal: 16,
+      alignItems: "center" as const,
+      borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border,
+    },
+    showMoreText: { fontSize: 13, fontWeight: "700" as const, color: c.accent },
+
+    // ── Emoji reaction picker (Facebook-style floating modal) ──
+    reactionPickerOverlay: {
+      flex: 1, backgroundColor: "rgba(0,0,0,0.35)",
+      justifyContent: "center" as const, alignItems: "center" as const,
+    },
+    reactionPickerPill: {
+      flexDirection: "row" as const, gap: 4,
+      backgroundColor: c.card,
+      borderRadius: 999,
+      paddingVertical: 10, paddingHorizontal: 12,
+      borderWidth: 1, borderColor: c.border,
+      elevation: 24,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.28, shadowRadius: 20,
+    },
+    reactionPickerBtn: {
+      width: 46, height: 46, borderRadius: 23,
+      alignItems: "center" as const, justifyContent: "center" as const,
+    },
+    reactionPickerBtnActive: {
+      backgroundColor: isDark ? "rgba(99,102,241,0.22)" : "rgba(99,102,241,0.12)",
+      transform: [{ scale: 1.18 }] as unknown as never,
+    },
+    reactionPickerEmoji: { fontSize: 28, lineHeight: 34 },
+    // Compact reaction pills (only shown when count > 0)
+    reactionPillsRow: {
+      flexDirection: "row" as const, flexWrap: "wrap" as const,
+      gap: 5, marginTop: 6, marginLeft: 36,
+    },
+    reactionPill: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 3,
+      paddingHorizontal: 8, paddingVertical: 3,
+      borderRadius: 999, borderWidth: 1,
+      backgroundColor: c.section, borderColor: c.border,
+    },
+    reactionPillActive: {
+      backgroundColor: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.1)",
+      borderColor: isDark ? "#6366f1" : "#818cf8",
+    },
+    reactionPillEmoji: { fontSize: 13 },
+    reactionPillCount: { fontSize: 11, fontWeight: "700" as const, color: c.subtext },
+    reactionPillCountActive: { color: isDark ? "#818cf8" : "#4338ca" },
+    // React chip button — labeled pill (replaces invisible 😊)
+    reactChip: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 4,
+      borderWidth: 1, borderColor: c.border,
+      borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3,
+      backgroundColor: c.section,
+    },
+    reactChipActive: {
+      borderColor: isDark ? "#6366f1" : "#818cf8",
+      backgroundColor: isDark ? "rgba(99,102,241,0.14)" : "rgba(99,102,241,0.08)",
+    },
+    reactChipEmoji: { fontSize: 13, lineHeight: 18 },
+    reactChipLabel: { fontSize: 11, fontWeight: "600" as const, color: c.subtext, lineHeight: 16 },
+    reactChipLabelActive: { color: isDark ? "#818cf8" : "#4338ca" },
+    // legacy (unused, kept so existing references compile)
+    reactBtn: { flexDirection: "row" as const, alignItems: "center" as const, gap: 2 },
+    reactBtnText: { fontSize: 13, color: c.subtext },
+    reactBtnActive: { fontSize: 13, color: isDark ? "#818cf8" : "#4338ca", fontWeight: "700" as const },
 
     loadingRow: { paddingVertical: 24, alignItems: "center" },
     errorRow: { paddingHorizontal: 14, paddingVertical: 12 },
     errorText: { fontSize: 14, color: "#f87171" },
 
-    // Action chips
-    actionsContent: {
-      flexDirection: "row" as const,
-      paddingHorizontal: 12, paddingVertical: 8, gap: 7,
-      alignItems: "center" as const,
+    // ── Two-zone action rail (post detail) ──
+    actionRail: {
+      marginHorizontal: 12, marginBottom: 8, borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(148,163,184,0.24)" : "rgba(67,56,202,0.14)",
+      backgroundColor: isDark ? "rgba(15,23,42,0.64)" : "rgba(255,255,255,0.72)",
+      overflow: "hidden" as const,
     },
-    actionChip: {
-      flexDirection: "row" as const, alignItems: "center" as const, gap: 5,
-      borderRadius: 999, paddingVertical: 7, paddingHorizontal: 13,
-      borderWidth: 1, borderColor: c.border,
+    actionRailIcons: {
+      flexDirection: "row" as const, justifyContent: "space-evenly" as const,
+      alignItems: "center" as const, flexWrap: "wrap" as const,
+      paddingVertical: 7, paddingHorizontal: 8, gap: 2,
     },
-    actionChipHypeActive: { borderColor: "#fb7185", backgroundColor: "rgba(251,113,133,0.12)" },
-    actionChipSaveActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)" },
-    actionChipIcon: { fontSize: 13, lineHeight: 18 as number, color: c.subtext },
-    actionChipLabel: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 0.3, color: c.subtext },
+    actionChipFlat: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 3,
+      borderRadius: 999, paddingVertical: 8, paddingHorizontal: 10,
+    },
+    actionChipFlatHypeActive: { backgroundColor: isDark ? "rgba(251,113,133,0.14)" : "rgba(159,23,77,0.1)" },
+    actionChipFlatSaveActive: { backgroundColor: isDark ? "rgba(245,158,11,0.14)" : "rgba(245,158,11,0.1)" },
+    actionChipFlatIcon: { fontSize: 19, lineHeight: 22, color: c.subtext },
+    actionChipFlatIconHype: { color: "#fb7185" },
+    actionChipFlatIconSave: { color: "#f59e0b" },
+    actionChipBadge: {
+      minWidth: 18, height: 17, paddingHorizontal: 5, marginLeft: -1,
+      borderRadius: 999, justifyContent: "center" as const, alignItems: "center" as const,
+      backgroundColor: isDark ? "rgba(129,140,248,0.2)" : "rgba(67,56,202,0.14)",
+    },
+    actionChipBadgeRose: { backgroundColor: isDark ? "rgba(251,113,133,0.22)" : "rgba(159,23,77,0.16)" },
+    actionChipBadgeAmber: { backgroundColor: isDark ? "rgba(245,158,11,0.22)" : "rgba(245,158,11,0.18)" },
+    actionChipBadgeText: {
+      fontSize: 10, fontWeight: "800" as const,
+      color: isDark ? "#c7d0ff" : "#312e81",
+      fontVariant: ["tabular-nums"] as const, lineHeight: 14,
+    },
+    actionChipBadgeTextRose: { color: isDark ? "#fda4af" : "#be123c" },
+    actionChipBadgeTextAmber: { color: isDark ? "#fcd34d" : "#b45309" },
+    actionRailContext: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      gap: 10, paddingVertical: 8, paddingHorizontal: 14,
+      borderTopWidth: 1 as const,
+      borderTopColor: isDark ? "rgba(148,163,184,0.18)" : "rgba(67,56,202,0.12)",
+      backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(21,20,27,0.025)",
+    },
+    actionStatusText: {
+      flex: 1, fontSize: 12, fontWeight: "700" as const,
+      color: isDark ? "#818cf8" : "#312e81",
+    },
+    actionStatusTextResult: { color: isDark ? "#fcd34d" : "#b45309" },
+    seeDetailsBtn2: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 6, flexShrink: 0 },
+    seeDetailsBtnText2: { fontSize: 12, fontWeight: "800" as const, color: isDark ? "#818cf8" : "#312e81" },
 
     // Inline post card
     postCard: { backgroundColor: c.card, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
+    postCardPlatform: { borderWidth: 1.5, borderColor: c.accentLight, backgroundColor: c.accent + "14" },
     postHeader: { flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
     postAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#312e81", alignItems: "center" as const, justifyContent: "center" as const },
     postAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" as const },
+    postAuthorRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 7 },
     postAuthor: { fontSize: 14, fontWeight: "700" as const, color: c.text },
+    platformBadge: {
+      fontSize: 9, fontWeight: "700" as const, letterSpacing: 0.6,
+      textTransform: "uppercase" as const, color: c.accent,
+      paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+      borderWidth: 1, borderColor: c.accentLight, overflow: "hidden" as const,
+    },
     postTime: { fontSize: 12, color: c.muted, marginTop: 1 },
     postCaption: { paddingHorizontal: 14, paddingBottom: 10, fontSize: 14, color: c.text, lineHeight: 20 },
     postImages: { flexDirection: "row" as const, gap: 2 },
@@ -367,6 +464,68 @@ function makeStyles(c: ColorPalette) {
   });
 }
 
+// ─── Emoji picker modal (Facebook-style) ─────────────────────────────────────
+
+type EmojiPickerProps = {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (emoji: string) => void;
+  currentReaction: string | null;
+  st: ReturnType<typeof makeStyles>;
+};
+
+function EmojiPickerModal({ visible, onClose, onSelect, currentReaction, st }: EmojiPickerProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={st.reactionPickerOverlay} onPress={onClose}>
+        <Pressable style={st.reactionPickerPill}>
+          {REACTION_EMOJIS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              style={[st.reactionPickerBtn, currentReaction === emoji && st.reactionPickerBtnActive]}
+              onPress={() => { onSelect(emoji); onClose(); }}
+              hitSlop={4}
+            >
+              <Text style={st.reactionPickerEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ─── Shared reaction logic ────────────────────────────────────────────────────
+
+function useReactions(initialReaction: string | null, initialCounts: Array<{ emoji: string; count: number }>, commentId: string) {
+  const [localReaction, setLocalReaction] = useState<string | null>(initialReaction);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
+    Object.fromEntries(initialCounts.map((r) => [r.emoji, r.count])),
+  );
+  const [reactMut] = useMutation(SET_COMMENT_REACTION);
+
+  async function handleReact(emoji: string) {
+    const prev = localReaction;
+    const next = prev === emoji ? null : emoji;
+    setLocalReaction(next);
+    setReactionCounts((c) => {
+      const u = { ...c };
+      if (prev) u[prev] = Math.max(0, (u[prev] ?? 1) - 1);
+      if (next) u[next] = (u[next] ?? 0) + 1;
+      return u;
+    });
+    try {
+      await reactMut({ variables: { commentId, emoji: next } });
+    } catch {
+      setLocalReaction(prev);
+      setReactionCounts(Object.fromEntries(initialCounts.map((r) => [r.emoji, r.count])));
+    }
+  }
+
+  const activeReactions = REACTION_EMOJIS.filter((e) => (reactionCounts[e] ?? 0) > 0);
+  return { localReaction, reactionCounts, activeReactions, handleReact };
+}
+
 // ─── Comment component ────────────────────────────────────────────────────────
 
 type CommentItemProps = {
@@ -376,17 +535,26 @@ type CommentItemProps = {
   st: ReturnType<typeof makeStyles>;
   onReply: (id: string, name: string) => void;
   onLike: (id: string, liked: boolean) => void;
+  forceExpanded?: boolean;
+  highlightedCommentId?: string | null;
 };
 
-function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps) {
+function CommentItem({ comment, replies, st, onReply, onLike, forceExpanded, highlightedCommentId }: CommentItemProps) {
+  const isHighlighted = highlightedCommentId === comment.id;
   const [localLiked, setLocalLiked] = useState(comment.viewerHasLiked);
   const [localCount, setLocalCount] = useState(comment.likeCount);
   const [showReplies, setShowReplies] = useState(false);
-  const [localReaction, setLocalReaction] = useState<string | null>(comment.viewerReaction ?? null);
-  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
-    Object.fromEntries((comment.reactions ?? []).map((r) => [r.emoji, r.count])),
+  const [showPicker, setShowPicker] = useState(false);
+  const { localReaction, reactionCounts, activeReactions, handleReact } = useReactions(
+    comment.viewerReaction ?? null,
+    comment.reactions ?? [],
+    comment.id,
   );
-  const [reactMut] = useMutation(SET_COMMENT_REACTION);
+
+  // Auto-expand replies when a reply was just posted to this comment
+  useEffect(() => {
+    if (forceExpanded) setShowReplies(true);
+  }, [forceExpanded]);
 
   const authorName = comment.author.displayName?.trim() || comment.author.username;
   const initial = authorName.slice(0, 1).toUpperCase();
@@ -399,27 +567,9 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
     onLike(comment.id, next);
   }
 
-  async function handleReact(emoji: string) {
-    const prev = localReaction;
-    const next = prev === emoji ? null : emoji;
-    setLocalReaction(next);
-    setReactionCounts((c) => {
-      const updated = { ...c };
-      if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 1) - 1);
-      if (next) updated[next] = (updated[next] ?? 0) + 1;
-      return updated;
-    });
-    try {
-      await reactMut({ variables: { commentId: comment.id, emoji: next } });
-    } catch {
-      setLocalReaction(prev);
-      setReactionCounts(Object.fromEntries((comment.reactions ?? []).map((r) => [r.emoji, r.count])));
-    }
-  }
-
   return (
     <>
-      <View style={st.commentRow}>
+      <View style={[st.commentRow, isHighlighted && st.commentRowHighlighted]}>
         <Pressable
           style={st.commentHeader}
           onPress={() => router.push(`/profile/${comment.author.id}` as `/${string}`)}
@@ -433,42 +583,78 @@ function CommentItem({ comment, replies, st, onReply, onLike }: CommentItemProps
           <Text style={st.commentAuthor}>{authorName}</Text>
           <Text style={st.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
         </Pressable>
+
         <Text style={st.commentContent}>{comment.content}</Text>
+
         <View style={st.commentActions}>
-          <Pressable style={st.commentActionBtn} onPress={handleLike} hitSlop={8}>
+          {/* Like — tap to toggle, long-press to open reaction picker */}
+          <Pressable
+            style={st.commentActionBtn}
+            onPress={handleLike}
+            onLongPress={() => setShowPicker(true)}
+            delayLongPress={400}
+            hitSlop={8}
+          >
             <Text style={[st.commentActionText, localLiked && st.commentActionLiked]}>
-              {localLiked ? "♥" : "♡"} {localCount > 0 ? localCount : ""}
+              {localLiked ? "♥" : "♡"}{localCount > 0 ? ` ${localCount}` : ""}
             </Text>
           </Pressable>
+
+          {/* React chip — clearly labeled, opens emoji picker */}
+          <Pressable
+            style={[st.reactChip, localReaction ? st.reactChipActive : null]}
+            onPress={() => setShowPicker(true)}
+            hitSlop={6}
+          >
+            <Text style={st.reactChipEmoji}>{localReaction ?? "❤️"}</Text>
+            <Text style={[st.reactChipLabel, localReaction ? st.reactChipLabelActive : null]}>
+              {localReaction ? "Reacted" : "React"}
+            </Text>
+          </Pressable>
+
           <Pressable style={st.replyBtn} onPress={() => onReply(comment.id, authorName)} hitSlop={8}>
             <Text style={st.replyBtnText}>↩ Reply</Text>
           </Pressable>
+
           {replies.length > 0 && (
             <Pressable onPress={() => setShowReplies((v) => !v)} hitSlop={8}>
               <Text style={st.replyBtnText}>
-                {showReplies ? "Hide" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
+                {showReplies ? "Hide replies" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"} ▸`}
               </Text>
             </Pressable>
           )}
         </View>
-        {/* Emoji reaction strip */}
-        <View style={st.reactionStrip}>
-          {REACTION_EMOJIS.map((emoji) => {
-            const count = reactionCounts[emoji] ?? 0;
-            const isActive = localReaction === emoji;
-            return (
+
+        {/* Compact reaction pills — only those with count > 0 */}
+        {activeReactions.length > 0 && (
+          <View style={st.reactionPillsRow}>
+            {activeReactions.map((emoji) => (
               <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
-                <View style={[st.reactionBtn, isActive && st.reactionBtnActive]}>
-                  <Text style={st.reactionText}>{emoji}{count > 0 ? ` ${count}` : ""}</Text>
+                <View style={[st.reactionPill, localReaction === emoji && st.reactionPillActive]}>
+                  <Text style={st.reactionPillEmoji}>{emoji}</Text>
+                  <Text style={[st.reactionPillCount, localReaction === emoji && st.reactionPillCountActive]}>
+                    {reactionCounts[emoji]}
+                  </Text>
                 </View>
               </Pressable>
-            );
-          })}
-        </View>
+            ))}
+          </View>
+        )}
       </View>
+
+      {/* Replies — shown when expanded */}
       {showReplies && replies.map((r) => (
         <ReplyItem key={r.id} reply={r} st={st} onLike={onLike} />
       ))}
+
+      {/* Emoji picker modal */}
+      <EmojiPickerModal
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={(emoji) => void handleReact(emoji)}
+        currentReaction={localReaction}
+        st={st}
+      />
     </>
   );
 }
@@ -482,11 +668,12 @@ type ReplyItemProps = {
 function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
   const [localLiked, setLocalLiked] = useState(reply.viewerHasLiked);
   const [localCount, setLocalCount] = useState(reply.likeCount);
-  const [localReaction, setLocalReaction] = useState<string | null>(reply.viewerReaction ?? null);
-  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
-    Object.fromEntries((reply.reactions ?? []).map((r) => [r.emoji, r.count])),
+  const [showPicker, setShowPicker] = useState(false);
+  const { localReaction, reactionCounts, activeReactions, handleReact } = useReactions(
+    reply.viewerReaction ?? null,
+    reply.reactions ?? [],
+    reply.id,
   );
-  const [reactMut] = useMutation(SET_COMMENT_REACTION);
 
   const authorName = reply.author.displayName?.trim() || reply.author.username;
   const initial = authorName.slice(0, 1).toUpperCase();
@@ -499,502 +686,74 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
     onLike(reply.id, next);
   }
 
-  async function handleReact(emoji: string) {
-    const prev = localReaction;
-    const next = prev === emoji ? null : emoji;
-    setLocalReaction(next);
-    setReactionCounts((c) => {
-      const updated = { ...c };
-      if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 1) - 1);
-      if (next) updated[next] = (updated[next] ?? 0) + 1;
-      return updated;
-    });
-    try {
-      await reactMut({ variables: { commentId: reply.id, emoji: next } });
-    } catch {
-      setLocalReaction(prev);
-      setReactionCounts(Object.fromEntries((reply.reactions ?? []).map((r) => [r.emoji, r.count])));
-    }
-  }
-
   return (
-    <View style={st.replyRow}>
-      <Pressable
-        style={st.commentHeader}
-        onPress={() => router.push(`/profile/${reply.author.id}` as `/${string}`)}
-      >
-        <View style={[st.commentAvatar, { width: 24, height: 24, borderRadius: 12 }]}>
-          {authorImg
-            ? <Image source={{ uri: authorImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-            : <Text style={[st.commentAvatarText, { fontSize: 9 }]}>{initial}</Text>
-          }
-        </View>
-        <Text style={st.commentAuthor}>{authorName}</Text>
-        <Text style={st.commentTime}>{formatRelativeTime(reply.createdAt)}</Text>
-      </Pressable>
-      <Text style={[st.commentContent, { marginLeft: 32 }]}>{reply.content}</Text>
-      <View style={[st.commentActions, { marginLeft: 32 }]}>
-        <Pressable style={st.commentActionBtn} onPress={handleLike} hitSlop={8}>
-          <Text style={[st.commentActionText, localLiked && st.commentActionLiked]}>
-            {localLiked ? "♥" : "♡"} {localCount > 0 ? localCount : ""}
-          </Text>
+    <>
+      <View style={st.replyRow}>
+        <Pressable
+          style={st.commentHeader}
+          onPress={() => router.push(`/profile/${reply.author.id}` as `/${string}`)}
+        >
+          <View style={[st.commentAvatar, { width: 24, height: 24, borderRadius: 12 }]}>
+            {authorImg
+              ? <Image source={{ uri: authorImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+              : <Text style={[st.commentAvatarText, { fontSize: 9 }]}>{initial}</Text>
+            }
+          </View>
+          <Text style={st.commentAuthor}>{authorName}</Text>
+          <Text style={st.commentTime}>{formatRelativeTime(reply.createdAt)}</Text>
         </Pressable>
-      </View>
-      {/* Emoji reactions on replies */}
-      <View style={[st.reactionStrip, { marginLeft: 32 }]}>
-        {REACTION_EMOJIS.map((emoji) => {
-          const count = reactionCounts[emoji] ?? 0;
-          const isActive = localReaction === emoji;
-          return (
-            <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
-              <View style={[st.reactionBtn, isActive && st.reactionBtnActive]}>
-                <Text style={st.reactionText}>{emoji}{count > 0 ? ` ${count}` : ""}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
 
-// ─── Voters bottom sheet ──────────────────────────────────────────────────────
+        <Text style={[st.commentContent, { marginLeft: 32 }]}>{reply.content}</Text>
 
-type VotersSheetProps = {
-  postId: string;
-  visible: boolean;
-  onClose: () => void;
-  optionLabels: string[];
-  st: ReturnType<typeof makeStyles>;
-  insets: { bottom: number };
-};
-
-function VotersSheet({ postId, visible, onClose, optionLabels, st, insets }: VotersSheetProps) {
-  const [activeTab, setActiveTab] = useState<number | null>(null);
-
-  const { data, loading } = useQuery<VotersData>(VOTERS_BY_POST, {
-    variables: { postId, optionIndex: activeTab ?? undefined },
-    skip: !visible,
-    fetchPolicy: "network-only",
-  });
-
-  const voters = data?.votersByPost ?? [];
-  const tabs = [{ label: "All", value: null }, ...optionLabels.map((l, i) => ({ label: l, value: i }))];
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={st.modalOverlay} onPress={onClose}>
-        <View style={[st.modalSheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
-          <View style={st.modalHandle} />
-          <Text style={st.modalTitle}>Voters</Text>
-
-          <View style={st.tabRow}>
-            {tabs.map((t) => (
-              <Pressable
-                key={String(t.value)}
-                style={[st.tabBtn, activeTab === t.value && st.tabBtnActive]}
-                onPress={() => setActiveTab(t.value)}
-              >
-                <Text style={[st.tabBtnText, activeTab === t.value && st.tabBtnTextActive]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <ScrollView style={{ marginTop: 8 }}>
-            {loading ? (
-              <ActivityIndicator style={{ margin: 24 }} />
-            ) : voters.length === 0 ? (
-              <Text style={st.voterEmpty}>No voters yet</Text>
-            ) : (
-              voters.map((v) => {
-                const name = v.anonymous
-                  ? "Anonymous"
-                  : v.user?.displayName?.trim() || v.user?.username || "Unknown";
-                const initial = name.slice(0, 1).toUpperCase();
-                const voterImg = !v.anonymous ? normalizeProfileImageUrl(v.user?.profileImageUrl) : null;
-                return (
-                  <Pressable
-                    key={v.voteId}
-                    style={st.voterRow}
-                    onPress={() => {
-                      if (!v.anonymous && v.user) {
-                        onClose();
-                        router.push(`/profile/${v.user.id}` as `/${string}`);
-                      }
-                    }}
-                  >
-                    <View style={st.voterAvatar}>
-                      {voterImg
-                        ? <Image source={{ uri: voterImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                        : <Text style={st.voterAvatarText}>{initial}</Text>
-                      }
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={st.voterName}>{name}</Text>
-                      <Text style={st.voterTime}>{formatRelativeTime(v.createdAt)}</Text>
-                    </View>
-                    {optionLabels[v.selectedOptionIndex] ? (
-                      <Text style={[st.voterTime, { fontSize: 11 }]}>
-                        {optionLabels[v.selectedOptionIndex]}
-                      </Text>
-                    ) : null}
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      </Pressable>
-    </Modal>
-  );
-}
-
-// ─── Extend voting modal ──────────────────────────────────────────────────────
-
-type ExtendSheetProps = {
-  visible: boolean;
-  onClose: () => void;
-  onExtend: (ms: number) => void;
-  extending: boolean;
-  st: ReturnType<typeof makeStyles>;
-  insets: { bottom: number };
-};
-
-function ExtendSheet({ visible, onClose, onExtend, extending, st, insets }: ExtendSheetProps) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={st.extendModal}>
-        <View style={[st.extendSheet, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={st.extendTitle}>Extend voting</Text>
-          <View style={st.extendOptsRow}>
-            {EXTEND_OPTS.map((o) => (
-              <Pressable
-                key={o.label}
-                style={st.extendOpt}
-                onPress={() => onExtend(o.ms)}
-                disabled={extending}
-              >
-                {extending ? (
-                  <ActivityIndicator size="small" />
-                ) : (
-                  <Text style={st.extendOptText}>{o.label}</Text>
-                )}
-              </Pressable>
-            ))}
-          </View>
-          <Pressable style={st.extendCancel} onPress={onClose}>
-            <Text style={st.extendCancelText}>Cancel</Text>
+        <View style={[st.commentActions, { marginLeft: 32 }]}>
+          <Pressable
+            style={st.commentActionBtn}
+            onPress={handleLike}
+            onLongPress={() => setShowPicker(true)}
+            delayLongPress={400}
+            hitSlop={8}
+          >
+            <Text style={[st.commentActionText, localLiked && st.commentActionLiked]}>
+              {localLiked ? "♥" : "♡"}{localCount > 0 ? ` ${localCount}` : ""}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[st.reactChip, localReaction ? st.reactChipActive : null]}
+            onPress={() => setShowPicker(true)}
+            hitSlop={6}
+          >
+            <Text style={st.reactChipEmoji}>{localReaction ?? "❤️"}</Text>
+            <Text style={[st.reactChipLabel, localReaction ? st.reactChipLabelActive : null]}>
+              {localReaction ? "Reacted" : "React"}
+            </Text>
           </Pressable>
         </View>
-      </View>
-    </Modal>
-  );
-}
 
-// ─── Inline post card — no subscription, avoids dual-screen native view conflict ─
-
-type PostDetailCardProps = {
-  post: ReturnType<typeof mapGqlPostToFeedView>;
-  st: ReturnType<typeof makeStyles>;
-  colors: ColorPalette;
-  onVoters: () => void;
-};
-
-function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
-  const { isAuthenticated } = useAuth();
-  const { adjustSavedCount } = useTabBar();
-  const [voteMut] = useMutation(VOTE_POST);
-  const [hypeMut] = useMutation(SET_POST_HYPE);
-  const [keepMut] = useMutation(SET_POST_KEEP);
-  const [viewerVote, setViewerVote] = useState(post.viewerVote);
-  const [up, setUp] = useState(post.upvoteCount);
-  const [down, setDown] = useState(post.downvoteCount);
-  const [anonymous, setAnonymous] = useState(Boolean(post.myVoteAnonymous));
-  const [hyped, setHyped] = useState(Boolean(post.viewerHasHyped));
-  const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
-  const [kept, setKept] = useState(Boolean(post.viewerHasSaved));
-
-  const total = up + down;
-  const leftPct = total > 0 ? Math.round((100 * up) / total) : 50;
-  const rightPct = 100 - leftPct;
-  const isVotingClosed = post.isVotingOpen === false;
-
-  // Countdown timer
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    if (!post.votingEndsAt || isVotingClosed) return;
-    function calc() {
-      const diff = new Date(post.votingEndsAt!).getTime() - Date.now();
-      if (diff <= 0) { setTimeLeft("Voting ended"); return; }
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff % 86400000) / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h ${m}m left` : `${m}m ${s}s left`);
-    }
-    calc();
-    const t = setInterval(calc, 1000);
-    return () => clearInterval(t);
-  }, [post.votingEndsAt, isVotingClosed]);
-
-  function labelFor(i: number) {
-    return post.optionStats?.find((s) => s.index === i)?.label?.trim()
-      || post.postOptions?.[i]?.label?.trim()
-      || `Side ${i + 1}`;
-  }
-
-  async function castVote(idx: number) {
-    if (isVotingClosed) return;
-    if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const prev = viewerVote;
-    const newVote = idx === 0 ? "UP" : "DOWN";
-    if (prev === newVote) return;
-    setViewerVote(newVote as "UP" | "DOWN");
-    setUp((n) => n + (idx === 0 ? 1 : 0) - (prev === "UP" ? 1 : 0));
-    setDown((n) => n + (idx === 1 ? 1 : 0) - (prev === "DOWN" ? 1 : 0));
-    try {
-      await voteMut({ variables: { postId: post.id, selectedOptionIndex: idx, anonymous } });
-    } catch {
-      setViewerVote(prev);
-      setUp(post.upvoteCount);
-      setDown(post.downvoteCount);
-    }
-  }
-
-  async function handleAnonymousToggle(val: boolean) {
-    setAnonymous(val);
-    const curIdx = viewerVote === "UP" ? 0 : viewerVote === "DOWN" ? 1 : null;
-    if (hasVoted && curIdx !== null) {
-      try { await voteMut({ variables: { postId: post.id, selectedOptionIndex: curIdx, anonymous: val } }); }
-      catch { setAnonymous(!val); }
-    }
-  }
-
-  async function handleHype() {
-    if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const next = !hyped;
-    setHyped(next);
-    setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
-    try { await hypeMut({ variables: { postId: post.id, active: next } }); }
-    catch { setHyped(!next); setHypeCount((n) => Math.max(0, n + (next ? -1 : 1))); }
-  }
-
-  async function handleKeep() {
-    if (!isAuthenticated) { router.push("/auth/login"); return; }
-    const next = !kept;
-    setKept(next);
-    adjustSavedCount(next ? 1 : -1);
-    try { await keepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setKept(!next); adjustSavedCount(next ? -1 : 1); }
-  }
-
-  async function handleShare() {
-    try {
-      await Share.share({ url: postPermalink(post.id), message: post.caption ?? "Check out this comparison!" });
-    } catch { /* ignore */ }
-  }
-
-  const isPlatformPost = post.postType === "system";
-  const authorName = isPlatformPost
-    ? MODERATOR_PLATFORM_NAME
-    : post.authorDisplayName?.trim() || post.authorUsername;
-  const initial = authorName.slice(0, 1).toUpperCase();
-  const authorAvatarUrl = isPlatformPost ? null : post.authorProfileImageUrl ?? null;
-  const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls.slice(0, 2) : null;
-  const hasVoted = viewerVote !== null;
-
-  return (
-    <View style={st.postCard}>
-      <Pressable
-        style={st.postHeader}
-        onPress={() =>
-          !isPlatformPost &&
-          post.authorId &&
-          router.push(`/profile/${post.authorId}` as `/${string}`)
-        }
-        disabled={isPlatformPost}
-      >
-        <View style={[st.postAvatar, { overflow: "hidden" }]}>
-          {isPlatformPost ? (
-            <Image
-              source={logoAsset}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : authorAvatarUrl ? (
-            <Image source={{ uri: authorAvatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-          ) : (
-            <Text style={st.postAvatarText}>{initial}</Text>
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={st.postAuthor}>{authorName}</Text>
-          <Text style={st.postTime}>
-            {isPlatformPost
-              ? `Platform poll · ${formatRelativeTime(post.createdAt)}`
-              : formatRelativeTime(post.createdAt)}
-          </Text>
-        </View>
-      </Pressable>
-
-      {post.caption ? <Text style={st.postCaption}>{post.caption}</Text> : null}
-
-      {compareUrls ? (
-        <View style={st.postImages}>
-          {compareUrls.map((url, i) => {
-            const picked = (i === 0 && viewerVote === "UP") || (i === 1 && viewerVote === "DOWN");
-            return (
-              <Pressable
-                key={i}
-                style={[st.postImgCell, isVotingClosed && { opacity: 0.85 }]}
-                onPress={() => void castVote(i)}
-                disabled={isVotingClosed}
-              >
-                <Image source={{ uri: url }} style={st.postImg} contentFit="cover" cachePolicy="memory-disk" />
-                <View style={st.postPctOverlay}>
-                  <Text style={st.postPctText}>{i === 0 ? leftPct : rightPct}%</Text>
-                  <Text style={st.postPctLabel} numberOfLines={1}>{labelFor(i)}</Text>
-                </View>
-                {picked && !isVotingClosed && (
-                  <View style={st.postVotedBadge}>
-                    <View style={st.postVotedBadgeInner}>
-                      <Text style={st.postVotedBadgeText}>♥ VOTED</Text>
-                    </View>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : post.imageUrls[0] ? (
-        <Image source={{ uri: post.imageUrls[0] }} style={{ width: "100%", height: 280 }} contentFit="cover" cachePolicy="memory-disk" />
-      ) : null}
-
-      {compareUrls ? (
-        <View style={st.postSplitBar}>
-          <View style={{ flex: up || 1, backgroundColor: "#22c55e" }} />
-          <View style={{ flex: down || 1, backgroundColor: "#f97316" }} />
-        </View>
-      ) : null}
-
-      {/* Vote hint */}
-      {compareUrls && !isVotingClosed && (
-        <View style={st.postVoteHint}>
-          <Text style={[st.postVoteHintText, hasVoted && st.postVoteHintVoted]}>
-            {hasVoted ? "✓ Vote recorded — tap to change" : "👆 Tap an image to vote"}
-          </Text>
-          {timeLeft ? (
-            <Text style={[st.postVoteHintText, { marginTop: 4, color: "#f59e0b", fontWeight: "700" }]}>
-              ⏱ {timeLeft}
-            </Text>
-          ) : null}
-        </View>
-      )}
-
-      {/* Anonymous toggle — same Switch as feed card */}
-      {compareUrls && !isVotingClosed && (
-        <View style={{
-          flexDirection: "row", alignItems: "center",
-          paddingHorizontal: 14, paddingVertical: 8, gap: 8,
-          backgroundColor: colors.section,
-        }}>
-          <Text style={{ fontSize: 13 }}>👻</Text>
-          <Text style={{ flex: 1, fontSize: 12, color: colors.subtext, fontWeight: "500" }}>
-            Vote anonymously
-          </Text>
-          <Switch
-            value={anonymous}
-            onValueChange={(val) => void handleAnonymousToggle(val)}
-            trackColor={{ false: colors.border, true: "#8b5cf6" }}
-            thumbColor="#ffffff"
-          />
-        </View>
-      )}
-
-      {isVotingClosed && (
-        <View style={st.postVoteHint}>
-          <Text style={st.postVoteHintText}>{total} votes · Voting closed</Text>
-        </View>
-      )}
-
-      {/* LIVE SPLIT section */}
-      {compareUrls && (
-        <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <Text style={{ fontSize: 12, fontWeight: "800", color: colors.accent, letterSpacing: 1 }}>LIVE SPLIT</Text>
-            <Text style={{ fontSize: 12, color: colors.muted }}>{total} vote{total !== 1 ? "s" : ""}</Text>
-          </View>
-          {[0, 1].map((i) => {
-            const count = i === 0 ? up : down;
-            const pct = total > 0 ? Math.round((100 * count) / total) : 50;
-            const barColor = i === 0 ? "#22c55e" : "#f97316";
-            return (
-              <View key={i} style={{ marginBottom: 10 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text, flex: 1 }} numberOfLines={1}>
-                    {labelFor(i)}
+        {activeReactions.length > 0 && (
+          <View style={[st.reactionPillsRow, { marginLeft: 32 }]}>
+            {activeReactions.map((emoji) => (
+              <Pressable key={emoji} onPress={() => void handleReact(emoji)} hitSlop={4}>
+                <View style={[st.reactionPill, localReaction === emoji && st.reactionPillActive]}>
+                  <Text style={st.reactionPillEmoji}>{emoji}</Text>
+                  <Text style={[st.reactionPillCount, localReaction === emoji && st.reactionPillCountActive]}>
+                    {reactionCounts[emoji]}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.subtext, marginLeft: 8 }}>{count} · {pct}%</Text>
                 </View>
-                <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.section }}>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${pct}%` }} />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
 
-      {/* Action chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ borderTopWidth: 1, borderTopColor: colors.border }}
-        contentContainerStyle={st.actionsContent}
-      >
-        {([
-          { i: 0, label: "DISCUSS", icon: "💬", onPress: () => {} },
-          { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
-          {
-            i: 2,
-            label: `HYPE${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
-            icon: hyped ? "♥" : "♡",
-            onPress: () => void handleHype(),
-            active: hyped,
-            activeStyle: st.actionChipHypeActive,
-            activeTextColor: "#fb7185",
-          },
-          {
-            i: 3,
-            label: "KEEP",
-            icon: "🔖",
-            onPress: () => void handleKeep(),
-            active: kept,
-            activeStyle: st.actionChipSaveActive,
-            activeTextColor: "#f59e0b",
-          },
-          { i: 4, label: "VOTERS", icon: "👥", onPress: onVoters },
-        ] as Array<{ i: number; label: string; icon: string; onPress: () => void; active?: boolean; activeStyle?: object; activeTextColor?: string }>)
-          .map(({ i, label, icon, onPress, active, activeStyle, activeTextColor }) => (
-            <Pressable
-              key={i}
-              style={[st.actionChip, active && activeStyle]}
-              onPress={onPress}
-              hitSlop={4}
-            >
-              <Text style={[st.actionChipIcon, active && activeTextColor ? { color: activeTextColor } : null]}>
-                {icon}
-              </Text>
-              <Text style={[st.actionChipLabel, active && activeTextColor ? { color: activeTextColor } : null]}>
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-      </ScrollView>
-    </View>
+      <EmojiPickerModal
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={(emoji) => void handleReact(emoji)}
+        currentReaction={localReaction}
+        st={st}
+      />
+
+    </>
   );
 }
 
@@ -1002,11 +761,11 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
 
 export default function PostDetailScreen() {
   // ALL hooks must come before any conditional returns (Rules of Hooks)
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, commentId: deepLinkCommentId } = useLocalSearchParams<{ id: string; commentId?: string }>();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { user, isAuthenticated, hydrated } = useAuth();
-  const st = useMemo(() => makeStyles(colors), [colors]);
+  const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
   const { data: postData, loading: postLoading, error: postError } = useQuery<PostData>(
     GET_POST_BY_ID,
@@ -1015,7 +774,6 @@ export default function PostDetailScreen() {
   const post = postData?.getPostById
     ? mapGqlPostToFeedView(postData.getPostById as Parameters<typeof mapGqlPostToFeedView>[0])
     : null;
-  const isOwner = !!user && !!post?.authorId && user.id === post.authorId;
 
   const {
     data: commentsData,
@@ -1024,10 +782,17 @@ export default function PostDetailScreen() {
   } = useQuery<CommentsData>(COMMENTS_BY_POST, {
     variables: { postId: id },
     skip: !id || !isAuthenticated,
-    fetchPolicy: "network-only",
+    fetchPolicy: "cache-and-network",
   });
   const allComments = commentsData?.commentsByPost ?? [];
-  const topComments = allComments.filter((c) => !c.parentId);
+
+  // Oldest-first (natural conversation order, newest at bottom like Facebook)
+  const topComments = useMemo(
+    () => allComments
+      .filter((c) => !c.parentId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    [allComments],
+  );
   const repliesMap = useMemo(() => {
     const m = new Map<string, GqlComment[]>();
     allComments.filter((c) => c.parentId).forEach((c) => {
@@ -1035,32 +800,50 @@ export default function PostDetailScreen() {
       arr.push(c);
       m.set(c.parentId!, arr);
     });
+    // Replies oldest-first within each thread
+    m.forEach((arr) => arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
     return m;
   }, [allComments]);
 
   const [commentMut, { loading: commentSending }] = useMutation(COMMENT_POST);
   const [likeMut] = useMutation(SET_COMMENT_LIKE);
-  const [deleteMut, { loading: deleting }] = useMutation(DELETE_POST);
-  const [extendMut, { loading: extending }] = useMutation(EXTEND_POST_VOTING);
 
   const { showToast, ToastView } = useToast();
 
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
-  const [votersVisible, setVotersVisible] = useState(false);
-  const [extendVisible, setExtendVisible] = useState(false);
+  const scrollRef = useRef<typeof ScrollView>(null);
+  const [optimisticComments, setOptimisticComments] = useState<GqlComment[]>([]);
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(deepLinkCommentId ?? null);
 
-  const optionLabels = useMemo(() => {
-    if (!post) return ["Option A", "Option B"];
-    if (post.optionStats && post.optionStats.length > 0) {
-      return post.optionStats.map((s) => s.label || `Option ${s.index + 1}`);
-    }
-    if (post.postOptions && post.postOptions.length > 0) {
-      return post.postOptions.map((o, i) => o.label || `Option ${i + 1}`);
-    }
-    return ["Option A", "Option B"];
-  }, [post]);
+  // Track Y positions for scroll-to-comment
+  const commentsSectionY = useRef(0);
+  const commentLocalYs = useRef<Record<string, number>>({});
+
+  // When arriving from a comment deep-link: expand all, scroll to exact comment
+  useEffect(() => {
+    if (!deepLinkCommentId) return;
+    setShowAllComments(true);
+    const scrollTimer = setTimeout(() => {
+      const sectionY = commentsSectionY.current;
+      const localY = commentLocalYs.current[deepLinkCommentId] ?? 0;
+      const targetY = Math.max(0, sectionY + localY - 100);
+      (scrollRef.current as unknown as { scrollTo: (opts: { y: number; animated: boolean }) => void })
+        ?.scrollTo({ y: targetY, animated: true });
+    }, 550);
+    const highlightTimer = setTimeout(() => setHighlightedCommentId(null), 4000);
+    return () => { clearTimeout(scrollTimer); clearTimeout(highlightTimer); };
+  }, [deepLinkCommentId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to the comments section — used by the post card's Comments chip
+  const scrollToComments = useCallback(() => {
+    const y = Math.max(0, commentsSectionY.current - 60);
+    (scrollRef.current as unknown as { scrollTo: (opts: { y: number; animated: boolean }) => void })
+      ?.scrollTo({ y, animated: true });
+  }, []);
 
   const handleReply = useCallback((commentId: string, name: string) => {
     setReplyTo({ id: commentId, name });
@@ -1094,54 +877,70 @@ export default function PostDetailScreen() {
     );
   }
 
-  async function handleSend() {
+  async function submitComment() {
     const content = text.trim();
-    if (!content) return;
+    if (!content || commentSending) return;
     if (!isAuthenticated) { router.push("/auth/login"); return; }
+
+    const parentId = replyTo?.id ?? null;
+    const currentReplyTo = replyTo;
+
+    // Optimistic: add comment immediately with timestamp "now"
+    const optimistic: GqlComment = {
+      id: `optimistic-${Date.now()}`,
+      content,
+      postId: id ?? "",
+      parentId,
+      createdAt: new Date().toISOString(),
+      likeCount: 0,
+      viewerHasLiked: false,
+      reactions: [],
+      viewerReaction: null,
+      author: {
+        id: user?.id ?? "",
+        username: user?.username ?? "",
+        displayName: user?.displayName ?? null,
+        profileImageUrl: user?.profileImageUrl ?? null,
+      },
+    };
+    setOptimisticComments((prev) => [optimistic, ...prev]);
+    setText("");
+    setReplyTo(null);
+
+    // If replying to a comment, auto-expand its replies immediately
+    if (currentReplyTo) {
+      setExpandedIds((prev) => new Set([...prev, currentReplyTo.id]));
+    }
+
+    // Scroll to show the new comment (slight delay so optimistic renders first)
+    setTimeout(() => {
+      (scrollRef.current as unknown as { scrollToEnd: (opts: { animated: boolean }) => void })
+        ?.scrollToEnd({ animated: true });
+    }, 80);
+
     try {
       await commentMut({
-        variables: {
-          postId: id,
-          input: { content, parentId: replyTo?.id ?? undefined },
-        },
+        variables: { postId: id, input: { content, parentId: parentId ?? undefined } },
       });
-      setText("");
-      setReplyTo(null);
-      void refetchComments();
+      void refetchComments().then(() => {
+        setOptimisticComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      });
       showToast("Comment posted ✓", "success");
     } catch {
+      setOptimisticComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      if (currentReplyTo) {
+        setExpandedIds((prev) => { const s = new Set(prev); s.delete(currentReplyTo.id); return s; });
+      }
       showToast("Failed to post comment", "error");
     }
   }
 
-  async function handleDelete() {
-    Alert.alert("Delete post", "This cannot be undone. Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteMut({ variables: { postId: id } });
-            router.replace("/tabs" as `/${string}`);
-          } catch (e: unknown) {
-            Alert.alert("Error", e instanceof Error ? e.message : "Could not delete post");
-          }
-        },
-      },
-    ]);
-  }
-
-  async function handleExtend(addMs: number) {
+  async function copyLink() {
+    if (!id) return;
     try {
-      const base = post?.votingEndsAt ? new Date(post.votingEndsAt).getTime() : Date.now();
-      const newEndsAt = new Date(base + addMs).toISOString();
-      await extendMut({ variables: { postId: id, newVotingEndsAt: newEndsAt } });
-      setExtendVisible(false);
-      showToast("Voting extended ✓", "success");
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : "Could not extend voting", "error");
-    }
+      await Clipboard.setStringAsync(postWebUrl(id));
+      showToast("Copied ✓", "success");
+    } catch { /* ignore */ }
   }
 
   return (
@@ -1159,15 +958,20 @@ export default function PostDetailScreen() {
               <Text style={st.headerBackText}>← Back</Text>
             </TouchableOpacity>
           ),
+          headerRight: () => (
+            <TouchableOpacity onPress={() => void copyLink()} style={st.headerCopy} accessibilityLabel="Copy link">
+              <Text style={st.headerCopyText}>🔗 Copy link</Text>
+            </TouchableOpacity>
+          ),
         }}
       />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
         keyboardVerticalOffset={insets.top + 56}
       >
-        <ScrollView style={st.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+        <ScrollView ref={scrollRef as never} style={st.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           {/* Post card */}
           {postLoading && !post ? (
             <View style={st.loadingRow}>
@@ -1178,120 +982,127 @@ export default function PostDetailScreen() {
               <Text style={st.errorText}>Could not load post.</Text>
             </View>
           ) : post ? (
-            <PostDetailCard post={post} st={st} colors={colors} onVoters={() => setVotersVisible(true)} />
+            <FeedPostCard post={post} variant="detail" onCommentsPress={scrollToComments} />
           ) : null}
 
-          {/* Owner actions */}
-          {isOwner && post ? (
-            <View style={st.ownerActions}>
-              {post.isVotingOpen ? (
-                <Pressable
-                  style={st.ownerBtn}
-                  onPress={() => setExtendVisible(true)}
-                >
-                  <Text style={st.ownerBtnText}>⏱ Extend voting</Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                style={[st.ownerBtn, st.ownerBtnDelete]}
-                onPress={() => void handleDelete()}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <ActivityIndicator size="small" color="#f87171" />
+          {/* Comments — onLayout tracks section Y for deep-link scrolling */}
+          {(() => {
+            const PREVIEW = 5;
+            // Merge server (oldest-first) + optimistic at end; deduplicate by id
+            const seen = new Set<string>();
+            const merged = [...topComments, ...optimisticComments.filter((c) => !c.parentId)]
+              .filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
+            const totalCount = merged.length;
+            // Show last PREVIEW (most recent); "View older" reveals the rest at top
+            const hiddenCount = Math.max(0, totalCount - PREVIEW);
+            const visible = showAllComments ? merged : merged.slice(hiddenCount);
+
+            return (
+              <View onLayout={(e) => { commentsSectionY.current = e.nativeEvent.layout.y; }}>
+                <View style={st.sectionHeader}>
+                  <Text style={st.sectionTitle}>COMMENTS</Text>
+                  {totalCount > 0 ? <Text style={st.commentCount}>{totalCount}</Text> : null}
+                </View>
+
+                {commentsLoading && totalCount === 0 ? (
+                  <View style={st.loadingRow}>
+                    <ActivityIndicator color={colors.accent} />
+                  </View>
+                ) : totalCount === 0 ? (
+                  <View style={st.empty}>
+                    <Text style={st.emptyText}>No comments yet — be the first!</Text>
+                  </View>
                 ) : (
-                  <Text style={st.ownerBtnDeleteText}>🗑 Delete post</Text>
+                  <>
+                    {/* "View older" at the TOP — reveals older comments */}
+                    {!showAllComments && hiddenCount > 0 && (
+                      <Pressable style={st.viewOlderBtn} onPress={() => setShowAllComments(true)}>
+                        <Text style={st.viewOlderText}>
+                          View {hiddenCount} older comment{hiddenCount !== 1 ? "s" : ""} ▴
+                        </Text>
+                      </Pressable>
+                    )}
+                    {showAllComments && totalCount > PREVIEW && (
+                      <Pressable style={st.viewOlderBtn} onPress={() => setShowAllComments(false)}>
+                        <Text style={st.viewOlderText}>Show fewer ▾</Text>
+                      </Pressable>
+                    )}
+
+                    {visible.map((c) => (
+                      <View
+                        key={c.id}
+                        onLayout={(e) => { commentLocalYs.current[c.id] = e.nativeEvent.layout.y; }}
+                      >
+                        <CommentItem
+                          comment={c}
+                          replies={repliesMap.get(c.id) ?? []}
+                          colors={colors}
+                          st={st}
+                          onReply={handleReply}
+                          onLike={handleLike}
+                          forceExpanded={expandedIds.has(c.id)}
+                          highlightedCommentId={highlightedCommentId}
+                        />
+                      </View>
+                    ))}
+                  </>
                 )}
-              </Pressable>
-            </View>
-          ) : null}
-
-          {/* Comments */}
-          <View style={st.sectionHeader}>
-            <Text style={st.sectionTitle}>COMMENTS</Text>
-            {allComments.length > 0 ? (
-              <Text style={st.commentCount}>{allComments.length}</Text>
-            ) : null}
-          </View>
-
-          {commentsLoading ? (
-            <View style={st.loadingRow}>
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          ) : topComments.length === 0 ? (
-            <View style={st.empty}>
-              <Text style={st.emptyText}>No comments yet — be the first!</Text>
-            </View>
-          ) : (
-            topComments.map((c) => (
-              <CommentItem
-                key={c.id}
-                comment={c}
-                replies={repliesMap.get(c.id) ?? []}
-                colors={colors}
-                st={st}
-                onReply={handleReply}
-                onLike={handleLike}
-              />
-            ))
-          )}
+              </View>
+            );
+          })()}
         </ScrollView>
 
-        {/* Comment input */}
+        {/* Comment input — Facebook-style */}
         <View style={{ backgroundColor: colors.card }}>
           {replyTo ? (
             <View style={st.replyingBanner}>
-              <Text style={st.replyingText}>Replying to {replyTo.name}</Text>
-              <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
-                <Text style={st.replyingCancel}>✕ Cancel</Text>
+              <Text style={st.replyingText}>↩ Replying to {replyTo.name}</Text>
+              <Pressable onPress={() => setReplyTo(null)} hitSlop={12}>
+                <Text style={st.replyingCancel}>✕</Text>
               </Pressable>
             </View>
           ) : null}
-          <View style={[st.inputWrap, { paddingBottom: insets.bottom + 10 }]}>
-            <TextInput
-              ref={inputRef}
-              style={st.inputBox}
-              value={text}
-              onChangeText={setText}
-              placeholder={replyTo ? `Reply to ${replyTo.name}…` : "Write a comment…"}
-              placeholderTextColor={colors.muted}
-              multiline
-              returnKeyType="default"
-            />
-            <Pressable
-              style={[st.sendBtn, (!text.trim() || commentSending) && { opacity: 0.5 }]}
-              onPress={() => void handleSend()}
-              disabled={!text.trim() || commentSending}
-            >
-              {commentSending ? (
-                <ActivityIndicator size="small" color="#fff" />
+          <View style={[st.inputWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            {/* User avatar */}
+            <View style={st.inputAvatar}>
+              {user?.profileImageUrl ? (
+                <Image source={{ uri: normalizeProfileImageUrl(user.profileImageUrl) ?? "" }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
-                <Text style={st.sendBtnText}>↑</Text>
+                <Text style={st.inputAvatarText}>
+                  {(user?.displayName ?? user?.username ?? "?").slice(0, 1).toUpperCase()}
+                </Text>
               )}
-            </Pressable>
+            </View>
+            {/* Pill input + Post button */}
+            <View style={st.inputPill}>
+              <TextInput
+                ref={inputRef}
+                style={st.inputBox}
+                value={text}
+                onChangeText={setText}
+                placeholder={replyTo ? `Reply to ${replyTo.name}…` : "Write a comment…"}
+                placeholderTextColor={colors.muted}
+                multiline
+                returnKeyType="send"
+                blurOnSubmit={false}
+                onSubmitEditing={() => void submitComment()}
+              />
+              {(text.trim() || commentSending) ? (
+                <Pressable
+                  style={st.postBtn}
+                  onPress={() => void submitComment()}
+                  disabled={!text.trim() || commentSending}
+                >
+                  {commentSending
+                    ? <ActivityIndicator size="small" color={colors.accent} />
+                    : <Text style={st.postBtnText}>Post</Text>
+                  }
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
-
-      {/* Modals — outside KeyboardAvoidingView to avoid view-parent conflicts */}
-      {post ? (
-        <VotersSheet
-          postId={id ?? ""}
-          visible={votersVisible}
-          onClose={() => setVotersVisible(false)}
-          optionLabels={optionLabels}
-          st={st}
-          insets={insets}
-        />
-      ) : null}
-      <ExtendSheet
-        visible={extendVisible}
-        onClose={() => setExtendVisible(false)}
-        onExtend={(ms) => void handleExtend(ms)}
-        extending={extending}
-        st={st}
-        insets={insets}
-      />
     </View>
   );
 }
