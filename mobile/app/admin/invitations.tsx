@@ -50,6 +50,7 @@ export default function InvitationsScreen() {
   const { showToast, ToastView } = useToast();
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [adminModal, setAdminModal] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
 
@@ -62,7 +63,11 @@ export default function InvitationsScreen() {
   const [resendMut] = useMutation(RESEND_INVITATION);
   const [inviteAdminMut, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
 
-  const invitations = data?.listInvitations ?? [];
+  const allInvitations = data?.listInvitations ?? [];
+  const q = search.trim().toLowerCase();
+  const invitations = q
+    ? allInvitations.filter((i) => i.email.toLowerCase().includes(q))
+    : allInvitations;
 
   async function handleCancel(inv: Invitation) {
     Alert.alert("Cancel invitation", `Cancel invitation for ${inv.email}?`, [
@@ -106,6 +111,24 @@ export default function InvitationsScreen() {
 
       {/* Filters */}
       <View style={[st.toolbar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={[st.searchWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+          <Text style={{ color: colors.muted, marginRight: 8 }}>🔍</Text>
+          <TextInput
+            style={[st.searchInput, { color: colors.text }]}
+            placeholder="Search by email…"
+            placeholderTextColor={colors.muted}
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch("")} hitSlop={8}>
+              <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
+            </Pressable>
+          )}
+        </View>
         <View style={st.filterRow}>
           {([null, "PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"] as const).map((s) => {
             const active = statusFilter === s;
@@ -143,7 +166,9 @@ export default function InvitationsScreen() {
           keyExtractor={(i) => i.id}
           contentContainerStyle={st.list}
           ListEmptyComponent={
-            <Text style={[st.empty, { color: colors.muted }]}>No invitations</Text>
+            <Text style={[st.empty, { color: colors.muted }]}>
+              {q ? `No invitations match “${search.trim()}”` : "No invitations"}
+            </Text>
           }
           renderItem={({ item: inv }) => {
             const sc = STATUS_COLORS[inv.status] ?? { bg: "rgba(100,116,139,0.1)", text: colors.muted };
@@ -227,7 +252,13 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.bg },
     center: { flex: 1, alignItems: "center", justifyContent: "center" },
-    toolbar: { padding: 12, borderBottomWidth: 1 },
+    toolbar: { padding: 12, borderBottomWidth: 1, gap: 10 },
+    searchWrap: {
+      flexDirection: "row", alignItems: "center",
+      borderRadius: 10, borderWidth: 1,
+      paddingHorizontal: 12, paddingVertical: 8,
+    },
+    searchInput: { flex: 1, fontSize: 14, padding: 0 },
     filterRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
     filterChip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1 },
     filterChipText: { fontSize: 11, fontWeight: "700" },

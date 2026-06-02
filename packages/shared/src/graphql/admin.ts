@@ -282,3 +282,71 @@ export const ADMIN_MODERATOR_USER_MESSAGE = gql`
     }
   }
 `;
+
+// ── Platform-wide (SYSTEM) post management ─────────────────────
+export const ADMIN_PLATFORM_POSTS = gql`
+  query AdminPlatformPosts(
+    $query: AdminPlatformPostsQueryInput
+    $skip: Int
+    $take: Int
+  ) {
+    adminPlatformPosts(query: $query, skip: $skip, take: $take) {
+      id
+      type
+      caption
+      imageUrls
+      createdAt
+      updatedAt
+      status
+      scheduledAt
+      votingEndsAt
+      isVotingOpen
+      commentCount
+      hypeCount
+      saveCount
+      totalVotes
+      upvoteCount
+      downvoteCount
+      authorId
+      authorUsername
+      authorDisplayName
+      authorEmail
+      authorProfileImageUrl
+      category {
+        id
+        name
+        slug
+      }
+      options {
+        label
+        imageUrl
+      }
+      optionStats {
+        index
+        label
+        count
+        percentage
+      }
+      editedBy {
+        id
+        displayName
+        username
+        email
+        profileImageUrl
+      }
+      lastEditedBy {
+        id
+        displayName
+        username
+        email
+        profileImageUrl
+      }
+    }
+  }
+`;
+
+export const ADMIN_PLATFORM_POSTS_COUNT = gql`
+  query AdminPlatformPostsCount($filter: AdminPlatformPostsFilterInput) {
+    adminPlatformPostsCount(filter: $filter)
+  }
+`;

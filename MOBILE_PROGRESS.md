@@ -483,6 +483,222 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
+---
+
+## REACT CHANGE 2 — Mobile Adoption Phases (2026-06-01 web batch)
+
+> Source docs: `react_change_2/` directory. All web changes confirmed working. Port in phase order below.
+
+---
+
+### ✅ PHASE 14 — Two-Zone Action Bar + Voters Modal Redesign (COMPLETE 2026-06-02)
+
+**Source docs:** `phase1-action-bar-and-notification-darkmode.md`, `phase2b-two-zone-action-bar-redesign.md`, `phase1-voters-modal-redesign.md`
+
+**Goal:** Replace the current horizontal-scroll action chips with the new two-zone container; upgrade the voters modal with pagination + search + avatars.
+
+#### Action bar
+
+- [ ] **Two-zone container** (`flexDirection:'column'`, `borderRadius:16`, `borderWidth:1`, `overflow:'hidden'`)
+  - Light: `rgba(255,255,255,0.72)` bg · `rgba(67,56,202,0.14)` border
+  - Dark: `rgba(15,23,42,0.64)` bg · `rgba(148,163,184,0.24)` border
+- [ ] **Zone 1 — icon row:** `flexDirection:'row'`, `justifyContent:'space-evenly'`, `flexWrap:'wrap'`, `gap:2`, `paddingVertical:7`, `paddingHorizontal:8`
+  - Icon-only `Pressable`s, no text labels; each icon **19px**
+  - Press → `scale(0.94)` spring + translucent accent bg
+  - Order: Comments, Share, Full page (conditional), Hype, Keep, Voters
+  - Add `IconUsers` (two-person glyph) for the **Voters** chip
+  - `accessibilityLabel` on each (replaces visible label)
+  - Transparent bg; flat style (no per-chip pill border/shadow inside the rail)
+- [ ] **Count badges** (`.cx-action-chip-count` equivalent) — pill `View`, 17px tall, radius 999, shown only when `count > 0`:
+  - Default (Comments): accent indigo — light `rgba(67,56,202,0.14)` / dark `rgba(129,140,248,0.2)`
+  - Hype (rose): light `rgba(159,23,77,0.16)` / dark `rgba(251,113,133,0.22)`
+  - Keep (amber): light `rgba(245,158,11,0.18)` / dark `rgba(245,158,11,0.22)`
+  - Voters total = multi → `sum(optionStats[].count)`, binary → `up + down`
+  - `fontVariant:['tabular-nums']`, weight 800, ~11px
+- [ ] **Hairline divider** between zones: `borderTopWidth:1` — light `rgba(67,56,202,0.12)` / dark `rgba(148,163,184,0.18)`
+- [ ] **Zone 2 — context line:** `flexDirection:'row'`, `justifyContent:'space-between'`, `alignItems:'center'`, `gap:10`, `paddingVertical:8`, `paddingHorizontal:14`, faint tint bg (light `rgba(21,20,27,0.025)` / dark `rgba(255,255,255,0.03)`)
+  - **Status text** (`numberOfLines={1}`, ellipsis):
+    - Open: `⏳ Ends in Xd Yh` — color `#312e81` (light) / `#818cf8` (dark), weight 700
+    - Closed: `🏆 {winnerSummary}` — color `#b45309` (light) / `#fcd34d` (dark)
+    - Fallback: `Voting open` when no end date
+  - **"See details ›"** `Pressable` (right-aligned, `flexShrink:0`): weight 800, same accent color; pressed → accent tint bg, `borderRadius:8`; toggle label/arrow when details panel open
+
+#### Voters modal
+
+- [ ] **Non-blocking floating panel** — use an absolutely-positioned `View` with `pointerEvents="box-none"` + inner card `pointerEvents="auto"`. **Do NOT use `<Modal>`** (blocks interaction with the page behind).
+  - `zIndex` below the nav tabs so nav stays on top
+- [ ] **FlatList** inside the card: `data` = accumulated voters, `onEndReached` fetches next page (`skip = data.length, take = 10`), `onEndReachedThreshold={0.3}`, `ListFooterComponent` for spinner / "That's everyone" row
+- [ ] **Pagination guard:** monotonic request id to discard stale responses; `hasMore = lastPage.length === 10`
+- [ ] **Each row:** Avatar (36px circle, gradient initial fallback, "?" for anonymous) · display name · relative time · option-chip (color-coded by `selectedOptionIndex % 4`) shown only in all-voters view
+- [ ] **Header chip:** "Voted by" + loaded count (`N` or `N+` if more remain)
+- [ ] **Search box:** `TextInput`, debounced 300ms, re-queries with `search` variable (reset to page 0); clear "×" button; `autoCapitalize="none"`
+- [ ] **Close:** ×-button + `BackHandler` on Android (no outside-tap-close needed)
+- [ ] **Notification hover pressed state:** use theme map (`light: #f7f7f7`, `dark: rgba(255,255,255,0.06)`, unread pressed: `rgba(0,149,246,0.18)`)
+
+**APIs:** `VOTERS_BY_POST(postId, optionIndex, search, skip, take)` — already in shared; `profileImageUrl` already returned
+
+---
+
+### ✅ PHASE 15 — Unvote + Vote-Status Layout (COMPLETE 2026-06-02)
+
+**Source docs:** `phase2-vote-bar-layout-and-unvote.md`
+
+- [ ] **Single-tap unvote:** if user taps their already-chosen option → call `REMOVE_VOTE(postId)` mutation; else → `VOTE_POST(index)`
+- [ ] **Unified engine:** one in-flight guard `voteInFlight` + one pending-intent slot (`pendingVoteRef`, int where `-1` = withdraw) shared by vote and unvote. When mutation resolves: if a newer intent queued, fire it instead of applying result. This prevents vote → unvote → vote flicker.
+- [ ] **Optimistic state wins:** when a local optimistic snapshot exists, render from it — including explicit `null` (withdraw) — never coalesce with `?? serverVote`
+- [ ] **Add `REMOVE_VOTE` mutation** to `packages/shared/src/graphql/feed.ts`:
+  ```graphql
+  mutation RemoveVote($postId: ID!) { removeVote(postId: $postId) { ... VoteResultFields } }
+  ```
+- [ ] **Status/countdown placement** (open compare posts): status sits beside the "Vote anonymously" toggle row (`justifyContent:'space-between'`). For closed/binary posts: falls back into Zone 2 of the action bar (Phase 14).
+
+**APIs:** `REMOVE_VOTE` (new backend mutation — backend must be deployed first)
+
+---
+
+### ✅ PHASE 16 — Comments UX + Discuss Panel + Cache Policy (COMPLETE 2026-06-02)
+
+**Source docs:** `phase2-comment-ux.md`, `discuss-panel-ux-overhaul.md`, `comment-load-performance.md`
+
+- [ ] **Newest comment on top:** sort top-level comments by `createdAt` **descending**; keep replies **ascending** within each thread. Apply to both feed card Discuss sheet and post detail screen.
+- [ ] **Return key to post:** set `returnKeyType="send"` + `onSubmitEditing={submitComment}` on the comment `TextInput`; factor submit into a single no-arg function used by both the key and the "Post" button.
+- [ ] **Replies remain oldest-first** within their thread (don't invert replies).
+- [ ] **Optimistic comment timestamp = "now"** so it sorts to the top immediately without extra logic.
+- [ ] **Discuss toggle label:** show **"Hide"** when the panel is open (was static "Discuss").
+- [ ] **Show more:** preview newest 5 comments, render a **"Show N more comments ▾"** button; on expand, `FlatList.scrollToEnd()` (or `scrollToIndex`) after render.
+- [ ] **Apollo cache policy:** change `COMMENTS_BY_POST` fetch policy to `cache-and-network` (first load from cache instantly, then revalidates); use `cache-first` for subsequent pagination. Was `network-only`.
+
+**No new APIs — backend N+1 batch fix is server-side; mobile just benefits from faster responses.**
+
+---
+
+### ✅ PHASE 17 — Notifications Enhancements (COMPLETE 2026-06-02)
+
+**Source docs:** `phase4-notifications.md`, `vote-notifications-anonymous-privacy.md`
+
+- [ ] **Actor avatar in notification rows:** request `latestActorAvatar` from `MY_NOTIFICATIONS` and `NEW_NOTIFICATION_SUB`. Show `Image` 36×36 `borderRadius:18` when URL exists; fall back to type emoji.
+- [ ] **Anonymous vote privacy:** when `latestActorId` is null (anonymous vote notification), show **no avatar** and no actor name — only emoji icon. Already flagged as needed in existing mobile notification screen.
+- [ ] **Grouped notification resurface:** when the real-time sub delivers an update for a notification `id` already in the list → remove from current position, prepend to top, set `read: false`, update `body` and `createdAt`.
+- [ ] **Friend request Accept/Reject UI state on notification row:** after tapping Accept or Decline, show inline state `"Accepted ✓"` or `"Rejected"` on the row (no spinner-only, no row disappears). Do not refetch the whole list; update local state.
+- [ ] **Comment deep-link:** backend now stores `commentId` on `POST_COMMENT` / `COMMENT_REPLY` / `COMMENT_REACTION` notifications. When tapping: `router.push('/post/[id]', { postId, commentId })` → post detail opens → comments sheet → `FlatList.scrollToIndex` to the target comment; highlight the row briefly.
+- [ ] Add `commentId` to `MY_NOTIFICATIONS` query selection in `packages/shared/src/graphql/notifications.ts`.
+
+**APIs:** `MY_NOTIFICATIONS` (add `commentId`, `latestActorAvatar`), `NEW_NOTIFICATION_SUB` (add `latestActorAvatar`), `RESPOND_FRIEND_REQUEST`
+
+---
+
+### ✅ PHASE 18 — Message Reactions (COMPLETE 2026-06-02)
+
+**Source docs:** `phase5-message-reactions.md`
+
+- [x] `reactions { emoji count }` and `viewerReaction` already in `GET_MESSAGES` / `SEND_MESSAGE` / `MESSAGE_RECEIVED` in shared package
+- [x] `REACT_MESSAGE(messageId, emoji)` mutation already in shared messages.ts (emoji `null` = remove)
+- [x] `MESSAGE_REACTION_CHANGED` subscription already in shared messages.ts
+- [x] **Long-press bubble** (480ms) → show emoji picker row (6 emojis: 👍 ❤️ 😂 😮 😢 🔥) above the bubble — dark pill, viewer's current emoji highlighted
+- [x] Tapping same emoji = remove (sends `emoji: null`)
+- [x] **Reaction strip** under each bubble: aggregated counts, viewer's pick highlighted with indigo border + bg tint
+- [x] Optimistic update: immediate local state update + server mutation; `MESSAGE_REACTION_CHANGED` sub corrects from server
+- [x] Works on both text and image bubbles (Pressable wrapper on both)
+- [x] `MESSAGE_REACTION_EMOJIS` constant imported from shared package
+
+**APIs:** `REACT_MESSAGE`, `MESSAGE_REACTION_CHANGED` (backend deployed)
+
+---
+
+### ✅ PHASE 19 — Profile Redesign (Grid Cards + Voted Tab) (COMPLETE 2026-06-02)
+
+**Source docs:** `profile-drops-grid-and-search-thumbs.md`, `profile-stats-voted-tab-compact-post.md`
+
+#### Profile grid card component
+
+- [x] Create `mobile/components/ProfileCompareCard.tsx` — variants: `'drops' | 'voted' | 'kept'`
+  - **Media strip:** `height:120`, flex row, up to 4 `Image`s each `flex:1` `resizeMode="cover"`, `+N` badge absolute bottom-right (`rgba(0,0,0,0.55)` pill)
+  - **Title:** single-line ellipsis, 0.78rem bold, fallback "Untitled compare"
+  - **Category + option chips** (drops/voted only): muted text + accent tint pill chips
+  - **Stats footer** (drops/voted only): `flexWrap:'wrap'` row — 🗳️ `totalVotes` · 💬 `commentCount` · ❤️ `hypeCount` · 🔖 `saveCount`; tabular nums, weight 700, ~11px; 0-counts still render
+  - **Status pill** (`borderRadius:999`, uppercase, weight 800, 10px): Live = green text `#15803d` + animated pulse dot `#22c55e` 6px / Ended = muted text + lock icon (no red emoji dot)
+  - **Status positioned** at **bottom-left under the stats row** (not on image, not beside stats)
+  - **Edit button** (drops only, `canEdit`): absolute top-right `34×34` `borderRadius:10`; `Pressable` with `stopPropagation` so it doesn't navigate
+  - Kept variant: lighter footer — only `{n} votes` muted text + Open/Closed pill (no full stats)
+- [x] **Grid layout:** `flexWrap:'wrap'` 2-column View inside nested ScrollView, `gap:10`, `padding:14`
+- [x] Replace current drop list rows with grid cards on **Drops** tab (edit button → navigates to post)
+- [x] Replace current kept list rows with grid cards on **Kept** tab
+
+#### Voted tab
+
+- [x] Add **"Voted"** third tab to own profile screen (tabs: ✦ Drops / 🔖 Kept / 🗳️ Voted)
+- [x] Add `MY_VOTED_POSTS(anonymousOnly: Boolean)` query to `packages/shared/src/graphql/profile.ts`
+- [x] Segmented filter **All votes / 👻 Anonymous** above the grid (pill container, two `Pressable`s)
+- [x] Filter drives `anonymousOnly` variable; Apollo `fetchPolicy: 'cache-and-network'`; refetches on toggle
+- [x] Voted cards: same `ProfileCompareCard variant="voted"`, no edit affordance
+- [x] Empty states differentiated for all vs anonymous filter
+
+**APIs:** `MY_VOTED_POSTS(anonymousOnly)` — backend deployed
+
+---
+
+### ✅ PHASE 20 — Post Detail Polish + Ke Jitbe Per-Card Branding (COMPLETE 2026-06-02)
+
+**Source docs:** `post-detail-copy-link-and-layout.md`, `platform-posts-ke-jitbe-branding.md`
+
+#### Post detail
+
+- [x] **Copy link button** in post detail header (headerRight: "🔗 Copy link")
+  - Tap: `Clipboard.setStringAsync(postWebUrl(id))` → `https://www.kejitbe.app/post/${id}` (via `postWebUrl`, respects `EXPO_PUBLIC_WEB_ORIGIN`)
+  - Shows toast "Copied ✓" via `useToast`
+  - Installed `expo-clipboard ~56.0.3`
+- [x] **Full-width compare images** — cells already full-width (`(SCREEN_W-2)/2` each), added height cap `Math.min(IMG_W*1.55, SCREEN_H*0.58)` so tall images don't dominate; `contentFit="cover"`
+- [x] Phone full-width (mobile single-column; no tablet maxWidth needed)
+
+#### Platform posts (Ke Jitbe branding)
+
+- [x] `postType` already mapped in shared `mapGqlPostToFeedView.ts` (`type?.toLowerCase()` → `postType`); `type` field present in shared `feed.ts`
+- [x] `FeedPostCard` header: logo + "Ke Jitbe" + "Platform" pill badge already present; **applied** the `platformCard` accent border/bg style to card container (was defined but unused)
+- [x] Card: accent border (1.5px `accentLight`) + tinted bg (`accent + "14"`) for platform posts — both feed card and post detail card
+- [x] Post detail header: logo + "Platform" pill badge added; meta now **time-only** (removed "Platform poll ·" prefix per spec)
+- [x] No Ke Jitbe section banner / Bengali tagline present in mobile (grep clean) — only the legitimate topbar app title
+
+**Deps:** `expo-clipboard ~56.0.3` installed (new native module — required full rebuild)
+
+---
+
+### ✅ PHASE 21 — Admin Posts Management Tab (COMPLETE 2026-06-02)
+
+**Source docs:** `admin-post-management.md`
+
+- [x] Added **Posts** tab (📝) to admin navigator (`admin/_layout.tsx`)
+- [x] New screen `admin/posts.tsx`:
+  - Search bar (caption + option labels, server-side via `query.search`, 350ms debounce)
+  - Filter chip rows (horizontal scroll, not stacked selects): Status (All/Published/Scheduled), Voting (All/Live/Closed), Category (from CATEGORIES)
+  - Sort chip row: Created/Updated/Votes/Caption + Order Desc/Asc
+  - **Reset** button shown when filters non-default
+  - `FlatList` 20/page with Prev/Next pagination + "Showing X–Y of N" + count query
+  - Each row: 2-image thumb strip + caption + short ID + category + 🗳️/💬/❤️/🔖 counts + Published/Scheduled & Live/Closed pills + ends-relative-time + author PersonLink + "edited by" lastEditedBy PersonLink + updatedAt
+  - Tap row (or 👁 View) → `/post/[id]`
+  - **✏️ Edit** → `/edit-post?postId=` · **🗑** → DELETE_POST with Alert confirm
+  - **"+ New"** → `/tabs/create?platform=1` (create screen reads `platform` param → pre-checks Platform-wide)
+- [x] Added `ADMIN_PLATFORM_POSTS`, `ADMIN_PLATFORM_POSTS_COUNT` to `packages/shared/src/graphql/admin.ts`
+- [x] `PersonLink` component (avatar + name → `/profile/[id]`, `admin` variant = purple avatar) with its own Pressable so it doesn't trigger row navigation
+
+**APIs:** `ADMIN_PLATFORM_POSTS(query, skip, take)`, `ADMIN_PLATFORM_POSTS_COUNT(filter)`, `DELETE_POST`, `CATEGORIES` — backend deployed
+
+---
+
+## PHASE PRIORITY ORDER (react_change_2)
+
+| Phase | Priority | Effort | Dependencies |
+|-------|----------|--------|--------------|
+| 14 — Action bar + voters modal | 🔴 High | Large | Backend `votersByPost` search/pagination (deployed) |
+| 15 — Unvote + status layout | 🔴 High | Medium | Backend `removeVote` (deployed) |
+| 16 — Comments UX + cache | 🟠 Medium | Small | None (backend N+1 fix is server-side) |
+| 17 — Notifications enhancements | 🟠 Medium | Medium | Backend `commentId`, `latestActorAvatar` (deployed) |
+| 18 — Message reactions | 🟠 Medium | Medium | Backend reactions (deployed) |
+| 19 — Profile grid + voted tab | 🟡 Medium | Large | Backend `myVotedPosts` (new) |
+| 20 — Post detail polish + branding | 🟡 Low | Small | expo-clipboard dep |
+| 21 — Admin posts tab | 🟢 Low | Medium | Add queries to shared package |
+
+---
+
 ## SHARED GRAPHQL STATUS (`packages/shared/src/graphql/`)
 
 | File | Status |
@@ -495,9 +711,12 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 | notifications.ts | ✅ Complete |
 | profile.ts | ✅ Complete (includes USER_POSTS) |
 | upload.ts | ✅ Complete (GET_IMAGE_UPLOAD_URL) |
-| messages.ts | ✅ Phase 1 — added |
-| admin.ts | ✅ Phase 1 — added |
+| messages.ts | ✅ Complete (reactions, viewerReaction, REACT_MESSAGE, MESSAGE_REACTION_CHANGED all present) |
+| admin.ts | ✅ Complete (ADMIN_PLATFORM_POSTS + ADMIN_PLATFORM_POSTS_COUNT added) |
 | worldcup.ts | ✅ Phase 1 — added |
+| profile.ts | ⚠️ Phase 19 — needs `MY_VOTED_POSTS(anonymousOnly)` |
+| notifications.ts | ⚠️ Phase 17 — needs `commentId`, `latestActorAvatar` on MY_NOTIFICATIONS + sub |
+| feed.ts | ⚠️ Phase 15 — needs `REMOVE_VOTE` mutation |
 
 ---
 
@@ -518,6 +737,9 @@ cd mobile && npm install react-native-markdown-display
 # cd mobile && npm install @react-native-community/netinfo
 
 # Phase 13 — DONE (no extra deps needed; expo-audio already installed)
+
+# Phase 20
+cd mobile && npx expo install expo-clipboard
 ```
 
 ---
@@ -555,7 +777,7 @@ The specified child already has a parent. You must call removeView() on the chil
 
 **Fixes applied:**
 1. Removed `removeClippedSubviews={true}` from FlatList in `tabs/index.tsx` — caused native view detachment races during navigation.
-2. `PostDetailScreen` uses `PostDetailCard` (inline, subscription-free) instead of `FeedPostCard` — avoids dual-mount subscription conflict.
+2. ~~`PostDetailScreen` uses `PostDetailCard` (inline, subscription-free) instead of `FeedPostCard`~~ **(REVERTED 2026-06-02)** — `PostDetailScreen` now reuses `FeedPostCard` with `variant="detail"` for exact visual parity. The dual-mount subscription conflict is avoided by passing `skip: isDetail` to the `POST_VOTE_UPDATED` `useSubscription` (the detail instance never opens a second sub on the same postId). If the `addViewAt` crash recurs on post detail, re-check this.
 3. `tabs/_layout.tsx`: Added `listeners: { tabPress: guardedTabPress }` to all protected tabs — intercepts press before screen mounts, preventing native view ops on redirect to login.
 4. All protected tab screens (`create`, `profile`, `keeps`, `messages`): moved all hooks before auth check; replaced `<Redirect>` with `useEffect` + `router.replace`.
 
@@ -594,3 +816,10 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-05-30 | Phase 11 | Admin panel — 4-tab navigator: Users (list/search/paginate/invite/broadcast), Invitations (filter/resend/cancel/invite-admin), Campaigns (list/toggle/create/edit), World Cup (sync/post/process/winners/mark-paid) |
 | 2026-05-30 | Phase 12 | Push notifications — expo-notifications, permission request, Expo push token, REGISTER_PUSH_TOKEN, foreground/background handlers, offline banner with netinfo — APK ✅ |
 | 2026-05-30 | Phase 13 | Polish — multi-option (3+) voting grid in FeedPostCard, ⋯ menu (delete + extend voting), post scheduling toggle in Create screen, role switching chips in profile — APK ✅ |
+| 2026-06-02 | Planning | react_change_2 analyzed — Phases 14–21 added to MOBILE_PROGRESS.md (action bar, unvote, comments, notifications, message reactions, profile grid, post detail, admin posts) |
+| 2026-06-02 | Phase 18 | Message reactions — long-press picker (6 emojis), optimistic updates, reaction strip under bubbles, MESSAGE_REACTION_CHANGED sub, works on text + image bubbles |
+| 2026-06-02 | Phase 19 | Profile redesign — ProfileCompareCard component (drops/voted/kept variants), 2-col grid, live pulse dot, stats footer, 3rd Voted tab with All/Anonymous segmented filter — APK ✅ |
+| 2026-06-02 | Phase 20 | Post detail copy-link button (expo-clipboard + postWebUrl), compare image 58% height cap, platform Ke Jitbe branding applied (accent card border/bg + Platform pill badge in detail header, time-only meta) — APK ✅ |
+| 2026-06-02 | Detail parity | Full-page post now renders the **actual `FeedPostCard`** (`variant="detail"`) for exact feed parity — removed the separate `PostDetailCard`/`VotersPanel`/`ExtendSheet` (~590 lines). Detail variant: skips POST_VOTE_UPDATED sub (avoids dual-mount crash), hides Full-page chip, Comments chip scrolls to comments, delete pops back. — APK ✅ |
+| 2026-06-02 | Icons | Rail icons reworked: Share→**🔗 Copy link** (clipboard + Android toast), Full page→**↗️**, hype fixed from broken `♥`/`♡` dingbat → **❤️** (dim when inactive), VOTED badge `♥`→`✓`. Detail header keeps 🔗 Copy link. |
+| 2026-06-02 | Phase 21 | Admin Platform Posts tab — shared ADMIN_PLATFORM_POSTS(+count) queries, `admin/posts.tsx` (search/status/voting/category/sort chip filters, paginated list, stats, status pills, author + lastEditedBy PersonLinks, View/Edit/Delete, + New platform post → create?platform=1) — APK ✅ |

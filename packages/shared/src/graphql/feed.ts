@@ -155,8 +155,8 @@ export const MY_SAVED_POSTS = gql`
 `;
 
 export const VOTERS_BY_POST = gql`
-  query VotersByPost($postId: ID!, $optionIndex: Int) {
-    votersByPost(postId: $postId, optionIndex: $optionIndex) {
+  query VotersByPost($postId: ID!, $optionIndex: Int, $search: String, $skip: Int, $take: Int) {
+    votersByPost(postId: $postId, optionIndex: $optionIndex, search: $search, skip: $skip, take: $take) {
       voteId
       selectedOptionIndex
       anonymous
@@ -165,7 +165,19 @@ export const VOTERS_BY_POST = gql`
         id
         username
         displayName
+        profileImageUrl
       }
+    }
+  }
+`;
+
+export const REMOVE_VOTE = gql`
+  mutation RemoveVote($postId: ID!) {
+    removeVote(postId: $postId) {
+      postId
+      totalVotes
+      countsPerOption
+      percentages
     }
   }
 `;

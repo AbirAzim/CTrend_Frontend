@@ -14,6 +14,8 @@ export const MY_NOTIFICATIONS = gql`
         actorCount
         latestActorId
         latestActorName
+        latestActorAvatar
+        commentId
         read
         archived
         createdAt

@@ -28,6 +28,7 @@ import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import logoAsset from "../../assets/logo.png";
 
 const MODERATOR_BRAND_NAME = "Ke Jitbe Moderator";
 
@@ -82,8 +83,8 @@ function Avatar({ name, imageUrl, size = 36 }: { name: string; imageUrl?: string
 
 function ModeratorAvatar({ size = 36 }: { size?: number }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: "#7c3aed", alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ fontSize: size * 0.5 }}>?</Text>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <Image source={logoAsset} style={{ width: size, height: size }} resizeMode="cover" />
     </View>
   );
 }
