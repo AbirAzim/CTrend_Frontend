@@ -92,7 +92,9 @@ async listVotedPostIds(userId, anonymousOnly = false) {
 
 The single-post page (`/post/:id`, `PostDetailPage` → `FeedPostCard`) used the same
 card as the feed but, standalone, a tall compare image dominated the page. Capped the
-media height so it reads with feed-card weight:
+media height so it reads with feed-card weight.
+
+**Also see:** [post-detail-copy-link-and-layout.md](./2026-06-01_post-detail-copy-link-and-layout.md) — Copy link button, full-width compare fix, extra padding (2026-06-01 follow-up).
 
 ```css
 .ig-post-detail .ig-post-media-wrap,
