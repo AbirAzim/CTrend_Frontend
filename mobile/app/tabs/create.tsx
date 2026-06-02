@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -201,11 +201,13 @@ export default function CreateScreen() {
   const { isAuthenticated, hydrated, user } = useAuth();
   const { colors } = useTheme();
   const isAdmin = user?.role?.toLowerCase() === "admin";
+  const { platform: platformParam } = useLocalSearchParams<{ platform?: string }>();
 
   const [slots, setSlots] = useState<Slot[]>([makeSlot("1"), makeSlot("2")]);
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [platformWide, setPlatformWide] = useState(false);
+  // Pre-select platform-wide when admin arrives from "+ New platform post"
+  const [platformWide, setPlatformWide] = useState(platformParam === "1");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
 
