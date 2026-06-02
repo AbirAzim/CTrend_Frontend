@@ -171,6 +171,17 @@ export const VOTERS_BY_POST = gql`
   }
 `;
 
+export const REMOVE_VOTE = gql`
+  mutation RemoveVote($postId: ID!) {
+    removeVote(postId: $postId) {
+      postId
+      totalVotes
+      countsPerOption
+      percentages
+    }
+  }
+`;
+
 /** Match backend `CreatePostInput` — `imageUrls` optional on API; send 1 or 2+ URLs from create UI. */
 export const CREATE_POST = gql`
   mutation CreatePost($input: CreatePostInput!) {
