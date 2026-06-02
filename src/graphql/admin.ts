@@ -207,6 +207,9 @@ export const ADMIN_PLATFORM_POSTS = gql`
       votingEndsAt
       endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       hypeCount
       saveCount
@@ -218,6 +221,13 @@ export const ADMIN_PLATFORM_POSTS = gql`
       authorDisplayName
       authorEmail
       authorProfileImageUrl
+      author {
+        id
+        username
+        displayName
+        email
+        profileImageUrl
+      }
       category {
         id
         name
@@ -237,6 +247,16 @@ export const ADMIN_PLATFORM_POSTS = gql`
         label
         count
         percentage
+      }
+      voteWinner {
+        selectedOptionIndex
+        pickedAt
+        user {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
       }
       editedBy {
         id

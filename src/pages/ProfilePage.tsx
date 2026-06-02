@@ -201,6 +201,19 @@ export function ProfilePage() {
     saveCount?: number | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
+    isPrizeClaimed?: boolean | null;
+    votePrizeClaimedAt?: string | null;
+    canClaimPrize?: boolean | null;
+    voteWinner?: {
+      user?: {
+        id: string;
+        username: string;
+        displayName?: string | null;
+        profileImageUrl?: string | null;
+      } | null;
+      selectedOptionIndex?: number | null;
+      pickedAt?: string | null;
+    } | null;
     options?: Array<{ label?: string | null }> | null;
     category?: { id: string; name?: string | null; slug?: string | null } | null;
     campaign?: { id: string; name?: string | null; slug?: string | null } | null;
@@ -226,6 +239,19 @@ export function ProfilePage() {
     saveCount?: number | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
+    isPrizeClaimed?: boolean | null;
+    votePrizeClaimedAt?: string | null;
+    canClaimPrize?: boolean | null;
+    voteWinner?: {
+      user?: {
+        id: string;
+        username: string;
+        displayName?: string | null;
+        profileImageUrl?: string | null;
+      } | null;
+      selectedOptionIndex?: number | null;
+      pickedAt?: string | null;
+    } | null;
     options?: Array<{ label?: string | null }> | null;
     category?: { id: string; name?: string | null; slug?: string | null } | null;
     campaign?: { id: string; name?: string | null; slug?: string | null } | null;

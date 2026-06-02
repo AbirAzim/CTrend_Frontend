@@ -34,6 +34,9 @@ export function mapGqlPostToFeedView(p: {
   votingEndsAt?: string | null;
   endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
   hypeCount?: number;
@@ -126,6 +129,15 @@ export function mapGqlPostToFeedView(p: {
       p.isVotingOpen === undefined || p.isVotingOpen === null
         ? null
         : p.isVotingOpen,
+    isPrizeClaimed:
+      p.isPrizeClaimed === undefined || p.isPrizeClaimed === null
+        ? null
+        : p.isPrizeClaimed,
+    votePrizeClaimedAt: p.votePrizeClaimedAt ?? null,
+    canClaimPrize:
+      p.canClaimPrize === undefined || p.canClaimPrize === null
+        ? null
+        : p.canClaimPrize,
     upvoteCount: p.upvoteCount,
     downvoteCount: p.downvoteCount,
     hypeCount: p.hypeCount ?? 0,

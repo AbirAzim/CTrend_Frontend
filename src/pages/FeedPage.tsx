@@ -105,6 +105,7 @@ export function FeedPage() {
   const [modalSearch, setModalSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(8);
   const [isCampaignFilterOpen, setIsCampaignFilterOpen] = useState(false);
+  const [isCampaignFilterDockVisible, setIsCampaignFilterDockVisible] = useState(true);
   const lastScrollYRef = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [isWideScreen, setIsWideScreen] = useState(() =>
@@ -364,6 +365,8 @@ export function FeedPage() {
       if (scrollingDown) {
         setIsCampaignFilterOpen(false);
       }
+      // Keep filter dock only near top; hide it once user scrolls down.
+      setIsCampaignFilterDockVisible(currentY < 96);
       lastScrollYRef.current = currentY;
     }
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -502,7 +505,7 @@ export function FeedPage() {
 
       <div className="ig-feed">
         <CampaignBanners />
-        {!useMockFeed && campaignFilters.length > 0 ? (
+        {!useMockFeed && campaignFilters.length > 0 && isCampaignFilterDockVisible ? (
           <div className="cx-campaign-filter-dock">
             <button
               type="button"
@@ -510,7 +513,10 @@ export function FeedPage() {
               aria-expanded={isCampaignFilterOpen}
               onClick={() => setIsCampaignFilterOpen((prev) => !prev)}
             >
-              Filter feed
+              <span className="cx-campaign-filter-toggle-kicker">Filter feed</span>
+              <span className="cx-campaign-filter-toggle-value">
+                {activeCampaign ? activeCampaign.name : "All compares"}
+              </span>
             </button>
             {isCampaignFilterOpen ? (
               <div className="cx-campaign-filter-shell">
@@ -545,6 +551,9 @@ export function FeedPage() {
                     </button>
                   ))}
                 </div>
+                <p className="cx-campaign-filter-help muted small">
+                  Pick one campaign to focus the feed instantly.
+                </p>
                 {activeCampaign ? (
                   <p className="cx-campaign-filter-note muted small">
                     Showing <strong>{activeCampaign.name}</strong> posts now.
