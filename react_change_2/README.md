@@ -50,6 +50,12 @@ Use this table when porting the **current web work** to mobile or reviewing with
 
 Earlier phases (1–4, profile): see rows without bold in the table above.
 
+### Web-only (do not port to native app)
+
+| Doc | Topic |
+|-----|--------|
+| [admin-mobile-redesign.md](./2026-06-01_admin-mobile-redesign.md) | Admin responsive **browser** layout (select/chips, stacked tables). Native admin UI is separate. |
+
 ---
 
 ## Quick reference — files touched (web)
