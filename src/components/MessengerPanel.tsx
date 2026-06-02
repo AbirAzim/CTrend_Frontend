@@ -1024,7 +1024,15 @@ export function MessengerPanel() {
       ? createPortal(
           <div
             className="mp-mobile-shell"
-            style={{ "--mp-keyboard-inset": `${keyboardInsetPx}px` } as CSSProperties}
+            style={
+              {
+                "--mp-keyboard-inset": `${keyboardInsetPx}px`,
+                // When the iOS keyboard is open, the bottom nav is usually covered.
+                // Avoid stacking both nav-gap and keyboard inset at once.
+                "--mp-shell-bottom-gap":
+                  keyboardInsetPx > 0 ? "0px" : "var(--ig-bottom-nav-stack)",
+              } as CSSProperties
+            }
             role="dialog"
             aria-modal="false"
             aria-label="Messages"
