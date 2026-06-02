@@ -572,7 +572,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 17 — Notifications Enhancements
+### ✅ PHASE 17 — Notifications Enhancements (COMPLETE 2026-06-02)
 
 **Source docs:** `phase4-notifications.md`, `vote-notifications-anonymous-privacy.md`
 
@@ -587,20 +587,21 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⬜ PHASE 18 — Message Reactions
+### ✅ PHASE 18 — Message Reactions (COMPLETE 2026-06-02)
 
 **Source docs:** `phase5-message-reactions.md`
 
-- [ ] Add `reactions { emoji count }` and `viewerReaction` fields to `GET_MESSAGES` / `SEND_MESSAGE` response type in `packages/shared/src/graphql/messages.ts` (web already done — sync shared package)
-- [ ] Add `REACT_MESSAGE(messageId, emoji)` mutation to shared messages.ts (emoji `null` = remove)
-- [ ] Add `MESSAGE_REACTION_CHANGED` subscription to shared messages.ts
-- [ ] **Long-press bubble** (480ms) → show emoji picker row (6 emojis: 👍 ❤️ 😂 😮 😢 🔥) above the bubble
-- [ ] Tapping same emoji = remove (send `emoji: null`)
-- [ ] **Reaction strip** under each bubble: aggregated counts with viewer's picked emoji highlighted
-- [ ] Wire `reactMessage` optimistic + `MESSAGE_REACTION_CHANGED` sub merge in messenger provider / chat screen
-- [ ] Works on both text and image bubbles
+- [x] `reactions { emoji count }` and `viewerReaction` already in `GET_MESSAGES` / `SEND_MESSAGE` / `MESSAGE_RECEIVED` in shared package
+- [x] `REACT_MESSAGE(messageId, emoji)` mutation already in shared messages.ts (emoji `null` = remove)
+- [x] `MESSAGE_REACTION_CHANGED` subscription already in shared messages.ts
+- [x] **Long-press bubble** (480ms) → show emoji picker row (6 emojis: 👍 ❤️ 😂 😮 😢 🔥) above the bubble — dark pill, viewer's current emoji highlighted
+- [x] Tapping same emoji = remove (sends `emoji: null`)
+- [x] **Reaction strip** under each bubble: aggregated counts, viewer's pick highlighted with indigo border + bg tint
+- [x] Optimistic update: immediate local state update + server mutation; `MESSAGE_REACTION_CHANGED` sub corrects from server
+- [x] Works on both text and image bubbles (Pressable wrapper on both)
+- [x] `MESSAGE_REACTION_EMOJIS` constant imported from shared package
 
-**APIs:** `REACT_MESSAGE`, `MESSAGE_REACTION_CHANGED` (backend already deployed)
+**APIs:** `REACT_MESSAGE`, `MESSAGE_REACTION_CHANGED` (backend deployed)
 
 ---
 
@@ -711,7 +712,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 | notifications.ts | ✅ Complete |
 | profile.ts | ✅ Complete (includes USER_POSTS) |
 | upload.ts | ✅ Complete (GET_IMAGE_UPLOAD_URL) |
-| messages.ts | ⚠️ Phase 18 — needs `reactions`, `viewerReaction`, `REACT_MESSAGE`, `MESSAGE_REACTION_CHANGED` |
+| messages.ts | ✅ Complete (reactions, viewerReaction, REACT_MESSAGE, MESSAGE_REACTION_CHANGED all present) |
 | admin.ts | ⚠️ Phase 21 — needs `ADMIN_PLATFORM_POSTS`, `ADMIN_PLATFORM_POSTS_COUNT` |
 | worldcup.ts | ✅ Phase 1 — added |
 | profile.ts | ⚠️ Phase 19 — needs `MY_VOTED_POSTS(anonymousOnly)` |
@@ -817,3 +818,4 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-05-30 | Phase 12 | Push notifications — expo-notifications, permission request, Expo push token, REGISTER_PUSH_TOKEN, foreground/background handlers, offline banner with netinfo — APK ✅ |
 | 2026-05-30 | Phase 13 | Polish — multi-option (3+) voting grid in FeedPostCard, ⋯ menu (delete + extend voting), post scheduling toggle in Create screen, role switching chips in profile — APK ✅ |
 | 2026-06-02 | Planning | react_change_2 analyzed — Phases 14–21 added to MOBILE_PROGRESS.md (action bar, unvote, comments, notifications, message reactions, profile grid, post detail, admin posts) |
+| 2026-06-02 | Phase 18 | Message reactions — long-press picker (6 emojis), optimistic updates, reaction strip under bubbles, MESSAGE_REACTION_CHANGED sub, works on text + image bubbles |

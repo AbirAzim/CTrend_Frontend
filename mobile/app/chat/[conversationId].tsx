@@ -21,14 +21,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   GET_MESSAGES,
   MARK_CONVERSATION_READ,
+  MESSAGE_REACTION_CHANGED,
+  MESSAGE_REACTION_EMOJIS,
   MESSAGE_RECEIVED,
   MESSAGE_READ_SUB,
   MY_CONVERSATIONS,
   PRESENCE_CHANGED,
+  REACT_MESSAGE,
   SEND_MESSAGE,
   SET_TYPING,
   TYPING_INDICATOR_SUB,
-
 } from "@ctrend/shared/graphql/messages";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
@@ -40,6 +42,8 @@ import { clearConversationNotification } from "../../lib/messageNotifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type MessageReaction = { emoji: string; count: number };
+
 type Message = {
   id: string;
   conversationId: string;
@@ -49,6 +53,8 @@ type Message = {
   text: string;
   imageUrl?: string | null;
   readBy: Array<{ userId: string; readAt: string }>;
+  reactions?: MessageReaction[] | null;
+  viewerReaction?: string | null;
   createdAt: string;
 };
 
@@ -72,6 +78,16 @@ type Conversation = {
 
 type ConversationsData = { myConversations: Conversation[] };
 
+type ReactionChangedData = {
+  messageReactionChanged: {
+    messageId: string;
+    conversationId: string;
+    reactions: MessageReaction[];
+    actorUserId: string | null;
+    actorEmoji: string | null;
+  };
+};
+
 const PAGE_SIZE = 30;
 
 const EMOJI_PRESETS = [
@@ -88,70 +104,137 @@ function MessageBubble({
   isOwn,
   showAvatar,
   colors,
+  isReacting,
+  onLongPress,
+  onReact,
 }: {
   msg: Message;
   isOwn: boolean;
   showAvatar: boolean;
   colors: ReturnType<typeof useTheme>["colors"];
+  isReacting: boolean;
+  onLongPress: () => void;
+  onReact: (emoji: string) => void;
 }) {
   const avatar = normalizeProfileImageUrl(msg.senderAvatar);
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
+  const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
 
   return (
-    <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
-      {/* Other-side avatar */}
-      {!isOwn && (
-        <View style={styles.bubbleAvatarSlot}>
-          {showAvatar && (
-            <View style={[styles.bubbleAvatar, { overflow: "hidden" }]}>
-              {avatar
-                ? <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                : <Text style={styles.bubbleAvatarText}>{initial}</Text>
-              }
-            </View>
-          )}
+    <View>
+      {/* Quick-react emoji picker — shown above bubble on long-press */}
+      {isReacting && (
+        <View
+          style={[
+            styles.quickReactRow,
+            isOwn ? styles.quickReactOwn : styles.quickReactOther,
+          ]}
+        >
+          {MESSAGE_REACTION_EMOJIS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              style={[
+                styles.quickReactBtn,
+                msg.viewerReaction === emoji && styles.quickReactBtnActive,
+              ]}
+              onPress={() => onReact(emoji)}
+            >
+              <Text style={styles.quickReactEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+          <Pressable style={styles.quickReactClose} onPress={onLongPress}>
+            <Text style={styles.quickReactCloseText}>✕</Text>
+          </Pressable>
         </View>
       )}
 
-      <View style={[styles.bubbleGroup, isOwn ? { alignItems: "flex-end" } : { alignItems: "flex-start" }]}>
-        {/* Sender name (group chats or first in sequence) */}
-        {!isOwn && showAvatar && (
-          <Text style={[styles.bubbleSender, { color: colors.accent }]}>{msg.senderName}</Text>
-        )}
-
-        {/* Image message */}
-        {msg.imageUrl ? (
-          <View style={[styles.bubbleImg, isOwn && { borderBottomRightRadius: 4 }, !isOwn && { borderBottomLeftRadius: 4 }]}>
-            <Image
-              source={{ uri: msg.imageUrl }}
-              style={styles.bubbleImgContent}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-            {msg.text ? (
-              <Text style={[styles.bubbleImgCaption, { color: "#fff" }]}>{msg.text}</Text>
-            ) : null}
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.bubble,
-              isOwn
-                ? [{ backgroundColor: colors.accent }, styles.bubbleOwn]
-                : [{ backgroundColor: colors.card, borderColor: colors.border }, styles.bubbleOther],
-            ]}
-          >
-            <Text style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text }]}>
-              {msg.text}
-            </Text>
+      <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
+        {/* Other-side avatar */}
+        {!isOwn && (
+          <View style={styles.bubbleAvatarSlot}>
+            {showAvatar && (
+              <View style={[styles.bubbleAvatar, { overflow: "hidden" }]}>
+                {avatar
+                  ? <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                  : <Text style={styles.bubbleAvatarText}>{initial}</Text>
+                }
+              </View>
+            )}
           </View>
         )}
 
-        {/* Time + seen */}
-        <Text style={[styles.bubbleTime, { color: colors.muted }]}>
-          {formatRelativeTime(msg.createdAt)}
-          {isOwn && msg.readBy.length > 1 ? "  ✓✓" : ""}
-        </Text>
+        <View style={[styles.bubbleGroup, isOwn ? { alignItems: "flex-end" } : { alignItems: "flex-start" }]}>
+          {/* Sender name (group chats or first in sequence) */}
+          {!isOwn && showAvatar && (
+            <Text style={[styles.bubbleSender, { color: colors.accent }]}>{msg.senderName}</Text>
+          )}
+
+          {/* Image bubble */}
+          {msg.imageUrl ? (
+            <Pressable
+              onLongPress={onLongPress}
+              delayLongPress={480}
+              style={[
+                styles.bubbleImg,
+                isOwn && { borderBottomRightRadius: 4 },
+                !isOwn && { borderBottomLeftRadius: 4 },
+              ]}
+            >
+              <Image
+                source={{ uri: msg.imageUrl }}
+                style={styles.bubbleImgContent}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+              {msg.text ? (
+                <Text style={[styles.bubbleImgCaption, { color: "#fff" }]}>{msg.text}</Text>
+              ) : null}
+            </Pressable>
+          ) : (
+            /* Text bubble */
+            <Pressable
+              onLongPress={onLongPress}
+              delayLongPress={480}
+              style={[
+                styles.bubble,
+                isOwn
+                  ? [{ backgroundColor: colors.accent }, styles.bubbleOwn]
+                  : [{ backgroundColor: colors.card, borderColor: colors.border }, styles.bubbleOther],
+              ]}
+            >
+              <Text style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text }]}>
+                {msg.text}
+              </Text>
+            </Pressable>
+          )}
+
+          {/* Reaction strip */}
+          {activeReactions.length > 0 && (
+            <View style={styles.reactionStrip}>
+              {activeReactions.map((r) => (
+                <Pressable
+                  key={r.emoji}
+                  onPress={() => onReact(r.emoji)}
+                  style={[
+                    styles.reactionChip,
+                    { backgroundColor: colors.section },
+                    msg.viewerReaction === r.emoji && styles.reactionChipActive,
+                  ]}
+                >
+                  <Text style={styles.reactionChipText}>
+                    {r.emoji} {r.count}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {/* Time + seen */}
+          <Text style={[styles.bubbleTime, { color: colors.muted }]}>
+            {formatRelativeTime(msg.createdAt)}
+            {isOwn && msg.readBy.length > 1 ? "  ✓✓" : ""}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -167,9 +250,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<Message[]>([]);
-  // Ref-based dedup: immune to React batching race conditions
   const seenIds = useRef(new Set<string>());
-  // Synchronous guard — prevents double loadMore calls before state re-renders
   const loadingMoreRef = useRef(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -180,10 +261,10 @@ export default function ChatScreen() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
-
 
   // ── Fetch conversation metadata for header ──────────────────────────────────
   const { data: convsData } = useQuery<ConversationsData>(MY_CONVERSATIONS, {
@@ -208,7 +289,6 @@ export default function ChatScreen() {
       const sorted = [...(data.messages ?? [])].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      // Add to seenIds (never reset — avoids race where subscription fires mid-seed)
       sorted.forEach((m) => seenIds.current.add(m.id));
       setMessages(sorted);
       setHasMore((data.messages ?? []).length === PAGE_SIZE);
@@ -219,12 +299,8 @@ export default function ChatScreen() {
   const [markRead] = useMutation(MARK_CONVERSATION_READ);
   useEffect(() => {
     if (conversationId) {
-      // Dismiss notifee grouped notification for this conversation
       clearConversationNotification(conversationId);
-
-      void markRead({ variables: { conversationId },
-        refetchQueries: [MY_CONVERSATIONS],
-      });
+      void markRead({ variables: { conversationId }, refetchQueries: [MY_CONVERSATIONS] });
     }
   }, [conversationId, markRead]);
 
@@ -232,6 +308,45 @@ export default function ChatScreen() {
   const [sendMessage] = useMutation(SEND_MESSAGE);
   const [setTypingMut] = useMutation(SET_TYPING);
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
+  const [reactMessage] = useMutation(REACT_MESSAGE);
+
+  // ── React to a message (optimistic) ────────────────────────────────────────
+  function handleReact(msg: Message, emoji: string) {
+    const isRemove = msg.viewerReaction === emoji;
+    const emojiToSend = isRemove ? null : emoji;
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== msg.id) return m;
+        let updated = [...(m.reactions ?? [])];
+
+        if (m.viewerReaction && !isRemove) {
+          // Decrement previous when switching emoji
+          updated = updated
+            .map((r) => r.emoji === m.viewerReaction ? { ...r, count: Math.max(0, r.count - 1) } : r)
+            .filter((r) => r.count > 0);
+        }
+
+        if (isRemove) {
+          updated = updated
+            .map((r) => r.emoji === emoji ? { ...r, count: Math.max(0, r.count - 1) } : r)
+            .filter((r) => r.count > 0);
+        } else {
+          const existing = updated.find((r) => r.emoji === emoji);
+          if (existing) {
+            updated = updated.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1 } : r);
+          } else {
+            updated = [...updated, { emoji, count: 1 }];
+          }
+        }
+
+        return { ...m, reactions: updated, viewerReaction: isRemove ? null : emoji };
+      })
+    );
+
+    setActiveReactMsgId(null);
+    void reactMessage({ variables: { messageId: msg.id, emoji: emojiToSend } }).catch(() => {});
+  }
 
   // ── New message subscription ────────────────────────────────────────────────
   useSubscription<{ messageReceived: Message }>(MESSAGE_RECEIVED, {
@@ -239,8 +354,6 @@ export default function ChatScreen() {
     onData: ({ data }) => {
       const msg = data.data?.messageReceived;
       if (!msg || msg.conversationId !== conversationId) return;
-
-      // Ref-based dedup: immune to React batching races
       if (seenIds.current.has(msg.id)) return;
       seenIds.current.add(msg.id);
       setMessages((prev) => [msg, ...prev]);
@@ -249,6 +362,23 @@ export default function ChatScreen() {
         Vibration.vibrate(150);
       }
       void markRead({ variables: { conversationId }, refetchQueries: [MY_CONVERSATIONS] });
+    },
+  });
+
+  // ── Reaction changed subscription ───────────────────────────────────────────
+  useSubscription<ReactionChangedData>(MESSAGE_REACTION_CHANGED, {
+    skip: !conversationId,
+    onData: ({ data }) => {
+      const ev = data.data?.messageReactionChanged;
+      if (!ev || ev.conversationId !== conversationId) return;
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== ev.messageId) return m;
+          const newViewerReaction =
+            ev.actorUserId === user?.id ? ev.actorEmoji : m.viewerReaction;
+          return { ...m, reactions: ev.reactions, viewerReaction: newViewerReaction };
+        })
+      );
     },
   });
 
@@ -381,7 +511,7 @@ export default function ChatScreen() {
           ...(uploadedUrl ? { imageUrl: uploadedUrl } : {}),
         },
       });
-    } catch { /* message failed silently — could add error toast */ }
+    } catch { /* message failed silently */ }
     finally {
       setSending(false);
       setImageUploading(false);
@@ -395,7 +525,6 @@ export default function ChatScreen() {
   const canSend = (text.trim().length > 0 || imageUri !== null) && !sending && !imageUploading;
 
   const handleLoadMore = useCallback(async () => {
-    // Use ref (synchronous) not state (async) to prevent double-fire race
     if (loadingMoreRef.current || !hasMore || !conversationId || messages.length === 0) return;
     loadingMoreRef.current = true;
     setLoadingMore(true);
@@ -436,7 +565,6 @@ export default function ChatScreen() {
           <Text style={[styles.backText, { color: colors.accent }]}>‹</Text>
         </Pressable>
 
-        {/* Avatar */}
         <View style={[styles.headerAvatar, { overflow: "hidden" }]}>
           {headerAvatar
             ? <Image source={{ uri: headerAvatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
@@ -489,12 +617,16 @@ export default function ChatScreen() {
               const showAvatar = !isOwn && (
                 !prevMsg || prevMsg.senderId !== msg.senderId
               );
+              const isReacting = activeReactMsgId === msg.id;
               return (
                 <MessageBubble
                   msg={msg}
                   isOwn={isOwn}
                   showAvatar={showAvatar}
                   colors={colors}
+                  isReacting={isReacting}
+                  onLongPress={() => setActiveReactMsgId(isReacting ? null : msg.id)}
+                  onReact={(emoji) => handleReact(msg, emoji)}
                 />
               );
             }}
@@ -510,7 +642,7 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
-        {/* Emoji picker */}
+        {/* Emoji picker (insert into message text) */}
         {showEmoji && (
           <View style={[styles.emojiPicker, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiRow}>
@@ -667,11 +799,71 @@ const styles = StyleSheet.create({
   bubbleImgContent: { width: 200, height: 200 },
   bubbleImgCaption: { paddingHorizontal: 10, paddingVertical: 6, fontSize: 13 },
 
+  // Quick-react emoji picker
+  quickReactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    marginHorizontal: 4,
+    backgroundColor: "rgba(15,20,40,0.92)",
+    borderRadius: 24,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    gap: 2,
+  },
+  quickReactOwn: { alignSelf: "flex-end" },
+  quickReactOther: { alignSelf: "flex-start", marginLeft: 38 },
+  quickReactBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 18,
+  },
+  quickReactBtnActive: {
+    backgroundColor: "rgba(99,102,241,0.35)",
+  },
+  quickReactEmoji: { fontSize: 22 },
+  quickReactClose: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    marginLeft: 2,
+  },
+  quickReactCloseText: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700" },
+
+  // Reaction strip
+  reactionStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 4,
+    marginHorizontal: 2,
+  },
+  reactionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  reactionChipActive: {
+    backgroundColor: "rgba(99,102,241,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.45)",
+  },
+  reactionChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+
   // Typing
   typingBar: { paddingHorizontal: 16, paddingVertical: 4 },
   typingText: { fontSize: 12, fontStyle: "italic" },
 
-  // Emoji picker
+  // Emoji picker (message compose)
   emojiPicker: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 4 },
   emojiRow: { paddingHorizontal: 8, gap: 2 },
   emojiBtn: { padding: 8, borderRadius: 8 },
