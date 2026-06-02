@@ -747,6 +747,22 @@ export function MessengerPanel() {
     { skip: !isAuthenticated, fetchPolicy: "cache-and-network" },
   );
 
+  const activeChat =
+    openWindowIds.length > 0
+      ? (conversations.find((c) => c.id === openWindowIds[0]) ?? null)
+      : null;
+  const mobileSheetOpen =
+    isAuthenticated && isMobile && (panelOpen || Boolean(activeChat));
+
+  useEffect(() => {
+    if (!mobileSheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileSheetOpen]);
+
   if (!isAuthenticated) return null;
 
   const openConversations = openWindowIds
@@ -807,8 +823,6 @@ export function MessengerPanel() {
     }
   }
 
-  const activeChat = openConversations[0] ?? null;
-  const mobileSheetOpen = isMobile && (panelOpen || Boolean(activeChat));
   const showMobileChat = isMobile && Boolean(activeChat);
   const showMobileList = isMobile && panelOpen && !activeChat;
 
@@ -822,15 +836,6 @@ export function MessengerPanel() {
     setPanelOpen(true);
     setSearch("");
   }
-
-  useEffect(() => {
-    if (!mobileSheetOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobileSheetOpen]);
 
   const listPanel = panelOpen || showMobileList ? (
           <div className={`mp-panel${isMobile ? " mp-panel--mobile-full" : ""}`}>
