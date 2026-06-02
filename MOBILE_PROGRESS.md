@@ -818,16 +818,16 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 27 — Winner/Claim Visibility (Profile + Admin) + Filter UX Polish
+### ⏳ PHASE 27 — Winner/Claim Visibility (Profile + Admin) + Filter UX Polish — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-02_vote-end-winner-claim-and-filter-ux.md` (visibility parts), `2026-06-02_admin-post-management-ux-overhaul.md` (winner column data only)
 
 **Goal:** Surface winner identity + claim status on profile drops cards and the admin posts list; polish the feed campaign-filter trigger.
 
-- [ ] **Shared GraphQL** — add winner/claim fields (`voteWinner { user {…} }`, `isPrizeClaimed`, `votePrizeClaimedAt`, `canClaimPrize`) to profile drops/voted queries and to the admin posts query.
-- [ ] **ProfileCompareCard** (`mobile/components/ProfileCompareCard.tsx`) — drops/voted cards show winner identity + **claimed** badge + a **"claimable"** hint when applicable.
-- [ ] **Admin posts** (`app/admin/posts.tsx`) — each row shows winner avatar/name (tappable → profile) + prize-claimed status/time.
-- [ ] **Feed filter trigger polish** — stronger hierarchy on the Phase-23 filter trigger: kicker label + active value + helper text; improved dark-mode contrast.
+- [x] **Shared GraphQL** — added `voteWinner { selectedOptionIndex pickedAt user {…} }`, `isPrizeClaimed`, `votePrizeClaimedAt`, `canClaimPrize` to `MY_VOTED_POSTS` + `USER_POSTS` (profile.ts) and to `ADMIN_PLATFORM_POSTS` (admin.ts).
+- [x] **ProfileCompareCard** — drops/voted (rich-meta) cards, once ended, show wrap pills: **🏆 {winner}**, **✅ Prize claimed**, and **🎁 Claim from notifications** (when `canClaimPrize && !isPrizeClaimed`). Gold/claimed-green palettes; `statusRow` now wraps.
+- [x] **Admin posts** (`app/admin/posts.tsx`) — closed posts with a winner show a **🏆 Winner** row: `PersonLink` (avatar+name → profile) + **✅ CLAIMED · {time}** or **UNCLAIMED** pill.
+- [x] **Feed filter polish** — added helper line ("Show compares from a specific campaign, or all.") to the expanded `FeedCampaignFilter` panel (kicker + active value already from Phase 23).
 
 **APIs:** profile + admin post queries (add winner/claim fields) — backend deployed.
 
@@ -1088,3 +1088,4 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 24 | Vote-draw winner banner — shared `POST_VOTE_WINNER_FIELDS` on feed/detail + `FeedPostVoteWinnerView` type + mapper; new `PostVoteWinnerBanner` gold trophy card in `FeedPostCard` (above action rail, only when closed + winner.user exists, tap → profile). APK installed on Pixel 6 — ✅ device-tested |
 | 2026-06-02 | Phase 25 | Ending-soon banner + admin threshold — `endingSoonLeadMinutes` on feed/detail/saved/admin queries + type + mapper (default 5); amber top banner in `FeedPostCard` when open & within lead window (driven by 1s countdown tick); admin-only lead-time input in `edit-post.tsx` (clamped 1–1440) via `UPDATE_POST`. APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 26 | Vote-end notifications + winner claim — shared `CLAIM_POST_VOTE_PRIZE` mutation; notifications screen icons + `POST_NOTIF_TYPES` for `VOTE_ENDED`/`VOTE_WINNER`/`VOTE_PRIZE_CLAIMED`; "🏆 Claim prize" button on unclaimed winner rows → optimistic "Prize claim submitted" + hide button (rollback on error). APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-02 | Phase 27 | Winner/claim visibility — `voteWinner`+claim fields on profile (voted/drops) + admin posts queries; `ProfileCompareCard` winner/claimed/claimable wrap pills; admin posts winner row (PersonLink + claimed/unclaimed pill); `FeedCampaignFilter` helper text. APK installed on Pixel 6 — ⏳ awaiting device test |

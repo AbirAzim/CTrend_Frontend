@@ -64,6 +64,9 @@ export function FeedCampaignFilter({ selectedId, onSelect }: Props) {
 
 			{open ? (
 				<View style={styles.chips}>
+					<Text style={[styles.helper, { color: colors.muted }]}>
+						Show compares from a specific campaign, or all.
+					</Text>
 					<FilterChip
 						label='All compares'
 						active={!selectedId}
@@ -163,6 +166,12 @@ const styles = StyleSheet.create({
 		flexWrap: 'wrap',
 		gap: 8,
 		marginTop: 10,
+	},
+	helper: {
+		width: '100%',
+		fontSize: 11,
+		fontWeight: '600',
+		marginBottom: 2,
 	},
 	chip: {
 		flexDirection: 'row',
