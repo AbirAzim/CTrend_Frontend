@@ -236,6 +236,24 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: isDark ? 'rgba(245,158,11,0.5)' : 'rgba(217,160,23,0.55)',
 			borderWidth: 1.5,
 		},
+		endingSoonBanner: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 8,
+			paddingHorizontal: 14,
+			paddingVertical: 9,
+			backgroundColor: isDark ? 'rgba(245,158,11,0.16)' : 'rgba(245,158,11,0.15)',
+			borderBottomWidth: 1,
+			borderBottomColor: isDark ? 'rgba(245,158,11,0.32)' : 'rgba(217,160,23,0.32)',
+		},
+		endingSoonIcon: { fontSize: 14 },
+		endingSoonText: {
+			flex: 1,
+			fontSize: 12.5,
+			fontWeight: '700' as const,
+			color: isDark ? '#fcd34d' : '#b45309',
+		},
+		endingSoonStrong: { fontWeight: '800' as const },
 		timeLabel: { fontSize: 11, color: c.muted, marginTop: 2 },
 		moreBtn: { padding: 8 },
 		moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
@@ -880,6 +898,21 @@ function FeedPostCardComponent({
 	const activeVotingEndsAt =
 		optimisticVote?.votingEndsAt ?? post.votingEndsAt ?? null;
 
+	// Ending-soon urgency banner (Phase 25) — re-evaluated each render; the 1s
+	// countdown interval below keeps re-rendering while voting is open.
+	const endingSoonLeadMinutes = Math.max(
+		1,
+		Math.round(post.endingSoonLeadMinutes ?? 5),
+	);
+	const endingSoonRemainingMs = activeVotingEndsAt
+		? new Date(activeVotingEndsAt).getTime() - Date.now()
+		: null;
+	const isEndingSoon =
+		!isVotingClosed &&
+		endingSoonRemainingMs !== null &&
+		endingSoonRemainingMs > 0 &&
+		endingSoonRemainingMs <= endingSoonLeadMinutes * 60_000;
+
 	const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls : null;
 	const isBinary = compareUrls?.length === 2;
 
@@ -1521,6 +1554,19 @@ function FeedPostCardComponent({
 				isPlatformPost && st.platformCard,
 				campaign && st.campaignCard,
 			]}>
+			{/* Ending-soon urgency banner */}
+			{isEndingSoon ? (
+				<View style={st.endingSoonBanner}>
+					<Text style={st.endingSoonIcon}>⏳</Text>
+					<Text style={st.endingSoonText} numberOfLines={1}>
+						Poll ending soon, vote now!{' '}
+						<Text style={st.endingSoonStrong}>
+							{countdownStr || 'Time is running out'}
+						</Text>
+					</Text>
+				</View>
+			) : null}
+
 			{/* Header */}
 			<View style={st.header}>
 				<Pressable
