@@ -15,6 +15,16 @@ export type ProfileCompareCardPost = {
   saveCount?: number | null;
   isVotingOpen?: boolean | null;
   votingEndsAt?: string | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
+  voteWinner?: {
+    user?: {
+      id: string;
+      username: string;
+      displayName?: string | null;
+    } | null;
+  } | null;
 };
 
 function votingEnded(post: ProfileCompareCardPost): boolean {
@@ -145,6 +155,21 @@ export function ProfileCompareCard({
             )}
             <div className="cx-profile-card-status-row">
               <VotingStatusBadge isOpen={isOpen} variant={variant} />
+              {!isOpen && post.voteWinner?.user ? (
+                <span className="cx-profile-status-pill cx-profile-status-pill--winner">
+                  🏆 Winner: {post.voteWinner.user.displayName?.trim() || `@${post.voteWinner.user.username}`}
+                </span>
+              ) : null}
+              {!isOpen && post.isPrizeClaimed ? (
+                <span className="cx-profile-status-pill cx-profile-status-pill--claimed">
+                  ✅ Prize claimed
+                </span>
+              ) : null}
+              {!isOpen && post.voteWinner?.user && post.canClaimPrize && !post.isPrizeClaimed ? (
+                <span className="cx-profile-status-pill cx-profile-status-pill--claimable">
+                  🎁 You can claim from notifications
+                </span>
+              ) : null}
             </div>
           </div>
         </div>

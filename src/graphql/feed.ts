@@ -45,12 +45,16 @@ export const FEED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
       endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       likeCount
       hypeCount
@@ -84,12 +88,16 @@ export const GET_POST_BY_ID = gql`
       imageUrls
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
       votingEndsAt
       endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       likeCount
       hypeCount
@@ -177,6 +185,9 @@ export const MY_SAVED_POSTS = gql`
       votingEndsAt
       endingSoonLeadMinutes
       isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
       commentCount
       likeCount
       hypeCount
@@ -326,6 +337,17 @@ export const POST_VOTE_UPDATED = gql`
 export const DELETE_POST = gql`
   mutation DeletePost($postId: ID!) {
     deletePost(postId: $postId)
+  }
+`;
+
+export const CLAIM_POST_VOTE_PRIZE = gql`
+  mutation ClaimPostVotePrize($postId: ID!) {
+    claimPostVotePrize(postId: $postId) {
+      id
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+    }
   }
 `;
 

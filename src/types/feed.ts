@@ -27,6 +27,9 @@ export type FeedPostView = {
   votingEndsAt?: string | null;
   endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
+  isPrizeClaimed?: boolean | null;
+  votePrizeClaimedAt?: string | null;
+  canClaimPrize?: boolean | null;
   upvoteCount: number;
   downvoteCount: number;
   hypeCount?: number;

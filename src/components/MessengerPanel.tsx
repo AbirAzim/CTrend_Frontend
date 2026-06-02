@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useMobileShell } from "../lib/useMobileShell";
 import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
@@ -740,6 +740,7 @@ export function MessengerPanel() {
 
   const [search, setSearch] = useState("");
   const [startingId, setStartingId] = useState<string | null>(null);
+  const [keyboardInsetPx, setKeyboardInsetPx] = useState(0);
 
   // Always load friends so we can show a unified contact list
   const { data: friendsData, loading: friendsLoading } = useQuery<{ myFriends: FriendRow[] }>(
@@ -762,6 +763,35 @@ export function MessengerPanel() {
       document.body.style.overflow = prev;
     };
   }, [mobileSheetOpen]);
+
+  // iOS Safari keeps fixed elements anchored to the layout viewport while the
+  // keyboard opens; use VisualViewport to lift the messenger sheet above it.
+  useEffect(() => {
+    if (!isMobile || !mobileSheetOpen) {
+      setKeyboardInsetPx(0);
+      return;
+    }
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const syncInset = () => {
+      const inset = Math.max(
+        0,
+        Math.round(window.innerHeight - vv.height - vv.offsetTop),
+      );
+      setKeyboardInsetPx(inset);
+    };
+
+    syncInset();
+    vv.addEventListener("resize", syncInset);
+    vv.addEventListener("scroll", syncInset);
+    window.addEventListener("orientationchange", syncInset);
+    return () => {
+      vv.removeEventListener("resize", syncInset);
+      vv.removeEventListener("scroll", syncInset);
+      window.removeEventListener("orientationchange", syncInset);
+    };
+  }, [isMobile, mobileSheetOpen]);
 
   if (!isAuthenticated) return null;
 
@@ -992,7 +1022,13 @@ export function MessengerPanel() {
   const mobileSheet =
     mobileSheetOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="mp-mobile-shell" role="dialog" aria-modal="false" aria-label="Messages">
+          <div
+            className="mp-mobile-shell"
+            style={{ "--mp-keyboard-inset": `${keyboardInsetPx}px` } as CSSProperties}
+            role="dialog"
+            aria-modal="false"
+            aria-label="Messages"
+          >
             {showMobileChat && activeChat ? (
               <ChatWindow
                 conversation={activeChat}
