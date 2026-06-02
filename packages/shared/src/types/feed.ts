@@ -59,6 +59,8 @@ export type FeedPostView = {
   compareOptionLabels?: string[] | null;
   /** Campaign this compare is linked to (Phase 22). */
   campaign?: FeedPostCampaignView | null;
+  /** Random prize-draw winner after voting closes (Phase 24). */
+  voteWinner?: FeedPostVoteWinnerView | null;
 };
 
 export type FeedPostCampaignView = {
@@ -68,6 +70,17 @@ export type FeedPostCampaignView = {
   bannerText?: string | null;
   bannerImageUrl?: string | null;
   prizePerWinner: number;
+};
+
+export type FeedPostVoteWinnerView = {
+  selectedOptionIndex?: number | null;
+  pickedAt?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
 };
 
 export type VoteOptionStatView = {

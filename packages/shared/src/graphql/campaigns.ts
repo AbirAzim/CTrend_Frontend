@@ -11,6 +11,7 @@ export const ACTIVE_CAMPAIGNS = gql`
       ctaLabel
       prizePerWinner
       fixturesEnabled
+      isDefault
     }
   }
 `;
@@ -27,6 +28,7 @@ export const CAMPAIGNS_ADMIN = gql`
       ctaLabel
       ctaUrl
       isActive
+      isDefault
       prizePerWinner
       startDate
       endDate
@@ -42,6 +44,7 @@ export const CREATE_CAMPAIGN = gql`
       name
       slug
       isActive
+      isDefault
     }
   }
 `;
@@ -64,6 +67,7 @@ export const UPDATE_CAMPAIGN = gql`
       ctaLabel
       ctaUrl
       isActive
+      isDefault
     }
   }
 `;

@@ -31,6 +31,7 @@ type Campaign = {
   ctaLabel?: string | null;
   ctaUrl?: string | null;
   isActive: boolean;
+  isDefault?: boolean | null;
   prizePerWinner?: number | null;
   startDate?: string | null;
   endDate?: string | null;
@@ -57,6 +58,7 @@ export default function CampaignsScreen() {
   const [createModal, setCreateModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Campaign | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [isDefaultForm, setIsDefaultForm] = useState(false);
 
   const { data, loading, refetch } = useQuery<CampaignsData>(CAMPAIGNS_ADMIN, {
     fetchPolicy: "cache-and-network",
@@ -77,6 +79,7 @@ export default function CampaignsScreen() {
 
   function openCreate() {
     setForm(EMPTY_FORM);
+    setIsDefaultForm(false);
     setEditTarget(null);
     setCreateModal(true);
   }
@@ -91,6 +94,7 @@ export default function CampaignsScreen() {
       ctaUrl: c.ctaUrl ?? "",
       prizePerWinner: c.prizePerWinner != null ? String(c.prizePerWinner) : "",
     });
+    setIsDefaultForm(!!c.isDefault);
     setEditTarget(c);
     setCreateModal(true);
   }
@@ -108,6 +112,7 @@ export default function CampaignsScreen() {
       ctaLabel: form.ctaLabel.trim() || undefined,
       ctaUrl: form.ctaUrl.trim() || undefined,
       prizePerWinner: form.prizePerWinner ? Number(form.prizePerWinner) : undefined,
+      isDefault: isDefaultForm,
     };
     try {
       if (editTarget) {
@@ -176,6 +181,11 @@ export default function CampaignsScreen() {
                     {c.isActive ? "ACTIVE" : "INACTIVE"}
                   </Text>
                 </View>
+                {c.isDefault && (
+                  <View style={[st.pill, { backgroundColor: "rgba(245,158,11,0.14)" }]}>
+                    <Text style={[st.pillText, { color: "#d97706" }]}>DEFAULT</Text>
+                  </View>
+                )}
               </View>
 
               <Pressable style={[st.editBtn, { borderColor: colors.border }]} onPress={() => openEdit(c)}>
@@ -220,6 +230,18 @@ export default function CampaignsScreen() {
                   />
                 </View>
               ))}
+              <View style={st.defaultRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.fieldLabel, { color: colors.text, marginBottom: 2 }]}>Default campaign</Text>
+                  <Text style={[st.defaultHint, { color: colors.muted }]}>Shown first on the feed filter. Only one campaign can be default.</Text>
+                </View>
+                <Switch
+                  value={isDefaultForm}
+                  onValueChange={setIsDefaultForm}
+                  trackColor={{ false: colors.border, true: colors.accent }}
+                  thumbColor={isDefaultForm ? colors.accent : colors.muted}
+                />
+              </View>
             </ScrollView>
             <Pressable
               style={[st.submitBtn, { backgroundColor: colors.accent }, saving && { opacity: 0.6 }]}
@@ -266,6 +288,8 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#444", alignSelf: "center", marginBottom: 4 },
     sheetTitle: { fontSize: 16, fontWeight: "800", textAlign: "center", marginBottom: 4 },
     fieldLabel: { fontSize: 11, fontWeight: "600", marginBottom: 4 },
+    defaultRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 4, marginBottom: 6 },
+    defaultHint: { fontSize: 11, lineHeight: 15 },
     modalInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
     submitBtn: { borderRadius: 12, paddingVertical: 13, alignItems: "center", marginTop: 4 },
     submitBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },

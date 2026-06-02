@@ -12,10 +12,24 @@ export const POST_CAMPAIGN_FIELDS = `
   }
 `;
 
+/** Random prize-draw winner drawn after voting closes (Phase 24). */
+export const POST_VOTE_WINNER_FIELDS = `
+  voteWinner {
+    selectedOptionIndex
+    pickedAt
+    user {
+      id
+      username
+      displayName
+      profileImageUrl
+    }
+  }
+`;
+
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
-  query FeedPosts {
-    feedPosts {
+  query FeedPosts($campaignId: ID) {
+    feedPosts(campaignId: $campaignId) {
       id
       type
       authorId
@@ -48,6 +62,7 @@ export const FEED_POSTS = gql`
         label
       }
       ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;
@@ -89,6 +104,7 @@ export const GET_POST_BY_ID = gql`
         label
       }
       ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;

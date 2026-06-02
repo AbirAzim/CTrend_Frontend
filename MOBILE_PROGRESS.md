@@ -698,7 +698,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ⏳ PHASE 22 — Campaign Attachment (create select + feed ribbon) — IMPLEMENTED, awaiting device test
+### ✅ PHASE 22 — Campaign Attachment (create select + feed ribbon) — COMPLETE 2026-06-02 (device-tested)
 
 **Source docs:** `2026-06-01_post-campaign-attachment.md`
 
@@ -724,17 +724,17 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 23 — Campaign Default + Feed Filter + "See other campaigns"
+### ✅ PHASE 23 — Campaign Default + Feed Filter + "See other campaigns" — COMPLETE 2026-06-02 (device-tested)
 
 **Source docs:** `2026-06-02_campaign-default-and-filtering.md`
 
 **Goal:** Support multiple active campaigns with one default; filter the home feed by campaign; jump between campaigns from the ribbon.
 
-- [ ] **Shared GraphQL** — add `isDefault` to `ACTIVE_CAMPAIGNS` / `CAMPAIGNS_ADMIN` selections + `UPDATE_CAMPAIGN`/`CREATE_CAMPAIGN` inputs; add optional `campaignId: ID` argument to `FEED_POSTS`.
-- [ ] **Feed query** — thread a `campaignId` variable into the feed query in `app/tabs/index.tsx`; refetch when the selected filter changes.
-- [ ] **Filter dock** — collapsible filter trigger above the feed (mobile sheet or chip row): "All compares" + each active campaign, **default campaign first / emphasized**. Hidden by default; opens on tap; selected campaign shows as a compact summary line when closed.
-- [ ] **"See other campaigns"** — from `PostCampaignBadge` (Phase 22), an action that opens the active-campaign list (bottom sheet); selecting one applies the feed filter.
-- [ ] **Create screen** — order the campaign picker: default first with `(default)` hint; admin also sees `(inactive)` flagged.
+- [x] **Shared GraphQL** — `FEED_POSTS($campaignId: ID)` filter arg; `isDefault` added to `ACTIVE_CAMPAIGNS`, `CAMPAIGNS_ADMIN`, and `CREATE_CAMPAIGN`/`UPDATE_CAMPAIGN` return selections (input flows through generic `$input`).
+- [x] **Feed query** — `app/tabs/index.tsx` reads `?campaign=` route param → `campaignId` variable; live/removed queues cleared on filter change via `useEffect`.
+- [x] **Filter dock** — new `components/FeedCampaignFilter.tsx`: collapsible "🎯 FILTER FEED" trigger (compact summary value) → expands to chips ("All compares" + active campaigns, **default first** with `default` badge); rendered in `ListHeaderComponent` so it scrolls away on scroll-down.
+- [x] **"See other campaigns"** — `PostCampaignBadge` now queries `ACTIVE_CAMPAIGNS`; shows the action when >1 active → bottom sheet → selecting navigates `/tabs?campaign=id`.
+- [x] **Create screen** — campaign picker ordered **default first** with `(default)` hint; admin sees `(inactive)`. Also added **Default campaign** toggle + `DEFAULT` pill to `app/admin/campaigns.tsx`.
 
 **APIs:** `ACTIVE_CAMPAIGNS` (add `isDefault`), `FEED_POSTS(campaignId)` (backend deployed).
 
@@ -749,16 +749,16 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 24 — Vote-Draw Winner Banner
+### ⏳ PHASE 24 — Vote-Draw Winner Banner — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-01_post-vote-draw-winner.md`
 
 **Goal:** After voting closes, a random non-anonymous winner on the winning side is shown in a trophy banner.
 
-- [ ] **Shared GraphQL** — add `voteWinner { selectedOptionIndex pickedAt user { id displayName username profileImageUrl } }` to `FEED_POSTS` + `GET_POST_BY_ID`.
-- [ ] **types/map** — add `voteWinner?` to view type + map in `mapGqlPostToFeedView.ts`.
-- [ ] **PostVoteWinnerBanner** — new `mobile/components/PostVoteWinnerBanner.tsx`: trophy card with winner avatar + name, tappable → `router.push('/profile/[id]')`.
-- [ ] **FeedPostCard** — render the banner **above the action bar** only when voting is closed AND `voteWinner.user` exists. No banner when closed-with-no-votes or anonymous-only winner.
+- [x] **Shared GraphQL** — added `POST_VOTE_WINNER_FIELDS` (`voteWinner { selectedOptionIndex pickedAt user { id username displayName profileImageUrl } }`) interpolated into `FEED_POSTS` + `GET_POST_BY_ID`.
+- [x] **types/map** — added `FeedPostVoteWinnerView` + `voteWinner?` to `FeedPostView`; mapped in `mapGqlPostToFeedView.ts` (only when `voteWinner.user` exists).
+- [x] **PostVoteWinnerBanner** — new `mobile/components/PostVoteWinnerBanner.tsx`: gold trophy card (🏆 + avatar + "PRIZE DRAW WINNER" + name + "Voted for {option}"), tappable → `/profile/[id]`.
+- [x] **FeedPostCard** — renders the banner just above the two-zone action rail only when `isVotingClosed && post.voteWinner?.user`; `optionLabel` from `compareLabel(post, selectedOptionIndex)`. No banner for open posts / no-winner / anonymous-only.
 
 **APIs:** feed queries (add `voteWinner`) — backend deployed.
 
@@ -1083,4 +1083,6 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Icons | Rail icons reworked: Share→**🔗 Copy link** (clipboard + Android toast), Full page→**↗️**, hype fixed from broken `♥`/`♡` dingbat → **❤️** (dim when inactive), VOTED badge `♥`→`✓`. Detail header keeps 🔗 Copy link. |
 | 2026-06-02 | Phase 21 | Admin Platform Posts tab — shared ADMIN_PLATFORM_POSTS(+count) queries, `admin/posts.tsx` (search/status/voting/category/sort chip filters, paginated list, stats, status pills, author + lastEditedBy PersonLinks, View/Edit/Delete, + New platform post → create?platform=1) — APK ✅ |
 | 2026-06-02 | Planning | react_change_3 analyzed — Phases 22–30 added to MOBILE_PROGRESS.md (campaign attach, campaign default+filter, vote-draw winner, ending-soon threshold, vote-end notif+claim, winner/claim visibility, image focal editor, comment reactions, brand avatar+announce nav+scheduled time). Each phase has device test cases; awaiting per-phase testing before marking ✅ |
-| 2026-06-02 | Phase 22 | Campaign attachment implemented — shared `POST_CAMPAIGN_FIELDS` on feed/detail/saved queries + `FeedPostCampaignView` type + mapper; new `PostCampaignBadge` gold ribbon in `FeedPostCard` (+ gold card border); create screen campaign picker modal (active for users / all for admin) sending `campaignId`. ⏳ Awaiting device test |
+| 2026-06-02 | Phase 22 | Campaign attachment — shared `POST_CAMPAIGN_FIELDS` on feed/detail/saved queries + `FeedPostCampaignView` type + mapper; new `PostCampaignBadge` gold ribbon in `FeedPostCard` (+ gold card border); create screen campaign picker modal (active for users / all for admin) sending `campaignId`. APK built + installed on Pixel 6 — ✅ device-tested |
+| 2026-06-02 | Phase 23 | Campaign default + feed filter — `FEED_POSTS($campaignId)` arg + `isDefault` on campaign queries; new `FeedCampaignFilter` dock (default-first chips, `?campaign=` route param); `PostCampaignBadge` "See other campaigns" sheet; create picker default-first ordering; admin Campaigns `Default` toggle + pill. APK installed on Pixel 6 — ✅ device-tested |
+| 2026-06-02 | Phase 24 | Vote-draw winner banner — shared `POST_VOTE_WINNER_FIELDS` on feed/detail + `FeedPostVoteWinnerView` type + mapper; new `PostVoteWinnerBanner` gold trophy card in `FeedPostCard` (above action rail, only when closed + winner.user exists, tap → profile). APK installed on Pixel 6 — ⏳ awaiting device test |

@@ -36,7 +36,7 @@ const { width: SW } = Dimensions.get("window");
 
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
-type CampaignOption = { id: string; name: string; isActive?: boolean | null };
+type CampaignOption = { id: string; name: string; isActive?: boolean | null; isDefault?: boolean | null };
 type ActiveCampaignsData = { activeCampaigns: CampaignOption[] };
 type AdminCampaignsData = { campaigns: CampaignOption[] };
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
@@ -257,9 +257,12 @@ export default function CreateScreen() {
   const { data: adminCampData } = useQuery<AdminCampaignsData>(CAMPAIGNS_ADMIN, {
     fetchPolicy: "cache-first", skip: !isAuthenticated || !isAdmin,
   });
-  const campaigns: CampaignOption[] = isAdmin
-    ? adminCampData?.campaigns ?? []
-    : activeCampData?.activeCampaigns ?? [];
+  const campaigns: CampaignOption[] = [
+    ...(isAdmin ? adminCampData?.campaigns ?? [] : activeCampData?.activeCampaigns ?? []),
+  ].sort((a, b) => {
+    if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
+    return (a.name ?? "").localeCompare(b.name ?? "");
+  });
   const selectedCampaign = campaigns.find((c) => c.id === campaignId);
 
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
@@ -697,6 +700,7 @@ export default function CreateScreen() {
               {campaigns.map((camp) => {
                 const active = camp.id === campaignId;
                 const inactive = camp.isActive === false;
+                const suffix = `${camp.isDefault ? "  (default)" : ""}${inactive ? "  (inactive)" : ""}`;
                 return (
                   <Pressable
                     key={camp.id}
@@ -704,7 +708,7 @@ export default function CreateScreen() {
                     onPress={() => { setCampaignId(camp.id); setCampaignModal(false); }}
                   >
                     <Text style={[st.modalRowText, { color: active ? colors.accent : colors.text }, active && { fontWeight: "700" }]}>
-                      {camp.name?.trim() || camp.id}{inactive ? "  (inactive)" : ""}
+                      {camp.name?.trim() || camp.id}{suffix}
                     </Text>
                     {active && <Text style={[{ color: colors.accent, fontSize: 16, fontWeight: "700" }]}>✓</Text>}
                   </Pressable>

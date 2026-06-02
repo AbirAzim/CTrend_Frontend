@@ -1,8 +1,8 @@
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import logoAsset from "../../assets/logo.png";
-import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
 
@@ -28,6 +28,7 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { CampaignBanner } from "../../components/CampaignBanner";
+import { FeedCampaignFilter } from "../../components/FeedCampaignFilter";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -131,6 +132,8 @@ export default function FeedScreen() {
   const { isAuthenticated } = useAuth();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const { campaign } = useLocalSearchParams<{ campaign?: string }>();
+  const campaignId = campaign && campaign.length > 0 ? campaign : undefined;
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
@@ -160,8 +163,20 @@ export default function FeedScreen() {
 
   const { data, loading, error, refetch, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
-    { fetchPolicy: "cache-and-network", notifyOnNetworkStatusChange: true, pollInterval: 20000 },
+    {
+      variables: { campaignId },
+      fetchPolicy: "cache-and-network",
+      notifyOnNetworkStatusChange: true,
+      pollInterval: 20000,
+    },
   );
+
+  // Reset live-pushed / locally-removed posts when the campaign filter changes
+  // so the filtered view doesn't show stale cross-campaign posts.
+  useEffect(() => {
+    setLiveQueue([]);
+    setRemovedIds(new Set());
+  }, [campaignId]);
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
   const { data: meData } = useQuery<{ me: UserRow }>(ME, {
@@ -279,7 +294,15 @@ export default function FeedScreen() {
               tintColor={colors.accent}
             />
           }
-          ListHeaderComponent={<CampaignBanner />}
+          ListHeaderComponent={
+            <>
+              <FeedCampaignFilter
+                selectedId={campaignId}
+                onSelect={(id) => router.setParams({ campaign: id ?? "" })}
+              />
+              <CampaignBanner />
+            </>
+          }
           ListEmptyComponent={
             !loading ? (
               <View style={styles.empty}>
