@@ -55,8 +55,12 @@ export type FeedPostView = {
   mySelectedOptionIndex?: number | null;
   /** Per-option counts/percentages from API when present. */
   optionStats?: VoteOptionStatView[] | null;
-  /** Option titles from API `options` (same order as voting indices / compare columns). */
-  postOptions?: { label: string }[] | null;
+  /** Option titles + per-option image focal from API `options` (same order as voting indices / compare columns). */
+  postOptions?: {
+    label: string;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
   /** Campaign this compare is linked to (Phase 22). */

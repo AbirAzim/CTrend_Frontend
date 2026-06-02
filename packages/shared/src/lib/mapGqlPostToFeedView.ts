@@ -62,7 +62,11 @@ export function mapGqlPostToFeedView(p: {
     count: number;
     percentage: number;
   }> | null;
-  options?: Array<{ label: string }> | null;
+  options?: Array<{
+    label: string;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }> | null;
   status?: string | null;
   scheduledAt?: string | null;
   campaign?: {
@@ -96,7 +100,11 @@ export function mapGqlPostToFeedView(p: {
       }))
     : null;
   const postOptions =
-    p.options?.map((o) => ({ label: o.label })) ?? null;
+    p.options?.map((o) => ({
+      label: o.label,
+      imageFocalX: o.imageFocalX ?? null,
+      imageFocalY: o.imageFocalY ?? null,
+    })) ?? null;
   const rawType = p.type?.toLowerCase();
   const postType =
     rawType === "system" || rawType === "org" || rawType === "user"

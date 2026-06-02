@@ -840,18 +840,20 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 28 — Per-Option Image Focal Position Editor
+### ⏳ PHASE 28 — Per-Option Image Focal Position Editor — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-02_image-focal-position-editor.md`
 
 **Goal:** Authors set a per-option focal point (0–100) so compare images frame consistently; feed renders with that focal as `object-position`.
 
-- [ ] **Shared GraphQL** — extend the post `options` selection to `options { label imageUrl imageFocalX imageFocalY }` (a `POST_OPTION_FIELDS` fragment) across feed + detail; include focal in `CREATE_POST` option input.
-- [ ] **types/map** — add `imageFocalX`/`imageFocalY` to the `postOptions` view type + map (default 50/50).
-- [ ] **imageFocal helper** — port `lib/imageFocal.ts` (focal → `contentPosition`/`{x%,y%}` for `expo-image` `contentPosition`).
-- [ ] **ImagePositionEditor** — new `mobile/components/ImagePositionEditor.tsx`: modal to drag the image (`PanResponder`/gesture) and/or sliders to set focal; "Done" returns 0–100 values.
-- [ ] **Create screen** — each draft option gets focal defaults 50/50; a **"Position"** button opens the editor; show a "Position ·" indicator when customized.
-- [ ] **FeedPostCard** — apply `contentPosition` per option image from the focal values.
+- [x] **Shared GraphQL** — added `imageFocalX`/`imageFocalY` to the `options` selection in `FEED_POSTS` + `GET_POST_BY_ID` + `MY_SAVED_POSTS`; focal flows through the generic `CREATE_POST` option input.
+- [x] **types/map** — added `imageFocalX`/`imageFocalY` to `postOptions` view type; mapped in `mapGqlPostToFeedView.ts` (null = center).
+- [x] **imageFocal helper** — new `mobile/lib/imageFocal.ts`: `clampFocal`, `hasCustomFocal`, `imageContentPosition(x,y)` → expo-image `contentPosition` `{ left:'x%', top:'y%' }`.
+- [x] **ImagePositionEditor** — new `mobile/components/ImagePositionEditor.tsx`: modal with a **drag-to-reposition** frame (PanResponder, dragging the image moves focal like web), live X/Y readout, crosshair guide, Reset/Cancel/Done; Done returns clamped 0–100. (Drag instead of web's sliders — no native slider dep.)
+- [x] **Create screen** — each `Slot` carries `imageFocalX/Y` (default 50/50); a **"⊹ Position"** button under each filled tile opens the editor; shows **"Position ·"** when customized; focal sent in `CREATE_POST` options.
+- [x] **FeedPostCard** — both binary + multi compare images apply `contentPosition` from `post.postOptions[i].imageFocalX/Y`.
+
+**Build note:** drag-only editor (no `@react-native-community/slider`); expo-image `ImageContentPosition` typed cleanly.
 
 **APIs:** post `options.imageFocalX/Y` (backend deployed); `CREATE_POST` option focal input.
 
@@ -1089,3 +1091,4 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 25 | Ending-soon banner + admin threshold — `endingSoonLeadMinutes` on feed/detail/saved/admin queries + type + mapper (default 5); amber top banner in `FeedPostCard` when open & within lead window (driven by 1s countdown tick); admin-only lead-time input in `edit-post.tsx` (clamped 1–1440) via `UPDATE_POST`. APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 26 | Vote-end notifications + winner claim — shared `CLAIM_POST_VOTE_PRIZE` mutation; notifications screen icons + `POST_NOTIF_TYPES` for `VOTE_ENDED`/`VOTE_WINNER`/`VOTE_PRIZE_CLAIMED`; "🏆 Claim prize" button on unclaimed winner rows → optimistic "Prize claim submitted" + hide button (rollback on error). APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 27 | Winner/claim visibility — `voteWinner`+claim fields on profile (voted/drops) + admin posts queries; `ProfileCompareCard` winner/claimed/claimable wrap pills; admin posts winner row (PersonLink + claimed/unclaimed pill); `FeedCampaignFilter` helper text. APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-02 | Phase 28 | Image focal editor — `imageFocalX/Y` on options (feed/detail/saved queries + type + mapper); new `lib/imageFocal.ts` + drag-based `ImagePositionEditor`; create screen per-slot focal + "⊹ Position" trigger; `FeedPostCard` applies `contentPosition` on binary + multi compare images. APK installed on Pixel 6 — ⏳ awaiting device test |

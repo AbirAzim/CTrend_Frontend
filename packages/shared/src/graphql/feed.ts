@@ -61,6 +61,8 @@ export const FEED_POSTS = gql`
       }
       options {
         label
+        imageFocalX
+        imageFocalY
       }
       ${POST_CAMPAIGN_FIELDS}
       ${POST_VOTE_WINNER_FIELDS}
@@ -104,6 +106,8 @@ export const GET_POST_BY_ID = gql`
       }
       options {
         label
+        imageFocalX
+        imageFocalY
       }
       ${POST_CAMPAIGN_FIELDS}
       ${POST_VOTE_WINNER_FIELDS}
@@ -182,6 +186,8 @@ export const MY_SAVED_POSTS = gql`
       }
       options {
         label
+        imageFocalX
+        imageFocalY
       }
     }
   }
