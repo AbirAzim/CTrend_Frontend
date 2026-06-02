@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -78,6 +79,7 @@ type GqlVoter = {
 
 type CommentsData = { commentsByPost: GqlComment[] };
 type PostData = { getPostById: unknown };
+// VotersData used as generic for client.query
 type VotersData = { votersByPost: GqlVoter[] };
 
 // ─── Duration options for extend voting ──────────────────────────────────────
@@ -92,7 +94,7 @@ const EXTEND_OPTS = [
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function makeStyles(c: ColorPalette) {
+function makeStyles(c: ColorPalette, isDark: boolean) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: c.bg },
     scroll: { flex: 1, backgroundColor: c.bg },
@@ -188,70 +190,69 @@ function makeStyles(c: ColorPalette) {
     },
     sendBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
-    // Voter modal
-    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-    modalSheet: {
-      position: "absolute",
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: c.card,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      maxHeight: "70%",
-    },
-    modalHandle: {
-      width: 36,
-      height: 4,
-      backgroundColor: c.border,
-      borderRadius: 2,
-      alignSelf: "center",
-      marginTop: 10,
-      marginBottom: 6,
-    },
-    modalTitle: {
-      fontSize: 16,
-      fontWeight: "800",
-      color: c.text,
-      textAlign: "center",
-      paddingBottom: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
-      marginHorizontal: 16,
-    },
-    tabRow: { flexDirection: "row", paddingHorizontal: 16, paddingTop: 10, gap: 8 },
-    tabBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
+    // ── Voters floating panel (non-blocking) ──
+    votersPanel: {
+      position: "absolute" as const,
+      left: 12, right: 12,
+      maxHeight: Math.round(Dimensions.get("window").height * 0.72),
       borderRadius: 20,
-      borderWidth: 1,
-      borderColor: c.border,
+      backgroundColor: c.card,
+      borderWidth: 1, borderColor: isDark ? "rgba(148,163,184,0.24)" : "rgba(67,56,202,0.14)",
+      overflow: "hidden" as const,
+      // shadow
+      elevation: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.28,
+      shadowRadius: 20,
+      zIndex: 49,
     },
-    tabBtnActive: { backgroundColor: c.accent, borderColor: c.accent },
-    tabBtnText: { fontSize: 12, fontWeight: "700", color: c.subtext },
-    tabBtnTextActive: { color: "#fff" },
+    votersPanelHeader: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    votersPanelTitle: { fontSize: 15, fontWeight: "800" as const, color: c.text },
+    votersPanelClose: { padding: 4 },
+    votersPanelCloseText: { fontSize: 16, color: c.muted, fontWeight: "700" as const },
+    votersPanelSearch: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      gap: 8, paddingHorizontal: 12, paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
+    },
+    votersPanelSearchInput: {
+      flex: 1, fontSize: 14, color: c.text,
+      backgroundColor: c.section, borderRadius: 12,
+      paddingHorizontal: 12, paddingVertical: 8,
+    },
+    votersTabRow: { flexDirection: "row" as const, gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
+    votersTab: {
+      paddingHorizontal: 14, paddingVertical: 5,
+      borderRadius: 999, borderWidth: 1, borderColor: c.border,
+    },
+    votersTabActive: { backgroundColor: c.accent, borderColor: c.accent },
+    votersTabText: { fontSize: 12, fontWeight: "700" as const, color: c.subtext },
+    votersTabTextActive: { color: "#fff" },
     voterRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      gap: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.border,
+      flexDirection: "row" as const, alignItems: "center" as const,
+      paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border,
     },
     voterAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 36, height: 36, borderRadius: 18,
       backgroundColor: "#312e81",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
+      alignItems: "center" as const, justifyContent: "center" as const, overflow: "hidden" as const,
     },
-    voterAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-    voterName: { fontSize: 14, fontWeight: "700", color: c.text },
+    voterAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" as const },
+    voterName: { fontSize: 14, fontWeight: "700" as const, color: c.text },
     voterTime: { fontSize: 12, color: c.muted },
-    voterEmpty: { textAlign: "center", paddingVertical: 24, color: c.muted, fontSize: 14 },
+    voterOptionTag: {
+      paddingHorizontal: 8, paddingVertical: 3,
+      borderRadius: 999, borderWidth: 1,
+    },
+    voterOptionTagText: { fontSize: 10, fontWeight: "700" as const },
+    voterEmpty: { textAlign: "center" as const, paddingVertical: 24, color: c.muted, fontSize: 14 },
 
     // Owner actions
     ownerActions: {
@@ -327,21 +328,57 @@ function makeStyles(c: ColorPalette) {
     errorRow: { paddingHorizontal: 14, paddingVertical: 12 },
     errorText: { fontSize: 14, color: "#f87171" },
 
-    // Action chips
-    actionsContent: {
-      flexDirection: "row" as const,
-      paddingHorizontal: 12, paddingVertical: 8, gap: 7,
-      alignItems: "center" as const,
+    // ── Two-zone action rail (post detail) ──
+    actionRail: {
+      marginHorizontal: 12, marginBottom: 8, borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? "rgba(148,163,184,0.24)" : "rgba(67,56,202,0.14)",
+      backgroundColor: isDark ? "rgba(15,23,42,0.64)" : "rgba(255,255,255,0.72)",
+      overflow: "hidden" as const,
     },
-    actionChip: {
-      flexDirection: "row" as const, alignItems: "center" as const, gap: 5,
-      borderRadius: 999, paddingVertical: 7, paddingHorizontal: 13,
-      borderWidth: 1, borderColor: c.border,
+    actionRailIcons: {
+      flexDirection: "row" as const, justifyContent: "space-evenly" as const,
+      alignItems: "center" as const, flexWrap: "wrap" as const,
+      paddingVertical: 7, paddingHorizontal: 8, gap: 2,
     },
-    actionChipHypeActive: { borderColor: "#fb7185", backgroundColor: "rgba(251,113,133,0.12)" },
-    actionChipSaveActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)" },
-    actionChipIcon: { fontSize: 13, lineHeight: 18 as number, color: c.subtext },
-    actionChipLabel: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 0.3, color: c.subtext },
+    actionChipFlat: {
+      flexDirection: "row" as const, alignItems: "center" as const, gap: 3,
+      borderRadius: 999, paddingVertical: 8, paddingHorizontal: 10,
+    },
+    actionChipFlatHypeActive: { backgroundColor: isDark ? "rgba(251,113,133,0.14)" : "rgba(159,23,77,0.1)" },
+    actionChipFlatSaveActive: { backgroundColor: isDark ? "rgba(245,158,11,0.14)" : "rgba(245,158,11,0.1)" },
+    actionChipFlatIcon: { fontSize: 19, lineHeight: 22, color: c.subtext },
+    actionChipFlatIconHype: { color: "#fb7185" },
+    actionChipFlatIconSave: { color: "#f59e0b" },
+    actionChipBadge: {
+      minWidth: 18, height: 17, paddingHorizontal: 5, marginLeft: -1,
+      borderRadius: 999, justifyContent: "center" as const, alignItems: "center" as const,
+      backgroundColor: isDark ? "rgba(129,140,248,0.2)" : "rgba(67,56,202,0.14)",
+    },
+    actionChipBadgeRose: { backgroundColor: isDark ? "rgba(251,113,133,0.22)" : "rgba(159,23,77,0.16)" },
+    actionChipBadgeAmber: { backgroundColor: isDark ? "rgba(245,158,11,0.22)" : "rgba(245,158,11,0.18)" },
+    actionChipBadgeText: {
+      fontSize: 10, fontWeight: "800" as const,
+      color: isDark ? "#c7d0ff" : "#312e81",
+      fontVariant: ["tabular-nums"] as const, lineHeight: 14,
+    },
+    actionChipBadgeTextRose: { color: isDark ? "#fda4af" : "#be123c" },
+    actionChipBadgeTextAmber: { color: isDark ? "#fcd34d" : "#b45309" },
+    actionRailContext: {
+      flexDirection: "row" as const, alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      gap: 10, paddingVertical: 8, paddingHorizontal: 14,
+      borderTopWidth: 1 as const,
+      borderTopColor: isDark ? "rgba(148,163,184,0.18)" : "rgba(67,56,202,0.12)",
+      backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(21,20,27,0.025)",
+    },
+    actionStatusText: {
+      flex: 1, fontSize: 12, fontWeight: "700" as const,
+      color: isDark ? "#818cf8" : "#312e81",
+    },
+    actionStatusTextResult: { color: isDark ? "#fcd34d" : "#b45309" },
+    seeDetailsBtn2: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 6, flexShrink: 0 },
+    seeDetailsBtnText2: { fontSize: 12, fontWeight: "800" as const, color: isDark ? "#818cf8" : "#312e81" },
 
     // Inline post card
     postCard: { backgroundColor: c.card, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: c.border },
@@ -558,96 +595,185 @@ function ReplyItem({ reply, st, onLike }: ReplyItemProps) {
   );
 }
 
-// ─── Voters bottom sheet ──────────────────────────────────────────────────────
+// ─── Voters floating panel (non-blocking, paginated, searchable) ─────────────
 
-type VotersSheetProps = {
+const VOTERS_PAGE_SIZE = 10;
+const OPTION_TAG_COLORS = ["#6366f1", "#f97316", "#22c55e", "#a855f7"];
+
+type VotersPanelProps = {
   postId: string;
   visible: boolean;
   onClose: () => void;
   optionLabels: string[];
   st: ReturnType<typeof makeStyles>;
-  insets: { bottom: number };
+  colors: ColorPalette;
+  bottomOffset: number;
 };
 
-function VotersSheet({ postId, visible, onClose, optionLabels, st, insets }: VotersSheetProps) {
+function VotersPanel({ postId, visible, onClose, optionLabels, st, colors, bottomOffset }: VotersPanelProps) {
+  const client = useApolloClient();
   const [activeTab, setActiveTab] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [voters, setVoters] = useState<GqlVoter[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const reqIdRef = useRef(0);
+  const votersRef = useRef<GqlVoter[]>([]);
 
-  const { data, loading } = useQuery<VotersData>(VOTERS_BY_POST, {
-    variables: { postId, optionIndex: activeTab ?? undefined },
-    skip: !visible,
-    fetchPolicy: "network-only",
-  });
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const voters = data?.votersByPost ?? [];
-  const tabs = [{ label: "All", value: null }, ...optionLabels.map((l, i) => ({ label: l, value: i }))];
+  const fetchVoters = useCallback(async (append: boolean) => {
+    const reqId = ++reqIdRef.current;
+    if (append) setLoadingMore(true);
+    else { setLoadingInitial(true); votersRef.current = []; }
+    try {
+      const base = append ? votersRef.current : [];
+      const { data } = await client.query<VotersData>({
+        query: VOTERS_BY_POST,
+        variables: {
+          postId,
+          optionIndex: activeTab ?? undefined,
+          search: debouncedSearch || null,
+          skip: base.length,
+          take: VOTERS_PAGE_SIZE,
+        },
+        fetchPolicy: "network-only",
+      });
+      if (reqIdRef.current !== reqId) return;
+      const rows: GqlVoter[] = data?.votersByPost ?? [];
+      const next = [...base, ...rows];
+      votersRef.current = next;
+      setVoters(next);
+      setHasMore(rows.length === VOTERS_PAGE_SIZE);
+    } catch { /* silent */ }
+    finally {
+      if (reqIdRef.current === reqId) { setLoadingInitial(false); setLoadingMore(false); }
+    }
+  }, [client, postId, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!visible) return;
+    void fetchVoters(false);
+  }, [visible, activeTab, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!visible) return null;
+
+  const tabs = [{ label: "All", value: null }, ...optionLabels.map((l, i) => ({ label: l || `Option ${i + 1}`, value: i }))];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={st.modalOverlay} onPress={onClose}>
-        <View style={[st.modalSheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
-          <View style={st.modalHandle} />
-          <Text style={st.modalTitle}>Voters</Text>
-
-          <View style={st.tabRow}>
-            {tabs.map((t) => (
-              <Pressable
-                key={String(t.value)}
-                style={[st.tabBtn, activeTab === t.value && st.tabBtnActive]}
-                onPress={() => setActiveTab(t.value)}
-              >
-                <Text style={[st.tabBtnText, activeTab === t.value && st.tabBtnTextActive]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <ScrollView style={{ marginTop: 8 }}>
-            {loading ? (
-              <ActivityIndicator style={{ margin: 24 }} />
-            ) : voters.length === 0 ? (
-              <Text style={st.voterEmpty}>No voters yet</Text>
-            ) : (
-              voters.map((v) => {
-                const name = v.anonymous
-                  ? "Anonymous"
-                  : v.user?.displayName?.trim() || v.user?.username || "Unknown";
-                const initial = name.slice(0, 1).toUpperCase();
-                const voterImg = !v.anonymous ? normalizeProfileImageUrl(v.user?.profileImageUrl) : null;
-                return (
-                  <Pressable
-                    key={v.voteId}
-                    style={st.voterRow}
-                    onPress={() => {
-                      if (!v.anonymous && v.user) {
-                        onClose();
-                        router.push(`/profile/${v.user.id}` as `/${string}`);
-                      }
-                    }}
-                  >
-                    <View style={st.voterAvatar}>
-                      {voterImg
-                        ? <Image source={{ uri: voterImg }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                        : <Text style={st.voterAvatarText}>{initial}</Text>
-                      }
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={st.voterName}>{name}</Text>
-                      <Text style={st.voterTime}>{formatRelativeTime(v.createdAt)}</Text>
-                    </View>
-                    {optionLabels[v.selectedOptionIndex] ? (
-                      <Text style={[st.voterTime, { fontSize: 11 }]}>
-                        {optionLabels[v.selectedOptionIndex]}
-                      </Text>
-                    ) : null}
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+      <View style={[st.votersPanel, { bottom: bottomOffset }]} pointerEvents="auto">
+        {/* Header */}
+        <View style={st.votersPanelHeader}>
+          <Text style={st.votersPanelTitle}>
+            Voted by {voters.length}{hasMore ? "+" : ""}
+          </Text>
+          <Pressable onPress={onClose} hitSlop={8} style={st.votersPanelClose}>
+            <Text style={st.votersPanelCloseText}>✕</Text>
+          </Pressable>
         </View>
-      </Pressable>
-    </Modal>
+
+        {/* Search */}
+        <View style={st.votersPanelSearch}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search voters…"
+            placeholderTextColor={colors.muted}
+            style={st.votersPanelSearchInput}
+            autoCapitalize="none"
+          />
+          {search ? (
+            <Pressable onPress={() => setSearch("")} hitSlop={8}>
+              <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Tabs */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={st.votersTabRow}
+        >
+          {tabs.map((t) => (
+            <Pressable
+              key={String(t.value)}
+              style={[st.votersTab, activeTab === t.value && st.votersTabActive]}
+              onPress={() => setActiveTab(t.value)}
+            >
+              <Text style={[st.votersTabText, activeTab === t.value && st.votersTabTextActive]}>
+                {t.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* Voter list */}
+        <FlatList
+          data={voters}
+          keyExtractor={(v) => v.voteId}
+          onEndReached={() => { if (hasMore && !loadingMore && !loadingInitial) void fetchVoters(true); }}
+          onEndReachedThreshold={0.3}
+          style={{ height: 340 }}
+          ListEmptyComponent={
+            loadingInitial
+              ? <ActivityIndicator style={{ margin: 24 }} color={colors.accent} />
+              : <Text style={st.voterEmpty}>
+                  {debouncedSearch ? "No voters match your search" : "No voters yet"}
+                </Text>
+          }
+          ListFooterComponent={
+            loadingMore
+              ? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.accent} />
+              : !hasMore && voters.length > 0
+                ? <Text style={[st.voterEmpty, { fontSize: 12, paddingVertical: 12 }]}>That's everyone</Text>
+                : null
+          }
+          renderItem={({ item: v }) => {
+            const name = v.anonymous
+              ? "Anonymous"
+              : v.user?.displayName?.trim() || v.user?.username || "Unknown";
+            const initial = name.slice(0, 1).toUpperCase();
+            const img = !v.anonymous ? normalizeProfileImageUrl(v.user?.profileImageUrl) : null;
+            const tagLabel = optionLabels[v.selectedOptionIndex];
+            const tagColor = OPTION_TAG_COLORS[v.selectedOptionIndex % OPTION_TAG_COLORS.length];
+            return (
+              <Pressable
+                style={st.voterRow}
+                onPress={() => {
+                  if (!v.anonymous && v.user) {
+                    onClose();
+                    router.push(`/profile/${v.user.id}` as `/${string}`);
+                  }
+                }}
+              >
+                <View style={st.voterAvatar}>
+                  {img
+                    ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                    : <Text style={st.voterAvatarText}>{v.anonymous ? "?" : initial}</Text>
+                  }
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.voterName}>{name}</Text>
+                  <Text style={st.voterTime}>{formatRelativeTime(v.createdAt)}</Text>
+                </View>
+                {activeTab === null && tagLabel ? (
+                  <View style={[st.voterOptionTag, { backgroundColor: tagColor + "22", borderColor: tagColor + "44" }]}>
+                    <Text style={[st.voterOptionTagText, { color: tagColor }]}>{tagLabel}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          }}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -715,6 +841,8 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
   const [hyped, setHyped] = useState(Boolean(post.viewerHasHyped));
   const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
   const [kept, setKept] = useState(Boolean(post.viewerHasSaved));
+  const [saveCount, setSaveCount] = useState(post.saveCount ?? 0);
+  const [detailsOpen, setDetailsOpen] = useState(true);
 
   const total = up + down;
   const leftPct = total > 0 ? Math.round((100 * up) / total) : 50;
@@ -785,9 +913,14 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
     if (!isAuthenticated) { router.push("/auth/login"); return; }
     const next = !kept;
     setKept(next);
+    setSaveCount((n) => Math.max(0, n + (next ? 1 : -1)));
     adjustSavedCount(next ? 1 : -1);
     try { await keepMut({ variables: { postId: post.id, keep: next } }); }
-    catch { setKept(!next); adjustSavedCount(next ? -1 : 1); }
+    catch {
+      setKept(!next);
+      setSaveCount((n) => Math.max(0, n + (next ? -1 : 1)));
+      adjustSavedCount(next ? -1 : 1);
+    }
   }
 
   async function handleShare() {
@@ -921,7 +1054,7 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
       )}
 
       {/* LIVE SPLIT section */}
-      {compareUrls && (
+      {compareUrls && detailsOpen && (
         <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <Text style={{ fontSize: 12, fontWeight: "800", color: colors.accent, letterSpacing: 1 }}>LIVE SPLIT</Text>
@@ -948,52 +1081,94 @@ function PostDetailCard({ post, st, colors, onVoters }: PostDetailCardProps) {
         </View>
       )}
 
-      {/* Action chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ borderTopWidth: 1, borderTopColor: colors.border }}
-        contentContainerStyle={st.actionsContent}
-      >
-        {([
-          { i: 0, label: "DISCUSS", icon: "💬", onPress: () => {} },
-          { i: 1, label: "SHARE", icon: "↗", onPress: () => void handleShare() },
-          {
-            i: 2,
-            label: `HYPE${hypeCount > 0 ? " " + String(hypeCount) : ""}`,
-            icon: hyped ? "♥" : "♡",
-            onPress: () => void handleHype(),
-            active: hyped,
-            activeStyle: st.actionChipHypeActive,
-            activeTextColor: "#fb7185",
-          },
-          {
-            i: 3,
-            label: "KEEP",
-            icon: "🔖",
-            onPress: () => void handleKeep(),
-            active: kept,
-            activeStyle: st.actionChipSaveActive,
-            activeTextColor: "#f59e0b",
-          },
-          { i: 4, label: "VOTERS", icon: "👥", onPress: onVoters },
-        ] as Array<{ i: number; label: string; icon: string; onPress: () => void; active?: boolean; activeStyle?: object; activeTextColor?: string }>)
-          .map(({ i, label, icon, onPress, active, activeStyle, activeTextColor }) => (
-            <Pressable
-              key={i}
-              style={[st.actionChip, active && activeStyle]}
-              onPress={onPress}
-              hitSlop={4}
-            >
-              <Text style={[st.actionChipIcon, active && activeTextColor ? { color: activeTextColor } : null]}>
-                {icon}
-              </Text>
-              <Text style={[st.actionChipLabel, active && activeTextColor ? { color: activeTextColor } : null]}>
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-      </ScrollView>
+      {/* ── Two-zone action rail ── */}
+      {(() => {
+        const commentCount = post.commentCount ?? 0;
+        const total = up + down;
+        const isVotingClosedCard = post.isVotingOpen === false;
+        const statusText = compareUrls
+          ? isVotingClosedCard
+            ? (() => {
+                if (total === 0) return "🏆 No votes were cast";
+                if (up === down) return "🏆 Tie · 50% each";
+                const wLabel = up > down
+                  ? (post.optionStats?.find((s) => s.index === 0)?.label?.trim() || "Side 1")
+                  : (post.optionStats?.find((s) => s.index === 1)?.label?.trim() || "Side 2");
+                const pct = Math.round((100 * Math.max(up, down)) / total);
+                return `🏆 ${wLabel} won · ${pct}% (${total.toLocaleString()} votes)`;
+              })()
+            : timeLeft
+              ? `⏳ ${timeLeft}`
+              : "Voting open"
+          : null;
+
+        type ChipDef = { i: number; icon: string; label: string; onPress: () => void; count?: number; isHype?: boolean; isSave?: boolean; active?: boolean };
+        const chips: ChipDef[] = [
+          { i: 0, icon: "💬", label: "Comments", onPress: () => {}, count: commentCount },
+          { i: 1, icon: "📤", label: "Share", onPress: () => void handleShare() },
+          { i: 2, icon: hyped ? "♥" : "♡", label: "Hype", onPress: () => void handleHype(), count: hypeCount, isHype: true, active: hyped },
+          { i: 3, icon: "🔖", label: "Keep", onPress: () => void handleKeep(), count: saveCount, isSave: true, active: kept },
+          { i: 4, icon: "👥", label: "Voters", onPress: onVoters, count: total },
+        ];
+
+        return (
+          <View style={st.actionRail}>
+            <View style={st.actionRailIcons}>
+              {chips.map(({ i, icon, label, onPress, count, isHype, isSave, active }) => (
+                <Pressable
+                  key={i}
+                  style={[
+                    st.actionChipFlat,
+                    isHype && active && st.actionChipFlatHypeActive,
+                    isSave && active && st.actionChipFlatSaveActive,
+                  ]}
+                  onPress={onPress}
+                  accessibilityLabel={label}
+                  hitSlop={4}
+                >
+                  <Text style={[
+                    st.actionChipFlatIcon,
+                    isHype && active && st.actionChipFlatIconHype,
+                    isSave && active && st.actionChipFlatIconSave,
+                  ]}>
+                    {icon}
+                  </Text>
+                  {count != null && count > 0 ? (
+                    <View style={[
+                      st.actionChipBadge,
+                      isHype && st.actionChipBadgeRose,
+                      isSave && st.actionChipBadgeAmber,
+                    ]}>
+                      <Text style={[
+                        st.actionChipBadgeText,
+                        isHype && st.actionChipBadgeTextRose,
+                        isSave && st.actionChipBadgeTextAmber,
+                      ]}>
+                        {count}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+            {statusText ? (
+              <View style={st.actionRailContext}>
+                <Text
+                  style={[st.actionStatusText, isVotingClosedCard && st.actionStatusTextResult]}
+                  numberOfLines={1}
+                >
+                  {statusText}
+                </Text>
+                <Pressable style={st.seeDetailsBtn2} onPress={() => setDetailsOpen((v) => !v)}>
+                  <Text style={st.seeDetailsBtnText2}>
+                    {detailsOpen ? "Hide ‹" : "See details ›"}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        );
+      })()}
     </View>
   );
 }
@@ -1004,9 +1179,9 @@ export default function PostDetailScreen() {
   // ALL hooks must come before any conditional returns (Rules of Hooks)
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { user, isAuthenticated, hydrated } = useAuth();
-  const st = useMemo(() => makeStyles(colors), [colors]);
+  const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
   const { data: postData, loading: postLoading, error: postError } = useQuery<PostData>(
     GET_POST_BY_ID,
@@ -1273,15 +1448,16 @@ export default function PostDetailScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Modals — outside KeyboardAvoidingView to avoid view-parent conflicts */}
+      {/* Voters non-blocking floating panel */}
       {post ? (
-        <VotersSheet
+        <VotersPanel
           postId={id ?? ""}
           visible={votersVisible}
           onClose={() => setVotersVisible(false)}
           optionLabels={optionLabels}
           st={st}
-          insets={insets}
+          colors={colors}
+          bottomOffset={insets.bottom + 70}
         />
       ) : null}
       <ExtendSheet

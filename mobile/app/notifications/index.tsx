@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
-import { Feather } from "@expo/vector-icons";
+// @expo/vector-icons hoisted to root node_modules — use text icons to avoid bundler resolution issues
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -243,7 +243,7 @@ function NotifRow({
               onMarkRead(notif);
             }}
           >
-            <Feather name="check" size={16} color={colors.subtext} />
+            <Text style={{ fontSize: 14, color: colors.subtext }}>✓</Text>
           </Pressable>
         ) : null}
         <Pressable
@@ -255,7 +255,7 @@ function NotifRow({
             onArchive(notif);
           }}
         >
-          <Feather name="archive" size={16} color={colors.subtext} />
+          <Text style={{ fontSize: 14, color: colors.subtext }}>📥</Text>
         </Pressable>
       </View>
 
