@@ -33,7 +33,7 @@ export function ImagePositionEditor({
 	onChange,
 	onClose,
 }: Props) {
-	const { colors, isDark } = useTheme();
+	const { colors } = useTheme();
 	const [localX, setLocalX] = useState(focalX);
 	const [localY, setLocalY] = useState(focalY);
 	const frame = useRef({ width: 1, height: 1 });
