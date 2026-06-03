@@ -45,7 +45,16 @@ jobs:
           cache: npm
 
       - name: Install Vercel CLI
-        run: npm i -g vercel@latest
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          for i in 1 2 3 4 5; do
+            npm i -g vercel@latest && exit 0
+            echo "npm install failed (attempt $i) — retrying in 15s..."
+            sleep 15
+          done
+          echo "Vercel CLI install failed after 5 attempts" && exit 1
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
@@ -81,7 +90,16 @@ jobs:
           cache: npm
 
       - name: Install Vercel CLI
-        run: npm i -g vercel@latest
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          for i in 1 2 3 4 5; do
+            npm i -g vercel@latest && exit 0
+            echo "npm install failed (attempt $i) — retrying in 15s..."
+            sleep 15
+          done
+          echo "Vercel CLI install failed after 5 attempts" && exit 1
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
