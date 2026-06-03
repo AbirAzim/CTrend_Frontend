@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -107,6 +108,7 @@ function MessageBubble({
   isReacting,
   onLongPress,
   onReact,
+  onImagePress,
 }: {
   msg: Message;
   isOwn: boolean;
@@ -115,6 +117,7 @@ function MessageBubble({
   isReacting: boolean;
   onLongPress: () => void;
   onReact: (emoji: string) => void;
+  onImagePress: (uri: string) => void;
 }) {
   const avatar = normalizeProfileImageUrl(msg.senderAvatar);
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
@@ -172,6 +175,7 @@ function MessageBubble({
           {/* Image bubble */}
           {msg.imageUrl ? (
             <Pressable
+              onPress={() => onImagePress(msg.imageUrl!)}
               onLongPress={onLongPress}
               delayLongPress={480}
               style={[
@@ -262,6 +266,7 @@ export default function ChatScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -627,6 +632,7 @@ export default function ChatScreen() {
                   isReacting={isReacting}
                   onLongPress={() => setActiveReactMsgId(isReacting ? null : msg.id)}
                   onReact={(emoji) => handleReact(msg, emoji)}
+                  onImagePress={(uri) => setViewerUri(uri)}
                 />
               );
             }}
@@ -732,6 +738,33 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={viewerUri !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerUri(null)}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.viewerBackdrop} onPress={() => setViewerUri(null)}>
+          {viewerUri && (
+            <Image
+              source={{ uri: viewerUri }}
+              style={styles.viewerImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
+          )}
+          <Pressable
+            style={[styles.viewerCloseBtn, { top: insets.top + 8 }]}
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+          >
+            <Text style={styles.viewerCloseText}>✕</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -928,4 +961,24 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   sendBtnText: { fontSize: 18, fontWeight: "700" },
+
+  // Full-screen image viewer
+  viewerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.96)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewerImage: { width: "100%", height: "100%" },
+  viewerCloseBtn: {
+    position: "absolute",
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewerCloseText: { color: "#fff", fontSize: 18, fontWeight: "700" },
 });
