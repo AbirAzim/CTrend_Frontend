@@ -136,6 +136,99 @@ export async function postOrUpdateMessageNotification(
   }
 }
 
+/**
+ * Posts a "bell" notification (likes, comments, friend requests, votes, …)
+ * via Notifee so it can carry the actor's avatar as the Android large icon.
+ * Falls back to Expo (no large icon) if Notifee fails.
+ */
+export async function postBellNotification(opts: {
+  title: string;
+  body: string;
+  actorAvatar: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  postId?: string | null;
+}) {
+  const id = `bell_${Date.now()}_${++_notifSeq}`;
+  const data = {
+    type: "BELL",
+    referenceType: opts.referenceType ?? "",
+    referenceId: opts.referenceId ?? "",
+    postId: opts.postId ?? "",
+  };
+
+  // Notifee first — supports actor avatar (largeIcon).
+  const icon = await composedIcon(opts.actorAvatar);
+  try {
+    await notifee.displayNotification({
+      id,
+      title: opts.title,
+      body: opts.body,
+      data,
+      android: {
+        channelId: CHANNEL_ID,
+        importance: AndroidImportance.HIGH,
+        smallIcon: "ic_launcher_monochrome",
+        ...(icon
+          ? { largeIcon: icon }
+          : isHttpsUrl(opts.actorAvatar)
+          ? { largeIcon: opts.actorAvatar, circularLargeIcon: true }
+          : {}),
+        pressAction: { id: "default" },
+        autoCancel: true,
+        showTimestamp: true,
+      },
+      ios: { sound: "default" },
+    });
+    console.warn("[bell] posted via notifee:", id);
+    return;
+  } catch (e) {
+    console.warn("[bell] notifee failed, trying expo:", e);
+  }
+
+  // Expo fallback (no large icon, but still delivered + tappable).
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: id,
+      content: { title: opts.title, body: opts.body, data, sound: true },
+      trigger: Platform.OS === "android" ? { channelId: CHANNEL_ID } : null,
+    });
+    console.warn("[bell] posted via expo:", id);
+  } catch (e) {
+    console.warn("[bell] expo fallback failed:", e);
+  }
+}
+
+export type NotifNavData = {
+  type?: string;
+  conversationId?: string;
+  referenceType?: string;
+  referenceId?: string;
+  postId?: string;
+};
+
+/** Resolves the in-app route for a notification payload (shared by every tap path). */
+export function resolveNotificationRoute(data: NotifNavData): string | null {
+  const chatId =
+    (data.type === "MESSAGE" && data.conversationId) ||
+    (data.referenceType === "CONVERSATION" && data.referenceId) ||
+    (data.referenceType === "MESSAGE" && data.referenceId) ||
+    null;
+  if (chatId) return `/chat/${chatId}`;
+  if (data.postId) return `/post/${data.postId}`;
+  if (data.referenceType === "POST" && data.referenceId) return `/post/${data.referenceId}`;
+  if (data.referenceType === "USER" && data.referenceId) return `/profile/${data.referenceId}`;
+  return "/notifications";
+}
+
+/** Navigates to the route for a tapped notification (foreground path). */
+export function navigateForNotification(data: NotifNavData) {
+  const route = resolveNotificationRoute(data);
+  if (!route) return;
+  if (route.startsWith("/chat/")) clearConversationNotification(route.slice("/chat/".length));
+  setTimeout(() => router.push(route as `/${string}`), 300);
+}
+
 export async function handleInlineReply(conversationId: string, text: string): Promise<void> {
   try {
     await apolloClient.mutate({
@@ -180,13 +273,17 @@ export function registerNotifeeHandlers() {
   if (_foregroundHandlerRegistered) return;
   _foregroundHandlerRegistered = true;
 
-  // Notifee foreground handler — kept for any Notifee-posted notifications.
+  // Notifee foreground handler — routes any Notifee-posted notification tap.
   notifee.onForegroundEvent(({ type, detail }) => {
-    const data = detail.notification?.data as { type?: string; conversationId?: string } | undefined;
-    if (data?.type !== "MESSAGE" || !data.conversationId) return;
-    const conversationId = data.conversationId;
-    if (type === EventType.PRESS) {
-      navigateToChat(conversationId);
+    if (type !== EventType.PRESS) return;
+    const data = detail.notification?.data as NotifNavData | undefined;
+    if (!data) return;
+    if (data.type === "MESSAGE" && data.conversationId) {
+      navigateToChat(data.conversationId);
+      return;
+    }
+    if (data.type === "BELL") {
+      navigateForNotification(data);
     }
   });
 }
