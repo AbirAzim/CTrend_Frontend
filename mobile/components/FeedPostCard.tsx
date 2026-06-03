@@ -40,6 +40,7 @@ import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import type { FeedPostView } from '@ctrend/shared/types/feed';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { FeedInlineComments } from './FeedInlineComments';
 import type { ColorPalette } from '../context/ThemeContext';
 import { useSounds } from '../context/SoundContext';
 import { useTabBar } from '../context/TabBarContext';
@@ -486,6 +487,11 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 				? 'rgba(245,158,11,0.14)'
 				: 'rgba(245,158,11,0.1)',
 		},
+		actionChipFlatCommentActive: {
+			backgroundColor: isDark
+				? 'rgba(99,102,241,0.18)'
+				: 'rgba(99,102,241,0.12)',
+		},
 		// Icon + superscript badge wrapper
 		chipIconWrap: {
 			position: 'relative' as const,
@@ -874,6 +880,9 @@ function FeedPostCardComponent({
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
+	// Inline comments panel (feed only) — toggled by the 💬 chip instead of navigating.
+	const [commentsOpen, setCommentsOpen] = useState(false);
+	const [commentCountOverride, setCommentCountOverride] = useState<number | null>(null);
 
 	function goToPost() {
 		if (!isAuthenticated) {
@@ -1922,7 +1931,7 @@ function FeedPostCardComponent({
 			) : null}
 
 			{(() => {
-				const commentCount = post.commentCount ?? 0;
+				const commentCount = commentCountOverride ?? (post.commentCount ?? 0);
 				const votersTotal = isBinary ? binaryTotal : multiTotal;
 				const hasCompare = Boolean(compareUrls);
 
@@ -1949,15 +1958,21 @@ function FeedPostCardComponent({
 					isHype?: boolean;
 					isSave?: boolean;
 					isVoters?: boolean;
+					isComment?: boolean;
 					active?: boolean;
 				};
 				const chips: ChipDef[] = [
 					{
 						i: 0,
 						icon: '💬',
-						accessLabel: 'Comments',
-						onPress: isDetail ? (onCommentsPress ?? goToPost) : goToPost,
+						accessLabel: commentsOpen ? 'Hide comments' : 'Comments',
+						// In the feed, toggle inline comments instead of navigating to the full page.
+						onPress: isDetail
+							? (onCommentsPress ?? goToPost)
+							: () => setCommentsOpen((v) => !v),
 						count: commentCount,
+						isComment: true,
+						active: !isDetail && commentsOpen,
 					},
 					{
 						i: 1,
@@ -2018,6 +2033,7 @@ function FeedPostCardComponent({
 									isHype,
 									isSave,
 									isVoters,
+									isComment,
 									active,
 								}) => (
 									<Animated.View
@@ -2028,6 +2044,7 @@ function FeedPostCardComponent({
 												st.actionChipFlat,
 												isHype && active && st.actionChipFlatHypeActive,
 												isSave && active && st.actionChipFlatSaveActive,
+												isComment && active && st.actionChipFlatCommentActive,
 											]}
 											onPressIn={() => chipPressIn(i)}
 											onPressOut={() => chipPressOut(i)}
@@ -2089,6 +2106,17 @@ function FeedPostCardComponent({
 			})()}
 
 			{/* ── Voters panel ── */}
+			{/* Inline comments (feed only) */}
+			{!isDetail && commentsOpen ? (
+				<FeedInlineComments
+					postId={post.id}
+					onClose={() => setCommentsOpen(false)}
+					onCommentAdded={() =>
+						setCommentCountOverride((c) => (c ?? (post.commentCount ?? 0)) + 1)
+					}
+				/>
+			) : null}
+
 			<FeedVotersPanel
 				visible={votersVisible}
 				onClose={() => setVotersVisible(false)}
