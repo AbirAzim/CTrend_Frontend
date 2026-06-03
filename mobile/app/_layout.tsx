@@ -19,6 +19,7 @@ import { usePushNotifications } from "../hooks/usePushNotifications";
 import { NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { MESSAGE_RECEIVED, MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
+import { GET_USER_PROFILE } from "@ctrend/shared/graphql/friends";
 import {
   postOrUpdateMessageNotification,
   postBellNotification,
@@ -92,6 +93,49 @@ function BadgeSync() {
   return null;
 }
 
+/**
+ * Builds the system-notification title/body.
+ * The backend `body` already reads like "<name> commented on your post", so we
+ * surface the actor's name as the (bold) title and the action as the body —
+ * matching how social apps show "Name" + "did X". Brand/system notifications
+ * (no actor) keep the backend title/body as-is.
+ */
+function buildBellText(
+  actorName: string | null,
+  title: string,
+  body: string,
+): { title: string; body: string } {
+  if (!actorName) return { title: title || body || "Notification", body: body || "" };
+  const trimmed = (body || "").trim();
+  const phrase = trimmed.startsWith(actorName) ? trimmed.slice(actorName.length).trim() : trimmed;
+  return { title: actorName, body: phrase || title || "" };
+}
+
+/**
+ * Resolves the actor's avatar for a notification. The realtime `newNotification`
+ * subscription doesn't always include `latestActorAvatar` (unlike the query), so
+ * fall back to fetching the actor's profile when it's missing.
+ */
+async function resolveActorAvatar(
+  client: ReturnType<typeof useApolloClient>,
+  rawAvatar: string | null | undefined,
+  actorId: string | null,
+): Promise<string | null> {
+  const direct = normalizeProfileImageUrl(rawAvatar);
+  if (direct) return direct;
+  if (!actorId) return null;
+  try {
+    const res = await client.query<{ getUserProfile?: { profileImageUrl?: string | null } }>({
+      query: GET_USER_PROFILE,
+      variables: { userId: actorId },
+      fetchPolicy: "cache-first",
+    });
+    return normalizeProfileImageUrl(res.data?.getUserProfile?.profileImageUrl);
+  } catch {
+    return null;
+  }
+}
+
 // Fires for bell-type notifications (votes, comments, friend requests, etc.) on every screen.
 function GlobalNotificationSubscription() {
   const { isAuthenticated } = useAuth();
@@ -104,29 +148,42 @@ function GlobalNotificationSubscription() {
     onData: ({ data }) => {
       const n = data.data?.newNotification as (NotifToast & { read?: boolean }) | null;
       if (!n) return;
-      console.warn("[bell] received:", n.type, n.title);
+
+      const raw = n as unknown as Record<string, unknown>;
+      const actorName = (raw.latestActorName as string | null | undefined)?.trim() || null;
+      const actorId = (raw.latestActorId as string | null | undefined) ?? null;
+      const postId = (raw.postId as string | null | undefined) ?? null;
+      const { title, body } = buildBellText(actorName, n.title, n.body);
+      console.warn("[bell] received:", n.type, "actorAvatar?", !!raw.latestActorAvatar);
 
       // In-app banner
       playNotification();
       showToast({
         id: n.id,
         type: n.type,
-        title: n.title,
-        body: n.body,
+        title,
+        body,
         referenceId: n.referenceId,
         referenceType: n.referenceType,
-        postId: (n as unknown as Record<string, unknown>).postId as string | null ?? null,
+        postId,
       });
 
-      const raw = n as unknown as Record<string, unknown>;
-      void postBellNotification({
-        title: n.title || n.body || "Notification",
-        body: n.body || "",
-        actorAvatar: normalizeProfileImageUrl(raw.latestActorAvatar as string | null | undefined),
-        referenceType: n.referenceType ?? null,
-        referenceId: n.referenceId ?? null,
-        postId: (raw.postId as string | null | undefined) ?? null,
-      });
+      // Android system notification with the actor's avatar (fetched if the
+      // subscription payload didn't include it).
+      void resolveActorAvatar(
+        client,
+        raw.latestActorAvatar as string | null | undefined,
+        actorId,
+      ).then((actorAvatar) =>
+        postBellNotification({
+          title,
+          body,
+          actorAvatar,
+          referenceType: n.referenceType ?? null,
+          referenceId: n.referenceId ?? null,
+          postId,
+        }),
+      );
 
       // Refresh bell badge count
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
