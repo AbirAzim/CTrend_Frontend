@@ -4,7 +4,7 @@ import * as Notifications from "expo-notifications";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
-import { AppState, Platform, View } from "react-native";
+import { AppState, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { apolloClient } from "../lib/apolloClient";
@@ -17,9 +17,12 @@ import { OfflineBanner } from "../components/OfflineBanner";
 import { InAppNotificationBanner } from "../components/InAppNotificationBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { MESSAGE_RECEIVED, MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import {
   postOrUpdateMessageNotification,
+  postBellNotification,
+  resolveNotificationRoute,
   clearConversationNotification,
   initMessageNotifications,
   registerNotifeeHandlers,
@@ -28,59 +31,44 @@ import {
   handleMarkReadAction,
   REPLY_ACTION_ID,
   MARK_READ_ACTION_ID,
+  type NotifNavData,
 } from "../lib/messageNotifications";
 import {
   consumePendingChatNavigation,
+  consumePendingNavigationRoute,
+  setPendingNavigationRoute,
   getActiveConversationId,
   setActiveConversationId,
 } from "../lib/activeConversation";
 
 // Background event handler — must be registered at module level (runs when app is killed/bg)
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-  const data = detail.notification?.data as { type?: string; conversationId?: string } | undefined;
-  if (data?.type !== "MESSAGE" || !data.conversationId) return;
-  const conversationId = data.conversationId;
+  const data = detail.notification?.data as NotifNavData | undefined;
+  if (!data) return;
 
-  if (type === EventType.PRESS) {
-    handleNotifeeBackgroundPress(conversationId);
+  // Chat messages: inline reply / mark-read actions + tap navigation.
+  if (data.type === "MESSAGE" && data.conversationId) {
+    const conversationId = data.conversationId;
+    if (type === EventType.PRESS) {
+      handleNotifeeBackgroundPress(conversationId);
+      return;
+    }
+    if (type === EventType.ACTION_PRESS) {
+      if (detail.pressAction?.id === REPLY_ACTION_ID && detail.input?.trim()) {
+        await handleInlineReply(conversationId, detail.input.trim());
+      } else if (detail.pressAction?.id === MARK_READ_ACTION_ID) {
+        await handleMarkReadAction(conversationId);
+      }
+    }
     return;
   }
 
-  if (type === EventType.ACTION_PRESS) {
-    if (detail.pressAction?.id === REPLY_ACTION_ID && detail.input?.trim()) {
-      await handleInlineReply(conversationId, detail.input.trim());
-    } else if (detail.pressAction?.id === MARK_READ_ACTION_ID) {
-      await handleMarkReadAction(conversationId);
-    }
+  // Bell notifications (likes, comments, friend requests, votes, …):
+  // stash the resolved route to navigate once the app is active.
+  if (data.type === "BELL" && type === EventType.PRESS) {
+    setPendingNavigationRoute(resolveNotificationRoute(data));
   }
 });
-
-const BELL_CHANNEL_ID = "default";
-
-async function postSystemNotification(
-  title: string,
-  body: string,
-  data: Record<string, unknown>,
-) {
-  try {
-    const safeData: Record<string, string> = {};
-    for (const [k, v] of Object.entries(data)) {
-      safeData[k] = v == null ? "" : String(v);
-    }
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: title || "Ke Jitbe",
-        body: body || " ",
-        data: safeData,
-        sound: true,
-      },
-      trigger: Platform.OS === "android" ? { channelId: BELL_CHANNEL_ID } : null,
-    });
-    console.warn("[bell] posted:", title);
-  } catch (e) {
-    console.warn("[bell] postSystemNotification failed:", e);
-  }
-}
 
 function AppStatusBar() {
   const { isDark } = useTheme();
@@ -131,15 +119,14 @@ function GlobalNotificationSubscription() {
       });
 
       const raw = n as unknown as Record<string, unknown>;
-      void postSystemNotification(
-        n.title || n.body || "Notification",
-        n.body || "",
-        {
-          referenceType: n.referenceType ?? "",
-          referenceId: n.referenceId ?? "",
-          postId: raw.postId ?? "",
-        },
-      );
+      void postBellNotification({
+        title: n.title || n.body || "Notification",
+        body: n.body || "",
+        actorAvatar: normalizeProfileImageUrl(raw.latestActorAvatar as string | null | undefined),
+        referenceType: n.referenceType ?? null,
+        referenceId: n.referenceId ?? null,
+        postId: (raw.postId as string | null | undefined) ?? null,
+      });
 
       // Refresh bell badge count
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
@@ -261,6 +248,12 @@ function AppServices() {
         navigateFromMessageNotification(pending);
         return true;
       }
+      const pendingRoute = consumePendingNavigationRoute();
+      if (pendingRoute) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTimeout(() => router.push(pendingRoute as any), 400);
+        return true;
+      }
       return false;
     }
 
@@ -268,9 +261,16 @@ function AppServices() {
 
     void notifee.getInitialNotification().then((initial) => {
       if (!initial) return;
-      const data = initial.notification?.data as { type?: string; conversationId?: string } | undefined;
-      if (data?.type === "MESSAGE" && data.conversationId) {
+      const data = initial.notification?.data as NotifNavData | undefined;
+      if (!data) return;
+      if (data.type === "MESSAGE" && data.conversationId) {
         navigateFromMessageNotification(data.conversationId);
+        return;
+      }
+      if (data.type === "BELL") {
+        const route = resolveNotificationRoute(data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (route) setTimeout(() => router.push(route as any), 400);
       }
     });
   }, [isAuthenticated]);
@@ -280,7 +280,13 @@ function AppServices() {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
       const pending = consumePendingChatNavigation();
-      if (pending) navigateFromMessageNotification(pending);
+      if (pending) {
+        navigateFromMessageNotification(pending);
+        return;
+      }
+      const route = consumePendingNavigationRoute();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (route) setTimeout(() => router.push(route as any), 400);
     });
     return () => sub.remove();
   }, [isAuthenticated]);

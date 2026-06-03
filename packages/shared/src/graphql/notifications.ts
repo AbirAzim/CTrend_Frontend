@@ -75,6 +75,7 @@ export const NEW_NOTIFICATION_SUB = gql`
       actorCount
       latestActorId
       latestActorName
+      latestActorAvatar
       read
       archived
       createdAt
