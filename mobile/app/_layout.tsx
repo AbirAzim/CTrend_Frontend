@@ -4,7 +4,7 @@ import * as Notifications from "expo-notifications";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
-import { AppState, Platform, View } from "react-native";
+import { AppState, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { apolloClient } from "../lib/apolloClient";
@@ -17,9 +17,13 @@ import { OfflineBanner } from "../components/OfflineBanner";
 import { InAppNotificationBanner } from "../components/InAppNotificationBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { MESSAGE_RECEIVED, MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
+import { GET_USER_PROFILE } from "@ctrend/shared/graphql/friends";
 import {
   postOrUpdateMessageNotification,
+  postBellNotification,
+  resolveNotificationRoute,
   clearConversationNotification,
   initMessageNotifications,
   registerNotifeeHandlers,
@@ -28,59 +32,44 @@ import {
   handleMarkReadAction,
   REPLY_ACTION_ID,
   MARK_READ_ACTION_ID,
+  type NotifNavData,
 } from "../lib/messageNotifications";
 import {
   consumePendingChatNavigation,
+  consumePendingNavigationRoute,
+  setPendingNavigationRoute,
   getActiveConversationId,
   setActiveConversationId,
 } from "../lib/activeConversation";
 
 // Background event handler — must be registered at module level (runs when app is killed/bg)
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-  const data = detail.notification?.data as { type?: string; conversationId?: string } | undefined;
-  if (data?.type !== "MESSAGE" || !data.conversationId) return;
-  const conversationId = data.conversationId;
+  const data = detail.notification?.data as NotifNavData | undefined;
+  if (!data) return;
 
-  if (type === EventType.PRESS) {
-    handleNotifeeBackgroundPress(conversationId);
+  // Chat messages: inline reply / mark-read actions + tap navigation.
+  if (data.type === "MESSAGE" && data.conversationId) {
+    const conversationId = data.conversationId;
+    if (type === EventType.PRESS) {
+      handleNotifeeBackgroundPress(conversationId);
+      return;
+    }
+    if (type === EventType.ACTION_PRESS) {
+      if (detail.pressAction?.id === REPLY_ACTION_ID && detail.input?.trim()) {
+        await handleInlineReply(conversationId, detail.input.trim());
+      } else if (detail.pressAction?.id === MARK_READ_ACTION_ID) {
+        await handleMarkReadAction(conversationId);
+      }
+    }
     return;
   }
 
-  if (type === EventType.ACTION_PRESS) {
-    if (detail.pressAction?.id === REPLY_ACTION_ID && detail.input?.trim()) {
-      await handleInlineReply(conversationId, detail.input.trim());
-    } else if (detail.pressAction?.id === MARK_READ_ACTION_ID) {
-      await handleMarkReadAction(conversationId);
-    }
+  // Bell notifications (likes, comments, friend requests, votes, …):
+  // stash the resolved route to navigate once the app is active.
+  if (data.type === "BELL" && type === EventType.PRESS) {
+    setPendingNavigationRoute(resolveNotificationRoute(data));
   }
 });
-
-const BELL_CHANNEL_ID = "default";
-
-async function postSystemNotification(
-  title: string,
-  body: string,
-  data: Record<string, unknown>,
-) {
-  try {
-    const safeData: Record<string, string> = {};
-    for (const [k, v] of Object.entries(data)) {
-      safeData[k] = v == null ? "" : String(v);
-    }
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: title || "Ke Jitbe",
-        body: body || " ",
-        data: safeData,
-        sound: true,
-      },
-      trigger: Platform.OS === "android" ? { channelId: BELL_CHANNEL_ID } : null,
-    });
-    console.warn("[bell] posted:", title);
-  } catch (e) {
-    console.warn("[bell] postSystemNotification failed:", e);
-  }
-}
 
 function AppStatusBar() {
   const { isDark } = useTheme();
@@ -104,6 +93,49 @@ function BadgeSync() {
   return null;
 }
 
+/**
+ * Builds the system-notification title/body.
+ * The backend `body` already reads like "<name> commented on your post", so we
+ * surface the actor's name as the (bold) title and the action as the body —
+ * matching how social apps show "Name" + "did X". Brand/system notifications
+ * (no actor) keep the backend title/body as-is.
+ */
+function buildBellText(
+  actorName: string | null,
+  title: string,
+  body: string,
+): { title: string; body: string } {
+  if (!actorName) return { title: title || body || "Notification", body: body || "" };
+  const trimmed = (body || "").trim();
+  const phrase = trimmed.startsWith(actorName) ? trimmed.slice(actorName.length).trim() : trimmed;
+  return { title: actorName, body: phrase || title || "" };
+}
+
+/**
+ * Resolves the actor's avatar for a notification. The realtime `newNotification`
+ * subscription doesn't always include `latestActorAvatar` (unlike the query), so
+ * fall back to fetching the actor's profile when it's missing.
+ */
+async function resolveActorAvatar(
+  client: ReturnType<typeof useApolloClient>,
+  rawAvatar: string | null | undefined,
+  actorId: string | null,
+): Promise<string | null> {
+  const direct = normalizeProfileImageUrl(rawAvatar);
+  if (direct) return direct;
+  if (!actorId) return null;
+  try {
+    const res = await client.query<{ getUserProfile?: { profileImageUrl?: string | null } }>({
+      query: GET_USER_PROFILE,
+      variables: { userId: actorId },
+      fetchPolicy: "cache-first",
+    });
+    return normalizeProfileImageUrl(res.data?.getUserProfile?.profileImageUrl);
+  } catch {
+    return null;
+  }
+}
+
 // Fires for bell-type notifications (votes, comments, friend requests, etc.) on every screen.
 function GlobalNotificationSubscription() {
   const { isAuthenticated } = useAuth();
@@ -116,29 +148,44 @@ function GlobalNotificationSubscription() {
     onData: ({ data }) => {
       const n = data.data?.newNotification as (NotifToast & { read?: boolean }) | null;
       if (!n) return;
-      console.warn("[bell] received:", n.type, n.title);
+
+      const raw = n as unknown as Record<string, unknown>;
+      const actorName = (raw.latestActorName as string | null | undefined)?.trim() || null;
+      const actorId = (raw.latestActorId as string | null | undefined) ?? null;
+      const postId = (raw.postId as string | null | undefined) ?? null;
+      const commentId = (raw.commentId as string | null | undefined) ?? null;
+      const { title, body } = buildBellText(actorName, n.title, n.body);
+      console.warn("[bell] received:", n.type, "actorAvatar?", !!raw.latestActorAvatar);
 
       // In-app banner
       playNotification();
       showToast({
         id: n.id,
         type: n.type,
-        title: n.title,
-        body: n.body,
+        title,
+        body,
         referenceId: n.referenceId,
         referenceType: n.referenceType,
-        postId: (n as unknown as Record<string, unknown>).postId as string | null ?? null,
+        postId,
       });
 
-      const raw = n as unknown as Record<string, unknown>;
-      void postSystemNotification(
-        n.title || n.body || "Notification",
-        n.body || "",
-        {
-          referenceType: n.referenceType ?? "",
-          referenceId: n.referenceId ?? "",
-          postId: raw.postId ?? "",
-        },
+      // Android system notification with the actor's avatar (fetched if the
+      // subscription payload didn't include it).
+      void resolveActorAvatar(
+        client,
+        raw.latestActorAvatar as string | null | undefined,
+        actorId,
+      ).then((actorAvatar) =>
+        postBellNotification({
+          title,
+          body,
+          actorAvatar,
+          notifType: n.type ?? null,
+          referenceType: n.referenceType ?? null,
+          referenceId: n.referenceId ?? null,
+          postId,
+          commentId,
+        }),
       );
 
       // Refresh bell badge count
@@ -261,6 +308,12 @@ function AppServices() {
         navigateFromMessageNotification(pending);
         return true;
       }
+      const pendingRoute = consumePendingNavigationRoute();
+      if (pendingRoute) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTimeout(() => router.push(pendingRoute as any), 400);
+        return true;
+      }
       return false;
     }
 
@@ -268,9 +321,16 @@ function AppServices() {
 
     void notifee.getInitialNotification().then((initial) => {
       if (!initial) return;
-      const data = initial.notification?.data as { type?: string; conversationId?: string } | undefined;
-      if (data?.type === "MESSAGE" && data.conversationId) {
+      const data = initial.notification?.data as NotifNavData | undefined;
+      if (!data) return;
+      if (data.type === "MESSAGE" && data.conversationId) {
         navigateFromMessageNotification(data.conversationId);
+        return;
+      }
+      if (data.type === "BELL") {
+        const route = resolveNotificationRoute(data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (route) setTimeout(() => router.push(route as any), 400);
       }
     });
   }, [isAuthenticated]);
@@ -280,7 +340,13 @@ function AppServices() {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
       const pending = consumePendingChatNavigation();
-      if (pending) navigateFromMessageNotification(pending);
+      if (pending) {
+        navigateFromMessageNotification(pending);
+        return;
+      }
+      const route = consumePendingNavigationRoute();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (route) setTimeout(() => router.push(route as any), 400);
     });
     return () => sub.remove();
   }, [isAuthenticated]);
@@ -304,38 +370,21 @@ function NotificationResponseHandler() {
       lastId = id;
       setTimeout(() => { lastId = ""; }, 2000);
 
-      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+      const data = response.notification.request.content.data as NotifNavData | undefined;
       if (!data) return;
-      const { referenceType, referenceId, postId, type, conversationId } = data as {
-        referenceType?: string;
-        referenceId?: string;
-        postId?: string;
-        type?: string;
-        conversationId?: string;
-      };
 
       // Small delay lets Expo Router finish mounting the initial route so the
       // back stack is never empty (avoids "stuck with no back button" on cold start).
       setTimeout(() => {
-        const chatId =
-          (type === "MESSAGE" && conversationId) ||
-          (referenceType === "MESSAGE" && referenceId) ||
-          (referenceType === "CONVERSATION" && referenceId) ||
-          null;
-        if (chatId) {
+        const route = resolveNotificationRoute(data);
+        if (!route) { router.push("/notifications"); return; }
+        if (route.startsWith("/chat/")) {
+          const chatId = route.slice("/chat/".length);
           if (pathnameRef.current.includes(`/chat/${chatId}`)) return;
-          clearConversationNotification(String(chatId));
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          router.push(`/chat/${chatId}` as any);
-          return;
+          clearConversationNotification(chatId);
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (postId) { router.push(`/post/${postId}` as any); return; }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (referenceType === "POST" && referenceId) { router.push(`/post/${referenceId}` as any); return; }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (referenceType === "USER" && referenceId) { router.push(`/profile/${referenceId}` as any); return; }
-        router.push("/notifications");
+        router.push(route as any);
       }, 300);
     });
 
