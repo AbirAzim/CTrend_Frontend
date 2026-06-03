@@ -148,16 +148,20 @@ export async function postBellNotification(opts: {
   title: string;
   body: string;
   actorAvatar: string | null;
+  notifType?: string | null;
   referenceType?: string | null;
   referenceId?: string | null;
   postId?: string | null;
+  commentId?: string | null;
 }) {
   const id = `bell_${Date.now()}_${++_notifSeq}`;
   const data = {
     type: "BELL",
+    notifType: opts.notifType ?? "",
     referenceType: opts.referenceType ?? "",
     referenceId: opts.referenceId ?? "",
     postId: opts.postId ?? "",
+    commentId: opts.commentId ?? "",
   };
 
   // Notifee first — supports actor avatar (largeIcon).
@@ -203,24 +207,60 @@ export async function postBellNotification(opts: {
 }
 
 export type NotifNavData = {
-  type?: string;
+  type?: string;          // routing discriminator: "MESSAGE" | "BELL"
+  notifType?: string;     // original notification type, e.g. POST_COMMENT, POST_HYPE
   conversationId?: string;
   referenceType?: string;
   referenceId?: string;
   postId?: string;
+  commentId?: string;
 };
 
-/** Resolves the in-app route for a notification payload (shared by every tap path). */
+// Comment-focused notifications → open the post scrolled to that comment.
+const COMMENT_NOTIF_TYPES = new Set([
+  "POST_COMMENT", "NEW_COMMENT", "COMMENT_REPLY", "COMMENT_REACTION", "COMMENT_LIKE",
+]);
+// Post-focused notifications → open the post.
+const POST_NOTIF_TYPES = new Set([
+  "POST_HYPE", "POST_VOTE", "NEW_POST_FRIEND",
+  "VOTE_ENDED", "VOTE_WINNER", "POST_WINNER", "VOTE_PRIZE_CLAIMED",
+]);
+// Person-focused notifications → open that user's profile.
+const PROFILE_NOTIF_TYPES = new Set([
+  "FRIEND_REQUEST", "FRIEND_REQUEST_ACCEPTED", "NEW_FOLLOWER",
+]);
+// Platform notifications → open the linked post if any, else the notifications list.
+const ANNOUNCEMENT_NOTIF_TYPES = new Set([
+  "ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM",
+]);
+
+/**
+ * Resolves the in-app route for a notification payload — shared by every tap path
+ * (Notifee foreground/background/cold-start and the Expo fallback handler).
+ * Mirrors the in-app notification list's `navigateFromNotif`.
+ */
 export function resolveNotificationRoute(data: NotifNavData): string | null {
+  // Chat messages
   const chatId =
     (data.type === "MESSAGE" && data.conversationId) ||
     (data.referenceType === "CONVERSATION" && data.referenceId) ||
     (data.referenceType === "MESSAGE" && data.referenceId) ||
     null;
   if (chatId) return `/chat/${chatId}`;
-  if (data.postId) return `/post/${data.postId}`;
-  if (data.referenceType === "POST" && data.referenceId) return `/post/${data.referenceId}`;
-  if (data.referenceType === "USER" && data.referenceId) return `/profile/${data.referenceId}`;
+
+  const nt = data.notifType ?? "";
+  const refType = (data.referenceType ?? "").toUpperCase();
+  const postTarget = data.postId || (refType === "POST" ? data.referenceId : undefined) || null;
+  const postRoute = (base: string) => (data.commentId ? `${base}?commentId=${data.commentId}` : base);
+
+  if (COMMENT_NOTIF_TYPES.has(nt) && postTarget) return postRoute(`/post/${postTarget}`);
+  if (POST_NOTIF_TYPES.has(nt) && postTarget) return `/post/${postTarget}`;
+  if (PROFILE_NOTIF_TYPES.has(nt) && data.referenceId) return `/profile/${data.referenceId}`;
+  if (ANNOUNCEMENT_NOTIF_TYPES.has(nt)) return postTarget ? `/post/${postTarget}` : "/notifications";
+
+  // Fallback by data shape (unknown/missing type)
+  if (postTarget) return postRoute(`/post/${postTarget}`);
+  if (refType === "USER" && data.referenceId) return `/profile/${data.referenceId}`;
   return "/notifications";
 }
 

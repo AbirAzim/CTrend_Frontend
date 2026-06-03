@@ -153,6 +153,7 @@ function GlobalNotificationSubscription() {
       const actorName = (raw.latestActorName as string | null | undefined)?.trim() || null;
       const actorId = (raw.latestActorId as string | null | undefined) ?? null;
       const postId = (raw.postId as string | null | undefined) ?? null;
+      const commentId = (raw.commentId as string | null | undefined) ?? null;
       const { title, body } = buildBellText(actorName, n.title, n.body);
       console.warn("[bell] received:", n.type, "actorAvatar?", !!raw.latestActorAvatar);
 
@@ -179,9 +180,11 @@ function GlobalNotificationSubscription() {
           title,
           body,
           actorAvatar,
+          notifType: n.type ?? null,
           referenceType: n.referenceType ?? null,
           referenceId: n.referenceId ?? null,
           postId,
+          commentId,
         }),
       );
 
@@ -367,38 +370,21 @@ function NotificationResponseHandler() {
       lastId = id;
       setTimeout(() => { lastId = ""; }, 2000);
 
-      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+      const data = response.notification.request.content.data as NotifNavData | undefined;
       if (!data) return;
-      const { referenceType, referenceId, postId, type, conversationId } = data as {
-        referenceType?: string;
-        referenceId?: string;
-        postId?: string;
-        type?: string;
-        conversationId?: string;
-      };
 
       // Small delay lets Expo Router finish mounting the initial route so the
       // back stack is never empty (avoids "stuck with no back button" on cold start).
       setTimeout(() => {
-        const chatId =
-          (type === "MESSAGE" && conversationId) ||
-          (referenceType === "MESSAGE" && referenceId) ||
-          (referenceType === "CONVERSATION" && referenceId) ||
-          null;
-        if (chatId) {
+        const route = resolveNotificationRoute(data);
+        if (!route) { router.push("/notifications"); return; }
+        if (route.startsWith("/chat/")) {
+          const chatId = route.slice("/chat/".length);
           if (pathnameRef.current.includes(`/chat/${chatId}`)) return;
-          clearConversationNotification(String(chatId));
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          router.push(`/chat/${chatId}` as any);
-          return;
+          clearConversationNotification(chatId);
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (postId) { router.push(`/post/${postId}` as any); return; }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (referenceType === "POST" && referenceId) { router.push(`/post/${referenceId}` as any); return; }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (referenceType === "USER" && referenceId) { router.push(`/profile/${referenceId}` as any); return; }
-        router.push("/notifications");
+        router.push(route as any);
       }, 300);
     });
 
