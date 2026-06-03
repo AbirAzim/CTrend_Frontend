@@ -6,6 +6,9 @@ import { router } from "expo-router";
 import { apolloClient } from "./apolloClient";
 import { SEND_MESSAGE, MARK_CONVERSATION_READ } from "@ctrend/shared/graphql/messages";
 import { setPendingChatNavigation } from "./activeConversation";
+// Brand logo shown as the notification large icon when there's no actor avatar
+// (e.g. system/announcement notifications) — mirrors the in-app notification list.
+import BRAND_LOGO from "../assets/logo.png";
 
 export const REPLY_ACTION_ID = "reply";
 export const MARK_READ_ACTION_ID = "mark_read";
@@ -170,10 +173,10 @@ export async function postBellNotification(opts: {
         importance: AndroidImportance.HIGH,
         smallIcon: "ic_launcher_monochrome",
         ...(icon
-          ? { largeIcon: icon }
+          ? { largeIcon: icon, circularLargeIcon: true }
           : isHttpsUrl(opts.actorAvatar)
           ? { largeIcon: opts.actorAvatar, circularLargeIcon: true }
-          : {}),
+          : { largeIcon: BRAND_LOGO }),
         pressAction: { id: "default" },
         autoCancel: true,
         showTimestamp: true,

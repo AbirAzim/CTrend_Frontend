@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -100,37 +101,50 @@ function PersonLink({
   );
 }
 
-// ─── Filter chip rows ──────────────────────────────────────────────────────────
+// ─── Filter sheet building blocks ──────────────────────────────────────────────
 
-function ChipRow<T extends string>({
-  label, value, options, onChange, colors,
+const SORT_LABELS: Record<SortBy, string> = {
+  createdAt: "Created",
+  updatedAt: "Updated",
+  votes: "Votes",
+  caption: "Caption",
+};
+
+/** Human-friendly order label that adapts to the active sort field. */
+function orderLabel(sortBy: SortBy, order: SortOrder): string {
+  if (sortBy === "caption") return order === "asc" ? "A → Z" : "Z → A";
+  if (sortBy === "votes") return order === "asc" ? "Fewest first" : "Most first";
+  return order === "asc" ? "Oldest first" : "Newest first";
+}
+
+/** A single selectable pill, used inside filter groups and the active-chips row. */
+function SelectChip({
+  label, active, onPress, colors,
 }: {
   label: string;
-  value: T;
-  options: Array<{ v: T; l: string }>;
-  onChange: (v: T) => void;
+  active: boolean;
+  onPress: () => void;
   colors: ColorPalette;
 }) {
   return (
-    <View style={st.chipRowWrap}>
-      <Text style={[st.chipRowLabel, { color: colors.muted }]}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
-        {options.map((o) => {
-          const active = o.v === value;
-          return (
-            <Pressable
-              key={o.v}
-              style={[
-                st.filterChip,
-                { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.accent : "transparent" },
-              ]}
-              onPress={() => onChange(o.v)}
-            >
-              <Text style={[st.filterChipText, { color: active ? "#fff" : colors.subtext }]}>{o.l}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+    <Pressable
+      onPress={onPress}
+      style={[
+        st.selChip,
+        { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.accent : "transparent" },
+      ]}
+    >
+      <Text style={[st.selChipText, { color: active ? "#fff" : colors.subtext }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** A labelled group of wrapped chips inside the filter sheet. */
+function FilterGroup({ label, colors, children }: { label: string; colors: ColorPalette; children: ReactNode }) {
+  return (
+    <View style={st.group}>
+      <Text style={[st.groupLabel, { color: colors.muted }]}>{label}</Text>
+      <View style={st.groupChips}>{children}</View>
     </View>
   );
 }
@@ -150,6 +164,7 @@ export default function AdminPostsScreen() {
   const [sortBy, setSortBy] = useState<SortBy>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [skip, setSkip] = useState(0);
+  const [filterSheet, setFilterSheet] = useState(false);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearchChange = useCallback((text: string) => {
@@ -202,6 +217,18 @@ export default function AdminPostsScreen() {
     setSortBy("createdAt"); setSortOrder("desc"); setSkip(0);
   }
 
+  // Active (non-default) filters shown as removable chips in the toolbar.
+  const activeChips: Array<{ key: string; label: string; clear: () => void }> = [];
+  if (statusFilter !== "all")
+    activeChips.push({ key: "status", label: statusFilter === "PUBLISHED" ? "Published" : "Scheduled", clear: () => { setStatusFilter("all"); setSkip(0); } });
+  if (votingFilter !== "all")
+    activeChips.push({ key: "voting", label: votingFilter === "live" ? "Live" : "Closed", clear: () => { setVotingFilter("all"); setSkip(0); } });
+  if (categoryFilter !== "all")
+    activeChips.push({ key: "cat", label: categories.find((c) => c.id === categoryFilter)?.name ?? "Category", clear: () => { setCategoryFilter("all"); setSkip(0); } });
+  if (sortBy !== "createdAt" || sortOrder !== "desc")
+    activeChips.push({ key: "sort", label: `${SORT_LABELS[sortBy]} · ${orderLabel(sortBy, sortOrder)}`, clear: () => { setSortBy("createdAt"); setSortOrder("desc"); setSkip(0); } });
+  const activeCount = activeChips.length;
+
   function handleDelete(p: PlatformPost) {
     Alert.alert("Delete post", "This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
@@ -253,53 +280,40 @@ export default function AdminPostsScreen() {
           )}
         </View>
 
-        <ChipRow
-          label="Status"
-          value={statusFilter}
-          onChange={(v) => { setStatusFilter(v); setSkip(0); }}
-          colors={colors}
-          options={[{ v: "all", l: "All" }, { v: "PUBLISHED", l: "Published" }, { v: "SCHEDULED", l: "Scheduled" }]}
-        />
-        <ChipRow
-          label="Voting"
-          value={votingFilter}
-          onChange={(v) => { setVotingFilter(v); setSkip(0); }}
-          colors={colors}
-          options={[{ v: "all", l: "All" }, { v: "live", l: "Live" }, { v: "closed", l: "Closed" }]}
-        />
-        <ChipRow
-          label="Category"
-          value={categoryFilter}
-          onChange={(v) => { setCategoryFilter(v); setSkip(0); }}
-          colors={colors}
-          options={[{ v: "all", l: "All" }, ...categories.map((c) => ({ v: c.id, l: c.name }))]}
-        />
-        <ChipRow
-          label="Sort"
-          value={sortBy}
-          onChange={(v) => { setSortBy(v); setSkip(0); }}
-          colors={colors}
-          options={[
-            { v: "createdAt", l: "Created" },
-            { v: "updatedAt", l: "Updated" },
-            { v: "votes", l: "Votes" },
-            { v: "caption", l: "Caption" },
-          ]}
-        />
-        <View style={st.sortOrderRow}>
-          <ChipRow
-            label="Order"
-            value={sortOrder}
-            onChange={(v) => { setSortOrder(v); setSkip(0); }}
-            colors={colors}
-            options={[{ v: "desc", l: "Desc" }, { v: "asc", l: "Asc" }]}
-          />
-          {!isDefaultFilters && (
-            <Pressable style={[st.resetBtn, { borderColor: colors.border }]} onPress={resetFilters}>
-              <Text style={[st.resetBtnText, { color: colors.accent }]}>↺ Reset</Text>
-            </Pressable>
-          )}
+        {/* Compact toolbar: Filters button + result count */}
+        <View style={st.toolbarRow}>
+          <Pressable
+            style={[
+              st.filterBtn,
+              { borderColor: activeCount > 0 ? colors.accent : colors.border, backgroundColor: activeCount > 0 ? colors.accent : "transparent" },
+            ]}
+            onPress={() => setFilterSheet(true)}
+          >
+            <Text style={[st.filterBtnText, { color: activeCount > 0 ? "#fff" : colors.text }]}>
+              ⚙  Filters{activeCount > 0 ? ` · ${activeCount}` : ""}
+            </Text>
+          </Pressable>
+          <Text style={[st.resultCount, { color: colors.muted }]}>
+            {total} {total === 1 ? "post" : "posts"}
+          </Text>
         </View>
+
+        {/* Active filter chips — quick-remove without opening the sheet */}
+        {activeChips.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.activeChipsRow}>
+            {activeChips.map((c) => (
+              <Pressable key={c.key} style={[st.activeChip, { backgroundColor: colors.section, borderColor: colors.border }]} onPress={c.clear}>
+                <Text style={[st.activeChipText, { color: colors.text }]}>{c.label}</Text>
+                <Text style={[st.activeChipX, { color: colors.muted }]}>✕</Text>
+              </Pressable>
+            ))}
+            {!isDefaultFilters && (
+              <Pressable style={[st.activeChip, { borderColor: colors.accent }]} onPress={resetFilters}>
+                <Text style={[st.activeChipText, { color: colors.accent }]}>↺ Clear all</Text>
+              </Pressable>
+            )}
+          </ScrollView>
+        )}
       </View>
 
       {loading && posts.length === 0 ? (
@@ -463,6 +477,61 @@ export default function AdminPostsScreen() {
           }}
         />
       )}
+
+      {/* Filter bottom sheet */}
+      <Modal visible={filterSheet} transparent animationType="slide" onRequestClose={() => setFilterSheet(false)}>
+        <View style={st.modalRoot}>
+          <Pressable style={st.modalOverlay} onPress={() => setFilterSheet(false)} />
+          <View style={[st.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <View style={st.handle} />
+            <View style={st.sheetHead}>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>Filters</Text>
+              {!isDefaultFilters && (
+                <Pressable onPress={resetFilters} hitSlop={8}>
+                  <Text style={[st.sheetReset, { color: colors.accent }]}>↺ Reset all</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              <FilterGroup label="Status" colors={colors}>
+                {([["all", "All"], ["PUBLISHED", "Published"], ["SCHEDULED", "Scheduled"]] as Array<[StatusFilter, string]>).map(([v, l]) => (
+                  <SelectChip key={v} label={l} active={statusFilter === v} colors={colors} onPress={() => { setStatusFilter(v); setSkip(0); }} />
+                ))}
+              </FilterGroup>
+
+              <FilterGroup label="Voting" colors={colors}>
+                {([["all", "All"], ["live", "Live"], ["closed", "Closed"]] as Array<[VotingFilter, string]>).map(([v, l]) => (
+                  <SelectChip key={v} label={l} active={votingFilter === v} colors={colors} onPress={() => { setVotingFilter(v); setSkip(0); }} />
+                ))}
+              </FilterGroup>
+
+              <FilterGroup label="Category" colors={colors}>
+                <SelectChip label="All" active={categoryFilter === "all"} colors={colors} onPress={() => { setCategoryFilter("all"); setSkip(0); }} />
+                {categories.map((c) => (
+                  <SelectChip key={c.id} label={c.name} active={categoryFilter === c.id} colors={colors} onPress={() => { setCategoryFilter(c.id); setSkip(0); }} />
+                ))}
+              </FilterGroup>
+
+              <FilterGroup label="Sort by" colors={colors}>
+                {(Object.keys(SORT_LABELS) as SortBy[]).map((v) => (
+                  <SelectChip key={v} label={SORT_LABELS[v]} active={sortBy === v} colors={colors} onPress={() => { setSortBy(v); setSkip(0); }} />
+                ))}
+              </FilterGroup>
+
+              <FilterGroup label="Order" colors={colors}>
+                {(["desc", "asc"] as SortOrder[]).map((v) => (
+                  <SelectChip key={v} label={orderLabel(sortBy, v)} active={sortOrder === v} colors={colors} onPress={() => { setSortOrder(v); setSkip(0); }} />
+                ))}
+              </FilterGroup>
+            </ScrollView>
+
+            <Pressable style={[st.applyBtn, { backgroundColor: colors.accent }]} onPress={() => setFilterSheet(false)}>
+              <Text style={st.applyBtnText}>Show {total} {total === 1 ? "post" : "posts"}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -482,14 +551,33 @@ const st = StyleSheet.create({
     searchIcon: { fontSize: 14 },
     searchInput: { flex: 1, fontSize: 14, padding: 0 },
 
-    chipRowWrap: { marginBottom: 6 },
-    chipRowLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 0.5, marginBottom: 3, textTransform: "uppercase" },
-    chipRow: { gap: 6, paddingRight: 8 },
-    filterChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
-    filterChipText: { fontSize: 12, fontWeight: "700" },
-    sortOrderRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
-    resetBtn: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 1 },
-    resetBtnText: { fontSize: 12, fontWeight: "700" },
+    // Compact toolbar
+    toolbarRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+    filterBtn: { flexDirection: "row", alignItems: "center", borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
+    filterBtnText: { fontSize: 13, fontWeight: "700" },
+    resultCount: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
+
+    // Active filter chips (removable)
+    activeChipsRow: { gap: 6, paddingTop: 8, paddingRight: 8 },
+    activeChip: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+    activeChipText: { fontSize: 12, fontWeight: "600" },
+    activeChipX: { fontSize: 11, fontWeight: "700" },
+
+    // Filter sheet
+    modalRoot: { flex: 1 },
+    modalOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)" },
+    sheet: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18 },
+    handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#888", opacity: 0.4, alignSelf: "center", marginBottom: 12 },
+    sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+    sheetTitle: { fontSize: 17, fontWeight: "800" },
+    sheetReset: { fontSize: 13, fontWeight: "700" },
+    group: { marginTop: 12 },
+    groupLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" },
+    groupChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    selChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+    selChipText: { fontSize: 13, fontWeight: "700" },
+    applyBtn: { borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 18 },
+    applyBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 
     center: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 40 },
     list: { padding: 12, gap: 10 },

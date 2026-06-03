@@ -56,7 +56,9 @@ export function usePushNotifications(isAuthenticated: boolean) {
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#6366f1",
-          sound: "default",
+          // Omit `sound` to use the system default tone. Passing "default" makes
+          // expo-notifications look for a custom raw resource named "default"
+          // (which doesn't exist) → "custom sound default not found" warning.
           showBadge: true,
         });
       }
