@@ -16785,7 +16785,10 @@ a.cx-profile-btn-accent {
   white-space: nowrap;
   vertical-align: bottom;
 }
-.cw-bubble:hover .cw-bubble-time { display: inline; }
+/* Reveal the timestamp on the whole bubble row (wrap), not just the bubble,
+   so moving the cursor from the bubble to the side reply arrow doesn't toggle
+   the time on/off and reflow the row out from under the pointer. */
+.cw-bubble-wrap:hover .cw-bubble-time { display: inline; }
 
 /* Message reactions (Messenger-style) */
 .cw-bubble-wrap {

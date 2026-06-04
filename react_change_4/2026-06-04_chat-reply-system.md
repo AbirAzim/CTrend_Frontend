@@ -29,6 +29,11 @@ Messenger-style:
 - The sent message renders a **quoted snippet** (sender name + text/📷 thumbnail)
   inside the bubble.
 - Tapping a quoted snippet **scrolls to the original** message and flashes it.
+- Hover state is unified to the whole **bubble row** (`.cw-bubble-wrap`): the
+  timestamp, side reply arrow, and reaction tray all reveal together and stay
+  stable, so moving the cursor from the bubble to the reply arrow no longer
+  reflows the row (time toggling on `.cw-bubble:hover` used to make the arrow jump
+  away as the bubble shrank).
 
 The quoted message is stored as a **denormalised snapshot** (`replyTo`) on the new
 message at send time, so the preview is cheap to render and stays stable if the
