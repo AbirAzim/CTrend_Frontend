@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -35,6 +35,7 @@ import {
 } from "@ctrend/shared/graphql/messages";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
+import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useSounds } from "../../context/SoundContext";
@@ -90,29 +91,6 @@ type ReactionChangedData = {
 
 const PAGE_SIZE = 30;
 
-// Show a centered time divider when messages are more than this far apart (Messenger-style).
-const MESSAGE_GAP_MS = 15 * 60 * 1000;
-
-/** Messenger-style absolute time/date label for dividers and tap-to-reveal. */
-function formatMessageTime(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const now = new Date();
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  if (d.toDateString() === now.toDateString()) return time;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
-  const within7Days = now.getTime() - d.getTime() < 7 * 24 * 60 * 60 * 1000;
-  if (within7Days) return `${d.toLocaleDateString([], { weekday: "short" })} ${time}`;
-  const sameYear = d.getFullYear() === now.getFullYear();
-  const date = d.toLocaleDateString(
-    [],
-    sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" },
-  );
-  return `${date}, ${time}`;
-}
-
 const EMOJI_PRESETS = [
   "😂", "❤️", "🔥", "👍", "😍",
   "🥺", "😭", "✨", "🎉", "😎",
@@ -128,30 +106,18 @@ function MessageBubble({
   showAvatar,
   colors,
   isReacting,
-  showDivider,
-  timeLabel,
-  revealed,
-  showSeen,
-  seenAvatarUri,
   onLongPress,
   onReact,
   onImagePress,
-  onToggleTime,
 }: {
   msg: Message;
   isOwn: boolean;
   showAvatar: boolean;
   colors: ReturnType<typeof useTheme>["colors"];
   isReacting: boolean;
-  showDivider: boolean;
-  timeLabel: string;
-  revealed: boolean;
-  showSeen: boolean;
-  seenAvatarUri: string | null;
   onLongPress: () => void;
   onReact: (emoji: string) => void;
   onImagePress: (uri: string) => void;
-  onToggleTime: () => void;
 }) {
   const avatar = normalizeProfileImageUrl(msg.senderAvatar);
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
@@ -159,13 +125,6 @@ function MessageBubble({
 
   return (
     <View>
-      {/* Centered time divider (start of a new burst / new day) */}
-      {showDivider && (
-        <View style={styles.timeDivider}>
-          <Text style={[styles.timeDividerText, { color: colors.muted }]}>{timeLabel}</Text>
-        </View>
-      )}
-
       {/* Quick-react emoji picker — shown above bubble on long-press */}
       {isReacting && (
         <View
@@ -238,7 +197,6 @@ function MessageBubble({
           ) : (
             /* Text bubble */
             <Pressable
-              onPress={onToggleTime}
               onLongPress={onLongPress}
               delayLongPress={480}
               style={[
@@ -275,32 +233,13 @@ function MessageBubble({
             </View>
           )}
 
+          {/* Time + seen */}
+          <Text style={[styles.bubbleTime, { color: colors.muted }]}>
+            {formatRelativeTime(msg.createdAt)}
+            {isOwn && msg.readBy.length > 1 ? "  ✓✓" : ""}
+          </Text>
         </View>
       </View>
-
-      {/* Tap-to-reveal exact time for a single message */}
-      {revealed && (
-        <Text
-          style={[
-            styles.revealTime,
-            { color: colors.muted },
-            isOwn ? styles.revealTimeOwn : styles.revealTimeOther,
-          ]}
-        >
-          {timeLabel}
-        </Text>
-      )}
-
-      {/* Seen — small reader avatar under your last read message */}
-      {showSeen && (
-        <View style={styles.seenRow}>
-          <View style={styles.seenAvatar}>
-            {seenAvatarUri ? (
-              <Image source={{ uri: seenAvatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-            ) : null}
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -328,7 +267,6 @@ export default function ChatScreen() {
   const [imageUploading, setImageUploading] = useState(false);
   const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
-  const [revealedId, setRevealedId] = useState<string | null>(null);
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -591,14 +529,6 @@ export default function ChatScreen() {
   const typingLabel = Array.from(typingUsers.values()).join(", ");
   const canSend = (text.trim().length > 0 || imageUri !== null) && !sending && !imageUploading;
 
-  // Newest own message that the other side has read — gets the "seen" avatar (messages are newest-first).
-  const lastSeenOwnId = useMemo(() => {
-    for (const m of messages) {
-      if (m.senderId === user?.id && m.readBy.some((r) => r.userId !== user?.id)) return m.id;
-    }
-    return null;
-  }, [messages, user?.id]);
-
   const handleLoadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMore || !conversationId || messages.length === 0) return;
     loadingMoreRef.current = true;
@@ -688,14 +618,10 @@ export default function ChatScreen() {
             }
             renderItem={({ item: msg, index }) => {
               const isOwn = msg.senderId === user?.id;
-              const prevMsg = messages[index - 1]; // newer (list is newest-first)
-              const olderMsg = messages[index + 1]; // chronologically before this one
-              // Time divider above this message at the start of a new burst / new day.
-              const showDivider =
-                !olderMsg ||
-                new Date(msg.createdAt).toDateString() !== new Date(olderMsg.createdAt).toDateString() ||
-                new Date(msg.createdAt).getTime() - new Date(olderMsg.createdAt).getTime() >= MESSAGE_GAP_MS;
-              const showAvatar = !isOwn && (!prevMsg || prevMsg.senderId !== msg.senderId);
+              const prevMsg = messages[index - 1];
+              const showAvatar = !isOwn && (
+                !prevMsg || prevMsg.senderId !== msg.senderId
+              );
               const isReacting = activeReactMsgId === msg.id;
               return (
                 <MessageBubble
@@ -704,15 +630,9 @@ export default function ChatScreen() {
                   showAvatar={showAvatar}
                   colors={colors}
                   isReacting={isReacting}
-                  showDivider={showDivider}
-                  timeLabel={formatMessageTime(msg.createdAt)}
-                  revealed={revealedId === msg.id}
-                  showSeen={isOwn && msg.id === lastSeenOwnId}
-                  seenAvatarUri={headerAvatar}
                   onLongPress={() => setActiveReactMsgId(isReacting ? null : msg.id)}
                   onReact={(emoji) => handleReact(msg, emoji)}
                   onImagePress={(uri) => setViewerUri(uri)}
-                  onToggleTime={() => setRevealedId((cur) => (cur === msg.id ? null : msg.id))}
                 />
               );
             }}
@@ -905,16 +825,6 @@ const styles = StyleSheet.create({
   bubbleOther: { borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 15, lineHeight: 21 },
   bubbleTime: { fontSize: 10, marginTop: 3, marginHorizontal: 4 },
-  // Centered time divider (Messenger-style)
-  timeDivider: { alignItems: "center", justifyContent: "center", marginVertical: 12 },
-  timeDividerText: { fontSize: 11, fontWeight: "600" },
-  // Tap-to-reveal exact time
-  revealTime: { fontSize: 10, marginTop: 3, marginBottom: 2 },
-  revealTimeOwn: { textAlign: "right", marginRight: 6 },
-  revealTimeOther: { textAlign: "left", marginLeft: 40 },
-  // Seen reader avatar
-  seenRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 2, marginRight: 4 },
-  seenAvatar: { width: 14, height: 14, borderRadius: 7, overflow: "hidden", backgroundColor: "#312e81" },
   bubbleImg: {
     borderRadius: 16,
     overflow: "hidden",

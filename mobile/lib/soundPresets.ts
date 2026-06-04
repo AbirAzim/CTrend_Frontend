@@ -31,6 +31,8 @@ export type SoundPreferences = {
   voteSoundId: VoteSoundId;
   notificationSoundId: NotificationSoundId;
   messageSoundId: MessageSoundId;
+  // Device-local: whether to vibrate on notifications/messages. Default on.
+  vibrationEnabled: boolean;
 };
 
 export type SoundPresetMeta = {
