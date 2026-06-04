@@ -43,6 +43,13 @@ export const GET_MESSAGES = gql`
         count
       }
       viewerReaction
+      replyTo {
+        messageId
+        senderId
+        senderName
+        text
+        imageUrl
+      }
       createdAt
     }
   }
@@ -97,8 +104,8 @@ export const CREATE_GROUP_CONVERSATION = gql`
 `;
 
 export const SEND_MESSAGE = gql`
-  mutation SendMessage($conversationId: ID!, $text: String!, $imageUrl: String) {
-    sendMessage(conversationId: $conversationId, text: $text, imageUrl: $imageUrl) {
+  mutation SendMessage($conversationId: ID!, $text: String!, $imageUrl: String, $replyToId: ID) {
+    sendMessage(conversationId: $conversationId, text: $text, imageUrl: $imageUrl, replyToId: $replyToId) {
       id
       conversationId
       senderId
@@ -115,6 +122,13 @@ export const SEND_MESSAGE = gql`
         count
       }
       viewerReaction
+      replyTo {
+        messageId
+        senderId
+        senderName
+        text
+        imageUrl
+      }
       createdAt
     }
   }
@@ -165,6 +179,13 @@ export const MESSAGE_RECEIVED = gql`
         count
       }
       viewerReaction
+      replyTo {
+        messageId
+        senderId
+        senderName
+        text
+        imageUrl
+      }
       createdAt
     }
   }
