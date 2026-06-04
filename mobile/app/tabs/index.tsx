@@ -1,5 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
+import { PressableScale } from "../../components/PressableScale";
 import logoAsset from "../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -66,38 +68,37 @@ function FeedTopBar() {
       {/* Action icons */}
       <View style={styles.actions}>
         {/* Search */}
-        <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
-          <Text style={styles.iconSymbol}>🔍</Text>
-        </Pressable>
+        <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
+          <Ionicons name="search" size={19} color={colors.text} />
+        </PressableScale>
 
         {/* Theme toggle */}
-        <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
-          <Text style={styles.iconSymbol}>{isDark ? "✶" : "🌙"}</Text>
-        </Pressable>
+        <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
+          <Ionicons name={isDark ? "sunny" : "moon"} size={19} color={isDark ? "#fbbf24" : colors.text} />
+        </PressableScale>
 
         {/* Create + Admin live in the bottom nav (Create FAB + Admin shield), so they're
             intentionally not duplicated here. */}
 
         {/* Notification bell */}
-        <Pressable style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
-
-          <Text style={styles.bellSymbol}>🔔</Text>
+        <PressableScale style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
+          <Ionicons name="notifications" size={19} color="#f87171" />
           {unreadCount > 0 && (
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
             </View>
           )}
-        </Pressable>
+        </PressableScale>
 
         {/* Logout */}
         {isAuthenticated && (
-          <Pressable
+          <PressableScale
             style={[styles.circleBtn, styles.circleBtnLogout]}
             onPress={() => void handleLogout()}
             hitSlop={6}
           >
-            <Text style={styles.logoutSymbol}>→</Text>
-          </Pressable>
+            <Ionicons name="log-out-outline" size={19} color="#fca5a5" />
+          </PressableScale>
         )}
       </View>
     </View>
