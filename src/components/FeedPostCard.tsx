@@ -1274,23 +1274,29 @@ function FeedPostCardComponent({
       ? 0
       : multiPercents.filter((value) => value === multiLeaderPct).length;
 
-  // Winner indices used to visually highlight the winning option when voting is closed
-  const binaryWinnerSide: 0 | 1 | null =
-    isVotingClosed && isBinaryCompare && binaryTotal > 0
-      ? up > down
-        ? 0
-        : down > up
-          ? 1
-          : null
-      : null;
-  const multiWinnerIndex: number | null = (() => {
-    if (!isVotingClosed || !isMultiCompare || multiTotalVotes <= 0 || multiPercents.length === 0) {
-      return null;
+  // Winner predicates used to visually highlight the winning option(s) once
+  // voting is closed. These are tie-aware: when options share the top result
+  // they ALL count as winners (crown, no losing scrim) — a tie means everyone
+  // on top won, so nobody should be dimmed as a loser.
+  const isBinaryWinnerSide = (side: 0 | 1): boolean => {
+    if (!isVotingClosed || !isBinaryCompare || binaryTotal <= 0) return false;
+    if (up === down) return true; // tie → both sides win
+    return side === 0 ? up > down : down > up;
+  };
+  const isMultiWinnerIndex = (idx: number): boolean => {
+    if (
+      !isVotingClosed ||
+      !isMultiCompare ||
+      multiTotalVotes <= 0 ||
+      multiLeaderPct == null ||
+      multiLeaderPct <= 0
+    ) {
+      return false;
     }
-    const topPct = Math.max(...multiPercents);
-    const leaders = multiPercents.filter((p) => p === topPct);
-    return leaders.length === 1 ? multiPercents.indexOf(topPct) : null;
-  })();
+    // Every option matching the top percentage wins (covers ties for first);
+    // lower options remain genuine losers and stay dimmed.
+    return (multiPercents[idx] ?? -1) === multiLeaderPct;
+  };
 
   // True once the viewer has cast at least one vote on this post
   const hasVoted = isBinaryCompare
@@ -1538,7 +1544,7 @@ function FeedPostCardComponent({
                   (side === 0 && viewer === "UP") ||
                   (side === 1 && viewer === "DOWN");
                 const colTitle = compareOptionLabel(post, side);
-                const isWinner = binaryWinnerSide === side;
+                const isWinner = isBinaryWinnerSide(side);
                 return (
                   <button
                     key={`${post.id}-cmp-${i}`}
@@ -1602,7 +1608,7 @@ function FeedPostCardComponent({
               const pct = multiPercents[i] ?? 0;
               const picked = multiPickDisplayed === i;
               const colTitle = compareOptionLabel(post, i);
-              const isWinnerCell = multiWinnerIndex === i;
+              const isWinnerCell = isMultiWinnerIndex(i);
               return (
                 <button
                   key={`${post.id}-cmp-${i}`}
@@ -1768,7 +1774,7 @@ function FeedPostCardComponent({
                     pct != null &&
                     pct === binaryLeaderPct &&
                     pct > 0;
-                  const isFinalWinner = isVotingClosed && binaryWinnerSide === side;
+                  const isFinalWinner = isBinaryWinnerSide(side);
                   return (
                     <div key={side} className={`cx-pulse-row${isLeader ? " cx-pulse-row--leader" : ""}${isFinalWinner ? " cx-pulse-row--final-winner" : ""}${isVotingClosed && !isFinalWinner ? " cx-pulse-row--final-loser" : ""}`}>
                       <div className="cx-pulse-row-top">
