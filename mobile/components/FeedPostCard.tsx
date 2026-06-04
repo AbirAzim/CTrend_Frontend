@@ -21,7 +21,6 @@ import {
 	Text,
 	TextInput,
 	ToastAndroid,
-	Vibration,
 	View,
 } from 'react-native';
 import {
@@ -824,7 +823,7 @@ function FeedPostCardComponent({
 	const isDetail = variant === 'detail';
 	const { user, isAuthenticated } = useAuth();
 	const { colors, isDark } = useTheme();
-	const { playTick } = useSounds();
+	const { playTick, vibrate } = useSounds();
 	const { adjustSavedCount } = useTabBar();
 	const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
@@ -1175,7 +1174,7 @@ function FeedPostCardComponent({
 
 	function triggerVotePop(idx: number) {
 		playTick();
-		Vibration.vibrate(100);
+		vibrate(100);
 		Animated.sequence([
 			Animated.timing(cellScale[idx], {
 				toValue: 1.065,

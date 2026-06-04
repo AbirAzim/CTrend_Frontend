@@ -1,5 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
+import { PressableScale } from "../../components/PressableScale";
 import logoAsset from "../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,11 +37,9 @@ import { useTheme } from "../../context/ThemeContext";
 type FeedData = { feedPosts: unknown[] };
 
 function FeedTopBar() {
-  const { logout, isAuthenticated, user } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
-
-  const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
     skip: !isAuthenticated,
@@ -53,12 +53,8 @@ function FeedTopBar() {
     router.replace("/auth/login");
   }
 
-  function handleAdmin() {
-    router.push("/admin" as `/${string}`);
-  }
-
   return (
-    <View style={[styles.topBar, { paddingTop: insets.top, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
+    <View style={[styles.topBar, { paddingTop: insets.top + 8, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
       {/* Brand */}
       <Pressable style={styles.brand} hitSlop={4}>
         <Text style={[styles.brandText, { color: colors.accentLight }]} numberOfLines={1}>Ke Jitbe</Text>
@@ -72,51 +68,37 @@ function FeedTopBar() {
       {/* Action icons */}
       <View style={styles.actions}>
         {/* Search */}
-        <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
-          <Text style={styles.iconSymbol}>🔍</Text>
-        </Pressable>
+        <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
+          <Ionicons name="search" size={19} color={colors.text} />
+        </PressableScale>
 
         {/* Theme toggle */}
-        <Pressable style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
-          <Text style={styles.iconSymbol}>{isDark ? "✶" : "🌙"}</Text>
-        </Pressable>
+        <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
+          <Ionicons name={isDark ? "sunny" : "moon"} size={19} color={isDark ? "#fbbf24" : colors.text} />
+        </PressableScale>
 
-        {/* Admin — only for admin role */}
-        {isAdmin && (
-          <Pressable style={[styles.rectBtn, styles.rectBtnAdmin]} onPress={handleAdmin} hitSlop={6}>
-            <Text style={styles.rectBtnSymbol}>⚙</Text>
-          </Pressable>
-        )}
-
-        {/* Create new post */}
-        <Pressable
-          style={[styles.rectBtn, styles.rectBtnCreate]}
-          onPress={() => router.push("/tabs/create" as `/${string}`)}
-          hitSlop={6}
-        >
-          <Text style={styles.rectBtnSymbol}>✦</Text>
-        </Pressable>
+        {/* Create + Admin live in the bottom nav (Create FAB + Admin shield), so they're
+            intentionally not duplicated here. */}
 
         {/* Notification bell */}
-        <Pressable style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
-
-          <Text style={styles.bellSymbol}>🔔</Text>
+        <PressableScale style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
+          <Ionicons name="notifications" size={19} color="#f87171" />
           {unreadCount > 0 && (
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
             </View>
           )}
-        </Pressable>
+        </PressableScale>
 
         {/* Logout */}
         {isAuthenticated && (
-          <Pressable
+          <PressableScale
             style={[styles.circleBtn, styles.circleBtnLogout]}
             onPress={() => void handleLogout()}
             hitSlop={6}
           >
-            <Text style={styles.logoutSymbol}>→</Text>
-          </Pressable>
+            <Ionicons name="log-out-outline" size={19} color="#fca5a5" />
+          </PressableScale>
         )}
       </View>
     </View>
@@ -324,7 +306,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
     // subtle elevation
     elevation: 4,

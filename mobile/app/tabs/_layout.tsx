@@ -1,7 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@apollo/client/react";
 import { Tabs, router } from "expo-router";
 import { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View, Dimensions, type ColorValue } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
@@ -9,15 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-
-// Pill dimensions
-const PILL_H = 64;
-const PILL_MX = 20; // horizontal margin each side
-const PILL_MB = 14; // margin above safe area
-const FAB_SIZE = 54;
-
-// ─── Floating pill tab bar ────────────────────────────────────────────────────
+// ─── Full-width bottom navigation bar (Instagram / Facebook style) ─────────────
 
 function FloatingTabBar(props: {
   state: { index: number; routes: Array<{ key: string; name: string }> };
@@ -45,9 +38,6 @@ function FloatingTabBar(props: {
     if (savedData?.mySavedPosts) setSavedCount(savedData.mySavedPosts.length);
   }, [savedData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pillBg = isDark ? "rgba(18,18,26,0.96)" : "rgba(255,255,255,0.96)";
-  const pillBorder = isDark ? "rgba(100,100,180,0.18)" : "rgba(0,0,0,0.08)";
-
   // Per-tab scale animation for press feedback
   const tabScales = useRef(props.state.routes.map(() => new Animated.Value(1))).current;
 
@@ -58,31 +48,35 @@ function FloatingTabBar(props: {
     Animated.spring(tabScales[i], { toValue: 1, useNativeDriver: true, tension: 200, friction: 12 }).start();
   }
 
-  const bottom = PILL_MB + insets.bottom;
-
   return (
     <Animated.View
-      style={[
-        styles.pillWrap,
-        { bottom, transform: [{ translateY }] },
-      ]}
+      style={[styles.barWrap, { transform: [{ translateY }] }]}
       pointerEvents="box-none"
     >
-      {/* Pill container */}
-      <View style={[styles.pill, { backgroundColor: pillBg, borderColor: pillBorder }]}>
+      <View
+        style={[
+          styles.bar,
+          {
+            backgroundColor: colors.tabBg,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + 6,
+          },
+        ]}
+      >
         {props.state.routes.map((route, index) => {
           const focused = props.state.index === index;
           const descriptor = props.descriptors[route.key];
           const label = descriptor.options.title ?? route.name;
           const isCreate = route.name === "create";
-          const messagesIdx = props.state.routes.findIndex(r => r.name === "messages");
+          const messagesIdx = props.state.routes.findIndex((r) => r.name === "messages");
           const isMessages = index === messagesIdx;
 
+          // Instagram-style: bright white icons; active = pure white (filled), inactive = soft white.
           const iconColor: ColorValue = focused
-            ? isDark ? "#a5b4fc" : colors.accent
-            : isDark ? "#4b5563" : "#9ca3af";
+            ? isDark ? "#ffffff" : colors.accent
+            : isDark ? "#c7c7c7" : "#9ca3af";
 
-          const icon = descriptor.options.tabBarIcon?.({ color: iconColor, size: 24, focused });
+          const icon = descriptor.options.tabBarIcon?.({ color: iconColor, size: 27, focused });
 
           function handlePress() {
             const event = props.navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
@@ -95,47 +89,31 @@ function FloatingTabBar(props: {
             }
           }
 
-          // ── Create FAB ──────────────────────────────────────────────────
+          // ── Create — emphasized accent action, inline in the bar ──
           if (isCreate) {
             return (
-              <Animated.View
-                key={route.key}
-                style={[styles.fabWrap, { transform: [{ scale: tabScales[index] }] }]}
-              >
+              <Animated.View key={route.key} style={[styles.tabItem, { transform: [{ scale: tabScales[index] }] }]}>
                 <Pressable
                   onPress={handlePress}
                   onPressIn={() => pressIn(index)}
                   onPressOut={() => pressOut(index)}
-                  style={[
-                    styles.fab,
-                    {
-                      backgroundColor: colors.accent,
-                      shadowColor: colors.accent,
-                    },
-                  ]}
+                  style={[styles.createBtn, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
                 >
-                  <Text style={styles.fabText}>＋</Text>
+                  <Ionicons name="add" size={26} color="#fff" />
                 </Pressable>
               </Animated.View>
             );
           }
 
-          // ── Regular tab ─────────────────────────────────────────────────
+          // ── Regular tab ──
           return (
-            <Animated.View
-              key={route.key}
-              style={[styles.tabWrap, { transform: [{ scale: tabScales[index] }] }]}
-            >
+            <Animated.View key={route.key} style={[styles.tabItem, { transform: [{ scale: tabScales[index] }] }]}>
               <Pressable
-                style={styles.tabBtn}
+                style={styles.tabPress}
                 onPress={handlePress}
                 onPressIn={() => pressIn(index)}
                 onPressOut={() => pressOut(index)}
               >
-                {/* Active glow pill behind icon */}
-                {focused && (
-                  <View style={[styles.activePill, { backgroundColor: isDark ? "rgba(129,140,248,0.15)" : "rgba(99,102,241,0.1)" }]} />
-                )}
                 <View style={styles.iconWrap}>
                   {icon}
                   {isMessages && totalUnread > 0 && (
@@ -152,7 +130,7 @@ function FloatingTabBar(props: {
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: focused ? (isDark ? "#a5b4fc" : colors.accent) : isDark ? "#4b5563" : "#9ca3af" },
+                    { color: focused ? (isDark ? "#ffffff" : colors.accent) : isDark ? "#c7c7c7" : "#9ca3af" },
                     focused && styles.tabLabelActive,
                   ]}
                   numberOfLines={1}
@@ -166,17 +144,13 @@ function FloatingTabBar(props: {
 
         {/* ── Admin shield tab (admin users only) ── */}
         {isAdmin && (
-          <Animated.View style={[styles.tabWrap, { transform: [{ scale: tabScales[tabScales.length - 1] ?? new Animated.Value(1) }] }]}>
-            <Pressable
-              style={styles.tabBtn}
-              onPress={() => router.push("/admin" as `/${string}`)}
-            >
+          <Animated.View style={styles.tabItem}>
+            <Pressable style={styles.tabPress} onPress={() => router.push("/admin" as `/${string}`)}>
               <View style={styles.iconWrap}>
-                <ShieldIcon color={isDark ? "#a5b4fc" : colors.accent} size={24} />
-                {/* Accent dot */}
+                <Ionicons name="shield-checkmark" size={24} color={colors.accent} />
                 <View style={[styles.adminDot, { backgroundColor: colors.accent }]} />
               </View>
-              <Text style={[styles.tabLabel, { color: isDark ? "#a5b4fc" : colors.accent }, styles.tabLabelActive]} numberOfLines={1}>
+              <Text style={[styles.tabLabel, { color: colors.accent }, styles.tabLabelActive]} numberOfLines={1}>
                 Admin
               </Text>
             </Pressable>
@@ -204,14 +178,18 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "Feed",
-          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="keeps"
         options={{
           title: "Keeps",
-          tabBarIcon: ({ color, size }) => <BookmarkIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "bookmark" : "bookmark-outline"} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -221,148 +199,65 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: "Msgs",
-          tabBarIcon: ({ color, size }) => <ChatIcon color={color} size={size} />,
+          title: "Chats",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={size} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
 
-// ─── SVG-like icons (pure View) ───────────────────────────────────────────────
-
-function ShieldIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
-  const s = size;
-  const c = color as string;
-  return (
-    <View style={{ width: s, height: s, alignItems: "center", justifyContent: "center" }}>
-      {/* Shield body */}
-      <View style={{ width: s * 0.72, height: s * 0.84, borderRadius: s * 0.18, backgroundColor: c, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-        {/* Bottom point */}
-        <View style={{ position: "absolute", bottom: -s * 0.16, width: s * 0.72, height: s * 0.36, backgroundColor: c, borderBottomLeftRadius: s * 0.36, borderBottomRightRadius: s * 0.36, transform: [{ scaleY: 1.2 }] }} />
-        {/* Checkmark */}
-        <View style={{ width: s * 0.28, height: s * 0.14, borderBottomWidth: 2, borderLeftWidth: 2, borderColor: "#fff", transform: [{ rotate: "-45deg" }, { translateY: -s * 0.02 }] }} />
-      </View>
-    </View>
-  );
-}
-
-function HomeIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
-  const s = size;
-  return (
-    <View style={{ width: s, height: s, alignItems: "center", justifyContent: "flex-end" }}>
-      <View style={{
-        position: "absolute", top: 0, width: 0, height: 0,
-        borderLeftWidth: s * 0.54, borderRightWidth: s * 0.54,
-        borderBottomWidth: s * 0.48,
-        borderLeftColor: "transparent", borderRightColor: "transparent",
-        borderBottomColor: color as string,
-      }} />
-      <View style={{ width: s * 0.7, height: s * 0.5, backgroundColor: color as string, borderRadius: 2 }} />
-    </View>
-  );
-}
-
-function BookmarkIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
-  const s = size;
-  const w = s * 0.58;
-  const h = s * 0.84;
-  return (
-    <View style={{ width: s, height: s, alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: w, height: h, backgroundColor: color as string, borderRadius: 3, overflow: "hidden" }}>
-        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: s * 0.22, flexDirection: "row" }}>
-          <View style={{ flex: 1, borderTopRightRadius: w * 0.5, backgroundColor: "transparent" }} />
-          <View style={{ flex: 1, borderTopLeftRadius: w * 0.5, backgroundColor: "transparent" }} />
-        </View>
-        {/* Notch cutout */}
-        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: s * 0.22, flexDirection: "row" }}>
-          <View style={{ flex: 1, borderTopRightRadius: 99, backgroundColor: "rgba(0,0,0,0.35)" }} />
-          <View style={{ flex: 1, borderTopLeftRadius: 99, backgroundColor: "rgba(0,0,0,0.35)" }} />
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function ChatIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
-  const s = size;
-  return (
-    <View style={{ width: s, height: s }}>
-      <View style={{ width: s, height: s * 0.78, backgroundColor: color as string, borderRadius: s * 0.22 }} />
-      <View style={{ position: "absolute", bottom: 0, left: s * 0.1, width: 0, height: 0,
-        borderTopWidth: s * 0.26, borderRightWidth: s * 0.18,
-        borderTopColor: color as string, borderRightColor: "transparent" }} />
-    </View>
-  );
-}
-
-function UserIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
-  const s = size;
-  const headR = s * 0.23;
-  return (
-    <View style={{ width: s, height: s, alignItems: "center", justifyContent: "flex-end" }}>
-      <View style={{ position: "absolute", top: s * 0.02, width: headR * 2, height: headR * 2, borderRadius: headR, backgroundColor: color as string }} />
-      <View style={{ width: s * 0.88, height: s * 0.48, borderTopLeftRadius: s * 0.45, borderTopRightRadius: s * 0.45, backgroundColor: color as string }} />
-    </View>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const PILL_W = SCREEN_W - PILL_MX * 2;
-
 const styles = StyleSheet.create({
-  pillWrap: {
+  barWrap: {
     position: "absolute",
-    left: PILL_MX,
-    width: PILL_W,
-    alignItems: "center",
-    // Allow touches to pass through wrapper but not pill
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  pill: {
-    width: "100%",
-    height: PILL_H,
-    borderRadius: 36,
-    borderWidth: 1,
+  bar: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    // Shadow
-    elevation: 16,
+    alignItems: "flex-start",
+    justifyContent: "space-around",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 9,
+    paddingHorizontal: 4,
+    // Soft shadow lifting the bar off the content above it
+    elevation: 14,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
   },
-  tabWrap: {
+  tabItem: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
-  tabBtn: {
+  tabPress: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
     gap: 3,
-    minWidth: 52,
-  },
-  activePill: {
-    position: "absolute",
-    top: 0, bottom: 0, left: 0, right: 0,
-    borderRadius: 20,
+    paddingTop: 2,
+    width: "100%",
   },
   iconWrap: {
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
+    height: 28,
   },
   tabLabel: {
     fontSize: 10,
@@ -371,6 +266,19 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     fontWeight: "800",
+  },
+  // Emphasized create action (inline accent button)
+  createBtn: {
+    width: 52,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   badge: {
     position: "absolute",
@@ -387,31 +295,5 @@ const styles = StyleSheet.create({
   adminDot: {
     position: "absolute", top: -3, right: -3,
     width: 7, height: 7, borderRadius: 4,
-  },
-
-  // Create FAB
-  fabWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fab: {
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10, // lifts FAB above pill baseline
-    elevation: 10,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-  },
-  fabText: {
-    color: "#fff",
-    fontSize: 28,
-    fontWeight: "300",
-    lineHeight: 32,
-    marginTop: -2,
   },
 });
