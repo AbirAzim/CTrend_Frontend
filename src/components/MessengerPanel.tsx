@@ -382,6 +382,17 @@ function ChatWindow({
     setTimeout(() => el.classList.remove("cw-msg--flash"), 1200);
   }
 
+  // Snap to the newest message. Used after sending so the view always lands on
+  // the message you just sent — even when you'd scrolled up to reply to an
+  // older one. Waits a frame so the appended bubble is laid out first.
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      else bottomRef.current?.scrollIntoView();
+    });
+  }
+
   async function handleSend() {
     const trimmed = text.trim();
     if (!trimmed && !pendingImage) return;
@@ -405,6 +416,7 @@ function ChatWindow({
 
         URL.revokeObjectURL(pendingImage.previewUrl);
         setPendingImage(null);
+        scrollToBottom();
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Image upload failed.";
         setUploadError(msg + " Please try again.");
@@ -415,6 +427,7 @@ function ChatWindow({
       }
     } else {
       await sendMessage(conversation.id, trimmed, undefined, replyToId);
+      scrollToBottom();
     }
   }
 

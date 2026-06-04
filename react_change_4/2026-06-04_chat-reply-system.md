@@ -26,6 +26,10 @@ Messenger-style:
   long-press action tray. The admin chat shows a reply button on each row hover.
 - Picking a message opens a **reply preview bar** above the composer ("Replying to
   …") with a cancel button; the composer auto-focuses.
+- After sending, the list **snaps to the newest message** (the reply you just
+  sent) even if you'd scrolled up to reply to an older one — `scrollToBottom()`
+  runs on the next frame after each successful send, instead of relying on the
+  smooth count-effect which didn't reliably complete from far up the history.
 - The sent message renders a **quoted snippet** (sender name + text/📷 thumbnail)
   inside the bubble.
 - Tapping a quoted snippet **scrolls to the original** message and flashes it.
