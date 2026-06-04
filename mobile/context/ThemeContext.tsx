@@ -17,20 +17,21 @@ export type ColorPalette = {
   inputBg: string;
 };
 
+// Instagram-style dark theme: true-black base, neutral gray surfaces, blue accent.
 const DARK: ColorPalette = {
-  bg: "#08080f",
-  card: "#13131f",
-  section: "#1c1c2a",
-  border: "#252535",
-  topbar: "#0d0d1a",
-  text: "#f0f0ff",
-  subtext: "#8b8ba8",
-  muted: "#5c5c78",
-  accent: "#7c72f5",
-  accentLight: "#b8abff",
-  circleBtnBg: "#1c1c2e",
-  tabBg: "#0f0f1c",
-  inputBg: "#1a1a28",
+  bg: "#000000",        // true black feed (IG)
+  card: "#121212",      // slightly elevated surface
+  section: "#1c1c1e",   // raised surface / chips
+  border: "#262626",    // IG hairline gray
+  topbar: "#161616",    // header band — neutral, just-distinct from black
+  text: "#fafafa",
+  subtext: "#a8a8a8",   // IG secondary text
+  muted: "#737373",
+  accent: "#0095f6",    // Instagram blue
+  accentLight: "#5cb4f7",
+  circleBtnBg: "#1f1f21",
+  tabBg: "#000000",
+  inputBg: "#1c1c1e",
 };
 
 const LIGHT: ColorPalette = {

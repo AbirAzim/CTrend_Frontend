@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -28,9 +29,10 @@ export default function SoundPreferencesScreen() {
     preferences,
     setSoundPreference,
     savingPreference,
-    previewVoteSound,
-    previewNotificationSound,
-    previewMessageSound,
+    previewSound,
+    prepareSounds,
+    soundsReady,
+    setVibrationEnabled,
   } = useSounds();
 
   const [activeCategory, setActiveCategory] = useState<SoundCategory>("vote");
@@ -47,9 +49,7 @@ export default function SoundPreferencesScreen() {
 
   function handlePreview(id: string) {
     setPreviewingId(id);
-    if (activeCategory === "vote") previewVoteSound();
-    else if (activeCategory === "notification") previewNotificationSound();
-    else previewMessageSound();
+    previewSound(id);
     setTimeout(() => setPreviewingId(null), 600);
   }
 
@@ -98,8 +98,32 @@ export default function SoundPreferencesScreen() {
       >
         {/* Lead text */}
         <Text style={[st.lead, { color: colors.muted }]}>
-          Choose sounds for votes, notifications, and messages. Saved to your account on every device.
+          Choose sounds for votes, notifications, and messages. Saved on this device.
         </Text>
+
+        {/* Load sounds — primes the players so the first preview plays */}
+        <Pressable
+          style={[st.loadBtn, { borderColor: colors.accent, backgroundColor: soundsReady ? colors.section : "transparent" }]}
+          onPress={() => prepareSounds()}
+        >
+          <Text style={[st.loadBtnText, { color: colors.accent }]}>
+            {soundsReady ? "✓  Sounds ready" : "⬇  Load sounds"}
+          </Text>
+        </Pressable>
+
+        {/* Vibration toggle */}
+        <View style={[st.vibrationRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[st.vibrationTitle, { color: colors.text }]}>📳  Vibration</Text>
+            <Text style={[st.vibrationHint, { color: colors.muted }]}>Vibrate on notifications & messages.</Text>
+          </View>
+          <Switch
+            value={preferences.vibrationEnabled}
+            onValueChange={(v) => void setVibrationEnabled(v)}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor="#ffffff"
+          />
+        </View>
 
         {/* Category tabs */}
         <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
@@ -195,6 +219,18 @@ const st = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: "700" },
   savingIndicator: { width: 20 },
   lead: { fontSize: 13, marginHorizontal: 16, marginTop: 14, marginBottom: 8, lineHeight: 18 },
+  loadBtn: {
+    marginHorizontal: 16, marginBottom: 10, borderRadius: 10, borderWidth: 1,
+    paddingVertical: 10, alignItems: "center", justifyContent: "center",
+  },
+  loadBtnText: { fontSize: 13, fontWeight: "700" },
+  vibrationRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginHorizontal: 16, marginBottom: 12, borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  vibrationTitle: { fontSize: 14, fontWeight: "700" },
+  vibrationHint: { fontSize: 12, marginTop: 2 },
   tabRow: {
     flexDirection: "row",
     borderBottomWidth: 1,

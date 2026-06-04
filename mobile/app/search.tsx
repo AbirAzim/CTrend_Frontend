@@ -77,7 +77,11 @@ function UserRow({ item, colors }: { item: SearchUser; colors: ReturnType<typeof
 }
 
 function PostRow({ item, colors }: { item: SearchPost; colors: ReturnType<typeof useTheme>["colors"] }) {
-  const thumb = item.imageUrls[0] ?? item.options?.[0]?.imageUrl ?? null;
+  // Posts are comparisons — show up to two option images side by side.
+  const fromOptions = (item.options ?? [])
+    .map((o) => o.imageUrl)
+    .filter((u): u is string => !!u);
+  const thumbs = ((item.imageUrls?.length ? item.imageUrls : fromOptions)).slice(0, 2);
 
   return (
     <Pressable
@@ -85,8 +89,10 @@ function PostRow({ item, colors }: { item: SearchPost; colors: ReturnType<typeof
       onPress={() => router.push(`/post/${item.id}` as `/${string}`)}
     >
       <View style={[st.postThumb, { backgroundColor: colors.section, overflow: "hidden" }]}>
-        {thumb
-          ? <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+        {thumbs.length > 0
+          ? thumbs.map((uri, i) => (
+              <Image key={i} source={{ uri }} style={st.postThumbImg} contentFit="cover" cachePolicy="memory-disk" />
+            ))
           : <Text style={{ fontSize: 20 }}>📷</Text>
         }
       </View>
@@ -253,12 +259,15 @@ const st = StyleSheet.create({
   },
   avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   postThumb: {
-    width: 52,
-    height: 44,
+    width: 74,
+    height: 46,
     borderRadius: 8,
+    flexDirection: "row",
+    gap: 2,
     alignItems: "center",
     justifyContent: "center",
   },
+  postThumbImg: { flex: 1, height: "100%" },
   rowMeta: { flex: 1 },
   rowTitle: { fontSize: 14, fontWeight: "700", lineHeight: 19 },
   rowSub: { fontSize: 12, marginTop: 1 },

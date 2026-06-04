@@ -1,11 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { Vibration } from "react-native";
 import { useAudioPlayer } from "expo-audio";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import tickWav from "../assets/vote-tick.wav";
-import notifWav from "../assets/notification.wav";
-import { ME, UPDATE_PROFILE } from "@ctrend/shared/graphql/profile";
-import { useAuth } from "./AuthContext";
+// Distinct generated sound effects (see scripts/generate-sounds.js).
+import sBuzzIn from "../assets/sounds/buzz-in.wav";
+import sCrowdPop from "../assets/sounds/crowd-pop.wav";
+import sSoftPop from "../assets/sounds/soft-pop.wav";
+import sCoinPing from "../assets/sounds/coin-ping.wav";
+import sSlotTick from "../assets/sounds/slot-tick.wav";
+import sThock from "../assets/sounds/thock.wav";
+import sWhistleChirp from "../assets/sounds/whistle-chirp.wav";
+import sSuccessDuo from "../assets/sounds/success-duo.wav";
+import sAscendingChime from "../assets/sounds/ascending-chime.wav";
+import sSoftChime from "../assets/sounds/soft-chime.wav";
+import sGentleBell from "../assets/sounds/gentle-bell.wav";
+import sGentlePing from "../assets/sounds/gentle-ping.wav";
 import {
   DEFAULT_MESSAGE_SOUND_ID,
   DEFAULT_NOTIFICATION_SOUND_ID,
@@ -40,23 +49,17 @@ async function writeStoredPrefs(prefs: SoundPreferences): Promise<void> {
   }
 }
 
-function resolvePreferences(
-  fromServer?: { voteSoundId?: string | null; notificationSoundId?: string | null; messageSoundId?: string | null } | null,
-  fromCache?: Partial<SoundPreferences>,
-): SoundPreferences {
+// Sound prefs are device-local only (NOT synced to the account) — the same
+// account on web vs app keeps independent sound choices to avoid confusion.
+function resolvePreferences(fromCache?: Partial<SoundPreferences>): SoundPreferences {
   return {
     voteSoundId:
-      (fromServer?.voteSoundId && isVoteSoundId(fromServer.voteSoundId) ? fromServer.voteSoundId : null) ??
-      (fromCache?.voteSoundId && isVoteSoundId(fromCache.voteSoundId) ? fromCache.voteSoundId : null) ??
-      DEFAULT_VOTE_SOUND_ID,
+      (fromCache?.voteSoundId && isVoteSoundId(fromCache.voteSoundId) ? fromCache.voteSoundId : null) ?? DEFAULT_VOTE_SOUND_ID,
     notificationSoundId:
-      (fromServer?.notificationSoundId && isNotificationSoundId(fromServer.notificationSoundId) ? fromServer.notificationSoundId : null) ??
-      (fromCache?.notificationSoundId && isNotificationSoundId(fromCache.notificationSoundId) ? fromCache.notificationSoundId : null) ??
-      DEFAULT_NOTIFICATION_SOUND_ID,
+      (fromCache?.notificationSoundId && isNotificationSoundId(fromCache.notificationSoundId) ? fromCache.notificationSoundId : null) ?? DEFAULT_NOTIFICATION_SOUND_ID,
     messageSoundId:
-      (fromServer?.messageSoundId && isMessageSoundId(fromServer.messageSoundId) ? fromServer.messageSoundId : null) ??
-      (fromCache?.messageSoundId && isMessageSoundId(fromCache.messageSoundId) ? fromCache.messageSoundId : null) ??
-      DEFAULT_MESSAGE_SOUND_ID,
+      (fromCache?.messageSoundId && isMessageSoundId(fromCache.messageSoundId) ? fromCache.messageSoundId : null) ?? DEFAULT_MESSAGE_SOUND_ID,
+    vibrationEnabled: fromCache?.vibrationEnabled !== false, // default on
   };
 }
 
@@ -64,11 +67,13 @@ type SoundCtx = {
   playTick: () => void;
   playNotification: () => void;
   playMessage: () => void;
-  previewVoteSound: () => void;
-  previewNotificationSound: () => void;
-  previewMessageSound: () => void;
+  previewSound: (id: string) => void;
+  vibrate: (pattern?: number | number[]) => void;
+  prepareSounds: () => void;
+  soundsReady: boolean;
   preferences: SoundPreferences;
   setSoundPreference: (category: SoundCategory, id: VoteSoundId | NotificationSoundId | MessageSoundId) => Promise<void>;
+  setVibrationEnabled: (enabled: boolean) => Promise<void>;
   savingPreference: boolean;
 };
 
@@ -76,112 +81,138 @@ const SoundContext = createContext<SoundCtx>({
   playTick: () => {},
   playNotification: () => {},
   playMessage: () => {},
-  previewVoteSound: () => {},
-  previewNotificationSound: () => {},
-  previewMessageSound: () => {},
+  previewSound: () => {},
+  vibrate: () => {},
+  prepareSounds: () => {},
+  soundsReady: false,
   preferences: {
     voteSoundId: DEFAULT_VOTE_SOUND_ID,
     notificationSoundId: DEFAULT_NOTIFICATION_SOUND_ID,
     messageSoundId: DEFAULT_MESSAGE_SOUND_ID,
+    vibrationEnabled: true,
   },
   setSoundPreference: async () => {},
+  setVibrationEnabled: async () => {},
   savingPreference: false,
 });
 
-type MeSoundData = {
-  me: {
-    voteSoundId?: string | null;
-    notificationSoundId?: string | null;
-    messageSoundId?: string | null;
-  };
-};
-
 export function SoundProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
   const [preferences, setPreferences] = useState<SoundPreferences>({
     voteSoundId: DEFAULT_VOTE_SOUND_ID,
     notificationSoundId: DEFAULT_NOTIFICATION_SOUND_ID,
     messageSoundId: DEFAULT_MESSAGE_SOUND_ID,
+    vibrationEnabled: true,
   });
-  const [savingPreference, setSavingPreference] = useState(false);
+  const [soundsReady, setSoundsReady] = useState(false);
+  const savingPreference = false; // prefs are saved instantly on-device
 
-  const tickPlayer = useAudioPlayer(tickWav);
-  const notifPlayer = useAudioPlayer(notifWav);
+  // One audio player per distinct sound, keyed by preset id.
+  const pBuzzIn = useAudioPlayer(sBuzzIn);
+  const pCrowdPop = useAudioPlayer(sCrowdPop);
+  const pSoftPop = useAudioPlayer(sSoftPop);
+  const pCoinPing = useAudioPlayer(sCoinPing);
+  const pSlotTick = useAudioPlayer(sSlotTick);
+  const pThock = useAudioPlayer(sThock);
+  const pWhistleChirp = useAudioPlayer(sWhistleChirp);
+  const pSuccessDuo = useAudioPlayer(sSuccessDuo);
+  const pAscendingChime = useAudioPlayer(sAscendingChime);
+  const pSoftChime = useAudioPlayer(sSoftChime);
+  const pGentleBell = useAudioPlayer(sGentleBell);
+  const pGentlePing = useAudioPlayer(sGentlePing);
 
-  const { data: meData } = useQuery<MeSoundData>(ME, {
-    skip: !isAuthenticated,
-    fetchPolicy: "cache-and-network",
-  });
+  const players: Record<string, ReturnType<typeof useAudioPlayer>> = {
+    "buzz-in": pBuzzIn,
+    "crowd-pop": pCrowdPop,
+    "soft-pop": pSoftPop,
+    "coin-ping": pCoinPing,
+    "slot-tick": pSlotTick,
+    "thock": pThock,
+    "whistle-chirp": pWhistleChirp,
+    "success-duo": pSuccessDuo,
+    "ascending-chime": pAscendingChime,
+    "soft-chime": pSoftChime,
+    "gentle-bell": pGentleBell,
+    "gentle-ping": pGentlePing,
+  };
 
-  const [updateProfile] = useMutation(UPDATE_PROFILE);
+  function playId(id: string) {
+    const p = players[id];
+    if (!p) return;
+    // Reset to the start (so repeated taps replay) then play.
+    const fire = () => {
+      try {
+        p.seekTo(0).then(() => { try { p.play(); } catch { /* ignore */ } }).catch(() => { try { p.play(); } catch { /* ignore */ } });
+      } catch { try { p.play(); } catch { /* ignore */ } }
+    };
+    fire();
+    // If the asset hadn't finished loading, the first call is silent — retry once.
+    if (!p.isLoaded) setTimeout(fire, 200);
+  }
 
-  // Load from AsyncStorage on mount, then merge with server data
+  // Load device-local prefs from AsyncStorage on mount.
   useEffect(() => {
     let cancelled = false;
     readStoredPrefs().then((cached) => {
       if (cancelled) return;
-      setPreferences((prev) => resolvePreferences(null, { ...prev, ...cached }));
+      setPreferences((prev) => resolvePreferences({ ...prev, ...cached }));
     });
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync when ME query resolves
-  useEffect(() => {
-    if (!meData?.me) return;
-    setPreferences((prev) => {
-      const merged = resolvePreferences(meData.me, prev);
-      void writeStoredPrefs(merged);
-      return merged;
-    });
-  }, [meData?.me]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Prime players shortly after mount
+  // Prime every player (muted) shortly after launch so the FIRST preview/tap
+  // plays instantly — expo-audio players are silent until they've loaded once.
   useEffect(() => {
     const t = setTimeout(() => {
-      try {
-        tickPlayer.play();
-        notifPlayer.play();
-        setTimeout(() => {
-          try {
-            tickPlayer.pause();
-            tickPlayer.seekTo(0).catch(() => {});
-            notifPlayer.pause();
-            notifPlayer.seekTo(0).catch(() => {});
-          } catch { /* ignore */ }
-        }, 120);
-      } catch { /* ignore */ }
-    }, 600);
+      Object.values(players).forEach((p) => {
+        try {
+          p.volume = 0;
+          p.play();
+          setTimeout(() => {
+            try { p.pause(); p.seekTo(0).catch(() => {}); p.volume = 1; } catch { /* ignore */ }
+          }, 90);
+        } catch { /* ignore */ }
+      });
+      setSoundsReady(true);
+    }, 700);
     return () => clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function playTick() {
-    try { tickPlayer.play(); } catch { /* ignore */ }
-    setTimeout(() => tickPlayer.seekTo(0).catch(() => {}), 220);
+    playId(preferences.voteSoundId);
   }
 
   function playNotification() {
-    try { notifPlayer.play(); } catch { /* ignore */ }
-    setTimeout(() => notifPlayer.seekTo(0).catch(() => {}), 2500);
+    playId(preferences.notificationSoundId);
   }
 
   function playMessage() {
-    try { notifPlayer.play(); } catch { /* ignore */ }
-    setTimeout(() => notifPlayer.seekTo(0).catch(() => {}), 2500);
+    playId(preferences.messageSoundId);
   }
 
-  function previewVoteSound() {
-    try { tickPlayer.seekTo(0).catch(() => {}); tickPlayer.play(); } catch { /* ignore */ }
-    setTimeout(() => tickPlayer.seekTo(0).catch(() => {}), 300);
+  // Preview an arbitrary preset (used by the sound settings screen).
+  function previewSound(id: string) {
+    playId(id);
   }
 
-  function previewNotificationSound() {
-    try { notifPlayer.seekTo(0).catch(() => {}); notifPlayer.play(); } catch { /* ignore */ }
-    setTimeout(() => notifPlayer.seekTo(0).catch(() => {}), 3000);
+  // Vibrate, honoring the device-local preference.
+  function vibrate(pattern: number | number[] = 60) {
+    if (!preferences.vibrationEnabled) return;
+    try { Vibration.vibrate(pattern); } catch { /* ignore */ }
   }
 
-  function previewMessageSound() {
-    try { notifPlayer.seekTo(0).catch(() => {}); notifPlayer.play(); } catch { /* ignore */ }
-    setTimeout(() => notifPlayer.seekTo(0).catch(() => {}), 3000);
+  // Preload/prime all players (muted) so the very first preview plays instantly.
+  function prepareSounds() {
+    Object.values(players).forEach((p) => {
+      try {
+        const prevVol = p.volume ?? 1;
+        p.volume = 0;
+        p.play();
+        setTimeout(() => {
+          try { p.pause(); p.seekTo(0).catch(() => {}); p.volume = prevVol; } catch { /* ignore */ }
+        }, 60);
+      } catch { /* ignore */ }
+    });
+    setSoundsReady(true);
   }
 
   async function setSoundPreference(
@@ -191,20 +222,15 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     const field =
       category === "vote" ? "voteSoundId" :
       category === "notification" ? "notificationSoundId" : "messageSoundId";
-
     const updated: SoundPreferences = { ...preferences, [field]: id } as SoundPreferences;
     setPreferences(updated);
-    await writeStoredPrefs(updated);
+    await writeStoredPrefs(updated); // device-local only
+  }
 
-    if (!isAuthenticated) return;
-    setSavingPreference(true);
-    try {
-      await updateProfile({ variables: { input: { [field]: id } } });
-    } catch {
-      // ignore — preference is already saved locally
-    } finally {
-      setSavingPreference(false);
-    }
+  async function setVibrationEnabled(enabled: boolean): Promise<void> {
+    const updated: SoundPreferences = { ...preferences, vibrationEnabled: enabled };
+    setPreferences(updated);
+    await writeStoredPrefs(updated);
   }
 
   return (
@@ -212,11 +238,13 @@ export function SoundProvider({ children }: { children: ReactNode }) {
       playTick,
       playNotification,
       playMessage,
-      previewVoteSound,
-      previewNotificationSound,
-      previewMessageSound,
+      previewSound,
+      vibrate,
+      prepareSounds,
+      soundsReady,
       preferences,
       setSoundPreference,
+      setVibrationEnabled,
       savingPreference,
     }}>
       {children}
