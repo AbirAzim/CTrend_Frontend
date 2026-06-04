@@ -18,19 +18,19 @@ export type ColorPalette = {
 };
 
 const DARK: ColorPalette = {
-  bg: "#08080f",
-  card: "#13131f",
-  section: "#1c1c2a",
-  border: "#252535",
-  topbar: "#0d0d1a",
-  text: "#f0f0ff",
-  subtext: "#8b8ba8",
-  muted: "#5c5c78",
-  accent: "#7c72f5",
-  accentLight: "#b8abff",
-  circleBtnBg: "#1c1c2e",
-  tabBg: "#0f0f1c",
-  inputBg: "#1a1a28",
+  bg: "#0a0a18",        // deep indigo-black — richer, cooler than the old muddy near-black
+  card: "#16162b",      // indigo-tinted card for real depth
+  section: "#20203b",   // more saturated raised surface
+  border: "#2e2e52",    // cooler, more visible borders
+  topbar: "#0e0d20",
+  text: "#f4f3ff",      // crisp near-white, cool tint
+  subtext: "#a6a4d6",   // brighter violet-gray (was a dull #8b8ba8)
+  muted: "#6f6ea6",     // livelier muted (was #5c5c78)
+  accent: "#8b7dff",    // brighter, more vivid indigo
+  accentLight: "#c6bcff",
+  circleBtnBg: "#20203a",
+  tabBg: "#121026",
+  inputBg: "#1b1a32",
 };
 
 const LIGHT: ColorPalette = {
