@@ -70,11 +70,11 @@ export function FeedInlineComments({
 	const replyCount = (parentId: string) =>
 		all.filter((c) => c.parentId === parentId).length;
 
-	// Oldest → newest, then cap to the most recent INLINE_LIMIT.
+	// Newest → oldest (matches the full post page), capped to INLINE_LIMIT.
 	const ordered = [...topLevel].sort(
-		(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+		(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
-	const shown = ordered.slice(Math.max(0, ordered.length - INLINE_LIMIT));
+	const shown = ordered.slice(0, INLINE_LIMIT);
 	const hiddenCount = ordered.length - shown.length;
 
 	const openFullThread = useCallback(() => {
