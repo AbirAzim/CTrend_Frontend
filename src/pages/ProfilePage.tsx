@@ -264,7 +264,9 @@ export function ProfilePage() {
   const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
-  const [connectionsTab, setConnectionsTab] = useState<"friends" | "requests" | "suggestions">("friends");
+  const [connectionsTab, setConnectionsTab] = useState<
+    "friends" | "incoming" | "sent" | "suggestions"
+  >("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
   const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept" | "voted">(() => {
     if (initialTab === "kept") return "kept";
@@ -301,7 +303,8 @@ export function ProfilePage() {
     isVotingOpen?: boolean | null;
   } | null>(null);
   const [friendsPage, setFriendsPage] = useState(0);
-  const [requestsPage, setRequestsPage] = useState(0);
+  const [incomingPage, setIncomingPage] = useState(0);
+  const [sentPage, setSentPage] = useState(0);
   const [suggestionsPage, setSuggestionsPage] = useState(0);
   const PEOPLE_PAGE = 10;
 
@@ -364,7 +367,8 @@ export function ProfilePage() {
 
   useEffect(() => {
     setFriendsPage(0);
-    setRequestsPage(0);
+    setIncomingPage(0);
+    setSentPage(0);
     setSuggestionsPage(0);
   }, [connectionsSearch, connectionsTab]);
 
@@ -896,13 +900,25 @@ export function ProfilePage() {
             <button
               type="button"
               role="tab"
-              aria-selected={connectionsTab === "requests"}
-              className={`cx-conn-tab${connectionsTab === "requests" ? " cx-conn-tab--active" : ""}`}
-              onClick={() => setConnectionsTab("requests")}
+              aria-selected={connectionsTab === "incoming"}
+              className={`cx-conn-tab${connectionsTab === "incoming" ? " cx-conn-tab--active" : ""}`}
+              onClick={() => setConnectionsTab("incoming")}
             >
-              Requests
+              Received
               {requestedMe.length > 0 && (
                 <span className="cx-conn-tab-badge cx-conn-tab-badge--alert">{requestedMe.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={connectionsTab === "sent"}
+              className={`cx-conn-tab${connectionsTab === "sent" ? " cx-conn-tab--active" : ""}`}
+              onClick={() => setConnectionsTab("sent")}
+            >
+              Sent
+              {requestedByMe.length > 0 && (
+                <span className="cx-conn-tab-badge">{requestedByMe.length}</span>
               )}
             </button>
             <button
@@ -982,93 +998,140 @@ export function ProfilePage() {
             </div>
           )}
 
-          {/* ── Requests tab ── */}
-          {connectionsTab === "requests" && (
+          {/* ── Received (incoming) tab ── */}
+          {connectionsTab === "incoming" && (
             <div className="cx-conn-panel" role="tabpanel">
               {friendRequestsLoading ? (
                 <p className="cx-conn-empty">Loading…</p>
-              ) : requestedMe.length === 0 && requestedByMe.length === 0 ? (
+              ) : requestedMe.length === 0 ? (
                 <div className="cx-conn-empty">
                   <span className="cx-conn-empty-icon">📭</span>
-                  <p>No pending requests.</p>
+                  <p>No incoming requests.</p>
                 </div>
-              ) : (
-                <>
-                  {requestedMe.length > 0 && (
-                    <>
-                      <p className="cx-conn-group-label">Incoming</p>
-                      <ul className="cx-conn-list">
-                        {requestedMe.filter(matchesSearch).slice(requestsPage * PEOPLE_PAGE, (requestsPage + 1) * PEOPLE_PAGE).map((u) => (
-                          <li key={u.id} className="cx-conn-row">
-                            <div className="cx-conn-avatar-wrap">
-                              <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
-                                {normalizeProfileImageUrl(u.profileImageUrl) ? (
-                                  <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
-                                ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
-                              </Link>
-                            </div>
-                            <div className="cx-conn-info">
-                              <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
-                                <span className="cx-conn-name">{friendName(u)}</span>
-                              </Link>
-                            </div>
-                            <div className="cx-conn-actions">
-                              <button
-                                type="button"
-                                className="cx-conn-btn cx-conn-btn--accept"
-                                disabled={actionLoadingIds.has(u.id)}
-                                onClick={() => void handleAcceptRequest(u.id)}
-                              >
-                                {actionLoadingIds.has(u.id) ? "…" : "Accept"}
-                              </button>
-                              <button
-                                type="button"
-                                className="cx-conn-btn cx-conn-btn--ghost"
-                                disabled={actionLoadingIds.has(u.id)}
-                                onClick={() => void handleRejectRequest(u.id)}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  {requestedByMe.length > 0 && (
-                    <>
-                      <p className="cx-conn-group-label" style={{ marginTop: requestedMe.length > 0 ? "16px" : "0" }}>Sent</p>
-                      <ul className="cx-conn-list">
-                        {requestedByMe.filter(matchesSearch).slice(requestsPage * PEOPLE_PAGE, (requestsPage + 1) * PEOPLE_PAGE).map((u) => (
-                          <li key={u.id} className="cx-conn-row">
-                            <div className="cx-conn-avatar-wrap">
-                              <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
-                                {normalizeProfileImageUrl(u.profileImageUrl) ? (
-                                  <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
-                                ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
-                              </Link>
-                            </div>
-                            <div className="cx-conn-info">
-                              <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
-                                <span className="cx-conn-name">{friendName(u)}</span>
-                              </Link>
-                              <span className="cx-conn-pending-tag">Pending</span>
-                            </div>
+              ) : requestedMe.filter(matchesSearch).length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">🔍</span>
+                  <p>No requests match "{connectionsSearch}"</p>
+                </div>
+              ) : (() => {
+                const filtered = requestedMe.filter(matchesSearch);
+                const totalPages = Math.ceil(filtered.length / PEOPLE_PAGE);
+                const page = filtered.slice(
+                  incomingPage * PEOPLE_PAGE,
+                  (incomingPage + 1) * PEOPLE_PAGE,
+                );
+                return (
+                  <>
+                    <ul className="cx-conn-list">
+                      {page.map((u) => (
+                        <li key={u.id} className="cx-conn-row">
+                          <div className="cx-conn-avatar-wrap">
+                            <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
+                              {normalizeProfileImageUrl(u.profileImageUrl) ? (
+                                <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                              ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
+                            </Link>
+                          </div>
+                          <div className="cx-conn-info">
+                            <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
+                              <span className="cx-conn-name">{friendName(u)}</span>
+                            </Link>
+                          </div>
+                          <div className="cx-conn-actions">
+                            <button
+                              type="button"
+                              className="cx-conn-btn cx-conn-btn--accept"
+                              disabled={actionLoadingIds.has(u.id)}
+                              onClick={() => void handleAcceptRequest(u.id)}
+                            >
+                              {actionLoadingIds.has(u.id) ? "…" : "Accept"}
+                            </button>
                             <button
                               type="button"
                               className="cx-conn-btn cx-conn-btn--ghost"
                               disabled={actionLoadingIds.has(u.id)}
-                              onClick={() => void handleCancelRequest(u.id)}
+                              onClick={() => void handleRejectRequest(u.id)}
                             >
-                              {actionLoadingIds.has(u.id) ? "…" : "Cancel"}
+                              Reject
                             </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </>
-              )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    {totalPages > 1 && (
+                      <div className="cx-conn-pagination">
+                        <button type="button" className="cx-conn-page-btn" disabled={incomingPage === 0} onClick={() => setIncomingPage((p) => p - 1)}>‹</button>
+                        <span className="cx-conn-page-info">{incomingPage + 1} / {totalPages}</span>
+                        <button type="button" className="cx-conn-page-btn" disabled={incomingPage >= totalPages - 1} onClick={() => setIncomingPage((p) => p + 1)}>›</button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ── Sent tab ── */}
+          {connectionsTab === "sent" && (
+            <div className="cx-conn-panel" role="tabpanel">
+              {friendRequestsLoading ? (
+                <p className="cx-conn-empty">Loading…</p>
+              ) : requestedByMe.length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">📭</span>
+                  <p>No sent requests.</p>
+                </div>
+              ) : requestedByMe.filter(matchesSearch).length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">🔍</span>
+                  <p>No requests match "{connectionsSearch}"</p>
+                </div>
+              ) : (() => {
+                const filtered = requestedByMe.filter(matchesSearch);
+                const totalPages = Math.ceil(filtered.length / PEOPLE_PAGE);
+                const page = filtered.slice(
+                  sentPage * PEOPLE_PAGE,
+                  (sentPage + 1) * PEOPLE_PAGE,
+                );
+                return (
+                  <>
+                    <ul className="cx-conn-list">
+                      {page.map((u) => (
+                        <li key={u.id} className="cx-conn-row">
+                          <div className="cx-conn-avatar-wrap">
+                            <Link to={`/profile/${u.id}`} className="cx-conn-avatar">
+                              {normalizeProfileImageUrl(u.profileImageUrl) ? (
+                                <img src={normalizeProfileImageUrl(u.profileImageUrl) ?? ""} alt="" referrerPolicy="no-referrer" />
+                              ) : <span className="cx-conn-avatar-initial">{friendInitial(u)}</span>}
+                            </Link>
+                          </div>
+                          <div className="cx-conn-info">
+                            <Link to={`/profile/${u.id}`} className="cx-conn-name-link">
+                              <span className="cx-conn-name">{friendName(u)}</span>
+                            </Link>
+                            <span className="cx-conn-pending-tag">Pending</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="cx-conn-btn cx-conn-btn--ghost"
+                            disabled={actionLoadingIds.has(u.id)}
+                            onClick={() => void handleCancelRequest(u.id)}
+                          >
+                            {actionLoadingIds.has(u.id) ? "…" : "Cancel"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {totalPages > 1 && (
+                      <div className="cx-conn-pagination">
+                        <button type="button" className="cx-conn-page-btn" disabled={sentPage === 0} onClick={() => setSentPage((p) => p - 1)}>‹</button>
+                        <span className="cx-conn-page-info">{sentPage + 1} / {totalPages}</span>
+                        <button type="button" className="cx-conn-page-btn" disabled={sentPage >= totalPages - 1} onClick={() => setSentPage((p) => p + 1)}>›</button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
