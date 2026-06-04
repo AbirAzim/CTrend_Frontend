@@ -138,10 +138,15 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   function playId(id: string) {
     const p = players[id];
     if (!p) return;
-    try {
-      p.seekTo(0).catch(() => {});
-      p.play();
-    } catch { /* ignore */ }
+    // Reset to the start (so repeated taps replay) then play.
+    const fire = () => {
+      try {
+        p.seekTo(0).then(() => { try { p.play(); } catch { /* ignore */ } }).catch(() => { try { p.play(); } catch { /* ignore */ } });
+      } catch { try { p.play(); } catch { /* ignore */ } }
+    };
+    fire();
+    // If the asset hadn't finished loading, the first call is silent — retry once.
+    if (!p.isLoaded) setTimeout(fire, 200);
   }
 
   // Load device-local prefs from AsyncStorage on mount.
@@ -152,6 +157,24 @@ export function SoundProvider({ children }: { children: ReactNode }) {
       setPreferences((prev) => resolvePreferences({ ...prev, ...cached }));
     });
     return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prime every player (muted) shortly after launch so the FIRST preview/tap
+  // plays instantly — expo-audio players are silent until they've loaded once.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      Object.values(players).forEach((p) => {
+        try {
+          p.volume = 0;
+          p.play();
+          setTimeout(() => {
+            try { p.pause(); p.seekTo(0).catch(() => {}); p.volume = 1; } catch { /* ignore */ }
+          }, 90);
+        } catch { /* ignore */ }
+      });
+      setSoundsReady(true);
+    }, 700);
+    return () => clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function playTick() {

@@ -570,21 +570,28 @@ export default function ChatScreen() {
           <Text style={[styles.backText, { color: colors.accent }]}>‹</Text>
         </Pressable>
 
-        <View style={[styles.headerAvatar, { overflow: "hidden" }]}>
-          {headerAvatar
-            ? <Image source={{ uri: headerAvatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-            : <Text style={styles.headerAvatarText}>{headerInitial}</Text>
-          }
-        </View>
+        <Pressable
+          style={styles.headerProfile}
+          onPress={() => { if (otherParticipant?.id) router.push(`/profile/${otherParticipant.id}` as `/${string}`); }}
+          disabled={!otherParticipant?.id}
+          hitSlop={4}
+        >
+          <View style={[styles.headerAvatar, { overflow: "hidden" }]}>
+            {headerAvatar
+              ? <Image source={{ uri: headerAvatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+              : <Text style={styles.headerAvatarText}>{headerInitial}</Text>
+            }
+          </View>
 
-        <View style={styles.headerMeta}>
-          <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{headerName}</Text>
-          {otherParticipants.length === 1 && (
-            <Text style={[styles.headerStatus, { color: partnerOnline ? "#22c55e" : colors.muted }]}>
-              {partnerOnline ? "● Online" : "Offline"}
-            </Text>
-          )}
-        </View>
+          <View style={styles.headerMeta}>
+            <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{headerName}</Text>
+            {otherParticipants.length === 1 && (
+              <Text style={[styles.headerStatus, { color: partnerOnline ? "#22c55e" : colors.muted }]}>
+                {partnerOnline ? "● Online" : "Offline"}
+              </Text>
+            )}
+          </View>
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView
@@ -781,6 +788,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 10,
   },
+  headerProfile: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   backBtn: { padding: 6 },
   backText: { fontSize: 28, fontWeight: "300", lineHeight: 32 },
   headerAvatar: {
