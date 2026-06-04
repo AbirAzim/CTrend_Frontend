@@ -9467,6 +9467,12 @@ a.cx-profile-btn-accent {
   gap: 4px;
   padding: 12px 14px 0;
   border-bottom: 1px solid var(--ig-border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cx-conn-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .cx-conn-tab {
@@ -10862,6 +10868,16 @@ a.cx-profile-btn-accent {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+}
+.cx-friends-tabs::-webkit-scrollbar {
+  display: none;
+}
+.cx-friends-tabs .cx-friends-tab {
+  flex: 0 0 auto;
 }
 
 .cx-friends-tab {
@@ -17802,5 +17818,125 @@ a.cx-profile-btn-accent {
 
 .admin-mod-bubble-row--flash .admin-mod-bubble {
   animation: cw-msg-flash 1.2s ease;
+}
+
+/* ── Friends page: tab counts, sub-tabs, list transitions ─────────────── */
+
+.cx-friends-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.85);
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+}
+.cx-friends-tab.is-active .cx-friends-tab-count {
+  background: var(--cx-accent-deep);
+}
+.cx-friends-tab-count--alert {
+  background: #f43f5e;
+  color: #fff;
+}
+.cx-friends-tab.is-active .cx-friends-tab-count--alert {
+  background: #e11d48;
+  color: #fff;
+}
+
+/* Sub-tabs (Incoming / Sent) inside the Requests panel */
+.cx-friends-subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cx-friends-subtab {
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.18);
+  background: rgb(255 255 255 / 0.6);
+  color: var(--ig-text);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.cx-friends-subtab.is-active {
+  background: rgb(var(--cx-accent-rgb) / 0.14);
+  border-color: rgb(var(--cx-accent-rgb) / 0.45);
+  color: var(--cx-accent-deep);
+}
+
+/* Panel (tab / sub-tab body) entrance */
+.cx-friends-panel {
+  animation: cxPanelIn 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes cxPanelIn {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* List item base — smooth layout shifts as siblings slide up */
+.cx-friend-item {
+  transition: background 0.18s ease;
+  will-change: transform, opacity;
+}
+
+/* Item entering a list */
+.cx-friend-item--entering {
+  animation: cxFriendIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes cxFriendIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+/* Item leaving a list — fade + slide out, then collapse so the gap closes */
+.cx-friend-item--leaving {
+  animation: cxFriendOut 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+  overflow: hidden;
+}
+@keyframes cxFriendOut {
+  0% { opacity: 1; transform: none; max-height: 72px; }
+  35% { opacity: 0; transform: translateX(34px); max-height: 72px; }
+  100% {
+    opacity: 0;
+    transform: translateX(34px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: -8px;
+  }
+}
+
+/* Action button accents for clearer affordance + feedback */
+.cx-btn-accept {
+  color: #16a34a;
+  border-color: rgb(22 163 74 / 0.4);
+}
+.cx-btn-accept:hover { background: rgb(22 163 74 / 0.1); }
+.cx-btn-cancel,
+.cx-btn-unfriend {
+  color: #dc2626;
+  border-color: rgb(220 38 38 / 0.35);
+}
+.cx-btn-cancel:hover,
+.cx-btn-unfriend:hover { background: rgb(220 38 38 / 0.08); }
+
+:root[data-theme="dark"] .cx-friends-subtab {
+  background: rgb(255 255 255 / 0.05);
+  color: var(--ig-text);
+}
+:root[data-theme="dark"] .cx-friends-subtab.is-active {
+  background: rgb(var(--cx-accent-rgb) / 0.22);
 }
 

@@ -24,6 +24,8 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 |-----|--------|
 | [notification-ws-resilience.md](./2026-06-05_notification-ws-resilience.md) | Fix bell notifications (hype/comment/vote) "sometimes not coming" — WS reconnect + refetch on (re)connect/visibility |
 | [vote-tie-no-dim.md](./2026-06-05_vote-tie-no-dim.md) | Don't dim compare options on a tie — tie-aware winner predicates (both share top = both win) |
+| [friends-tabs-and-live-moves.md](./2026-06-05_friends-tabs-and-live-moves.md) | Friends page: separate Incoming/Sent tabs + instant animated moves between Suggestions/Requests/Friends (optimistic pins, 8s peer poll, rollback) |
+| [connections-received-sent-separate-tabs.md](./2026-06-05_connections-received-sent-separate-tabs.md) | **User ask:** Received + Sent as **separate top-level tabs** (Profile Connections + Friends page) — not one Requests tab with INCOMING/SENT sections |
 
 ## Backend (CTrend repo)
 
@@ -42,3 +44,8 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 - `index.css` — side reply action (`cw-bubble-line` / `cw-reply-action`), quoted snippet, reply bar, and flash-highlight styles (`cw-*` + `admin-mod-*`)
 - `context/NotificationContext.tsx` — WS reconnect + refetch-on-(re)connect/visibility so the bell doesn't miss real-time hype/comment/vote notifications
 - `components/FeedPostCard.tsx` — tie-aware winner predicates so equal-percentage compare options don't dim on a tie
+- `pages/FriendsPage.tsx` — Incoming/Sent sub-tabs + animated view-model engine (optimistic pins, peer poll, rollback) for instant moves between Suggestions/Requests/Friends
+- `index.css` — friends tab counts, sub-tabs, panel + list-item enter/leave animations, action-button accents
+- `pages/ProfilePage.tsx` — Connections: **Friends | Received | Sent | Suggestions** (see connections doc)
+- `pages/FriendsPage.tsx` — top-level **My Friends | Received | Sent | Suggestions** (see connections doc)
+- `index.css` — scrollable 4-tab bars, incoming alert badge on friends tabs
