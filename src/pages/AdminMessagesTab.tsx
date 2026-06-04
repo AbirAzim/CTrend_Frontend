@@ -53,6 +53,14 @@ type ModeratorMessageRow = {
   sentByAdminEmail: string;
 };
 
+type ReplyPreviewRow = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  imageUrl?: string | null;
+};
+
 type ThreadMessageRow = {
   id: string;
   senderId: string;
@@ -63,6 +71,7 @@ type ThreadMessageRow = {
   sentByAdminEmail?: string | null;
   text: string;
   imageUrl?: string | null;
+  replyTo?: ReplyPreviewRow | null;
   createdAt: string;
 };
 
@@ -134,6 +143,7 @@ export function AdminMessagesTab({
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [threadUserId, setThreadUserId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [replyTarget, setReplyTarget] = useState<ThreadMessageRow | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
@@ -284,6 +294,7 @@ export function AdminMessagesTab({
   function openThread(userId: string) {
     if (!isValidMongoObjectId(userId)) return;
     setThreadUserId(userId);
+    setReplyTarget(null);
     if (!recipientIds.includes(userId)) {
       setRecipientIds((prev) => [...prev, userId]);
     }
@@ -309,6 +320,11 @@ export function AdminMessagesTab({
       return;
     }
 
+    // A quoted reply only applies to a single-thread conversation, never a
+    // multi-recipient broadcast.
+    const replyToId =
+      replyTarget && targets.length === 1 ? replyTarget.id : undefined;
+
     setSendError(null);
     setUploading(Boolean(pendingImage));
     try {
@@ -321,9 +337,11 @@ export function AdminMessagesTab({
           userIds: targets,
           text: messageText.trim(),
           imageUrl,
+          replyToId,
         },
       });
       setMessageText("");
+      setReplyTarget(null);
       if (pendingImage) {
         URL.revokeObjectURL(pendingImage.previewUrl);
         setPendingImage(null);
@@ -532,6 +550,7 @@ export function AdminMessagesTab({
                 return (
                   <div
                     key={msg.id}
+                    data-admin-msg-id={msg.id}
                     className={`admin-mod-bubble-row${isModerator ? " admin-mod-bubble-row--mod" : " admin-mod-bubble-row--user"}`}
                   >
                     {!isModerator ? <AdminAvatar user={userAvatar} compact /> : null}
@@ -543,6 +562,39 @@ export function AdminMessagesTab({
                           : undefined
                       }
                     >
+                      {msg.replyTo ? (
+                        <button
+                          type="button"
+                          className="admin-mod-quoted"
+                          onClick={() => {
+                            const el = chatBodyRef.current?.querySelector<HTMLElement>(
+                              `[data-admin-msg-id="${msg.replyTo!.messageId}"]`,
+                            );
+                            if (!el) return;
+                            el.scrollIntoView({ behavior: "smooth", block: "center" });
+                            el.classList.add("admin-mod-bubble-row--flash");
+                            setTimeout(
+                              () => el.classList.remove("admin-mod-bubble-row--flash"),
+                              1200,
+                            );
+                          }}
+                        >
+                          <span className="admin-mod-quoted-bar" aria-hidden />
+                          <span className="admin-mod-quoted-meta">
+                            <span className="admin-mod-quoted-name">{msg.replyTo.senderName}</span>
+                            <span className="admin-mod-quoted-text">
+                              {msg.replyTo.text?.trim()
+                                ? msg.replyTo.text
+                                : msg.replyTo.imageUrl
+                                  ? "📷 Photo"
+                                  : "Message"}
+                            </span>
+                          </span>
+                          {msg.replyTo.imageUrl ? (
+                            <img src={msg.replyTo.imageUrl} alt="" className="admin-mod-quoted-thumb" />
+                          ) : null}
+                        </button>
+                      ) : null}
                       <div className="admin-mod-bubble-head">
                         {isModerator ? (
                           <>
@@ -578,6 +630,18 @@ export function AdminMessagesTab({
                         </a>
                       ) : null}
                     </div>
+                    <button
+                      type="button"
+                      className="admin-mod-reply-btn"
+                      aria-label="Reply"
+                      title="Reply"
+                      onClick={() => setReplyTarget(msg)}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden>
+                        <polyline points="9 17 4 12 9 7" />
+                        <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                      </svg>
+                    </button>
                     {isModerator ? (
                       <img src="/logo.png" alt="" className="admin-mod-msg-avatar admin-mod-msg-avatar--logo" />
                     ) : null}
@@ -600,6 +664,37 @@ export function AdminMessagesTab({
                   }}
                 >
                   Remove
+                </button>
+              </div>
+            ) : null}
+            {replyTarget ? (
+              <div className="admin-mod-reply-bar">
+                <span className="admin-mod-reply-bar-accent" aria-hidden />
+                <div className="admin-mod-reply-bar-meta">
+                  <span className="admin-mod-reply-bar-name">
+                    Replying to{" "}
+                    {replyTarget.senderId === "moderator"
+                      ? MODERATOR_BRAND_NAME
+                      : replyTarget.senderName}
+                  </span>
+                  <span className="admin-mod-reply-bar-text">
+                    {replyTarget.text?.trim()
+                      ? replyTarget.text
+                      : replyTarget.imageUrl
+                        ? "📷 Photo"
+                        : "Message"}
+                  </span>
+                </div>
+                {replyTarget.imageUrl ? (
+                  <img src={replyTarget.imageUrl} alt="" className="admin-mod-reply-bar-thumb" />
+                ) : null}
+                <button
+                  type="button"
+                  className="admin-mod-reply-bar-close"
+                  aria-label="Cancel reply"
+                  onClick={() => setReplyTarget(null)}
+                >
+                  ×
                 </button>
               </div>
             ) : null}

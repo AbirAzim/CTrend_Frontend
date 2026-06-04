@@ -74,6 +74,14 @@ export type Conversation = {
 
 export type MessageReactionCount = { emoji: string; count: number };
 
+export type ReplyPreview = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  imageUrl?: string | null;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -85,6 +93,7 @@ export type Message = {
   readBy: { userId: string; readAt: string }[];
   reactions: MessageReactionCount[];
   viewerReaction?: string | null;
+  replyTo?: ReplyPreview | null;
   createdAt: string;
 };
 
@@ -98,7 +107,12 @@ type MessengerContextValue = {
   setPanelOpen: (open: boolean) => void;
   openChat: (conversationId: string) => void;
   closeChat: (conversationId: string) => void;
-  sendMessage: (conversationId: string, text: string, imageUrl?: string) => Promise<void>;
+  sendMessage: (
+    conversationId: string,
+    text: string,
+    imageUrl?: string,
+    replyToId?: string | null,
+  ) => Promise<void>;
   reactMessage: (messageId: string, conversationId: string, emoji: string | null) => Promise<void>;
   markRead: (conversationId: string) => void;
   setTyping: (conversationId: string, isTyping: boolean) => void;
@@ -358,9 +372,14 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendMessage = useCallback(
-    async (conversationId: string, text: string, imageUrl?: string) => {
+    async (
+      conversationId: string,
+      text: string,
+      imageUrl?: string,
+      replyToId?: string | null,
+    ) => {
       const { data } = await sendMessageMut({
-        variables: { conversationId, text, imageUrl },
+        variables: { conversationId, text, imageUrl, replyToId: replyToId ?? null },
       });
       const raw = data?.sendMessage as Message | undefined;
       if (!raw) return;
