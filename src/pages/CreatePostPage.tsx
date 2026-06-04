@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@apollo/client";
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
-import { CREATE_SYSTEM_POST } from "../graphql/admin";
+import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "../graphql/admin";
 import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -74,6 +74,13 @@ export function CreatePostPage() {
   const [scheduledAt, setScheduledAt] = useState("");
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState("");
+  const [broadcastGlobally, setBroadcastGlobally] = useState(false);
+
+  const { data: platformSettingsData } = useQuery(PLATFORM_SETTINGS);
+  const allowUserGlobalPosts = Boolean(
+    platformSettingsData?.platformSettings?.allowUserGlobalPosts,
+  );
+  const showGlobalPostOption = !isAdmin && allowUserGlobalPosts;
 
   async function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
@@ -213,6 +220,7 @@ export function CreatePostPage() {
       contentText?: string;
       caption?: string;
       campaignId?: string;
+      broadcastGlobally?: boolean;
     } = {
       categoryId: category,
       imageUrls,
@@ -232,6 +240,9 @@ export function CreatePostPage() {
     const pickedCampaign = campaignId.trim();
     if (pickedCampaign) {
       input.campaignId = pickedCampaign;
+    }
+    if (showGlobalPostOption && broadcastGlobally) {
+      input.broadcastGlobally = true;
     }
 
     try {
@@ -338,6 +349,25 @@ export function CreatePostPage() {
       <form className="ig-create-form" onSubmit={(ev) => void onSubmit(ev)}>
 
         {/* ── Admin post type toggle ── */}
+        {showGlobalPostOption && (
+          <div className="ig-create-settings-card ig-user-global-post-option">
+            <label className="ig-user-global-post-label">
+              <input
+                type="checkbox"
+                checked={broadcastGlobally}
+                onChange={(e) => setBroadcastGlobally(e.target.checked)}
+              />
+              <span>
+                <strong>Post globally</strong>
+                <span className="muted small block">
+                  Everyone on Ke Jitbe will see your name and photo on this compare and get a
+                  notification. This is not an official Ke Jitbe platform post.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+
         {isAdmin && (
           <div className="ig-create-settings-card ig-admin-post-type">
             <p className="ig-settings-label">

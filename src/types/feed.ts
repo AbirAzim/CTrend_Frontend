@@ -8,6 +8,8 @@ export type FeedPostView = {
   id: string;
   /** API post type — `system` = platform-wide Ke Jitbe polls. */
   postType?: FeedPostType | null;
+  /** Normal user posted to everyone (admin toggle); shows user name/avatar, not platform brand. */
+  isUserGlobalBroadcast?: boolean | null;
   authorId?: string | null;
   authorUsername: string;
   authorDisplayName: string | null;

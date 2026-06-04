@@ -26,6 +26,7 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 | [vote-tie-no-dim.md](./2026-06-05_vote-tie-no-dim.md) | Don't dim compare options on a tie — tie-aware winner predicates (both share top = both win) |
 | [friends-tabs-and-live-moves.md](./2026-06-05_friends-tabs-and-live-moves.md) | Friends page: separate Incoming/Sent tabs + instant animated moves between Suggestions/Requests/Friends (optimistic pins, 8s peer poll, rollback) |
 | [connections-received-sent-separate-tabs.md](./2026-06-05_connections-received-sent-separate-tabs.md) | **User ask:** Received + Sent as **separate top-level tabs** (Profile Connections + Friends page) — not one Requests tab with INCOMING/SENT sections |
+| [user-global-platform-posts.md](./2026-06-05_user-global-platform-posts.md) | Admin toggle (default OFF) for normal users to post globally — user name/avatar on feed + `USER_GLOBAL_POST` notifications vs admin `SYSTEM` / **Ke Jitbe** brand |
 
 ## Backend (CTrend repo)
 
@@ -33,6 +34,11 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 - `messages/graphql/message.types.ts` — `MessageReplyPreviewGql` + `replyTo` on `MessageGql`
 - `messages/messages.service.ts` — `buildReplySnapshot`, `replyPreviewToGql`, `replyToId` through `sendMessage` / `sendModeratorMessage(s)`, `replyTo` in `messageToGql`
 - `messages/messages.resolver.ts` — `replyToId` arg on the three send mutations
+- `platform-settings/` — `allowUserGlobalPosts`, `platformSettings`, `setAllowUserGlobalPosts`
+- `posts/post.schema.ts` — `isUserGlobalBroadcast`; `posts/dto/create-post.input.ts` — `broadcastGlobally`
+- `posts/posts.service.ts` — create validation + `notifyAllUsersOfUserGlobalPost` fan-out
+- `feed/feed.service.ts` — global user posts in feed filter
+- `notifications/notification.schema.ts` — `USER_GLOBAL_POST`
 
 ## Web (this repo)
 
@@ -49,3 +55,11 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 - `pages/ProfilePage.tsx` — Connections: **Friends | Received | Sent | Suggestions** (see connections doc)
 - `pages/FriendsPage.tsx` — top-level **My Friends | Received | Sent | Suggestions** (see connections doc)
 - `index.css` — scrollable 4-tab bars, incoming alert badge on friends tabs
+- `graphql/admin.ts` — `PLATFORM_SETTINGS`, `SET_ALLOW_USER_GLOBAL_POSTS`
+- `graphql/feed.ts` — `isUserGlobalBroadcast`, `authorProfileImageUrl`
+- `pages/AdminPage.tsx` — global user posts toggle + Details panel
+- `pages/CreatePostPage.tsx` — **Post globally** when setting enabled
+- `components/FeedPostCard.tsx` — **Global** badge (distinct from platform **Platform** badge)
+- `components/NotificationBell.tsx` — `USER_GLOBAL_POST` handling
+- `lib/mapGqlPostToFeedView.ts`, `types/feed.ts` — global broadcast fields
+- `index.css` — admin global-posts card, user-global feed/create styles

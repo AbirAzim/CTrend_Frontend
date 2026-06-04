@@ -1322,6 +1322,7 @@ function FeedPostCardComponent({
   }, [post.id]);
 
   const isPlatformPost = post.postType === "system";
+  const isUserGlobalPost = Boolean(post.isUserGlobalBroadcast) && !isPlatformPost;
   const hasCampaign = Boolean(post.campaign);
   const showVoteWinner =
     post.isVotingOpen === false &&
@@ -1339,7 +1340,7 @@ function FeedPostCardComponent({
 
   return (
     <article
-      className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
+      className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
     >
       {isEndingSoon ? (
         <div className="cx-vote-ending-soon-banner" role="status" aria-live="polite">
@@ -1390,8 +1391,13 @@ function FeedPostCardComponent({
               )}
             </span>
             <div>
-              <span className="ig-post-username">
-                {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
+              <span className="ig-post-username-row">
+                <span className="ig-post-username">
+                  {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
+                </span>
+                {isUserGlobalPost ? (
+                  <span className="cx-user-global-post-badge">Global</span>
+                ) : null}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>

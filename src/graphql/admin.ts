@@ -422,3 +422,19 @@ export const ADMIN_MODERATOR_USER_MESSAGE = gql`
     }
   }
 `;
+
+export const PLATFORM_SETTINGS = gql`
+  query PlatformSettings {
+    platformSettings {
+      allowUserGlobalPosts
+    }
+  }
+`;
+
+export const SET_ALLOW_USER_GLOBAL_POSTS = gql`
+  mutation SetAllowUserGlobalPosts($enabled: Boolean!) {
+    setAllowUserGlobalPosts(enabled: $enabled) {
+      allowUserGlobalPosts
+    }
+  }
+`;
