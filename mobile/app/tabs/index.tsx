@@ -35,11 +35,9 @@ import { useTheme } from "../../context/ThemeContext";
 type FeedData = { feedPosts: unknown[] };
 
 function FeedTopBar() {
-  const { logout, isAuthenticated, user } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
-
-  const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
     skip: !isAuthenticated,
@@ -53,12 +51,8 @@ function FeedTopBar() {
     router.replace("/auth/login");
   }
 
-  function handleAdmin() {
-    router.push("/admin" as `/${string}`);
-  }
-
   return (
-    <View style={[styles.topBar, { paddingTop: insets.top, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
+    <View style={[styles.topBar, { paddingTop: insets.top + 8, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
       {/* Brand */}
       <Pressable style={styles.brand} hitSlop={4}>
         <Text style={[styles.brandText, { color: colors.accentLight }]} numberOfLines={1}>Ke Jitbe</Text>
@@ -81,21 +75,8 @@ function FeedTopBar() {
           <Text style={styles.iconSymbol}>{isDark ? "✶" : "🌙"}</Text>
         </Pressable>
 
-        {/* Admin — only for admin role */}
-        {isAdmin && (
-          <Pressable style={[styles.rectBtn, styles.rectBtnAdmin]} onPress={handleAdmin} hitSlop={6}>
-            <Text style={styles.rectBtnSymbol}>⚙</Text>
-          </Pressable>
-        )}
-
-        {/* Create new post */}
-        <Pressable
-          style={[styles.rectBtn, styles.rectBtnCreate]}
-          onPress={() => router.push("/tabs/create" as `/${string}`)}
-          hitSlop={6}
-        >
-          <Text style={styles.rectBtnSymbol}>✦</Text>
-        </Pressable>
+        {/* Create + Admin live in the bottom nav (Create FAB + Admin shield), so they're
+            intentionally not duplicated here. */}
 
         {/* Notification bell */}
         <Pressable style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
@@ -324,7 +305,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
     // subtle elevation
     elevation: 4,
