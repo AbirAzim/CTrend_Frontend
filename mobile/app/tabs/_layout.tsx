@@ -71,11 +71,12 @@ function FloatingTabBar(props: {
           const messagesIdx = props.state.routes.findIndex((r) => r.name === "messages");
           const isMessages = index === messagesIdx;
 
+          // Instagram-style: bright white icons; active = pure white (filled), inactive = soft white.
           const iconColor: ColorValue = focused
-            ? colors.accent
-            : isDark ? "#8e8e8e" : "#9ca3af";
+            ? isDark ? "#ffffff" : colors.accent
+            : isDark ? "#c7c7c7" : "#9ca3af";
 
-          const icon = descriptor.options.tabBarIcon?.({ color: iconColor, size: 26, focused });
+          const icon = descriptor.options.tabBarIcon?.({ color: iconColor, size: 27, focused });
 
           function handlePress() {
             const event = props.navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
@@ -129,7 +130,7 @@ function FloatingTabBar(props: {
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: focused ? colors.accent : isDark ? "#8e8e8e" : "#9ca3af" },
+                    { color: focused ? (isDark ? "#ffffff" : colors.accent) : isDark ? "#c7c7c7" : "#9ca3af" },
                     focused && styles.tabLabelActive,
                   ]}
                   numberOfLines={1}

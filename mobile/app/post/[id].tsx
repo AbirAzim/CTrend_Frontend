@@ -804,11 +804,11 @@ export default function PostDetailScreen() {
   });
   const allComments = commentsData?.commentsByPost ?? [];
 
-  // Oldest-first (natural conversation order, newest at bottom like Facebook)
+  // Newest-first for top-level comments (matches the web version).
   const topComments = useMemo(
     () => allComments
       .filter((c) => !c.parentId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [allComments],
   );
   const repliesMap = useMemo(() => {
@@ -930,10 +930,16 @@ export default function PostDetailScreen() {
       setExpandedIds((prev) => new Set([...prev, currentReplyTo.id]));
     }
 
-    // Scroll to show the new comment (slight delay so optimistic renders first)
+    // Scroll to show the new comment (slight delay so optimistic renders first).
+    // Top-level comments are newest-first → they appear at the top of the list, so
+    // scroll up to the comments section; replies are appended within their thread.
     setTimeout(() => {
-      (scrollRef.current as unknown as { scrollToEnd: (opts: { animated: boolean }) => void })
-        ?.scrollToEnd({ animated: true });
+      if (currentReplyTo) {
+        (scrollRef.current as unknown as { scrollToEnd: (opts: { animated: boolean }) => void })
+          ?.scrollToEnd({ animated: true });
+      } else {
+        scrollToComments();
+      }
     }, 80);
 
     try {
