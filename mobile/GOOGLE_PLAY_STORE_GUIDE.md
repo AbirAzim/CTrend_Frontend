@@ -130,6 +130,15 @@ For release AAB, see [§10](#10-build-the-release-aab).
 
 You cannot publish until the account is **verified** and in good standing.
 
+> ⚠️ **NEW personal accounts must run a 20-tester closed test for 14 days before production.**
+> Google requires **personal / individual developer accounts created on or after
+> 13 Nov 2023** to run a **closed test with at least 20 testers who stay opted-in for
+> 14 continuous days**, and *then* apply for production access — before you can ship to
+> the public Production track. This is **not optional** for new accounts. **Start
+> recruiting your 20 testers now** and budget ~2+ weeks of lead time. See [§16](#16-promote-through-tracks).
+>
+> If your account existed before that date, you are exempt and can skip straight to Production.
+
 ---
 
 ## 3. Legal & policy assets
@@ -400,24 +409,34 @@ Store copies of:
 
 Use a password manager + offline backup. **Do not commit** to git (`.gitignore` already blocks `*.keystore`).
 
-### 7.3 Optional: Play App Signing
+### 7.3 Play App Signing (required for new apps)
 
-Google recommends **Play App Signing**:
+New apps uploading an **AAB** use **Play App Signing** — it is effectively mandatory:
 
-- You upload an AAB signed with an **upload key**.
-- Google re-signs with the **app signing key** for users.
+- You upload an AAB signed with your **upload key** (the keystore from §7.1).
+- Google re-signs with the **app signing key** it holds, and distributes that to users.
 
-You can let Google generate the app signing key on first upload, or opt in during setup. Still keep your upload keystore safe.
+Let Google **generate the app signing key on first upload** (simplest, recommended).
+Your `keystore.properties` keystore is then your **upload key** — still back it up, because
+losing it means you must reset the upload key with Google support before you can ship updates.
 
 ---
 
 ## 8. Wire signing into Gradle
 
-Currently `mobile/android/app/build.gradle` signs **release** with the **debug** keystore — fine for local testing, **not** for Play Store.
+> ✅ **The Gradle wiring is already done** in `mobile/android/app/build.gradle`. It
+> reads `android/keystore.properties` and signs **release** with your release key
+> when that file exists, falling back to the debug key for local builds when it
+> doesn't. You only need to create the keystore (§7) and the properties file (§8.1).
 
 ### 8.1 Create `mobile/android/keystore.properties`
 
-**Gitignore this file** (add to `.gitignore` if not already):
+A committed template exists at **`mobile/android/keystore.properties.example`**. Copy it and fill in real values:
+
+```bash
+cp mobile/android/keystore.properties.example mobile/android/keystore.properties
+# then edit mobile/android/keystore.properties
+```
 
 ```properties
 storeFile=/home/YOUR_USER/secrets/ke-jitbe/ke-jitbe-release.keystore
@@ -426,41 +445,36 @@ keyAlias=ke-jitbe
 keyPassword=YOUR_KEY_PASSWORD
 ```
 
-Use an **absolute path** to the keystore.
+Use an **absolute path** to the keystore. `keystore.properties` is **gitignored** — never commit it.
 
-### 8.2 Update `mobile/android/app/build.gradle`
+### 8.2 How the wiring works (already in `build.gradle`)
 
-At the top of the `android {` block area, **before** `android {`, add:
+For reference, the build file already contains:
 
 ```gradle
+// before android { }
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
-if (keystorePropertiesFile.exists()) {
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
-```
 
-Inside `signingConfigs {`, add:
-
-```gradle
-release {
-    if (keystorePropertiesFile.exists()) {
+// inside signingConfigs { }
+if (hasReleaseKeystore) {
+    release {
         storeFile file(keystoreProperties['storeFile'])
         storePassword keystoreProperties['storePassword']
         keyAlias keystoreProperties['keyAlias']
         keyPassword keystoreProperties['keyPassword']
     }
 }
+
+// inside buildTypes.release { }
+signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
 ```
 
-Change `buildTypes.release`:
-
-```gradle
-release {
-    signingConfig signingConfigs.release   // was signingConfigs.debug
-    // ... rest unchanged
-}
-```
+Nothing to edit here — just make sure `keystore.properties` exists before a Play build.
 
 ### 8.3 Verify signing
 
@@ -723,19 +737,44 @@ Verify the build from Play matches your local release tests ([§11](#11-test-the
 
 ## 16. Promote through tracks
 
-Recommended path:
+### 16.1 For NEW personal developer accounts (likely you)
+
+Accounts created **on/after 13 Nov 2023** must complete a **closed test** before Google
+unlocks the Production track:
 
 ```
-Internal testing  (you + team, minutes to hours)
+Internal testing   (you + team — instant, unlimited iterations)
        ↓
-Closed testing    (optional, invited users)
+Closed testing     (REQUIRED — ≥20 testers opted-in for 14 continuous days)
        ↓
-Open testing      (optional, public beta)
+Apply for production access   (button appears after the 14-day test)
        ↓
-Production        (public)
+Production         (public, after Google reviews your application)
 ```
 
-To promote: open the tested release → **Promote release** → choose target track.
+**What "20 testers for 14 days" means in practice:**
+
+1. **Testing → Closed testing → Create a track** (or use the default "Alpha").
+2. Add an **email list of at least 20 Gmail addresses** under **Testers**, and have
+   **each person actually opt in** via the test link **and keep the app installed**.
+3. The 14-day clock counts **continuous opted-in testers** — if you drop below 20, it
+   can reset. Recruit 25+ to have a buffer.
+4. After 14 days Google shows **"Apply for production access"** on the dashboard.
+   Fill in the questionnaire (who your testers are, what feedback you got).
+5. Only then can you create a **Production** release.
+
+> Start this **early** — it is the longest single wait in the whole process (longer
+> than Google's review). Real testers (friends, family, teammates) are fine.
+
+### 16.2 For older accounts (created before 13 Nov 2023)
+
+You are exempt and can promote straight from Internal testing to Production:
+
+```
+Internal testing → (optional Closed/Open testing) → Production
+```
+
+To promote any release: open the tested release → **Promote release** → choose target track.
 
 ---
 
@@ -780,7 +819,8 @@ Never decrease `versionCode`. Never lose the upload/release keystore.
 
 ### Build & signing
 
-- [ ] Release AAB signed with **release** keystore (not debug)
+- [ ] `mobile/android/keystore.properties` created from `.example` (release key wired — §8)
+- [ ] Release AAB signed with **release** keystore, not debug — confirm via `./gradlew signingReport`
 - [ ] `versionCode` and `versionName` correct
 - [ ] `mobile/.env` production values embedded (rebuilt after last change)
 - [ ] `google-services.json` present for release build
@@ -799,8 +839,10 @@ Never decrease `versionCode`. Never lose the upload/release keystore.
 - [ ] Privacy policy URL live
 - [ ] Content rating completed
 - [ ] Data safety form completed
-- [ ] App access test account for reviewers
+- [ ] App access test account for reviewers (works on **production** backend)
 - [ ] Internal testing passed on real device via Play opt-in link
+- [ ] **(New personal accounts)** Closed test with **≥20 testers for 14 days** done + **production access granted** (§16.1)
+- [ ] Privacy/Terms pages **deployed & publicly reachable** at `https://kejitbe.app/privacy` and `/terms`
 
 ### Security
 
