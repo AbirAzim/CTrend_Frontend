@@ -157,26 +157,25 @@ function GlobalNotificationSubscription() {
       const { title, body } = buildBellText(actorName, n.title, n.body);
       console.warn("[bell] received:", n.type, "actorAvatar?", !!raw.latestActorAvatar);
 
-      // In-app banner
       playNotification();
-      showToast({
-        id: n.id,
-        type: n.type,
-        title,
-        body,
-        referenceId: n.referenceId,
-        referenceType: n.referenceType,
-        postId,
-      });
 
-      // Android system notification with the actor's avatar (fetched if the
-      // subscription payload didn't include it).
+      // Resolve avatar once — used for in-app banner + Android status-bar notification.
       void resolveActorAvatar(
         client,
         raw.latestActorAvatar as string | null | undefined,
         actorId,
-      ).then((actorAvatar) =>
-        postBellNotification({
+      ).then((actorAvatar) => {
+        showToast({
+          id: n.id,
+          type: n.type,
+          title,
+          body,
+          referenceId: n.referenceId,
+          referenceType: n.referenceType,
+          postId,
+          actorAvatarUrl: actorAvatar,
+        });
+        void postBellNotification({
           title,
           body,
           actorAvatar,
@@ -185,8 +184,8 @@ function GlobalNotificationSubscription() {
           referenceId: n.referenceId ?? null,
           postId,
           commentId,
-        }),
-      );
+        });
+      });
 
       // Refresh bell badge count
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });

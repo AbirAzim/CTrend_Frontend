@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +32,7 @@ type StatusFilter = "all" | "PUBLISHED" | "SCHEDULED";
 type VotingFilter = "all" | "live" | "closed";
 type SortBy = "createdAt" | "updatedAt" | "votes" | "caption";
 type SortOrder = "asc" | "desc";
+type PostScope = "admin" | "user";
 
 type Person = {
   id: string;
@@ -163,6 +164,7 @@ export default function AdminPostsScreen() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortBy>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [scope, setScope] = useState<PostScope>("admin");
   const [skip, setSkip] = useState(0);
   const [filterSheet, setFilterSheet] = useState(false);
 
@@ -181,16 +183,22 @@ export default function AdminPostsScreen() {
     status: statusFilter === "all" ? undefined : statusFilter,
     categoryId: categoryFilter === "all" ? undefined : categoryFilter,
     votingFilter: votingFilter === "all" ? undefined : votingFilter,
+    scope,
     sortBy,
     sortOrder,
-  }), [debouncedSearch, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder]);
+  }), [debouncedSearch, statusFilter, categoryFilter, votingFilter, scope, sortBy, sortOrder]);
 
   const countFilter = useMemo(() => ({
     search: listFilter.search,
     status: listFilter.status,
     categoryId: listFilter.categoryId,
     votingFilter: listFilter.votingFilter,
+    scope: listFilter.scope,
   }), [listFilter]);
+
+  useEffect(() => {
+    setSkip(0);
+  }, [debouncedSearch, statusFilter, categoryFilter, votingFilter, scope, sortBy, sortOrder]);
 
   const { data, loading, refetch } = useQuery<ListData>(ADMIN_PLATFORM_POSTS, {
     variables: { query: listFilter, skip, take: PAGE },
@@ -252,16 +260,46 @@ export default function AdminPostsScreen() {
       {/* Header + toolbar */}
       <View style={[st.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={st.headerTop}>
-          <View>
-            <Text style={[st.sectionTitle, { color: colors.text }]}>Platform Posts</Text>
-            <Text style={[st.sectionSub, { color: colors.muted }]}>System-wide compare polls</Text>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={[st.sectionTitle, { color: colors.text }]}>Post management</Text>
+            <Text style={[st.sectionSub, { color: colors.muted }]}>
+              {scope === "admin"
+                ? "Admin platform-wide polls — search, filter, open, or edit."
+                : "User global broadcasts — search, filter, open, or remove."}
+            </Text>
           </View>
-          <Pressable
-            style={[st.newBtn, { backgroundColor: colors.accent }]}
-            onPress={() => router.push("/tabs/create?platform=1" as `/${string}`)}
-          >
-            <Text style={st.newBtnText}>+ New</Text>
-          </Pressable>
+          {scope === "admin" ? (
+            <Pressable
+              style={[st.newBtn, { backgroundColor: colors.accent }]}
+              onPress={() => router.push("/tabs/create?platform=1" as `/${string}`)}
+            >
+              <Text style={st.newBtnText}>+ New</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={[st.scopeRow, { borderColor: colors.border }]}>
+          {([
+            ["admin", "Admin posts"],
+            ["user", "User global"],
+          ] as const).map(([key, label]) => {
+            const active = scope === key;
+            return (
+              <Pressable
+                key={key}
+                style={[
+                  st.scopeTab,
+                  active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                  !active && { borderColor: colors.border },
+                ]}
+                onPress={() => setScope(key)}
+              >
+                <Text style={[st.scopeTabText, { color: active ? "#fff" : colors.subtext }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <View style={[st.searchWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
@@ -323,7 +361,11 @@ export default function AdminPostsScreen() {
           data={posts}
           keyExtractor={(p) => p.id}
           contentContainerStyle={st.list}
-          ListEmptyComponent={<Text style={[st.empty, { color: colors.muted }]}>No platform posts found</Text>}
+          ListEmptyComponent={
+            <Text style={[st.empty, { color: colors.muted }]}>
+              {scope === "admin" ? "No admin platform posts found" : "No user global posts found"}
+            </Text>
+          }
           ListFooterComponent={
             <View>
               {total > 0 && (
@@ -544,6 +586,9 @@ const st = StyleSheet.create({
     headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
     sectionTitle: { fontSize: 18, fontWeight: "800" },
     sectionSub: { fontSize: 12, marginTop: 1 },
+    scopeRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+    scopeTab: { flex: 1, borderRadius: 999, borderWidth: 1, paddingVertical: 8, alignItems: "center" },
+    scopeTabText: { fontSize: 12, fontWeight: "700" },
     newBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
     newBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 

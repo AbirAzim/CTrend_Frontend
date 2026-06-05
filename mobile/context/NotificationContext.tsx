@@ -8,6 +8,8 @@ export type NotifToast = {
   referenceId: string | null;
   referenceType: string | null;
   postId: string | null;
+  /** Actor profile image — omit for system/brand notifications. */
+  actorAvatarUrl?: string | null;
 };
 
 type NotifCtx = {

@@ -1,13 +1,22 @@
 import { router } from "expo-router";
+import { Image } from "expo-image";
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNotification, type NotifToast } from "../context/NotificationContext";
 import { useTheme } from "../context/ThemeContext";
+import logoAsset from "../assets/logo.png";
 
 const POST_NOTIF_TYPES = new Set([
   "POST_HYPE", "POST_COMMENT", "NEW_POST_FRIEND",
   "COMMENT_REPLY", "COMMENT_REACTION", "NEW_COMMENT",
+  "USER_GLOBAL_POST", "ANNOUNCEMENT",
+  "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
+]);
+
+const BRAND_NOTIF_TYPES = new Set([
+  "ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM",
+  "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
 ]);
 
 function notifIcon(type: string): string {
@@ -19,6 +28,7 @@ function notifIcon(type: string): string {
     case "COMMENT_REACTION": return "😊";
     case "POST_HYPE": return "❤️";
     case "NEW_POST_FRIEND": return "✨";
+    case "USER_GLOBAL_POST": return "🌍";
     case "POST_VOTE": return "🗳";
     case "FRIEND_REQUEST": return "👋";
     case "FRIEND_REQUEST_ACCEPTED": return "🤝";
@@ -43,6 +53,32 @@ function handleToastTap(toast: NotifToast) {
     return;
   }
   router.push("/notifications" as `/${string}`);
+}
+
+function ToastAvatar({ toast }: { toast: NotifToast }) {
+  const useBrand = !toast.actorAvatarUrl && BRAND_NOTIF_TYPES.has(toast.type);
+
+  if (toast.actorAvatarUrl) {
+    return (
+      <Image
+        source={{ uri: toast.actorAvatarUrl }}
+        style={st.avatarImg}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+    );
+  }
+  if (useBrand) {
+    return (
+      <Image
+        source={logoAsset}
+        style={st.avatarImg}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+    );
+  }
+  return <Text style={st.iconText}>{notifIcon(toast.type)}</Text>;
 }
 
 export function InAppNotificationBanner() {
@@ -106,7 +142,7 @@ export function InAppNotificationBanner() {
         onPress={() => { dismissToast(); if (toast) handleToastTap(toast); }}
       >
         <View style={[st.iconCircle, { backgroundColor: colors.section }]}>
-          <Text style={st.iconText}>{toast ? notifIcon(toast.type) : ""}</Text>
+          {toast ? <ToastAvatar toast={toast} /> : null}
         </View>
         <View style={st.textWrap}>
           <Text style={[st.title, { color: colors.text }]} numberOfLines={1}>
@@ -152,7 +188,9 @@ const st = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    overflow: "hidden",
   },
+  avatarImg: { width: 40, height: 40, borderRadius: 20 },
   iconText: { fontSize: 18 },
   textWrap: { flex: 1 },
   title: { fontSize: 14, fontWeight: "700", marginBottom: 2 },
