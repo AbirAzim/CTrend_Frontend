@@ -124,10 +124,11 @@ export function PrivacyPolicyPage() {
 
           <h2>5. Data retention</h2>
           <p>
-            We keep your account and content for as long as your account is active. If you
-            delete your account (when that option is available) or request deletion, we will
-            remove or anonymise personal data within a reasonable period, except where we must
-            retain certain records for legal, security, or backup purposes.
+            We keep your account and content for as long as your account is active. You may
+            request account and data deletion at any time by emailing{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. We will remove or
+            anonymise personal data within a reasonable period, except where we must retain
+            certain records for legal, security, or backup purposes.
           </p>
 
           <h2>6. Your choices and rights</h2>
