@@ -1001,18 +1001,18 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 34 — Connections: Separate Received / Sent Tabs — NOT STARTED
+### ✅ PHASE 34 — Connections: Separate Received / Sent Tabs — COMPLETE 2026-06-05 (device-tested)
 
 **Source docs:** `2026-06-05_connections-received-sent-separate-tabs.md`
 
 **Goal:** Replace the single "Requests" tab (with INCOMING/SENT sections) with **four** top-level tabs: **Friends · Received · Sent · Suggestions**. Each tab is its own list with its own count badge + empty state.
 
-- [ ] **No GraphQL change** — uses existing `FRIEND_REQUESTS` (`requestedMe` = Received, `requestedByMe` = Sent), `MY_FRIENDS`, `FRIEND_SUGGESTIONS`.
-- [ ] **Friends screen** (`mobile/app/friends/index.tsx`) — replace the 3-tab (Suggestions/Requests/Friends) layout with a scrollable 4-tab bar: **My Friends · Received · Sent · Suggestions**. Remove the in-tab INCOMING/SENT section split.
-- [ ] **Received tab** — `requestedMe` rows, Accept / Reject actions, count badge (alert-styled when > 0).
-- [ ] **Sent tab** — `requestedByMe` rows, Cancel action, "Pending" badge.
-- [ ] **Profile Connections** — apply the same 4-tab model wherever the profile screen shows connections (mirror, with per-tab pagination if present).
-- [ ] **Search/clear** — search resets on tab switch (existing behaviour preserved per tab).
+- [x] **No GraphQL change** — uses existing `FRIEND_REQUESTS` (`requestedMe` = Received, `requestedByMe` = Sent), `MY_FRIENDS`, `FRIEND_SUGGESTIONS`.
+- [x] **Friends screen** (`mobile/app/friends/index.tsx`) — replace the 3-tab (Suggestions/Requests/Friends) layout with a scrollable 4-tab bar: **My Friends · Received · Sent · Suggestions**. Remove the in-tab INCOMING/SENT section split.
+- [x] **Received tab** — `requestedMe` rows, Accept / Reject actions, count badge (alert-styled when > 0).
+- [x] **Sent tab** — `requestedByMe` rows, Cancel action, "Pending" badge.
+- [x] **Profile Connections** — apply the same 4-tab model wherever the profile screen shows connections (mirror, with per-tab pagination if present).
+- [x] **Search/clear** — search resets on tab switch (existing behaviour preserved per tab).
 
 **APIs:** `FRIEND_REQUESTS`, `MY_FRIENDS`, `FRIEND_SUGGESTIONS`, `ADD_FRIEND`, `RESPOND_FRIEND_REQUEST`, `CANCEL_FRIEND_REQUEST`, `UNFRIEND` (existing).
 
@@ -1056,20 +1056,21 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 36 — User Global Platform Posts (admin toggle + broadcast) — NOT STARTED
+### ⏳ PHASE 36 — User Global Platform Posts (admin toggle + broadcast) — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-05_user-global-platform-posts.md`
 
 **Goal:** Admin can allow normal users to post **globally** (visible + notified to everyone). When ON, a user opts in per post; their **name + avatar** (not the Ke Jitbe brand) appear on the feed and in notifications. Clearly distinct from admin `SYSTEM` platform posts.
 
-- [ ] **Shared GraphQL** —
+- [x] **Shared GraphQL** —
   - `admin.ts`: add `PLATFORM_SETTINGS` query (`platformSettings { allowUserGlobalPosts }`) + `SET_ALLOW_USER_GLOBAL_POSTS($enabled)` mutation.
   - `feed.ts`: add `isUserGlobalBroadcast` + `authorProfileImageUrl` to feed/detail/saved post selections; `broadcastGlobally` flows through the generic `CREATE_POST` input.
-- [ ] **types/map** — add `isUserGlobalBroadcast` to `FeedPostView`; map it + `authorProfileImageUrl` in `mapGqlPostToFeedView.ts`.
-- [ ] **Admin screen** (`mobile/app/admin/admin-management.tsx` or appropriate) — prominent toggle card "Allow global user posts" (default OFF) bound to `platformSettings` + `setAllowUserGlobalPosts`; a Details/explainer block.
-- [ ] **Create screen** (`mobile/app/tabs/create.tsx`) — query `platformSettings.allowUserGlobalPosts`; when ON **and** user is not admin, show a **"🌍 Post globally"** toggle → sends `broadcastGlobally: true`. (Admins still use the existing platform-wide `CREATE_SYSTEM_POST` path; `broadcastGlobally` is rejected for admins.)
-- [ ] **FeedPostCard** — green **Global** badge + accent border for `isUserGlobalBroadcast` posts, showing the **real user** header (name + avatar) — distinct from the existing **Platform** (Ke Jitbe) badge/branding.
-- [ ] **Notifications screen** — handle `USER_GLOBAL_POST` (🌍 icon, title "🌍 {name}"): show the **poster's avatar** (not the brand logo), deep-link to the post. Add `USER_GLOBAL_POST` to `POST_NOTIF_TYPES`.
+- [x] **types/map** — add `isUserGlobalBroadcast` to `FeedPostView`; map it + `authorProfileImageUrl` in `mapGqlPostToFeedView.ts`.
+- [x] **Admin screen** (`mobile/app/admin/index.tsx`) — prominent toggle card "Allow global user posts" (default OFF) bound to `platformSettings` + `setAllowUserGlobalPosts`; a Details/explainer block.
+- [x] **Create screen** (`mobile/app/tabs/create.tsx`) — query `platformSettings.allowUserGlobalPosts`; when ON **and** user is not admin, show a **"🌍 Post globally"** toggle → sends `broadcastGlobally: true`. (Admins still use the existing platform-wide `CREATE_SYSTEM_POST` path; `broadcastGlobally` is rejected for admins.)
+- [x] **FeedPostCard** — green **Global** badge + accent border for `isUserGlobalBroadcast` posts, showing the **real user** header (name + avatar) — distinct from the existing **Platform** (Ke Jitbe) badge/branding.
+- [x] **Notifications screen** — handle `USER_GLOBAL_POST` (🌍 icon, title "🌍 {name}"): show the **poster's avatar** (not the brand logo), deep-link to the post. Add `USER_GLOBAL_POST` to `POST_NOTIF_TYPES`.
+- [x] **In-app banner + status bar** — `InAppNotificationBanner` + `postBellNotification` show actor avatar (or brand logo for system types); avatar fetched when WS sub omits it.
 
 **APIs:** `platformSettings`, `setAllowUserGlobalPosts`, `CREATE_POST(broadcastGlobally)`, feed `isUserGlobalBroadcast`/`authorProfileImageUrl`, `MY_NOTIFICATIONS` (`USER_GLOBAL_POST`) — backend deployed.
 
@@ -1083,16 +1084,16 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 37 — Admin Post Management Scope Tabs (Admin / User) — NOT STARTED
+### ⏳ PHASE 37 — Admin Post Management Scope Tabs (Admin / User) — IMPLEMENTED, awaiting device test
 
 **Source docs:** `2026-06-05_admin-post-management-scope-tabs.md`
 
 **Goal:** Split the admin Posts management screen into **Admin Post Management** (`SYSTEM`) and **User Post Management** (`USER` + `isUserGlobalBroadcast`) via a `scope` filter. Depends on Phase 36's user-global posts existing.
 
-- [ ] **Shared GraphQL** (`admin.ts`) — add a nullable `scope: String` (`"admin"` default | `"user"`) to the `ADMIN_PLATFORM_POSTS` / `ADMIN_PLATFORM_POSTS_COUNT` filter/query input objects. No document change beyond adding the field to the passed `$query`/`$filter` object.
-- [ ] **Admin posts screen** (`mobile/app/admin/posts.tsx`) — add a segmented **Admin / User** sub-tab control at the top; **Admin** is default. Switching tabs sets `scope` and resets to page 1.
-- [ ] **Scoped data** — `scope: "user"` → lists user global broadcasts (real author shown via the existing `PersonLink`); `scope: "admin"` → SYSTEM posts (brand) as before. All existing search/status/voting/category/sort filters + edit/delete/open actions work on both.
-- [ ] **CTA gating** — the **"+ New platform post"** CTA shows **only** on the Admin tab (creates a SYSTEM post); User tab is review/remove only.
+- [x] **Shared GraphQL** (`admin.ts`) — add a nullable `scope: String` (`"admin"` default | `"user"`) to the `ADMIN_PLATFORM_POSTS` / `ADMIN_PLATFORM_POSTS_COUNT` filter/query input objects. No document change beyond adding the field to the passed `$query`/`$filter` object.
+- [x] **Admin posts screen** (`mobile/app/admin/posts.tsx`) — add a segmented **Admin / User** sub-tab control at the top; **Admin** is default. Switching tabs sets `scope` and resets to page 1.
+- [x] **Scoped data** — `scope: "user"` → lists user global broadcasts (real author shown via the existing `PersonLink`); `scope: "admin"` → SYSTEM posts (brand) as before. All existing search/status/voting/category/sort filters + edit/delete/open actions work on both.
+- [x] **CTA gating** — the **"+ New platform post"** CTA shows **only** on the Admin tab (creates a SYSTEM post); User tab is review/remove only.
 
 **APIs:** `ADMIN_PLATFORM_POSTS(scope)`, `ADMIN_PLATFORM_POSTS_COUNT(scope)`, `DELETE_POST` — backend deployed.
 
@@ -1124,10 +1125,10 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 | File | Needs |
 |---|---|
-| messages.ts | `replyTo {…}` on `GET_MESSAGES`/`SEND_MESSAGE`/`MESSAGE_RECEIVED` + `$replyToId` arg on `SEND_MESSAGE` (Phase 31) |
-| feed.ts | `isUserGlobalBroadcast` + `authorProfileImageUrl` on feed/detail/saved + `broadcastGlobally` via create input (Phase 36) |
-| admin.ts | `PLATFORM_SETTINGS` + `SET_ALLOW_USER_GLOBAL_POSTS` (Phase 36); `scope` on `ADMIN_PLATFORM_POSTS`/`_COUNT` filter (Phase 37) |
-| notifications.ts | handle `USER_GLOBAL_POST` type (Phase 36) |
+| messages.ts | ✅ `replyTo {…}` on `GET_MESSAGES`/`SEND_MESSAGE`/`MESSAGE_RECEIVED` + `$replyToId` (Phase 31) |
+| feed.ts | ✅ `isUserGlobalBroadcast` + `authorProfileImageUrl` on feed/detail/saved + `broadcastGlobally` via create input (Phase 36) |
+| admin.ts | ✅ `PLATFORM_SETTINGS` + `SET_ALLOW_USER_GLOBAL_POSTS` (Phase 36); `scope` on admin posts filter (Phase 37) |
+| notifications.ts | ✅ `USER_GLOBAL_POST` handled in mobile UI (Phase 36) |
 | friends.ts | verify `CANCEL_FRIEND_REQUEST` present before Phase 34/35 (add if missing) |
 
 ---
