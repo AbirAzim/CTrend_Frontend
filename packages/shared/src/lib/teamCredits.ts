@@ -24,7 +24,7 @@ export const KEJITBE_DEVELOPERS: TeamMember[] = [
   },
   {
     id: "anjan",
-    name: "Anjan Kundu",
+    name: "Anjon Kundu",
     email: "anjonkundu509@gmail.com",
   },
   {
