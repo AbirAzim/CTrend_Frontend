@@ -108,6 +108,35 @@ function compareOptionLabel(post: FeedPostView, index: number): string {
   return `Side ${index + 1}`;
 }
 
+// Per-count compare grid recipes — images per row, top → bottom. Cells are all
+// the same square size (sized to the widest row), short rows are centered, and
+// nothing ever scrolls. Mirrors the mobile FeedPostCard layout.
+const COMPARE_ROW_RECIPES: Record<number, number[]> = {
+  2: [2],
+  3: [3],
+  4: [2, 2],
+  5: [3, 2],
+  6: [3, 3],
+  7: [4, 3],
+  8: [3, 3, 2],
+  9: [3, 3, 3],
+  10: [3, 4, 3],
+};
+
+// Rows for n compare images. 2–10 use the hand-tuned recipes; 11+ fall back to
+// rows of 4 (last row centered) so cells stay equal-sized.
+function getCompareRows(n: number): number[] {
+  if (COMPARE_ROW_RECIPES[n]) return COMPARE_ROW_RECIPES[n];
+  const rows: number[] = [];
+  let rem = n;
+  while (rem > 0) {
+    const take = Math.min(4, rem);
+    rows.push(take);
+    rem -= take;
+  }
+  return rows;
+}
+
 function pctParts(counts: number[]): number[] {
   const total = counts.reduce((a, b) => a + b, 0);
   if (total <= 0) {
@@ -660,6 +689,26 @@ function FeedPostCardComponent({
 
   const isBinaryCompare = compareUrls?.length === 2;
   const isMultiCompare = Boolean(compareUrls && compareUrls.length > 2);
+
+  // Multi-compare layout — fixed per-count rows (see getCompareRows), all cells
+  // the same square size (sized to the widest row), short rows centered, no
+  // scrolling. Cell width is a CSS calc so it stays responsive to card width.
+  const compareRows = useMemo(
+    () => getCompareRows(compareUrls?.length ?? 0),
+    [compareUrls],
+  );
+  const compareMaxCols = compareRows.length ? Math.max(...compareRows) : 1;
+  const compareRowsWithStart = useMemo(() => {
+    let start = 0;
+    return compareRows.map((size) => {
+      const row = { size, start };
+      start += size;
+      return row;
+    });
+  }, [compareRows]);
+  const multiCellWidthCss = `calc((100% - ${
+    (compareMaxCols - 1) * 2
+  }px) / ${compareMaxCols})`;
 
   const [multiCounts, setMultiCounts] = useState<number[]>(() => {
     const urls = post.imageUrls;
@@ -1511,13 +1560,7 @@ function FeedPostCardComponent({
         <>
           <div
             className={`ig-post-media-wrap ig-post-media-wrap--compare${
-              compareUrls.length === 3
-                ? " ig-post-media-wrap--compare-grid ig-post-media-wrap--compare-grid--3"
-                : compareUrls.length === 4
-                  ? " ig-post-media-wrap--compare-grid ig-post-media-wrap--compare-grid--4"
-                  : compareUrls.length >= 5
-                    ? " ig-post-media-wrap--compare-grid ig-post-media-wrap--compare-grid--many"
-                    : ""
+              isMultiCompare ? " ig-post-media-wrap--compare-rows" : ""
             }${isVotingClosed ? " ig-post-media-wrap--voting-closed" : ""}`}
           >
             {isVotingClosed && (
@@ -1556,8 +1599,8 @@ function FeedPostCardComponent({
                 )}
               </span>
             )}
-            {compareUrls.map((url, i) => {
-              if (isBinaryCompare) {
+            {isBinaryCompare &&
+              compareUrls.map((url, i) => {
                 const side = i as 0 | 1;
                 const pct = side === 0 ? leftPct : rightPct;
                 const picked =
@@ -1623,67 +1666,78 @@ function FeedPostCardComponent({
                     </span>
                   </button>
                 );
-              }
-
-              const pct = multiPercents[i] ?? 0;
-              const picked = multiPickDisplayed === i;
-              const colTitle = compareOptionLabel(post, i);
-              const isWinnerCell = isMultiWinnerIndex(i);
-              return (
-                <button
-                  key={`${post.id}-cmp-${i}`}
-                  type="button"
-                  className={`ig-compare-cell ig-compare-cell--multi ig-compare-cell--multi-${i % 10}${picked ? " ig-compare-cell--picked" : ""}${hasVoted && !picked && !isVotingClosed ? " ig-compare-cell--unchosen" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}${justVotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-voted" : ""}${justUnvotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-unvoted" : ""}`}
-                  disabled={voteControlsDisabled}
-                  aria-pressed={picked}
-                  aria-label={
-                    picked
-                      ? `Your choice: ${colTitle} — tap to change`
-                      : `Vote for ${colTitle}`
-                  }
-                  onClick={() => void handleMultiCompareTap(i)}
+              })}
+            {isMultiCompare &&
+              compareRowsWithStart.map(({ size, start }, rowIdx) => (
+                <div
+                  className="ig-compare-row"
+                  key={`${post.id}-crow-${rowIdx}`}
                 >
-                  <img
-                    src={url}
-                    alt=""
-                    width={1080}
-                    height={1080}
-                    loading="lazy"
-                    decoding="async"
-                    style={compareImageStyle(post, i)}
-                  />
-                  {picked && !isVotingClosed && (
-                    <span className="cx-voted-pin" aria-label="Your choice">
-                      <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
-                        <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
-                      </svg>
-                    </span>
-                  )}
-                  {justVotedIndex === i && !isVotingClosed && (
-                    <span className="cx-vote-flash" aria-hidden />
-                  )}
-                  {isVotingClosed && isWinnerCell && (
-                    <span className="cx-winner-crown-badge" aria-hidden>
-                      <span className="cx-winner-crown-icon">👑</span>
-                      <span>WINNER</span>
-                    </span>
-                  )}
-                  {isVotingClosed && !isWinnerCell && (
-                    <span className="cx-loser-scrim" aria-hidden />
-                  )}
-                  <span className={`ig-compare-pct${isVotingClosed && isWinnerCell ? " ig-compare-pct--winner" : ""}${isVotingClosed && !isWinnerCell ? " ig-compare-pct--loser" : ""}`}>
-                    <span className="ig-compare-pct-main">{`${pct}%`}</span>
-                    <span className="ig-compare-pct-sub">{colTitle}</span>
-                    <span className="ig-compare-meter" aria-hidden>
-                      <span
-                        className="ig-compare-meter-fill"
-                        style={{ width: `${clampPercent(pct)}%` }}
-                      />
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+                  {Array.from({ length: size }, (_, col) => {
+                    const i = start + col;
+                    const url = compareUrls[i];
+                    const pct = multiPercents[i] ?? 0;
+                    const picked = multiPickDisplayed === i;
+                    const colTitle = compareOptionLabel(post, i);
+                    const isWinnerCell = isMultiWinnerIndex(i);
+                    return (
+                      <button
+                        key={`${post.id}-cmp-${i}`}
+                        type="button"
+                        className={`ig-compare-cell ig-compare-cell--multi ig-compare-cell--multi-${i % 10}${picked ? " ig-compare-cell--picked" : ""}${hasVoted && !picked && !isVotingClosed ? " ig-compare-cell--unchosen" : ""}${isVotingClosed ? " ig-compare-cell--closed" : ""}${isWinnerCell ? " ig-compare-cell--winner" : ""}${!isVotingClosed && !hasVoted ? " ig-compare-cell--unvoted" : ""}${justVotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-voted" : ""}${justUnvotedIndex === i && !isVotingClosed ? " ig-compare-cell--just-unvoted" : ""}`}
+                        style={{ width: multiCellWidthCss, flex: "0 0 auto" }}
+                        disabled={voteControlsDisabled}
+                        aria-pressed={picked}
+                        aria-label={
+                          picked
+                            ? `Your choice: ${colTitle} — tap to change`
+                            : `Vote for ${colTitle}`
+                        }
+                        onClick={() => void handleMultiCompareTap(i)}
+                      >
+                        <img
+                          src={url}
+                          alt=""
+                          width={1080}
+                          height={1080}
+                          loading="lazy"
+                          decoding="async"
+                          style={compareImageStyle(post, i)}
+                        />
+                        {picked && !isVotingClosed && (
+                          <span className="cx-voted-pin" aria-label="Your choice">
+                            <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
+                              <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
+                            </svg>
+                          </span>
+                        )}
+                        {justVotedIndex === i && !isVotingClosed && (
+                          <span className="cx-vote-flash" aria-hidden />
+                        )}
+                        {isVotingClosed && isWinnerCell && (
+                          <span className="cx-winner-crown-badge" aria-hidden>
+                            <span className="cx-winner-crown-icon">👑</span>
+                            <span>WINNER</span>
+                          </span>
+                        )}
+                        {isVotingClosed && !isWinnerCell && (
+                          <span className="cx-loser-scrim" aria-hidden />
+                        )}
+                        <span className={`ig-compare-pct${isVotingClosed && isWinnerCell ? " ig-compare-pct--winner" : ""}${isVotingClosed && !isWinnerCell ? " ig-compare-pct--loser" : ""}`}>
+                          <span className="ig-compare-pct-main">{`${pct}%`}</span>
+                          <span className="ig-compare-pct-sub">{colTitle}</span>
+                          <span className="ig-compare-meter" aria-hidden>
+                            <span
+                              className="ig-compare-meter-fill"
+                              style={{ width: `${clampPercent(pct)}%` }}
+                            />
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
           </div>
           {/* Tap-to-vote hint — visible before any vote is cast, hidden once voted or closed */}
           {!isVotingClosed && (
