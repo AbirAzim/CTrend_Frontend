@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
 const APP_NAME = "Ke Jitbe";
-const OPERATOR_NAME = "CTrend";
+const COMPANY_NAME = "CTrend";
+const DEVELOPER_NAME = "Abir Azim Badhon";
 const OPERATOR_COUNTRY = "Bangladesh";
 const APP_DOMAIN = "kejitbe.app";
 const EFFECTIVE_DATE = "June 5, 2026";
@@ -25,7 +26,7 @@ export function TermsOfServicePage() {
         <div className="legal-body">
           <p>
             These Terms of Service (“Terms”) govern your access to and use of{" "}
-            <strong>{APP_NAME}</strong>, operated by <strong>{OPERATOR_NAME}</strong> (“we”,
+            <strong>{APP_NAME}</strong>, operated by <strong>{COMPANY_NAME}</strong> (“we”,
             “us”, “our”), including our website at {APP_DOMAIN} and our mobile applications
             (together, the “Service”). Ke Jitbe is offered to users <strong>worldwide</strong>,
             subject to these Terms, our <Link to="/privacy">Privacy Policy</Link>, and applicable
@@ -95,7 +96,7 @@ export function TermsOfServicePage() {
               not claim ownership of your content.
             </li>
             <li>
-              <strong>License to us:</strong> By posting content, you grant {OPERATOR_NAME} a
+              <strong>License to us:</strong> By posting content, you grant {COMPANY_NAME} a
               non-exclusive, worldwide, royalty-free license to host, store, reproduce, display,
               and distribute your content solely to operate, promote, and improve the Service
               (for example, showing your post in the feed or to your friends).
@@ -192,7 +193,7 @@ export function TermsOfServicePage() {
 
           <h2>13. Limitation of liability</h2>
           <p>
-            To the fullest extent permitted by law, {OPERATOR_NAME} and its operators will not
+            To the fullest extent permitted by law, {COMPANY_NAME} and its operators will not
             be liable for any indirect, incidental, special, consequential, or punitive damages,
             or any loss of profits, data, or goodwill, arising from your use of the Service or
             user content posted by others. Our total liability for any claim relating to the
@@ -203,15 +204,15 @@ export function TermsOfServicePage() {
 
           <h2>14. Indemnity</h2>
           <p>
-            You agree to indemnify and hold harmless {OPERATOR_NAME} from claims, damages, and
+            You agree to indemnify and hold harmless {COMPANY_NAME} from claims, damages, and
             expenses (including reasonable legal fees) arising from your use of the Service, your
             user content, or your violation of these Terms or any third party’s rights.
           </p>
 
           <h2>15. Worldwide service, local laws, and disputes</h2>
           <p>
-            {OPERATOR_NAME} is based in <strong>{OPERATOR_COUNTRY}</strong>, but the Service is
-            intended for users around the world. These Terms are governed by the laws of{" "}
+            {COMPANY_NAME} ({DEVELOPER_NAME}, {OPERATOR_COUNTRY}) operates the Service
+            worldwide. These Terms are governed by the laws of{" "}
             <strong>{OPERATOR_COUNTRY}</strong>, without regard to conflict-of-law principles,
             except where mandatory consumer or data-protection laws in your country give you
             rights that cannot be waived by contract.
@@ -244,6 +245,8 @@ export function TermsOfServicePage() {
           <Link to="/">Back to {APP_NAME}</Link>
           {" · "}
           <Link to="/privacy">Privacy Policy</Link>
+          {" · "}
+          <Link to="/credits">Credits &amp; team</Link>
           {" · "}
           <Link to="/login">Log in</Link>
           {" · "}

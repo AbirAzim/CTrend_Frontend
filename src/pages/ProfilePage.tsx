@@ -1197,7 +1197,16 @@ export function ProfilePage() {
         </section>
       ) : null}
 
-      <p className="muted small cx-profile-email">{user.email}</p>
+      <div className="cx-profile-footer-links">
+        <NavLink to="/credits" className="cx-profile-quick-link">
+          <span className="cx-profile-quick-link-icon" aria-hidden>👥</span>
+          <span className="cx-profile-quick-link-text">
+            <strong>Credits &amp; legal</strong>
+            <span className="muted small">Team, privacy &amp; terms</span>
+          </span>
+          <span className="cx-profile-quick-link-arrow" aria-hidden>→</span>
+        </NavLink>
+      </div>
 
       {showInviteModal && (
         <BulkInviteModal

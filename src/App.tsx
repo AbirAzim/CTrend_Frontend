@@ -21,6 +21,7 @@ import { SoundPreferencesPage } from "./pages/SoundPreferencesPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/TermsOfServicePage";
+import { CreditsPage } from "./pages/CreditsPage";
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
       <Route path="/reject-promotion" element={<RejectPromotionPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
+      <Route path="/credits" element={<CreditsPage />} />
       <Route element={<AppShell />}>
         <Route index element={<FeedPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />

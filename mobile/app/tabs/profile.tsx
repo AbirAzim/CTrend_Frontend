@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -19,6 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ME, MY_VOTED_POSTS, USER_POSTS } from "@ctrend/shared/graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "@ctrend/shared/graphql/auth";
+import { LEGAL_PAGE_URLS } from "@ctrend/shared/lib/teamCredits";
 import {
   MY_FRIENDS,
   FRIEND_REQUESTS,
@@ -353,13 +355,13 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* ── Sound preferences link ── */}
+          {/* ── Sounds ── */}
           <View style={[st.editRow, { marginTop: -8 }]}>
             <Pressable
-              style={[st.editBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[st.editBtn, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}
               onPress={() => router.push("/profile/sounds" as `/${string}`)}
             >
-              <Text style={[st.editBtnText, { color: colors.subtext }]}>🔊  Sound preferences</Text>
+              <Text style={[st.editBtnText, { color: colors.subtext }]}>🔊  Sounds</Text>
             </Pressable>
           </View>
 
@@ -682,6 +684,41 @@ export default function ProfileScreen() {
               ))
             )}
           </ScrollView>
+
+          {/* ── Footer: legal ── */}
+          <View style={st.profileFooter}>
+            <View style={[st.footerDivider, { backgroundColor: colors.border }]} />
+            <Text style={[st.footerLabel, { color: colors.muted }]}>LEGAL</Text>
+
+            <View style={[st.footerLegalBlock, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Pressable style={st.footerLegalRow} onPress={() => void Linking.openURL(LEGAL_PAGE_URLS.privacy)}>
+                <View style={st.footerRowText}>
+                  <Text style={[st.footerRowTitle, { color: colors.text }]}>Privacy Policy</Text>
+                  <Text style={[st.footerRowHint, { color: colors.muted }]}>How we handle your data</Text>
+                </View>
+                <Text style={[st.footerRowArrow, { color: colors.accent }]}>↗</Text>
+              </Pressable>
+              <View style={[st.footerLegalDivider, { backgroundColor: colors.border }]} />
+              <Pressable style={st.footerLegalRow} onPress={() => void Linking.openURL(LEGAL_PAGE_URLS.terms)}>
+                <View style={st.footerRowText}>
+                  <Text style={[st.footerRowTitle, { color: colors.text }]}>Terms of Service</Text>
+                  <Text style={[st.footerRowHint, { color: colors.muted }]}>Rules for using the app</Text>
+                </View>
+                <Text style={[st.footerRowArrow, { color: colors.accent }]}>↗</Text>
+              </Pressable>
+              <View style={[st.footerLegalDivider, { backgroundColor: colors.border }]} />
+              <Pressable
+                style={st.footerLegalRow}
+                onPress={() => router.push("/profile/credits" as `/${string}`)}
+              >
+                <View style={st.footerRowText}>
+                  <Text style={[st.footerRowTitle, { color: colors.text }]}>Credits & legal</Text>
+                  <Text style={[st.footerRowHint, { color: colors.muted }]}>Team, privacy & terms</Text>
+                </View>
+                <Text style={[st.footerRowArrow, { color: colors.accent }]}>→</Text>
+              </Pressable>
+            </View>
+          </View>
         </>
       )}
     </ScrollView>
@@ -801,4 +838,23 @@ const st = StyleSheet.create({
   addBtn: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6 },
   addBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
   pendingBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+
+  // Profile footer (settings & legal)
+  profileFooter: { marginTop: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  footerDivider: { height: StyleSheet.hairlineWidth, marginBottom: 18, opacity: 0.75 },
+  footerLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.6, marginBottom: 12 },
+  footerLegalBlock: { borderWidth: 1, borderRadius: 14, overflow: "hidden", marginBottom: 4 },
+  footerLegalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 10,
+  },
+  footerLegalDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
+  footerRowText: { flex: 1, gap: 2 },
+  footerRowTitle: { fontSize: 14, fontWeight: "700" },
+  footerRowHint: { fontSize: 11, lineHeight: 15 },
+  footerRowArrow: { fontSize: 16, fontWeight: "700" },
 });

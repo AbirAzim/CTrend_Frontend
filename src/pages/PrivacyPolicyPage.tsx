@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
 const APP_NAME = "Ke Jitbe";
-const OPERATOR_NAME = "CTrend";
+const COMPANY_NAME = "CTrend";
+const DEVELOPER_NAME = "Abir Azim Badhon";
 const OPERATOR_COUNTRY = "Bangladesh";
 const APP_DOMAIN = "kejitbe.app";
 const EFFECTIVE_DATE = "June 5, 2026";
@@ -25,7 +26,7 @@ export function PrivacyPolicyPage() {
         <div className="legal-body">
           <p>
             This Privacy Policy describes how <strong>{APP_NAME}</strong>, operated by{" "}
-            <strong>{OPERATOR_NAME}</strong> (“we”, “us”, “our”), collects, uses, and shares
+            <strong>{COMPANY_NAME}</strong> (“we”, “us”, “our”), collects, uses, and shares
             information when you use our website and mobile applications (together, the
             “Service”). Ke Jitbe is available to users <strong>worldwide</strong>. By creating
             an account or using the Service, you agree to this policy and our{" "}
@@ -34,11 +35,13 @@ export function PrivacyPolicyPage() {
 
           <h2>1. Who we are</h2>
           <p>
-            <strong>{OPERATOR_NAME}</strong>, based in <strong>{OPERATOR_COUNTRY}</strong>,
-            operates <strong>{APP_NAME}</strong> ({APP_DOMAIN}) — a global social comparison
-            platform where users post side-by-side image comparisons, vote on options, follow
-            friends, send messages, and receive notifications. This policy applies to all users of
-            the Service, regardless of where you live.
+            <strong>{COMPANY_NAME}</strong> ({DEVELOPER_NAME}, based in{" "}
+            <strong>{OPERATOR_COUNTRY}</strong>) operates <strong>{APP_NAME}</strong> (
+            {APP_DOMAIN}) — a global social comparison platform where users post side-by-side
+            image comparisons, vote on options, follow friends, send messages, and receive
+            notifications. This policy applies to all users of the Service, regardless of where
+            you live. See our <Link to="/credits">Credits &amp; team</Link> page for developer and
+            producer contacts.
           </p>
 
           <h2>2. Information we collect</h2>
@@ -144,7 +147,8 @@ export function PrivacyPolicyPage() {
             </li>
             <li>
               <strong>Report content:</strong> signed-in users can report posts they believe
-              violate our rules via the post menu. Reports are reviewed by CTrend moderators.
+              violate our rules via the post menu. Reports are reviewed by {COMPANY_NAME}{" "}
+              moderators.
             </li>
             <li>
               <strong>Access, correction, deletion:</strong> email us at{" "}
@@ -181,7 +185,8 @@ export function PrivacyPolicyPage() {
 
           <h2>10. International users and data transfers</h2>
           <p>
-            {OPERATOR_NAME} is based in {OPERATOR_COUNTRY}, but Ke Jitbe is used by people
+            {COMPANY_NAME} ({DEVELOPER_NAME}) is based in {OPERATOR_COUNTRY}, but Ke Jitbe is
+            used by people around the world. Our servers and service providers (for example cloud
             around the world. Our servers and service providers (for example cloud hosting in
             the United States or other regions) may process your information outside your home
             country. Those locations may have different data protection laws than where you live.
@@ -209,6 +214,8 @@ export function PrivacyPolicyPage() {
 
         <footer className="legal-footer">
           <Link to="/">Back to {APP_NAME}</Link>
+          {" · "}
+          <Link to="/credits">Credits &amp; team</Link>
           {" · "}
           <Link to="/terms">Terms of Service</Link>
           {" · "}
