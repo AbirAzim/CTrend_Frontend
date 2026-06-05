@@ -19,7 +19,7 @@ import { usePushNotifications } from "../hooks/usePushNotifications";
 import { MY_NOTIFICATIONS, NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { MESSAGE_RECEIVED, MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
-import { GET_USER_PROFILE } from "@ctrend/shared/graphql/friends";
+import { FRIEND_REQUESTS, FRIEND_SUGGESTIONS, GET_USER_PROFILE, MY_FRIENDS } from "@ctrend/shared/graphql/friends";
 import {
   postOrUpdateMessageNotification,
   postBellNotification,
@@ -190,6 +190,19 @@ function GlobalNotificationSubscription() {
 
       // Refresh bell badge count
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
+
+      // Friend graph changed → refresh any friend lists that are on screen
+      // (Received/Sent/Friends/Suggestions on the Friends + Profile screens).
+      // `include` only refetches active queries, so it's a no-op off-screen.
+      if (
+        n.type === "FRIEND_REQUEST" ||
+        n.type === "FRIEND_REQUEST_ACCEPTED" ||
+        n.type === "NEW_FOLLOWER"
+      ) {
+        void client.refetchQueries({
+          include: [FRIEND_REQUESTS, MY_FRIENDS, FRIEND_SUGGESTIONS],
+        });
+      }
     },
   });
 
