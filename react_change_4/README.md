@@ -27,6 +27,7 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 | [friends-tabs-and-live-moves.md](./2026-06-05_friends-tabs-and-live-moves.md) | Friends page: separate Incoming/Sent tabs + instant animated moves between Suggestions/Requests/Friends (optimistic pins, 8s peer poll, rollback) |
 | [connections-received-sent-separate-tabs.md](./2026-06-05_connections-received-sent-separate-tabs.md) | **User ask:** Received + Sent as **separate top-level tabs** (Profile Connections + Friends page) — not one Requests tab with INCOMING/SENT sections |
 | [user-global-platform-posts.md](./2026-06-05_user-global-platform-posts.md) | Admin toggle (default OFF) for normal users to post globally — user name/avatar on feed + `USER_GLOBAL_POST` notifications vs admin `SYSTEM` / **Ke Jitbe** brand |
+| [admin-post-management-scope-tabs.md](./2026-06-05_admin-post-management-scope-tabs.md) | Post management split into **Admin Post Management** (SYSTEM) and **User Post Management** (user global broadcasts) via a `scope` filter |
 
 ## Backend (CTrend repo)
 
@@ -39,6 +40,9 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 - `posts/posts.service.ts` — create validation + `notifyAllUsersOfUserGlobalPost` fan-out
 - `feed/feed.service.ts` — global user posts in feed filter
 - `notifications/notification.schema.ts` — `USER_GLOBAL_POST`
+- `posts/dto/admin-platform-posts.input.ts` — `scope` (`admin` | `user`) filter
+- `posts/posts.service.ts` — `buildPlatformPostsFilter` scope branch (SYSTEM vs user global) + threaded through list/count
+- `posts/posts.resolver.ts` — pass `scope` from admin posts query/filter inputs
 
 ## Web (this repo)
 
@@ -63,3 +67,5 @@ Overall plan: [`../PHASES.md`](../PHASES.md).
 - `components/NotificationBell.tsx` — `USER_GLOBAL_POST` handling
 - `lib/mapGqlPostToFeedView.ts`, `types/feed.ts` — global broadcast fields
 - `index.css` — admin global-posts card, user-global feed/create styles
+- `pages/AdminPage.tsx` — Post management **Admin / User** scope sub-tabs (`scope` filter, scoped count/CTA)
+- `index.css` — `admin-subtabs` / `admin-subtab` segmented control
