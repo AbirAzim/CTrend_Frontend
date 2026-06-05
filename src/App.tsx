@@ -22,6 +22,7 @@ import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/TermsOfServicePage";
 import { CreditsPage } from "./pages/CreditsPage";
+import { ChildSafetyPage } from "./pages/ChildSafetyPage";
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
       <Route path="/credits" element={<CreditsPage />} />
+      <Route path="/child-safety" element={<ChildSafetyPage />} />
       <Route element={<AppShell />}>
         <Route index element={<FeedPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />
