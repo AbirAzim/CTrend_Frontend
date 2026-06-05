@@ -90,6 +90,7 @@ function notifIcon(type: string): string {
     case "VOTE_PRIZE_CLAIMED": return "🎁";
     case "ANNOUNCEMENT":
     case "ADMIN_BROADCAST": return "📢";
+    case "USER_GLOBAL_POST": return "🌍";
     case "SYSTEM": return "ℹ";
     default: return "🔔";
   }
@@ -99,7 +100,7 @@ const POST_NOTIF_TYPES = new Set([
   "POST_HYPE", "POST_COMMENT", "NEW_POST_FRIEND",
   "COMMENT_REPLY", "COMMENT_REACTION", "NEW_COMMENT",
   "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
-  "ANNOUNCEMENT",
+  "ANNOUNCEMENT", "USER_GLOBAL_POST",
 ]);
 
 /** System/platform-generated notifications that should show the brand logo avatar (not a generic emoji). */

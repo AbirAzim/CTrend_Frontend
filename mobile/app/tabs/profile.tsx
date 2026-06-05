@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -152,7 +152,7 @@ export default function ProfileScreen() {
 
   const [contentTab, setContentTab] = useState<"drops" | "kept" | "voted">("drops");
   const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
-  const [peopleTab, setPeopleTab] = useState<"friends" | "requests" | "suggestions">("friends");
+  const [peopleTab, setPeopleTab] = useState<"friends" | "received" | "sent" | "suggestions">("friends");
   const [search, setSearch] = useState("");
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
 
@@ -186,6 +186,14 @@ export default function ProfileScreen() {
 
   const { data: requestsData, refetch: refetchRequests } = useQuery<{ friendRequests: { requestedByMe: Person[]; requestedMe: Person[] } }>(
     FRIEND_REQUESTS, { fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated },
+  );
+
+  // Refresh connection requests whenever the profile tab regains focus, so a
+  // request received elsewhere shows up immediately (cache-first won't refetch).
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) void refetchRequests();
+    }, [isAuthenticated, refetchRequests]),
   );
 
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery<{ friendSuggestions: Person[] }>(
@@ -570,7 +578,8 @@ export default function ProfileScreen() {
           <View style={[st.peopleTabRow, { borderBottomColor: colors.border }]}>
             {([
               { key: "friends", label: `Friends${friends.length > 0 ? ` (${friends.length})` : ""}` },
-              { key: "requests", label: `Requests${requestedMe.length > 0 ? ` (${requestedMe.length})` : ""}` },
+              { key: "received", label: `Received${requestedMe.length > 0 ? ` (${requestedMe.length})` : ""}` },
+              { key: "sent", label: `Sent${requestedByMe.length > 0 ? ` (${requestedByMe.length})` : ""}` },
               { key: "suggestions", label: "Suggestions" },
             ] as const).map((t) => (
               <Pressable
@@ -578,7 +587,7 @@ export default function ProfileScreen() {
                 style={[st.peopleTabBtn, peopleTab === t.key && [st.peopleTabBtnActive, { borderBottomColor: colors.accent }]]}
                 onPress={() => setPeopleTab(t.key)}
               >
-                <Text style={[st.peopleTabText, { color: peopleTab === t.key ? colors.accent : colors.muted }]}>{t.label}</Text>
+                <Text numberOfLines={1} style={[st.peopleTabText, { color: peopleTab === t.key ? colors.accent : colors.muted }]}>{t.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -613,55 +622,46 @@ export default function ProfileScreen() {
               ))
             )}
 
-            {peopleTab === "requests" && (
-              requestedMe.length === 0 && requestedByMe.length === 0 ? (
-                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No pending requests</Text>
-              ) : (
-                <>
-                  {requestedMe.length > 0 && (
-                    <>
-                      <Text style={[st.requestsHeader, { color: colors.muted }]}>REQUESTED ME</Text>
-                      {requestedMe.map((f) => (
-                        <PersonRow
-                          key={f.id} person={f} colors={colors}
-                          actionLoading={actionLoadingIds.has(f.id)}
-                          rightSlot={
-                            <View style={{ flexDirection: "row", gap: 6 }}>
-                              <Pressable style={st.acceptBtn} onPress={() => void handleRespond(f.id, true)}>
-                                <Text style={st.acceptBtnText}>Accept</Text>
-                              </Pressable>
-                              <Pressable style={[st.rejectBtn, { borderColor: colors.border }]} onPress={() => void handleRespond(f.id, false)}>
-                                <Text style={[st.rejectBtnText, { color: colors.subtext }]}>Reject</Text>
-                              </Pressable>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </>
-                  )}
-                  {requestedByMe.length > 0 && (
-                    <>
-                      <Text style={[st.requestsHeader, { color: colors.muted, marginTop: requestedMe.length > 0 ? 12 : 0 }]}>SENT BY ME</Text>
-                      {requestedByMe.map((f) => (
-                        <PersonRow
-                          key={f.id} person={f} colors={colors}
-                          actionLoading={actionLoadingIds.has(f.id)}
-                          rightSlot={
-                            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-                              <View style={[st.pendingBadge, { borderColor: "#f59e0b55", backgroundColor: "#f59e0b22" }]}>
-                                <Text style={{ fontSize: 10, fontWeight: "700", color: "#f59e0b" }}>PENDING</Text>
-                              </View>
-                              <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleCancelRequest(f.id)}>
-                                <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Cancel</Text>
-                              </Pressable>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </>
-                  )}
-                </>
-              )
+            {peopleTab === "received" && (
+              requestedMe.length === 0 ? (
+                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No incoming requests</Text>
+              ) : requestedMe.map((f) => (
+                <PersonRow
+                  key={f.id} person={f} colors={colors}
+                  actionLoading={actionLoadingIds.has(f.id)}
+                  rightSlot={
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      <Pressable style={st.acceptBtn} onPress={() => void handleRespond(f.id, true)}>
+                        <Text style={st.acceptBtnText}>Accept</Text>
+                      </Pressable>
+                      <Pressable style={[st.rejectBtn, { borderColor: colors.border }]} onPress={() => void handleRespond(f.id, false)}>
+                        <Text style={[st.rejectBtnText, { color: colors.subtext }]}>Reject</Text>
+                      </Pressable>
+                    </View>
+                  }
+                />
+              ))
+            )}
+
+            {peopleTab === "sent" && (
+              requestedByMe.length === 0 ? (
+                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No sent requests</Text>
+              ) : requestedByMe.map((f) => (
+                <PersonRow
+                  key={f.id} person={f} colors={colors}
+                  actionLoading={actionLoadingIds.has(f.id)}
+                  rightSlot={
+                    <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                      <View style={[st.pendingBadge, { borderColor: "#f59e0b55", backgroundColor: "#f59e0b22" }]}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: "#f59e0b" }}>PENDING</Text>
+                      </View>
+                      <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleCancelRequest(f.id)}>
+                        <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  }
+                />
+              ))
             )}
 
             {peopleTab === "suggestions" && (

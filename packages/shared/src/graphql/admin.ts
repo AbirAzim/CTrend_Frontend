@@ -364,3 +364,21 @@ export const ADMIN_PLATFORM_POSTS_COUNT = gql`
     adminPlatformPostsCount(filter: $filter)
   }
 `;
+
+// ─── Platform settings — allow normal users to post globally (Phase 36) ────────
+
+export const PLATFORM_SETTINGS = gql`
+  query PlatformSettings {
+    platformSettings {
+      allowUserGlobalPosts
+    }
+  }
+`;
+
+export const SET_ALLOW_USER_GLOBAL_POSTS = gql`
+  mutation SetAllowUserGlobalPosts($enabled: Boolean!) {
+    setAllowUserGlobalPosts(enabled: $enabled) {
+      allowUserGlobalPosts
+    }
+  }
+`;

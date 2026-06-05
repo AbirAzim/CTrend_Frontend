@@ -28,6 +28,8 @@ export function mapGqlPostToFeedView(p: {
   authorUsername: string;
   authorDisplayName?: string | null;
   authorEmail?: string | null;
+  authorProfileImageUrl?: string | null;
+  isUserGlobalBroadcast?: boolean | null;
   imageUrls?: string[] | null;
   caption?: string | null;
   createdAt?: string | null;
@@ -117,6 +119,8 @@ export function mapGqlPostToFeedView(p: {
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,
     authorEmail: p.authorEmail ?? null,
+    authorProfileImageUrl: p.authorProfileImageUrl ?? null,
+    isUserGlobalBroadcast: Boolean(p.isUserGlobalBroadcast),
     imageUrls,
     caption: p.caption ?? null,
     createdAt: p.createdAt ?? null,

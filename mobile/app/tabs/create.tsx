@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "@ctrend/shared/graphql/feed";
 import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
-import { CREATE_SYSTEM_POST } from "@ctrend/shared/graphql/admin";
+import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { ImagePositionEditor } from "../../components/ImagePositionEditor";
@@ -219,6 +219,7 @@ export default function CreateScreen() {
   const [categoryId, setCategoryId] = useState("");
   // Pre-select platform-wide when admin arrives from "+ New platform post"
   const [platformWide, setPlatformWide] = useState(platformParam === "1");
+  const [broadcastGlobally, setBroadcastGlobally] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
   const [campaignId, setCampaignId] = useState("");
@@ -272,6 +273,13 @@ export default function CreateScreen() {
     return (a.name ?? "").localeCompare(b.name ?? "");
   });
   const selectedCampaign = campaigns.find((c) => c.id === campaignId);
+
+  // Platform setting: can normal users broadcast a post globally? (Phase 36)
+  const { data: platformSettingsData } = useQuery<{ platformSettings: { allowUserGlobalPosts: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-and-network", skip: !isAuthenticated || isAdmin },
+  );
+  const allowUserGlobalPosts = Boolean(platformSettingsData?.platformSettings?.allowUserGlobalPosts);
 
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [createPost, { loading: submitting }] = useMutation(CREATE_POST);
@@ -375,6 +383,8 @@ export default function CreateScreen() {
     const input: Record<string, unknown> = { categoryId, imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
     if (campaignId) input.campaignId = campaignId;
+    // Non-admin global broadcast (admins use createSystemPost instead) — Phase 36
+    if (!isAdmin && allowUserGlobalPosts && broadcastGlobally) input.broadcastGlobally = true;
 
     if (deadlineEnabled) {
       input.votingEndsAt = deadlinePreset !== null ? hoursFromNow(deadlinePreset) : deadlineCustom.toISOString();
@@ -530,6 +540,27 @@ export default function CreateScreen() {
                   );
                 })}
               </View>
+            </View>
+          )}
+
+          {/* Non-admin: opt in to broadcast globally (Phase 36) */}
+          {!isAdmin && allowUserGlobalPosts && (
+            <View style={[st.settingRow, { borderBottomColor: colors.border }]}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 14 }}>🌍</Text>
+                  <Text style={[st.settingKey, { color: colors.text }]}>Post globally</Text>
+                </View>
+                <Text style={[st.optional, { color: colors.muted, marginTop: 2 }]}>
+                  Show this to everyone &amp; notify them with your name.
+                </Text>
+              </View>
+              <Switch
+                value={broadcastGlobally}
+                onValueChange={setBroadcastGlobally}
+                trackColor={{ false: colors.section, true: "#16a34a" }}
+                thumbColor="#fff"
+              />
             </View>
           )}
 

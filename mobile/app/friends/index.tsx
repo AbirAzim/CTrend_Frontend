@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router, Stack } from "expo-router";
-import { useState } from "react";
+import { router, Stack, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ADD_FRIEND,
+  CANCEL_FRIEND_REQUEST,
   FRIEND_REQUESTS,
   FRIEND_SUGGESTIONS,
   MY_FRIENDS,
@@ -48,7 +49,7 @@ type SuggestionsData = { friendSuggestions: FriendUser[] };
 type OnlineData = { onlineUserIds: string[] };
 type StartDmData = { startDirectConversation: { id: string } };
 
-type Tab = "suggestions" | "requests" | "friends";
+type Tab = "friends" | "received" | "sent" | "suggestions";
 
 // ─── Avatar helper ────────────────────────────────────────────────────────────
 
@@ -217,20 +218,21 @@ function SuggestionsTab({
   );
 }
 
-// ─── Requests tab ─────────────────────────────────────────────────────────────
+// ─── Received tab (requests sent to me) ────────────────────────────────────────
 
-function RequestsTab({
+function ReceivedTab({
+  items,
   search,
   colors,
   showToast,
+  onChanged,
 }: {
+  items: FriendUser[];
   search: string;
   colors: ReturnType<typeof useTheme>["colors"];
   showToast: (msg: string, type?: "success" | "error" | "info") => void;
+  onChanged: () => void;
 }) {
-  const { data, loading, refetch } = useQuery<FriendRequestsData>(FRIEND_REQUESTS, {
-    fetchPolicy: "cache-and-network",
-  });
   const [respond] = useMutation(RESPOND_FRIEND_REQUEST);
   const [actingIds, setActingIds] = useState<Set<string>>(new Set());
 
@@ -239,7 +241,7 @@ function RequestsTab({
     try {
       await respond({ variables: { requesterId, accept } });
       showToast(accept ? "Request accepted ✓" : "Request declined", accept ? "success" : "info");
-      void refetch();
+      onChanged();
     } catch {
       showToast("Action failed", "error");
     } finally {
@@ -251,54 +253,29 @@ function RequestsTab({
     }
   }
 
-  if (loading && !data) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
-  }
-
-  const incoming = (data?.friendRequests.requestedMe ?? []).filter((u) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return u.username.toLowerCase().includes(q) || (u.displayName?.toLowerCase() ?? "").includes(q);
-  });
-  const sent = (data?.friendRequests.requestedByMe ?? []).filter((u) => {
+  const incoming = items.filter((u) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return u.username.toLowerCase().includes(q) || (u.displayName?.toLowerCase() ?? "").includes(q);
   });
 
-  if (incoming.length === 0 && sent.length === 0) {
+  if (incoming.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyIcon}>👥</Text>
-        <Text style={[styles.emptyText, { color: colors.muted }]}>No pending requests</Text>
+        <Text style={styles.emptyIcon}>📥</Text>
+        <Text style={[styles.emptyText, { color: colors.muted }]}>
+          {search ? "No results" : "No incoming requests"}
+        </Text>
       </View>
     );
   }
 
   return (
     <FlatList
-      data={[
-        ...(incoming.length > 0 ? [{ _section: "Incoming" as const }] : []),
-        ...incoming.map((u) => ({ ...u, _type: "incoming" as const })),
-        ...(sent.length > 0 ? [{ _section: "Sent" as const }] : []),
-        ...sent.map((u) => ({ ...u, _type: "sent" as const })),
-      ]}
-      keyExtractor={(item) =>
-        "_section" in item ? `section-${item._section}` : item.id
-      }
+      data={incoming}
+      keyExtractor={(u) => u.id}
       contentContainerStyle={styles.listContent}
       renderItem={({ item }) => {
-        if ("_section" in item) {
-          return (
-            <Text style={[styles.sectionLabel, { color: colors.subtext }]}>
-              {item._section}
-            </Text>
-          );
-        }
         const name = item.displayName?.trim() || item.username;
         const isActing = actingIds.has(item.id);
         return (
@@ -313,40 +290,124 @@ function RequestsTab({
                 <Text style={[styles.rowSub, { color: colors.muted }]}>@{item.username}</Text>
               </View>
             </Pressable>
-            {item._type === "incoming" ? (
-              <View style={styles.twinBtns}>
-                <Pressable
-                  style={[styles.actionBtn, { backgroundColor: colors.accent }]}
-                  onPress={() => !isActing && void handleRespond(item.id, true)}
-                  disabled={isActing}
-                >
-                  {isActing ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={[styles.actionBtnText, { color: "#fff" }]}>Accept</Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.actionBtn,
-                    { backgroundColor: colors.section, borderColor: colors.border, marginLeft: 6 },
-                  ]}
-                  onPress={() => !isActing && void handleRespond(item.id, false)}
-                  disabled={isActing}
-                >
-                  <Text style={[styles.actionBtnText, { color: colors.muted }]}>Decline</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View
+            <View style={styles.twinBtns}>
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: colors.accent }]}
+                onPress={() => !isActing && void handleRespond(item.id, true)}
+                disabled={isActing}
+              >
+                {isActing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.actionBtnText, { color: "#fff" }]}>Accept</Text>
+                )}
+              </Pressable>
+              <Pressable
                 style={[
                   styles.actionBtn,
-                  { backgroundColor: colors.section, borderColor: colors.border },
+                  { backgroundColor: colors.section, borderColor: colors.border, marginLeft: 6 },
                 ]}
+                onPress={() => !isActing && void handleRespond(item.id, false)}
+                disabled={isActing}
               >
-                <Text style={[styles.actionBtnText, { color: colors.muted }]}>Pending</Text>
+                <Text style={[styles.actionBtnText, { color: colors.muted }]}>Reject</Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      }}
+    />
+  );
+}
+
+// ─── Sent tab (requests I made) ────────────────────────────────────────────────
+
+function SentTab({
+  items,
+  search,
+  colors,
+  showToast,
+  onChanged,
+}: {
+  items: FriendUser[];
+  search: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+  showToast: (msg: string, type?: "success" | "error" | "info") => void;
+  onChanged: () => void;
+}) {
+  const [cancelRequest] = useMutation(CANCEL_FRIEND_REQUEST);
+  const [actingIds, setActingIds] = useState<Set<string>>(new Set());
+
+  async function handleCancel(userId: string) {
+    setActingIds((prev) => new Set(prev).add(userId));
+    try {
+      await cancelRequest({ variables: { userId } });
+      showToast("Request cancelled", "info");
+      onChanged();
+    } catch {
+      showToast("Could not cancel request", "error");
+    } finally {
+      setActingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    }
+  }
+
+  const sent = items.filter((u) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return u.username.toLowerCase().includes(q) || (u.displayName?.toLowerCase() ?? "").includes(q);
+  });
+
+  if (sent.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyIcon}>📤</Text>
+        <Text style={[styles.emptyText, { color: colors.muted }]}>
+          {search ? "No results" : "No sent requests"}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={sent}
+      keyExtractor={(u) => u.id}
+      contentContainerStyle={styles.listContent}
+      renderItem={({ item }) => {
+        const name = item.displayName?.trim() || item.username;
+        const isActing = actingIds.has(item.id);
+        return (
+          <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable
+              onPress={() => router.push(`/profile/${item.id}` as `/${string}`)}
+              style={styles.rowLeft}
+            >
+              <UserAvatar user={item} />
+              <View style={styles.rowInfo}>
+                <View style={styles.nameRow}>
+                  <Text style={[styles.rowName, { color: colors.text }]}>{name}</Text>
+                  <View style={styles.pendingPill}>
+                    <Text style={styles.pendingPillText}>Pending</Text>
+                  </View>
+                </View>
+                <Text style={[styles.rowSub, { color: colors.muted }]}>@{item.username}</Text>
               </View>
-            )}
+            </Pressable>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
+              onPress={() => !isActing && void handleCancel(item.id)}
+              disabled={isActing}
+            >
+              {isActing ? (
+                <ActivityIndicator size="small" color={colors.muted} />
+              ) : (
+                <Text style={[styles.actionBtnText, { color: colors.muted }]}>Cancel</Text>
+              )}
+            </Pressable>
           </View>
         );
       }}
@@ -494,19 +555,32 @@ function FriendsTab({
 export default function FriendsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<Tab>("suggestions");
+  const [activeTab, setActiveTab] = useState<Tab>("friends");
   const [search, setSearch] = useState("");
   const { showToast, ToastView } = useToast();
 
-  const { data: requestsData } = useQuery<FriendRequestsData>(FRIEND_REQUESTS, {
+  const { data: requestsData, refetch: refetchRequests } = useQuery<FriendRequestsData>(FRIEND_REQUESTS, {
     fetchPolicy: "cache-and-network",
+    pollInterval: 8000,
   });
-  const incomingCount = requestsData?.friendRequests.requestedMe.length ?? 0;
+  const requestedMe = requestsData?.friendRequests.requestedMe ?? [];
+  const requestedByMe = requestsData?.friendRequests.requestedByMe ?? [];
+  const incomingCount = requestedMe.length;
+  const sentCount = requestedByMe.length;
 
-  const TABS: { key: Tab; label: string }[] = [
+  // Always pull fresh requests when the screen gains focus (a request received
+  // while elsewhere in the app wouldn't otherwise show until the next 8s poll).
+  useFocusEffect(
+    useCallback(() => {
+      void refetchRequests();
+    }, [refetchRequests]),
+  );
+
+  const TABS: { key: Tab; label: string; count?: number; alert?: boolean }[] = [
+    { key: "friends", label: "My Friends" },
+    { key: "received", label: "Received", count: incomingCount, alert: true },
+    { key: "sent", label: "Sent", count: sentCount },
     { key: "suggestions", label: "Suggestions" },
-    { key: "requests", label: incomingCount > 0 ? `Requests (${incomingCount})` : "Requests" },
-    { key: "friends", label: "Friends" },
   ];
 
   return (
@@ -543,10 +617,11 @@ export default function FriendsScreen() {
         )}
       </View>
 
-      {/* Tab selector */}
+      {/* Tab selector (4 tabs — horizontally scrollable) */}
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
         {TABS.map((t) => {
           const active = activeTab === t.key;
+          const hasCount = (t.count ?? 0) > 0;
           return (
             <Pressable
               key={t.key}
@@ -554,27 +629,42 @@ export default function FriendsScreen() {
               onPress={() => { setActiveTab(t.key); setSearch(""); }}
             >
               <Text
-                style={[
-                  styles.tabLabel,
-                  { color: active ? colors.accent : colors.muted },
-                ]}
+                numberOfLines={1}
+                style={[styles.tabLabel, { color: active ? colors.accent : colors.muted }]}
               >
                 {t.label}
               </Text>
+              {hasCount && (
+                <View
+                  style={[
+                    styles.tabCount,
+                    t.alert
+                      ? { backgroundColor: "#ef4444" }
+                      : { backgroundColor: colors.section, borderColor: colors.border, borderWidth: 1 },
+                  ]}
+                >
+                  <Text style={[styles.tabCountText, { color: t.alert ? "#fff" : colors.muted }]}>
+                    {t.count! > 9 ? "9+" : t.count}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
       </View>
 
       {/* Tab content */}
-      {activeTab === "suggestions" && (
-        <SuggestionsTab search={search} colors={colors} showToast={showToast} />
-      )}
-      {activeTab === "requests" && (
-        <RequestsTab search={search} colors={colors} showToast={showToast} />
-      )}
       {activeTab === "friends" && (
         <FriendsTab search={search} colors={colors} showToast={showToast} />
+      )}
+      {activeTab === "received" && (
+        <ReceivedTab items={requestedMe} search={search} colors={colors} showToast={showToast} onChanged={() => void refetchRequests()} />
+      )}
+      {activeTab === "sent" && (
+        <SentTab items={requestedByMe} search={search} colors={colors} showToast={showToast} onChanged={() => void refetchRequests()} />
+      )}
+      {activeTab === "suggestions" && (
+        <SuggestionsTab search={search} colors={colors} showToast={showToast} />
       )}
     </View>
   );
@@ -612,12 +702,32 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
     paddingVertical: 10,
+    paddingHorizontal: 2,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
-  tabLabel: { fontSize: 13, fontWeight: "700" },
+  tabLabel: { fontSize: 12, fontWeight: "700" },
+  tabCount: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabCountText: { fontSize: 10, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  pendingPill: {
+    backgroundColor: "#f59e0b22",
+    borderRadius: 99,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  pendingPillText: { color: "#f59e0b", fontSize: 10, fontWeight: "700" },
   listContent: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 8 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },

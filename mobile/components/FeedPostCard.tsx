@@ -233,6 +233,25 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderWidth: 1.5,
 			backgroundColor: c.accent + '14',
 		},
+		globalBadge: {
+			fontSize: 9,
+			fontWeight: '700' as const,
+			letterSpacing: 0.6,
+			textTransform: 'uppercase' as const,
+			color: isDark ? '#34d399' : '#15803d',
+			paddingHorizontal: 7,
+			paddingVertical: 2,
+			borderRadius: 999,
+			borderWidth: 1,
+			borderColor: isDark ? 'rgba(52,211,153,0.5)' : 'rgba(22,163,74,0.45)',
+			backgroundColor: isDark ? 'rgba(16,185,129,0.14)' : 'rgba(22,163,74,0.1)',
+			overflow: 'hidden' as const,
+		},
+		userGlobalCard: {
+			borderColor: isDark ? 'rgba(52,211,153,0.5)' : 'rgba(22,163,74,0.45)',
+			borderWidth: 1.5,
+			backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(22,163,74,0.06)',
+		},
 		campaignCard: {
 			borderColor: isDark ? 'rgba(245,158,11,0.5)' : 'rgba(217,160,23,0.55)',
 			borderWidth: 1.5,
@@ -1545,6 +1564,7 @@ function FeedPostCardComponent({
 	}
 
 	const isPlatformPost = post.postType === 'system';
+	const isUserGlobal = !isPlatformPost && Boolean(post.isUserGlobalBroadcast);
 	const authorName = isPlatformPost
 		? MODERATOR_PLATFORM_NAME
 		: post.authorDisplayName?.trim() || post.authorUsername;
@@ -1560,6 +1580,7 @@ function FeedPostCardComponent({
 			style={[
 				st.card,
 				isPlatformPost && st.platformCard,
+				isUserGlobal && st.userGlobalCard,
 				campaign && st.campaignCard,
 			]}>
 			{/* Ending-soon urgency banner */}
@@ -1613,6 +1634,8 @@ function FeedPostCardComponent({
 							<Text style={st.authorName}>{authorName}</Text>
 							{isPlatformPost ? (
 								<Text style={st.platformBadge}>Platform</Text>
+							) : isUserGlobal ? (
+								<Text style={st.globalBadge}>🌍 Global</Text>
 							) : null}
 						</View>
 						{timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}

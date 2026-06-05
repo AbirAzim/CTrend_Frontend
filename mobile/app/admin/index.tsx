@@ -8,6 +8,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -20,6 +21,8 @@ import {
   REMOVE_USER,
   INVITE_USER,
   INVITE_USERS_BULK,
+  PLATFORM_SETTINGS,
+  SET_ALLOW_USER_GLOBAL_POSTS,
 } from "@ctrend/shared/graphql/admin";
 import { SEND_ADMIN_BROADCAST as BROADCAST } from "@ctrend/shared/graphql/notifications";
 import { useTheme } from "../../context/ThemeContext";
@@ -97,6 +100,27 @@ export default function AdminUsersScreen() {
   const [inviteMut, { loading: inviting }] = useMutation(INVITE_USER);
   const [bulkMut, { loading: bulkInviting }] = useMutation(INVITE_USERS_BULK);
   const [broadcastMut, { loading: broadcasting }] = useMutation(BROADCAST);
+
+  // Platform setting: allow normal users to broadcast posts globally (Phase 36)
+  const { data: settingsData } = useQuery<{ platformSettings: { allowUserGlobalPosts: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-and-network" },
+  );
+  const allowGlobal = Boolean(settingsData?.platformSettings?.allowUserGlobalPosts);
+  const [setAllowGlobal, { loading: savingGlobal }] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
+  const [globalDetails, setGlobalDetails] = useState(false);
+
+  async function handleToggleGlobal(next: boolean) {
+    try {
+      await setAllowGlobal({
+        variables: { enabled: next },
+        refetchQueries: [{ query: PLATFORM_SETTINGS }],
+      });
+      showToast(next ? "Global user posts enabled" : "Global user posts disabled", "success");
+    } catch {
+      showToast("Could not update setting", "error");
+    }
+  }
 
   const users = data?.listUsers ?? [];
   const total = countData?.listUsersCount ?? 0;
@@ -180,6 +204,45 @@ export default function AdminUsersScreen() {
           <Pressable style={[st.chip, { borderColor: "#f59e0b" }]} onPress={() => setBroadcastModal(true)}>
             <Text style={[st.chipText, { color: "#f59e0b" }]}>📢 Broadcast</Text>
           </Pressable>
+        </View>
+
+        {/* Global user posts toggle (Phase 36) */}
+        <View
+          style={[
+            st.globalCard,
+            {
+              borderColor: allowGlobal ? "#16a34a" : colors.border,
+              backgroundColor: allowGlobal ? "#16a34a14" : colors.inputBg,
+            },
+          ]}
+        >
+          <View style={st.globalCardTop}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={[st.globalTitle, { color: colors.text }]}>🌍 Global user posts</Text>
+              <Text style={[st.globalStatus, { color: allowGlobal ? "#16a34a" : colors.muted }]}>
+                {allowGlobal ? "ON — users can post to everyone" : "OFF — only admin platform posts reach everyone"}
+              </Text>
+            </View>
+            <Switch
+              value={allowGlobal}
+              onValueChange={handleToggleGlobal}
+              disabled={savingGlobal}
+              trackColor={{ false: colors.section, true: "#16a34a" }}
+              thumbColor="#fff"
+            />
+          </View>
+          <Pressable onPress={() => setGlobalDetails((v) => !v)} hitSlop={6}>
+            <Text style={[st.globalDetailsToggle, { color: colors.accent }]}>
+              {globalDetails ? "Hide details ▴" : "Details ▾"}
+            </Text>
+          </Pressable>
+          {globalDetails && (
+            <Text style={[st.globalDetailsText, { color: colors.muted }]}>
+              When ON, any user can opt to broadcast a post platform-wide. Their name and photo appear
+              in the feed and in everyone&apos;s notifications (🌍), distinct from admin Ke Jitbe
+              Platform posts (📢). Default is OFF — turning it off blocks new global user posts.
+            </Text>
+          )}
         </View>
       </View>
 
@@ -345,6 +408,12 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     toolbarRow: { flexDirection: "row", gap: 6 },
     chip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1 },
     chipText: { fontSize: 11, fontWeight: "700" },
+    globalCard: { borderRadius: 12, borderWidth: 1.5, padding: 12, gap: 6 },
+    globalCardTop: { flexDirection: "row", alignItems: "center" },
+    globalTitle: { fontSize: 14, fontWeight: "800" },
+    globalStatus: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+    globalDetailsToggle: { fontSize: 12, fontWeight: "700" },
+    globalDetailsText: { fontSize: 12, lineHeight: 17 },
     list: { padding: 12, gap: 8 },
     empty: { textAlign: "center", padding: 24, fontSize: 14 },
     pageInfo: { textAlign: "center", fontSize: 12, paddingTop: 12, paddingBottom: 4 },
