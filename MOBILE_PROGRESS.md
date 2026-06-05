@@ -918,6 +918,220 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
+## REACT CHANGE 4 — Mobile Adoption Phases (2026-06-04/05 web batch)
+
+> Source docs: `react_change_4/` directory. **Web + backend confirmed working & deployed.**
+> Workflow: I (Claude) implement a phase → **you test on device (phone already connected via adb)** using the "Test cases" block → if it passes, tell me and I flip the phase header to ✅ COMPLETE and tick the boxes. Phases stay ❌ until you confirm.
+>
+> **Shared-GraphQL gap:** None of the react_change_4 fields are in `packages/shared/src/graphql/` yet (verified). Each phase lists the exact additions needed — always the first sub-task.
+>
+> **Scope notes:**
+> - `notification-ws-resilience.md` is web-WS-specific; mobile relies on FCM data pushes, not the `newNotification` WS sub. Folded into Phase 33 as a *foreground/reconnect refetch* hardening (the transferable principle), not a 1:1 port.
+
+---
+
+### ❌ PHASE 31 — Chat Reply / Quote (Messenger-style) — NOT STARTED
+
+**Source docs:** `2026-06-04_chat-reply-system.md`
+
+**Goal:** Reply to a specific message in a DM — quoted snippet inside the bubble, a reply bar above the composer, and tap-to-jump to the original.
+
+- [ ] **Shared GraphQL** (`packages/shared/src/graphql/messages.ts`) — add `replyTo { messageId senderId senderName text imageUrl }` selection to `GET_MESSAGES`, `SEND_MESSAGE`, `MESSAGE_RECEIVED`; add `$replyToId: ID` arg to `SEND_MESSAGE`.
+- [ ] **types** — add `ReplyPreview` type + `replyTo?` on the message view type used by `chat/[conversationId].tsx`.
+- [ ] **Reply gesture** — long-press a bubble → action tray → **"↩ Reply"** (alongside the existing Phase-18 reaction picker). Selecting sets `replyTarget` state.
+- [ ] **Reply bar** — above the composer: "Replying to {name}" + snippet (text or "📷 Photo") + **×** cancel; auto-focus input. Clears on thread switch and after send.
+- [ ] **Send** — pass `replyToId` to `sendMessage`; on success `flatList.scrollToOffset({offset:0})` (inverted list → newest) on next frame even if scrolled up.
+- [ ] **Quoted snippet in bubble** — render `replyTo` (sender name + text / 📷 thumbnail) as a small inset card above the message text, both own + other bubbles.
+- [ ] **Jump-to-original** — tap a quoted snippet → `scrollToIndex` to that `messageId` + brief highlight flash (Animated bg). Guard for not-yet-loaded messages (load older or no-op).
+
+**APIs:** `SEND_MESSAGE(replyToId)`, `replyTo` on `GET_MESSAGES`/`MESSAGE_RECEIVED` — backend deployed.
+
+**Test cases (run on device):**
+1. Open a DM, long-press a message → Reply → reply bar shows → send → quoted snippet renders above the new bubble.
+2. Tap the quoted snippet → list scrolls to the original and flashes it.
+3. Reply to an image message → snippet shows "📷 Photo" + thumb; attach an image with a reply set → reply context survives upload.
+4. Tap **×** on the reply bar → clears; switch to another thread → reply target clears.
+5. Scroll far up the history, reply to an old message, send → list snaps to the newest (your reply).
+6. Reply to an official/moderator message → renders quoting "Ke Jitbe Moderator".
+
+---
+
+### ❌ PHASE 32 — Vote-Tie No-Dim (tie-aware winners) — NOT STARTED
+
+**Source docs:** `2026-06-05_vote-tie-no-dim.md`
+
+**Goal:** On a closed poll that ended in a tie, **both** top options stay bright + crowned instead of both getting the loser scrim.
+
+- [ ] **No GraphQL/shared change** — pure `mobile/components/FeedPostCard.tsx` logic (post-detail reuses the same card, so both are fixed).
+- [ ] **Replace `binaryWinnerSide`** (returns `null` when `up===down`) with `isBinaryWinnerSide(side)` → `true` for **both** sides on a tie, else the higher side.
+- [ ] **Replace `multiWinnerIndex`** (returns `null` when >1 share top) with `isMultiWinnerIndex(idx)` → `true` for **every** option whose pct equals the top pct; genuinely lower options stay dimmed.
+- [ ] **Apply at all call sites** — binary image cells, multi image cells, and the binary details-breakdown row (winner-glow vs loser-dim / badge logic). Both crowned cells show the 👑 WINNER badge; neither gets the opacity/loser-scrim dim.
+- [ ] **Footer copy** (optional parity) — tie summary reads "Tie · {pct}% each" where the winner summary is shown.
+
+**APIs:** none.
+
+**Test cases (run on device):**
+1. 2-option compare, even 50/50 split, end voting → **both** images stay bright + show 👑 WINNER (no dim).
+2. Non-tie binary → lower option dims, higher shows the crown (unchanged).
+3. Multi-option: two options tie for first → both bright/crowned; a lower third stays dimmed.
+4. Verify in both feed card and post-detail (same component).
+
+---
+
+### ❌ PHASE 33 — Notification Delivery Resilience (foreground/reconnect refetch) — NOT STARTED
+
+**Source docs:** `2026-06-05_notification-ws-resilience.md`
+
+**Goal:** Mirror the web "recover missed notifications" principle on mobile — refetch the bell/notifications on app-foreground and Apollo WS reconnect so hype/comment/vote notifications can't silently lag.
+
+> Web fix is WS-sub-specific and doesn't 1:1 apply (mobile uses FCM data pushes + the in-app notification subscription). This phase ports the *transferable* part: refetch on foreground + on WS reconnect.
+
+- [ ] **App-foreground refetch** — `AppState` listener (`active`): refetch `MY_NOTIFICATIONS` + unread-count query so the badge/list catch up immediately on resume.
+- [ ] **WS reconnect refetch** — hook into the shared Apollo `graphql-ws` client's reconnect (or re-subscribe) for `NEW_NOTIFICATION_SUB`; on (re)connect, refetch the notification list once.
+- [ ] **Auth (re)connect** — ensure the WS reconnects with a fresh token after login (avoid the stale-auth socket that drops events) — confirm current mobile apolloClient already does this; add `reconnectWs()` on auth if not.
+- [ ] **Keep existing poll** as a safety net (don't remove); these changes just make recovery happen on foreground/reconnect instead of only on the next poll.
+
+**APIs:** `MY_NOTIFICATIONS`, unread-count, `NEW_NOTIFICATION_SUB` (existing).
+
+**Test cases (run on device):**
+1. From a second account, hype/comment on a post you own → bell badge updates (push + in-app).
+2. Background the app ~1 min, trigger a hype/comment, reopen → badge/list refresh immediately on foreground (not only after the poll).
+3. Toggle airplane mode briefly while a hype is sent → on reconnect the list refetches and shows it.
+4. Cold login → notifications load with a freshly authenticated socket (no missed events).
+
+---
+
+### ❌ PHASE 34 — Connections: Separate Received / Sent Tabs — NOT STARTED
+
+**Source docs:** `2026-06-05_connections-received-sent-separate-tabs.md`
+
+**Goal:** Replace the single "Requests" tab (with INCOMING/SENT sections) with **four** top-level tabs: **Friends · Received · Sent · Suggestions**. Each tab is its own list with its own count badge + empty state.
+
+- [ ] **No GraphQL change** — uses existing `FRIEND_REQUESTS` (`requestedMe` = Received, `requestedByMe` = Sent), `MY_FRIENDS`, `FRIEND_SUGGESTIONS`.
+- [ ] **Friends screen** (`mobile/app/friends/index.tsx`) — replace the 3-tab (Suggestions/Requests/Friends) layout with a scrollable 4-tab bar: **My Friends · Received · Sent · Suggestions**. Remove the in-tab INCOMING/SENT section split.
+- [ ] **Received tab** — `requestedMe` rows, Accept / Reject actions, count badge (alert-styled when > 0).
+- [ ] **Sent tab** — `requestedByMe` rows, Cancel action, "Pending" badge.
+- [ ] **Profile Connections** — apply the same 4-tab model wherever the profile screen shows connections (mirror, with per-tab pagination if present).
+- [ ] **Search/clear** — search resets on tab switch (existing behaviour preserved per tab).
+
+**APIs:** `FRIEND_REQUESTS`, `MY_FRIENDS`, `FRIEND_SUGGESTIONS`, `ADD_FRIEND`, `RESPOND_FRIEND_REQUEST`, `CANCEL_FRIEND_REQUEST`, `UNFRIEND` (existing).
+
+**Test cases (run on device):**
+1. Friends screen shows **four** tabs, not three; no INCOMING/SENT sections stacked in one tab.
+2. **Received** tab shows only incoming requests with Accept/Reject; badge appears when count > 0.
+3. **Sent** tab shows only outgoing requests with Cancel + Pending badge.
+4. Counts on each tab are correct and update after an action.
+5. Tab bar scrolls horizontally if labels overflow; readable in dark + light.
+
+---
+
+### ❌ PHASE 35 — Friends Live Animated Moves (optimistic pins) — NOT STARTED
+
+**Source docs:** `2026-06-05_friends-tabs-and-live-moves.md`
+
+**Goal:** Friend actions move a person between lists **instantly** with a fade/slide-out, backed by an optimistic-pin view-model engine + an 8s peer poll so peer-accepts animate in without a manual refresh. Layered on the Phase 34 four-tab structure.
+
+- [ ] **View-model engine** — local 4-section model (`suggestions / received / sent / friends`) reconciled against server snapshots; a `pin` (id → target section) overrides the snapshot until the mutation refetch lands or an **8s** safety expiry.
+- [ ] **Transition table:**
+  - Add (Suggestions) → Sent (or Friends if they'd already added me)
+  - Accept (Received) → Friends
+  - Reject (Received) → Suggestions · Cancel (Sent) → Suggestions · Unfriend (Friends) → Suggestions
+  - peer accepts my request → Friends (within the 8s poll)
+- [ ] **Sticky pins** for moves *to Suggestions* (reject/cancel/unfriend) don't expire — keeps the person in Suggestions even though `FRIEND_SUGGESTIONS` (limit 20) may not list them.
+- [ ] **Animations** — diff rendered vs desired view; tag rows entering/leaving; leaving rows stay mounted ~300ms (`Animated` opacity+translate) to play the exit, then drop so siblings slide up. (RN `LayoutAnimation` or `Animated` per-row.)
+- [ ] **Live peer updates** — `FRIEND_REQUESTS` + `MY_FRIENDS` poll every **8s** (`pollInterval`), so a peer accepting animates your Sent row out / Friends row in.
+- [ ] **Failure rollback** — mutation rejects → drop the pin → snapshot animates the person back; show an error toast.
+- [ ] **Dedupe guard** — never show a person in Suggestions while they're a pending request or already a friend.
+
+**APIs:** `ADD_FRIEND`, `RESPOND_FRIEND_REQUEST`, `CANCEL_FRIEND_REQUEST`, `UNFRIEND`, `FRIEND_REQUESTS`, `MY_FRIENDS` (existing — no backend friends subscription, 8s poll is the live mechanism).
+
+**Test cases (run on device):**
+1. **Add** from Suggestions → row slides out, Sent count +1.
+2. **Accept** a Received → slides out, My Friends count +1.
+3. **Reject** a Received → slides out, reappears in Suggestions.
+4. **Cancel** a Sent → slides out, back to Suggestions.
+5. **Unfriend** a Friend → slides out, back to Suggestions (stays even though suggestions list is capped).
+6. Second device accepts your request → within ~8s your Sent row leaves and they appear under Friends.
+7. Airplane-mode an unfriend → row animates back (rollback) + error toast.
+
+---
+
+### ❌ PHASE 36 — User Global Platform Posts (admin toggle + broadcast) — NOT STARTED
+
+**Source docs:** `2026-06-05_user-global-platform-posts.md`
+
+**Goal:** Admin can allow normal users to post **globally** (visible + notified to everyone). When ON, a user opts in per post; their **name + avatar** (not the Ke Jitbe brand) appear on the feed and in notifications. Clearly distinct from admin `SYSTEM` platform posts.
+
+- [ ] **Shared GraphQL** —
+  - `admin.ts`: add `PLATFORM_SETTINGS` query (`platformSettings { allowUserGlobalPosts }`) + `SET_ALLOW_USER_GLOBAL_POSTS($enabled)` mutation.
+  - `feed.ts`: add `isUserGlobalBroadcast` + `authorProfileImageUrl` to feed/detail/saved post selections; `broadcastGlobally` flows through the generic `CREATE_POST` input.
+- [ ] **types/map** — add `isUserGlobalBroadcast` to `FeedPostView`; map it + `authorProfileImageUrl` in `mapGqlPostToFeedView.ts`.
+- [ ] **Admin screen** (`mobile/app/admin/admin-management.tsx` or appropriate) — prominent toggle card "Allow global user posts" (default OFF) bound to `platformSettings` + `setAllowUserGlobalPosts`; a Details/explainer block.
+- [ ] **Create screen** (`mobile/app/tabs/create.tsx`) — query `platformSettings.allowUserGlobalPosts`; when ON **and** user is not admin, show a **"🌍 Post globally"** toggle → sends `broadcastGlobally: true`. (Admins still use the existing platform-wide `CREATE_SYSTEM_POST` path; `broadcastGlobally` is rejected for admins.)
+- [ ] **FeedPostCard** — green **Global** badge + accent border for `isUserGlobalBroadcast` posts, showing the **real user** header (name + avatar) — distinct from the existing **Platform** (Ke Jitbe) badge/branding.
+- [ ] **Notifications screen** — handle `USER_GLOBAL_POST` (🌍 icon, title "🌍 {name}"): show the **poster's avatar** (not the brand logo), deep-link to the post. Add `USER_GLOBAL_POST` to `POST_NOTIF_TYPES`.
+
+**APIs:** `platformSettings`, `setAllowUserGlobalPosts`, `CREATE_POST(broadcastGlobally)`, feed `isUserGlobalBroadcast`/`authorProfileImageUrl`, `MY_NOTIFICATIONS` (`USER_GLOBAL_POST`) — backend deployed.
+
+**Test cases (run on device):**
+1. **Default OFF:** admin screen shows OFF; a non-admin's Create screen has **no** global toggle.
+2. **Turn ON** as admin → refetch shows ON.
+3. As a **non-admin**, Create → enable **Post globally** → publish → appears in another account's feed with a **green Global** badge + your user header (not Platform/Ke Jitbe).
+4. Second account's bell → 🌍 row with the poster's name/photo; tap opens the post.
+5. An admin `SYSTEM` post still shows 📢 + **Ke Jitbe** branding (not the poster avatar).
+6. **Turn OFF** → non-admin can no longer post globally (backend rejects `broadcastGlobally`).
+
+---
+
+### ❌ PHASE 37 — Admin Post Management Scope Tabs (Admin / User) — NOT STARTED
+
+**Source docs:** `2026-06-05_admin-post-management-scope-tabs.md`
+
+**Goal:** Split the admin Posts management screen into **Admin Post Management** (`SYSTEM`) and **User Post Management** (`USER` + `isUserGlobalBroadcast`) via a `scope` filter. Depends on Phase 36's user-global posts existing.
+
+- [ ] **Shared GraphQL** (`admin.ts`) — add a nullable `scope: String` (`"admin"` default | `"user"`) to the `ADMIN_PLATFORM_POSTS` / `ADMIN_PLATFORM_POSTS_COUNT` filter/query input objects. No document change beyond adding the field to the passed `$query`/`$filter` object.
+- [ ] **Admin posts screen** (`mobile/app/admin/posts.tsx`) — add a segmented **Admin / User** sub-tab control at the top; **Admin** is default. Switching tabs sets `scope` and resets to page 1.
+- [ ] **Scoped data** — `scope: "user"` → lists user global broadcasts (real author shown via the existing `PersonLink`); `scope: "admin"` → SYSTEM posts (brand) as before. All existing search/status/voting/category/sort filters + edit/delete/open actions work on both.
+- [ ] **CTA gating** — the **"+ New platform post"** CTA shows **only** on the Admin tab (creates a SYSTEM post); User tab is review/remove only.
+
+**APIs:** `ADMIN_PLATFORM_POSTS(scope)`, `ADMIN_PLATFORM_POSTS_COUNT(scope)`, `DELETE_POST` — backend deployed.
+
+**Test cases (run on device):**
+1. Admin → Post management → **Admin** sub-tab: SYSTEM/platform posts (unchanged), "+ New platform post" CTA present.
+2. Switch to **User** sub-tab: only user global broadcasts, **real author** name+avatar shown, **no** create CTA.
+3. Search/status/voting/category/sort all work within each tab; switching tabs resets to page 1; counts reflect the selected scope.
+4. Edit/Delete/Open a row from either tab works.
+
+---
+
+## PHASE PRIORITY ORDER (react_change_4)
+
+| Phase | Priority | Effort | Dependencies (backend deployed ✅) |
+|-------|----------|--------|------------------------------------|
+| 31 — Chat reply / quote | 🔴 High | Medium | `replyTo` on messages, `replyToId` on `sendMessage` |
+| 32 — Vote-tie no-dim | 🔴 High | Small | none (pure UI) |
+| 33 — Notification delivery resilience | 🟠 Medium | Small | none (foreground/reconnect refetch) |
+| 34 — Connections received/sent tabs | 🟠 Medium | Medium | none (existing `friendRequests`) |
+| 35 — Friends live animated moves | 🟡 Medium | Large | none (existing mutations + 8s poll) |
+| 36 — User global platform posts | 🔴 High | Large | `platformSettings`, `broadcastGlobally`, `isUserGlobalBroadcast`, `USER_GLOBAL_POST` |
+| 37 — Admin post management scope tabs | 🟢 Low | Small | `scope` on admin posts (needs Phase 36) |
+
+**Suggested build order:** 32 (smallest, instant win) → 33 → 31 → 34 → 35 → 36 → 37. (35 builds on 34; 37 builds on 36.)
+
+---
+
+## SHARED GRAPHQL STATUS (react_change_4 additions needed)
+
+| File | Needs |
+|---|---|
+| messages.ts | `replyTo {…}` on `GET_MESSAGES`/`SEND_MESSAGE`/`MESSAGE_RECEIVED` + `$replyToId` arg on `SEND_MESSAGE` (Phase 31) |
+| feed.ts | `isUserGlobalBroadcast` + `authorProfileImageUrl` on feed/detail/saved + `broadcastGlobally` via create input (Phase 36) |
+| admin.ts | `PLATFORM_SETTINGS` + `SET_ALLOW_USER_GLOBAL_POSTS` (Phase 36); `scope` on `ADMIN_PLATFORM_POSTS`/`_COUNT` filter (Phase 37) |
+| notifications.ts | handle `USER_GLOBAL_POST` type (Phase 36) |
+| friends.ts | verify `CANCEL_FRIEND_REQUEST` present before Phase 34/35 (add if missing) |
+
+---
+
 ## PHASE PRIORITY ORDER (react_change_3)
 
 | Phase | Priority | Effort | Dependencies (backend deployed ✅) |
