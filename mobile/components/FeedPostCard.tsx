@@ -939,14 +939,13 @@ function FeedPostCardComponent({
 	const leftPct = binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : 50;
 	const rightPct =
 		binaryTotal > 0 ? Math.round((100 * down) / binaryTotal) : 50;
-	const binaryWinner: 0 | 1 | null =
-		isVotingClosed && binaryTotal > 0
-			? up > down
-				? 0
-				: down > up
-					? 1
-					: null
-			: null;
+	// Tie-aware binary winner predicate: on a tie (up === down) BOTH sides win,
+	// so neither image gets the loser dim/scrim. Matches web FeedPostCard.
+	const isBinaryWinnerSide = (side: 0 | 1): boolean => {
+		if (!isVotingClosed || binaryTotal <= 0) return false;
+		if (up === down) return true; // tie → both sides win
+		return side === 0 ? up > down : down > up;
+	};
 	const hasVoted = viewer !== null || activeMyIdx !== null;
 
 	// Multi-compare grid sizing — 3 cols for 3/5+ items, 2×2 for exactly 4 items
@@ -1721,7 +1720,7 @@ function FeedPostCardComponent({
 								(i === 0 && viewer === 'UP') || (i === 1 && viewer === 'DOWN');
 							const pct = i === 0 ? leftPct : rightPct;
 							const label = compareLabel(post, i);
-							const isWinner = isVotingClosed && binaryWinner === i;
+							const isWinner = isBinaryWinnerSide(i as 0 | 1);
 							return (
 								<Animated.View
 									key={`${post.id}-${i}`}
@@ -1730,7 +1729,12 @@ function FeedPostCardComponent({
 										isVotingClosed && !isWinner && st.compareCellLoser,
 										{
 											transform: [{ scale: cellScale[i] }],
-											opacity: cellOpacity[i],
+											// Once closed, drop the animated vote-dim and let the
+											// static winner/loser style decide — otherwise a tie's
+											// non-chosen winner stays stuck at the 0.55 vote-dim.
+											...(isVotingClosed
+												? null
+												: { opacity: cellOpacity[i] }),
 										},
 									]}>
 									<Pressable
