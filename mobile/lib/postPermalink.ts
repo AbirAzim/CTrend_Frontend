@@ -6,7 +6,7 @@ export function postPermalink(postId: string): string {
 }
 
 /** Public web URL — what users paste into a browser / share externally. */
-const WEB_ORIGIN = process.env.EXPO_PUBLIC_WEB_ORIGIN ?? "https://www.kejitbe.app";
+const WEB_ORIGIN = process.env.EXPO_PUBLIC_WEB_ORIGIN ?? "https://kejitbe.app";
 
 export function postWebUrl(postId: string): string {
   return `${WEB_ORIGIN}/post/${postId}`;

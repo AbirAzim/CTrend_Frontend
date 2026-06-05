@@ -5,6 +5,7 @@ import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
 import { AdminTabNav, type AdminTabId } from "../components/admin/AdminTabNav";
 import { AdminMessagesTab } from "./AdminMessagesTab";
+import { AdminReportedTab } from "./AdminReportedTab";
 import {
   CANCEL_INVITATION,
   CREATE_CATEGORY,
@@ -2747,6 +2748,7 @@ export function AdminPage() {
         {activeTab === "campaigns" && <CampaignsTab />}
         {activeTab === "categories" && <CategoriesTab />}
         {activeTab === "posts" && <PostsTab />}
+        {activeTab === "reports" && <AdminReportedTab />}
         {activeTab === "worldcup" && <WorldCupTab />}
         {activeTab === "admin-messages" && (
           <AdminMessagesTab

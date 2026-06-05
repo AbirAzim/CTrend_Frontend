@@ -44,6 +44,7 @@ import type { FeedPostView, VoteDirectionGql } from "../types/feed";
 import { MODERATOR_PLATFORM_NAME, PLATFORM_BRAND_LOGO_URL } from "../lib/moderatorBrand";
 import { PostCampaignBadge } from "./PostCampaignBadge";
 import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
+import { ContentReportModal } from "./ContentReportModal";
 import { imageObjectPosition } from "../lib/imageFocal";
 
 function storyInitial(name: string): string {
@@ -319,6 +320,7 @@ function FeedPostCardComponent({
   const votersModalCardRef = useRef<HTMLElement | null>(null);
   const [authorAvatarAttempt, setAuthorAvatarAttempt] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
   const isOwner = !!authUser && !!post.authorId && authUser.id === post.authorId;
@@ -1453,7 +1455,19 @@ function FeedPostCardComponent({
                 </button>
               )}
               {!canDelete && (
-                <button type="button" className="ig-more-item" role="menuitem" onClick={() => setMoreOpen(false)}>
+                <button
+                  type="button"
+                  className="ig-more-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    if (!isAuthenticated) {
+                      navigate("/login", { state: { from: location.pathname } });
+                      return;
+                    }
+                    setReportOpen(true);
+                  }}
+                >
                   Report
                 </button>
               )}
@@ -2173,6 +2187,20 @@ function FeedPostCardComponent({
           </section>
         </div>
       ) : null}
+
+      <ContentReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="post"
+        targetId={post.id}
+        reporterLabel={
+          authUser?.displayName?.trim() ||
+          authUser?.username ||
+          authUser?.email ||
+          "Signed-in user"
+        }
+        contextUrl={postPermalink(post.id)}
+      />
     </article>
   );
 }

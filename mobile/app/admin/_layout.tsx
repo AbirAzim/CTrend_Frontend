@@ -82,6 +82,10 @@ export default function AdminLayout() {
         options={{ title: "Platform Posts", tabBarLabel: "Posts", tabBarIcon: renderIcon("📝") }}
       />
       <Tabs.Screen
+        name="reports"
+        options={{ title: "Reported Posts", tabBarLabel: "Reports", tabBarIcon: renderIcon("🚩") }}
+      />
+      <Tabs.Screen
         name="messages"
         options={{ title: "Admin Messages", tabBarLabel: "Messages", tabBarIcon: renderIcon("💬") }}
       />

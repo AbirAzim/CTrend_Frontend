@@ -2,6 +2,8 @@
 
 Native app. The web app in `../src` is separate (Vite only).
 
+**Publishing to Google Play:** see **[GOOGLE_PLAY_STORE_GUIDE.md](./GOOGLE_PLAY_STORE_GUIDE.md)** (step-by-step).
+
 ## Setup
 
 ```bash
