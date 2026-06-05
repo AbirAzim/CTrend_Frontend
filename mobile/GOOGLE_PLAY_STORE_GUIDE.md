@@ -5,9 +5,12 @@ Step-by-step instructions to publish the **Expo React Native** app (`mobile/`) o
 | Item | Value |
 |------|--------|
 | **App name (user-facing)** | Ke Jitbe |
-| **Developer / operator (Play Console)** | **CTrend** (sole developer, based in Bangladesh) |
+| **Company / app brand** | **CTrend** |
+| **Developer (individual)** | **Abir Azim Badhon** (Bangladesh) |
+| **Play Console account type** | Personal developer (sole developer) |
+| **Contact email** | `badhonkhanbk007@gmail.com` |
 | **Distribution** | **Worldwide** — all countries/regions Google Play supports (unless you exclude specific markets later) |
-| **Website / legal pages** | `https://kejitbe.app` · `/privacy` · `/terms` |
+| **Website / legal pages** | `https://kejitbe.app` · `/privacy` · `/terms` · `/credits` |
 | **Package name** | `com.ctrend.app` |
 | **Stack** | Expo SDK 56 · React Native 0.85 · Hermes |
 | **Backend (production)** | `https://seashell-app-stt6c.ondigitalocean.app/graphql` |
@@ -113,11 +116,17 @@ For release AAB, see [§10](#10-build-the-release-aab).
 1. Open [Google Play Console](https://play.google.com/console).
 2. Sign in with your Google account.
 3. Click **Get started** / **Create developer account**.
-4. Choose **Organisation** or **Personal** (organisation recommended if you have a company name).
+4. Choose **Personal** (sole developer — **Abir Azim Badhon**, Bangladesh).
 5. Accept the **Developer Distribution Agreement**.
 6. Pay the **$25** registration fee.
-7. Complete **Account details** (contact email, website if any).
+7. Complete **Account details**:
+   - **Developer name** (shown on Play Store): **Abir Azim Badhon** (must match your ID if Google verifies)
+   - **Contact email:** `badhonkhanbk007@gmail.com`
+   - **Website:** `https://kejitbe.app`
+   - **Company / brand** in app listing and legal pages: **CTrend** (Ke Jitbe is the product name)
 8. Finish **Identity verification** if prompted (government ID, etc.).
+
+> **Note:** On a **Personal** account, the public Play Store “Developer” line usually shows your **legal name** (Abir Azim Badhon). **CTrend** appears as the company/brand on your website, privacy policy, terms, and in store description text. An **Organization** account is only needed if you want “CTrend” as the official Play Console legal entity (requires business registration in many regions).
 
 You cannot publish until the account is **verified** and in good standing.
 
@@ -168,6 +177,19 @@ A public **Terms of Service** page is built into the web app:
 
 Deploy with the web app to **`kejitbe.app`**. Sign-up page links to Terms + Privacy.
 
+### 3.2.1 Credits & team page
+
+Public **Credits & team** page lists developers, producers, and links to legal pages:
+
+| Item | Value |
+|------|--------|
+| **Route** | `/credits` |
+| **Source** | `src/pages/CreditsPage.tsx` · data in `packages/shared/src/lib/teamCredits.ts` |
+| **Mobile** | Profile → **Credits** (`mobile/app/profile/credits.tsx`) — opens Privacy/Terms in browser |
+
+**Developers:** Abir Azim Badhon, Anjan Kundu, Asief Mahir  
+**Producers:** Niaz Rahman Khan, Tushar Hasan Lavlu, Rahmatulla Sunny
+
 ### 3.3 Delete account / data
 
 Google Play requires a way for users to **request account and data deletion** when you collect personal data (email sign-up, profile, posts, etc.). Ke Jitbe meets this via **documented email support** — no in-app delete button yet.
@@ -204,7 +226,7 @@ Also declare that data is **encrypted in transit** (HTTPS) and whether it is **s
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | Legal entity — **CTrend**, Bangladesh | ✅ |
+| 1 | Legal identity — **CTrend** (brand), **Abir Azim Badhon** (developer), Bangladesh | ✅ |
 | 2 | Contact email — **`badhonkhanbk007@gmail.com`** | ✅ Set `VITE_PRIVACY_CONTACT_EMAIL` in `.env` before deploy |
 | 3 | Domain — **`https://kejitbe.app`** (`/privacy`, `/terms`) | ✅ Pages built — deploy to go live |
 | 4 | Terms of Service | ✅ `/terms` |
@@ -566,7 +588,7 @@ After the app is created:
 
 1. **Release** → **Production** (or **Testing**) → **Countries / regions**.
 2. For a **worldwide** launch, select **Add countries / regions** → choose **All countries** (or pick specific regions if you want a phased rollout).
-3. Legal pages (`/privacy`, `/terms`) already state that Ke Jitbe is offered internationally and that **CTrend** is based in Bangladesh.
+3. Legal pages (`/privacy`, `/terms`) state that **CTrend** operates Ke Jitbe, published by **Abir Azim Badhon** (Bangladesh).
 4. You remain responsible for local rules (age ratings, data safety answers, and any country-specific Play requirements). Google’s **Data safety** and **Content rating** forms apply globally to your listing.
 
 You land on the app dashboard with a **Setup checklist** — complete every required item before production.

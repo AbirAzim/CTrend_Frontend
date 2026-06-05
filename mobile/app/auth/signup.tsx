@@ -17,6 +17,7 @@ import {
 import { SIGNUP } from "@ctrend/shared/graphql/auth";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { AuthDivider, GoogleSignInButton } from "../../components/GoogleSignInButton";
+import { LegalLinksFooter } from "../../components/LegalLinksFooter";
 import { useTheme } from "../../context/ThemeContext";
 
 type SignupData = { signup: boolean };
@@ -112,6 +113,7 @@ export default function SignupScreen() {
 
           <AuthDivider />
           <GoogleSignInButton onError={setError} disabled={loading} />
+          <LegalLinksFooter />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -20,6 +20,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import type { StoredUser } from "../../lib/authStorage";
 import { AuthDivider, GoogleSignInButton } from "../../components/GoogleSignInButton";
+import { LegalLinksFooter } from "../../components/LegalLinksFooter";
 
 type LoginData = { login: { accessToken: string; user: StoredUser } };
 
@@ -104,6 +105,7 @@ export default function LoginScreen() {
 
           <AuthDivider />
           <GoogleSignInButton onError={setError} disabled={loading} />
+          <LegalLinksFooter />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
