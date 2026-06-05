@@ -2882,6 +2882,31 @@ a.cx-friend-avatar:hover {
   min-width: 0;
 }
 
+/* Per-count compare rows — fixed layout, equal square cells, short rows
+   centered, no scrolling (mirrors the mobile FeedPostCard recipe). Cell width
+   is set inline (calc based on the widest row's column count). */
+.ig-post-media-wrap--compare-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  aspect-ratio: unset;
+  overflow: hidden;
+}
+
+.ig-compare-row {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  justify-content: center;
+}
+
+.ig-post-media-wrap--compare-rows .ig-compare-cell {
+  border-radius: 0;
+  overflow: hidden;
+  aspect-ratio: 1;
+  min-width: 0;
+}
+
 /* Binary compare (2 items) gets rounded inner edges; grid does not */
 .ig-post-media-wrap--compare:not(.ig-post-media-wrap--compare-grid) .ig-compare-cell {
   border-radius: var(--cx-radius-md);
@@ -8311,6 +8336,28 @@ a.cx-friend-avatar:hover {
 
 .ig-post-detail .ig-post-media-wrap--compare-grid .ig-compare-cell {
   max-height: min(28vh, 260px);
+}
+
+/* Compare-rows layout in the detail view: keep the column-of-rows shape and
+   equal square cells; override the binary (flex-row, fixed-height) rules that
+   would otherwise match because rows isn't a --compare-grid. */
+.ig-post-detail .ig-post-media-wrap--compare-rows {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: unset;
+}
+
+.ig-post-detail .ig-post-media-wrap--compare-rows .ig-compare-cell {
+  flex: 0 0 auto;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 1;
+  align-self: auto;
 }
 
 .ig-post-detail .ig-post-media-wrap img,

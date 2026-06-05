@@ -59,8 +59,42 @@ import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+// Card has marginHorizontal:12 on each side, so its inner content is narrower
+// than the screen. Compare grids must size against this, not SCREEN_W.
+const CARD_MARGIN_H = 12;
+const CARD_CONTENT_W = SCREEN_W - CARD_MARGIN_H * 2;
+const MULTI_GRID_GAP = 2;
 const IMG_W = (SCREEN_W - 2) / 2;
 const IMG_H = IMG_W * 1.55;
+
+// Per-count compare grid recipes. Each entry is the number of images per row,
+// top → bottom. Cells are all the same square size (sized to the widest row),
+// short rows are centered, and nothing ever scrolls.
+const COMPARE_ROW_RECIPES: Record<number, number[]> = {
+	2: [2],
+	3: [3],
+	4: [2, 2],
+	5: [3, 2],
+	6: [3, 3],
+	7: [4, 3],
+	8: [3, 3, 2],
+	9: [3, 3, 3],
+	10: [3, 4, 3],
+};
+
+// Rows for n compare images. 2–10 use the hand-tuned recipes; 11+ fall back to
+// rows of 4 (last row centered) so cells stay equal-sized and reasonable.
+function getCompareRows(n: number): number[] {
+	if (COMPARE_ROW_RECIPES[n]) return COMPARE_ROW_RECIPES[n];
+	const rows: number[] = [];
+	let rem = n;
+	while (rem > 0) {
+		const take = Math.min(4, rem);
+		rows.push(take);
+		rem -= take;
+	}
+	return rows;
+}
 
 const GREEN = '#22c55e';
 const ORANGE = '#f97316';
@@ -885,18 +919,20 @@ function FeedPostCardComponent({
 		setVotersVisible(true);
 	}
 
-	// Animation values — pre-allocated for up to 4 options
+	// Animation values — one per compare option (min 4). Sized from the post's
+	// option count so multi-option posts (5–10+) never index past the array.
+	const animSlots = Math.max(post.imageUrls?.length ?? 0, 4);
 	const cellScale = useRef(
-		[0, 1, 2, 3].map(() => new Animated.Value(1)),
+		Array.from({ length: animSlots }, () => new Animated.Value(1)),
 	).current;
 	const cellOpacity = useRef(
-		[0, 1, 2, 3].map(() => new Animated.Value(1)),
+		Array.from({ length: animSlots }, () => new Animated.Value(1)),
 	).current;
 	const flashOpacity = useRef(
-		[0, 1, 2, 3].map(() => new Animated.Value(0)),
+		Array.from({ length: animSlots }, () => new Animated.Value(0)),
 	).current;
 	const badgeScale = useRef(
-		[0, 1, 2, 3].map(() => new Animated.Value(0)),
+		Array.from({ length: animSlots }, () => new Animated.Value(0)),
 	).current;
 	const splitLeftAnim = useRef(new Animated.Value(50)).current;
 	const splitRightAnim = useRef(new Animated.Value(50)).current;
@@ -979,10 +1015,22 @@ function FeedPostCardComponent({
 	};
 	const hasVoted = viewer !== null || activeMyIdx !== null;
 
-	// Multi-compare grid sizing — 3 cols for 3/5+ items, 2×2 for exactly 4 items
-	const numCols = !isBinary && compareUrls && compareUrls.length === 4 ? 2 : 3;
-	const multiCellWidth =
-		numCols === 2 ? (SCREEN_W - 2) / 2 : (SCREEN_W - 4) / 3;
+	// Multi-compare layout — fixed per-count rows (see getCompareRows), all cells
+	// the same square size (sized to the widest row so images stay identical),
+	// short rows centered, no scrolling. Width excludes the card's side margins.
+	const compareCount = compareUrls?.length ?? 0;
+	const compareRows = getCompareRows(compareCount);
+	const compareMaxCols = compareRows.length ? Math.max(...compareRows) : 1;
+	const multiCellWidth = Math.floor(
+		(CARD_CONTENT_W - (compareMaxCols - 1) * MULTI_GRID_GAP) / compareMaxCols,
+	);
+	// Precompute each row's starting option index for row-based rendering.
+	let compareRowCursor = 0;
+	const compareRowsWithStart = compareRows.map((size) => {
+		const start = compareRowCursor;
+		compareRowCursor += size;
+		return { size, start };
+	});
 	const multiTotal = activeStats?.reduce((sum, s) => sum + s.count, 0) ?? 0;
 
 	useEffect(() => {
@@ -1710,80 +1758,88 @@ function FeedPostCardComponent({
 			{compareUrls && !isBinary ? (
 				/* ── Multi-option grid (3+ options) ── */
 				<View style={styles.multiGrid}>
-					{compareUrls.map((url, i) => {
-						const stat = activeStats?.find((s) => s.index === i);
-						const pct = stat ? Math.round(stat.percentage) : 0;
-						const label = compareLabel(post, i);
-						const isVoted = activeMyIdx === i;
-						const maxCount = Math.max(
-							...(activeStats?.map((s) => s.count) ?? [0]),
-						);
-						const isWinner =
-							isVotingClosed &&
-							(stat?.count ?? 0) > 0 &&
-							stat?.count === maxCount;
-						const isLoser = isVotingClosed && !isWinner;
-						return (
-							<Animated.View
-								key={`${post.id}-multi-${i}`}
-								style={[
-									styles.multiCell,
-									{ width: multiCellWidth, height: multiCellWidth },
-									isLoser && { opacity: 0.5 },
-									{ transform: [{ scale: cellScale[i] }] },
-								]}>
-								<Pressable
-									style={styles.fill}
-									onPress={() => handleCellTap(i)}
-									disabled={isVotingClosed}>
-									<Image
-										source={{ uri: url }}
-										style={styles.multiImg}
-										contentFit='cover'
-										contentPosition={imageContentPosition(
-											post.postOptions?.[i]?.imageFocalX,
-											post.postOptions?.[i]?.imageFocalY,
-										)}
-										cachePolicy='memory-disk'
-									/>
-									<View style={st.pctOverlay}>
-										<Text style={st.pctText}>{pct}%</Text>
-										<Text style={st.pctLabel} numberOfLines={1}>
-											{label}
-										</Text>
-									</View>
+					{compareRowsWithStart.map(({ size, start }, rowIdx) => (
+						<View
+							key={`${post.id}-mrow-${rowIdx}`}
+							style={styles.multiRow}>
+							{Array.from({ length: size }, (_, col) => {
+								const i = start + col;
+								const url = compareUrls[i];
+								const stat = activeStats?.find((s) => s.index === i);
+								const pct = stat ? Math.round(stat.percentage) : 0;
+								const label = compareLabel(post, i);
+								const isVoted = activeMyIdx === i;
+								const maxCount = Math.max(
+									...(activeStats?.map((s) => s.count) ?? [0]),
+								);
+								const isWinner =
+									isVotingClosed &&
+									(stat?.count ?? 0) > 0 &&
+									stat?.count === maxCount;
+								const isLoser = isVotingClosed && !isWinner;
+								return (
 									<Animated.View
-										pointerEvents='none'
+										key={`${post.id}-multi-${i}`}
 										style={[
-											styles.absoluteFill,
-											{
-												backgroundColor: 'rgba(255,255,255,0.8)',
-												opacity: flashOpacity[i],
-											},
-										]}
-									/>
-									{isVoted && !isVotingClosed && (
-										<Animated.View
-											style={[
-												st.votedBadgeRow,
-												{ transform: [{ scale: badgeScale[i] }] },
-											]}>
-											<View style={st.votedBadge}>
-												<Text style={st.votedBadgeText}>✓ VOTED</Text>
+											styles.multiCell,
+											{ width: multiCellWidth, height: multiCellWidth },
+											isLoser && { opacity: 0.5 },
+											{ transform: [{ scale: cellScale[i] }] },
+										]}>
+										<Pressable
+											style={styles.fill}
+											onPress={() => handleCellTap(i)}
+											disabled={isVotingClosed}>
+											<Image
+												source={{ uri: url }}
+												style={styles.multiImg}
+												contentFit='cover'
+												contentPosition={imageContentPosition(
+													post.postOptions?.[i]?.imageFocalX,
+													post.postOptions?.[i]?.imageFocalY,
+												)}
+												cachePolicy='memory-disk'
+											/>
+											<View style={st.pctOverlay}>
+												<Text style={st.pctText}>{pct}%</Text>
+												<Text style={st.pctLabel} numberOfLines={1}>
+													{label}
+												</Text>
 											</View>
-										</Animated.View>
-									)}
-									{isWinner && (
-										<View style={st.winnerBadgeRow}>
-											<View style={st.winnerBadge}>
-												<Text style={st.winnerBadgeText}>👑 WINNER</Text>
-											</View>
-										</View>
-									)}
-								</Pressable>
-							</Animated.View>
-						);
-					})}
+											<Animated.View
+												pointerEvents='none'
+												style={[
+													styles.absoluteFill,
+													{
+														backgroundColor: 'rgba(255,255,255,0.8)',
+														opacity: flashOpacity[i],
+													},
+												]}
+											/>
+											{isVoted && !isVotingClosed && (
+												<Animated.View
+													style={[
+														st.votedBadgeRow,
+														{ transform: [{ scale: badgeScale[i] }] },
+													]}>
+													<View style={st.votedBadge}>
+														<Text style={st.votedBadgeText}>✓ VOTED</Text>
+													</View>
+												</Animated.View>
+											)}
+											{isWinner && (
+												<View style={st.winnerBadgeRow}>
+													<View style={st.winnerBadge}>
+														<Text style={st.winnerBadgeText}>👑 WINNER</Text>
+													</View>
+												</View>
+											)}
+										</Pressable>
+									</Animated.View>
+								);
+							})}
+						</View>
+					))}
 				</View>
 			) : compareUrls ? (
 				<>
@@ -2689,7 +2745,15 @@ const styles = StyleSheet.create({
 	fill: { flex: 1 },
 	absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 	// Multi-option grid (3–4 options)
-	multiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
+	multiGrid: {
+		flexDirection: 'column',
+		gap: MULTI_GRID_GAP,
+	},
+	multiRow: {
+		flexDirection: 'row',
+		gap: MULTI_GRID_GAP,
+		justifyContent: 'center',
+	},
 	multiCell: { overflow: 'hidden' },
 	multiImg: { width: '100%', height: '100%' },
 	// More menu
