@@ -19,6 +19,8 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { SignupPage } from "./pages/SignupPage";
 import { SoundPreferencesPage } from "./pages/SoundPreferencesPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
+import { TermsOfServicePage } from "./pages/TermsOfServicePage";
 
 export default function App() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
       <Route path="/reject-promotion" element={<RejectPromotionPage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
       <Route element={<AppShell />}>
         <Route index element={<FeedPage />} />
         <Route path="post/:postId" element={<PostDetailPage />} />

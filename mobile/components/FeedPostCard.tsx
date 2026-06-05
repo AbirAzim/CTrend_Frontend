@@ -16,6 +16,7 @@ import {
 	Modal,
 	Platform,
 	Pressable,
+	ScrollView,
 	StyleSheet,
 	Switch,
 	Text,
@@ -50,6 +51,12 @@ import logoAsset from '../assets/logo.png';
 import { PostCampaignBadge } from './PostCampaignBadge';
 import { PostVoteWinnerBanner } from './PostVoteWinnerBanner';
 import { imageContentPosition } from '../lib/imageFocal';
+import {
+	CONTENT_REPORT_REASONS,
+	type ContentReportReasonId,
+} from '@ctrend/shared/lib/contentReport';
+import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
+import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const IMG_W = (SCREEN_W - 2) / 2;
@@ -863,6 +870,11 @@ function FeedPostCardComponent({
 	const pendingVote = useRef<{ intent: number } | null>(null);
 
 	const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+	const [reportMenuVisible, setReportMenuVisible] = useState(false);
+	const [reportReasonId, setReportReasonId] =
+		useState<ContentReportReasonId>('spam');
+	const [reportDetails, setReportDetails] = useState('');
+	const [reportSubmitting, setReportSubmitting] = useState(false);
 	const [extendMenuVisible, setExtendMenuVisible] = useState(false);
 	const [votersVisible, setVotersVisible] = useState(false);
 	const [votersInitialTab, setVotersInitialTab] = useState<number | null>(null);
@@ -1525,8 +1537,46 @@ function FeedPostCardComponent({
 	}
 
 	function handleMore() {
-		if (!isOwner) return;
-		setMoreMenuVisible(true);
+		if (!isAuthenticated) {
+			router.push('/auth/login');
+			return;
+		}
+		if (isOwner) {
+			setMoreMenuVisible(true);
+			return;
+		}
+		setReportMenuVisible(true);
+	}
+
+	async function handleSubmitReport() {
+		if (!user) return;
+		setReportSubmitting(true);
+		try {
+			await submitContentReport(client, {
+				targetType: 'post',
+				targetId: post.id,
+				reasonId: reportReasonId,
+				details: reportDetails,
+				reporterLabel:
+					user.displayName?.trim() || user.username || user.email || 'Signed-in user',
+				contextUrl: postWebUrl(post.id),
+			});
+			setReportMenuVisible(false);
+			setReportDetails('');
+			setReportReasonId('spam');
+			if (Platform.OS === 'android') {
+				ToastAndroid.show('Report sent to moderators ✓', ToastAndroid.SHORT);
+			} else {
+				Alert.alert(
+					'Report submitted',
+					'Thank you. Our moderation team will review this content.',
+				);
+			}
+		} catch (err: unknown) {
+			Alert.alert('Could not send report', getApolloErrorMessage(err));
+		} finally {
+			setReportSubmitting(false);
+		}
 	}
 
 	function handleDelete() {
@@ -1641,7 +1691,7 @@ function FeedPostCardComponent({
 						{timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
 					</View>
 				</Pressable>
-				{isOwner ? (
+				{isAuthenticated ? (
 					<Pressable style={st.moreBtn} onPress={handleMore} hitSlop={8}>
 						<Text style={st.moreBtnText}>⋯</Text>
 					</Pressable>
@@ -2192,6 +2242,108 @@ function FeedPostCardComponent({
 				</Pressable>
 			</Modal>
 
+			{/* ── Report post (non-owner) ── */}
+			<Modal
+				visible={reportMenuVisible}
+				transparent
+				animationType='slide'
+				onRequestClose={() => !reportSubmitting && setReportMenuVisible(false)}>
+				<View style={styles.reportModalRoot}>
+					<Pressable
+						style={styles.reportModalOverlay}
+						onPress={() => !reportSubmitting && setReportMenuVisible(false)}
+					/>
+					<View
+						style={[
+							styles.menuSheet,
+							styles.reportSheet,
+							{ backgroundColor: colors.card, borderColor: colors.border },
+						]}>
+						<View style={[styles.menuHandle, { backgroundColor: colors.border }]} />
+						<Text style={[styles.menuTitle, { color: colors.text }]}>Report post</Text>
+						<Text style={[styles.reportHint, { color: colors.subtext }]}>
+							Choose a reason. CTrend moderators will review reported posts in Admin →
+							Reports.
+						</Text>
+						<ScrollView
+							style={styles.reportReasonScroll}
+							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps='handled'>
+							{CONTENT_REPORT_REASONS.map((reason) => (
+								<Pressable
+									key={reason.id}
+									style={[styles.reportReasonRow, { borderBottomColor: colors.border }]}
+									onPress={() => setReportReasonId(reason.id)}
+									disabled={reportSubmitting}>
+									<View
+										style={[
+											styles.reportRadio,
+											{
+												borderColor:
+													reportReasonId === reason.id
+														? colors.accent
+														: colors.border,
+											},
+										]}>
+										{reportReasonId === reason.id ? (
+											<View
+												style={[
+													styles.reportRadioDot,
+													{ backgroundColor: colors.accent },
+												]}
+											/>
+										) : null}
+									</View>
+									<Text style={[styles.menuRowText, { color: colors.text }]}>
+										{reason.label}
+									</Text>
+								</Pressable>
+							))}
+						</ScrollView>
+						<TextInput
+							style={[
+								styles.reportInput,
+								{
+									color: colors.text,
+									borderColor: colors.border,
+									backgroundColor: colors.bg,
+								},
+							]}
+							placeholder='Additional details (optional)'
+							placeholderTextColor={colors.subtext}
+							value={reportDetails}
+							onChangeText={setReportDetails}
+							multiline
+							maxLength={1000}
+							editable={!reportSubmitting}
+						/>
+						<View style={styles.reportActionsRow}>
+							<Pressable
+								style={[styles.reportCancelBtn, { borderColor: colors.border }]}
+								onPress={() => setReportMenuVisible(false)}
+								disabled={reportSubmitting}>
+								<Text style={[styles.reportCancelText, { color: colors.text }]}>
+									Cancel
+								</Text>
+							</Pressable>
+							<Pressable
+								style={[
+									styles.reportSubmitBtn,
+									{ backgroundColor: colors.accent, opacity: reportSubmitting ? 0.7 : 1 },
+								]}
+								onPress={() => void handleSubmitReport()}
+								disabled={reportSubmitting}>
+								{reportSubmitting ? (
+									<ActivityIndicator color='#fff' />
+								) : (
+									<Text style={styles.reportSubmitText}>Submit report</Text>
+								)}
+							</Pressable>
+						</View>
+					</View>
+				</View>
+			</Modal>
+
 			{/* ── Extend voting menu ── */}
 			<Modal
 				visible={extendMenuVisible}
@@ -2573,4 +2725,67 @@ const styles = StyleSheet.create({
 		borderBottomWidth: StyleSheet.hairlineWidth,
 	},
 	menuRowText: { fontSize: 16 },
+	reportModalRoot: { flex: 1, justifyContent: 'flex-end' },
+	reportModalOverlay: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: 'rgba(0,0,0,0.5)',
+	},
+	reportSheet: { maxHeight: '88%', paddingBottom: 24 },
+	reportHint: {
+		fontSize: 13,
+		lineHeight: 18,
+		paddingHorizontal: 20,
+		marginBottom: 8,
+	},
+	reportReasonScroll: { maxHeight: 220 },
+	reportReasonRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+	},
+	reportRadio: {
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		borderWidth: 2,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	reportRadioDot: { width: 10, height: 10, borderRadius: 5 },
+	reportInput: {
+		marginHorizontal: 20,
+		marginTop: 12,
+		marginBottom: 16,
+		minHeight: 72,
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		fontSize: 15,
+		textAlignVertical: 'top',
+	},
+	reportActionsRow: {
+		flexDirection: 'row',
+		gap: 10,
+		marginHorizontal: 20,
+		marginTop: 4,
+	},
+	reportCancelBtn: {
+		flex: 1,
+		borderRadius: 12,
+		borderWidth: 1,
+		paddingVertical: 14,
+		alignItems: 'center',
+	},
+	reportCancelText: { fontSize: 15, fontWeight: '700' },
+	reportSubmitBtn: {
+		flex: 1.4,
+		borderRadius: 12,
+		paddingVertical: 14,
+		alignItems: 'center',
+	},
+	reportSubmitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

@@ -5,6 +5,7 @@ export type AdminTabId =
   | "campaigns"
   | "categories"
   | "posts"
+  | "reports"
   | "worldcup"
   | "admin-messages";
 
@@ -15,6 +16,7 @@ const ADMIN_TABS: { id: AdminTabId; label: string; short: string }[] = [
   { id: "campaigns", label: "Campaigns", short: "Campaigns" },
   { id: "categories", label: "Categories", short: "Categories" },
   { id: "posts", label: "Post management", short: "Posts" },
+  { id: "reports", label: "Reported posts", short: "Reports" },
   { id: "admin-messages", label: "Admin messages", short: "Messages" },
   { id: "worldcup", label: "World Cup", short: "World Cup" },
 ];
