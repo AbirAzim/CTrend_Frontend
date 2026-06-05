@@ -18,6 +18,8 @@ import {
   REMOVE_USER,
   RESEND_INVITATION,
   UPDATE_CATEGORY,
+  PLATFORM_SETTINGS,
+  SET_ALLOW_USER_GLOBAL_POSTS,
 } from "../graphql/admin";
 import { CATEGORIES, DELETE_POST } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
@@ -2032,8 +2034,11 @@ type PostVotingFilter = "all" | "live" | "closed";
 type PostSortBy = "createdAt" | "votes" | "caption" | "updatedAt";
 type PostSortOrder = "asc" | "desc";
 
+type PostScope = "admin" | "user";
+
 function PostsTab() {
   const navigate = useNavigate();
+  const [scope, setScope] = useState<PostScope>("admin");
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<PostStatusFilter>("all");
@@ -2056,10 +2061,11 @@ function PostsTab() {
       status: statusFilter === "all" ? undefined : statusFilter,
       categoryId: categoryFilter === "all" ? undefined : categoryFilter,
       votingFilter: votingFilter === "all" ? undefined : votingFilter,
+      scope,
       sortBy,
       sortOrder,
     }),
-    [searchTerm, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder],
+    [searchTerm, statusFilter, categoryFilter, votingFilter, scope, sortBy, sortOrder],
   );
 
   const countFilter = useMemo(
@@ -2068,13 +2074,14 @@ function PostsTab() {
       status: listFilter.status,
       categoryId: listFilter.categoryId,
       votingFilter: listFilter.votingFilter,
+      scope: listFilter.scope,
     }),
     [listFilter],
   );
 
   useEffect(() => {
     setSkip(0);
-  }, [searchTerm, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder]);
+  }, [searchTerm, statusFilter, categoryFilter, votingFilter, scope, sortBy, sortOrder]);
 
   const { data, loading, error, refetch } = useQuery<{
     adminPlatformPosts: PlatformPostRow[];
@@ -2131,14 +2138,41 @@ function PostsTab() {
     <div className="admin-tab-panel">
       <AdminSectionHead
         title="Post management"
-        subtitle="Platform-wide polls — search, filter, open a post, or edit as any admin."
+        subtitle={
+          scope === "admin"
+            ? "Admin platform-wide polls — search, filter, open a post, or edit as any admin."
+            : "Normal-user posts broadcast platform-wide — search, filter, open, or remove."
+        }
         action={
-          <Link to="/create" className="admin-btn-cta">
-            <span className="admin-btn-cta-icon" aria-hidden>+</span>
-            New platform post
-          </Link>
+          scope === "admin" ? (
+            <Link to="/create" className="admin-btn-cta">
+              <span className="admin-btn-cta-icon" aria-hidden>+</span>
+              New platform post
+            </Link>
+          ) : undefined
         }
       />
+
+      <div className="admin-subtabs" role="tablist" aria-label="Post management scope">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "admin"}
+          className={`admin-subtab${scope === "admin" ? " is-active" : ""}`}
+          onClick={() => setScope("admin")}
+        >
+          Admin Post Management
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "user"}
+          className={`admin-subtab${scope === "user" ? " is-active" : ""}`}
+          onClick={() => setScope("user")}
+        >
+          User Post Management
+        </button>
+      </div>
 
       <div className="admin-posts-summary">
         <div className="admin-posts-summary-card">
@@ -2589,6 +2623,94 @@ function PostsTab() {
   );
 }
 
+// ─── Platform: allow normal users to post globally ───────────────────────────
+
+function AdminUserGlobalPostsControl() {
+  const { data, refetch } = useQuery(PLATFORM_SETTINGS);
+  const [setAllow] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
+  const [error, setError] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    if (data?.platformSettings) {
+      setEnabled(Boolean(data.platformSettings.allowUserGlobalPosts));
+    }
+  }, [data?.platformSettings?.allowUserGlobalPosts]);
+
+  function setEnabledOptimistic(next: boolean) {
+    if (next === enabled) return;
+    const previous = enabled;
+    setEnabled(next);
+    setError(null);
+    void setAllow({ variables: { enabled: next } })
+      .then(() => {
+        void refetch();
+      })
+      .catch((err: unknown) => {
+        setEnabled(previous);
+        setError(getApolloErrorMessage(err));
+      });
+  }
+
+  return (
+    <section
+      className={`admin-global-posts-bar${enabled ? " admin-global-posts-bar--danger" : " admin-global-posts-bar--safe"}`}
+      aria-label="Global user posts setting"
+    >
+      <div className="admin-global-posts-bar__row">
+        <span className="admin-global-posts-bar__label" id="admin-global-posts-title">
+          Let normal users post globally
+          {enabled ? (
+            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--danger">
+              Risk active
+            </span>
+          ) : (
+            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--safe">
+              Restricted
+            </span>
+          )}
+        </span>
+        <div className="admin-global-posts-bar__controls">
+          <label
+            className="ig-toggle-switch-wrap admin-global-posts-toggle"
+            title={enabled ? "Turn off global user posts" : "Allow global user posts"}
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              aria-labelledby="admin-global-posts-title"
+              aria-checked={enabled}
+              checked={enabled}
+              onChange={(e) => setEnabledOptimistic(e.target.checked)}
+            />
+            <span className="ig-toggle-switch" aria-hidden />
+          </label>
+          <button
+            type="button"
+            className="admin-global-posts-details-btn"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((o) => !o)}
+          >
+            {detailsOpen ? "Hide details" : "Details"}
+          </button>
+        </div>
+      </div>
+      {detailsOpen ? (
+        <div className="admin-global-posts-bar__details" id="admin-global-posts-details">
+          <p className="muted small">
+            <strong>Important platform control.</strong> When off (default), only admin{" "}
+            <strong>Platform-wide</strong> posts reach everyone with the <strong>Ke Jitbe</strong> brand.
+            When on, users can choose a global post — their name and photo appear on the feed and in
+            notifications for all members (not an official Ke Jitbe platform post).
+          </p>
+        </div>
+      ) : null}
+      {error ? <p className="admin-error small admin-global-posts-bar__error">{error}</p> : null}
+    </section>
+  );
+}
+
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
@@ -2613,6 +2735,8 @@ export function AdminPage() {
         </div>
         <span className="admin-role-badge admin-role-badge--admin">admin</span>
       </div>
+
+      <AdminUserGlobalPostsControl />
 
       <AdminTabNav activeTab={activeTab} onChange={setActiveTab} />
 

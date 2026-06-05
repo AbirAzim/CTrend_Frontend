@@ -42,6 +42,8 @@ export const FEED_POSTS = gql`
       authorUsername
       authorDisplayName
       authorEmail
+      authorProfileImageUrl
+      isUserGlobalBroadcast
       imageUrls
       caption
       createdAt
@@ -85,6 +87,8 @@ export const GET_POST_BY_ID = gql`
       authorUsername
       authorDisplayName
       authorEmail
+      authorProfileImageUrl
+      isUserGlobalBroadcast
       imageUrls
       caption
       createdAt

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -14,6 +15,7 @@ import {
   ARCHIVE_NOTIFICATION,
   NEW_NOTIFICATION_SUB,
 } from "../graphql/notifications";
+import { onWsConnected, reconnectWs } from "../lib/apolloClient";
 import { useAuth } from "./AuthContext";
 import { playNotificationChime } from "../lib/notificationSound";
 
@@ -73,6 +75,39 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [markReadMut] = useMutation(MARK_NOTIFICATION_READ);
   const [markAllReadMut] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
   const [archiveMut] = useMutation(ARCHIVE_NOTIFICATION);
+
+  // WebSocket resilience — mirror MessengerContext so the bell doesn't miss
+  // real-time hype/comment/vote notifications.
+  //
+  // The `newNotification` subscription is delivered only when the backend can
+  // read the subscriber's id from the WS auth context. If the socket connected
+  // before login (stale/no token) the server filter silently drops every
+  // notification, and the in-process PubSub has no replay for events fired
+  // during a reconnect gap. We therefore (1) force a fresh authenticated WS on
+  // mount, (2) refetch whenever the WS (re)connects, and (3) refetch when the
+  // tab returns to the foreground. Without this, the bell only recovered via
+  // the 25s poll — so notifications "sometimes" never seemed to arrive.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    reconnectWs();
+
+    const unsubWs = onWsConnected(() => {
+      void refetch();
+    });
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        void refetch();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      unsubWs();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isAuthenticated, refetch]);
 
   useSubscription(NEW_NOTIFICATION_SUB, {
     skip: !isAuthenticated,

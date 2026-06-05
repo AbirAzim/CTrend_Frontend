@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { createPortal } from "react-dom";
 import { useMobileShell } from "../lib/useMobileShell";
 import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
-import { useMessenger, type Conversation, type Message } from "../context/MessengerContext";
+import { useMessenger, type Conversation, type Message, type ReplyPreview } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
@@ -61,16 +61,54 @@ function ImageBubble({ src, caption }: { src: string; caption?: string }) {
   );
 }
 
+// ── Quoted reply preview (inside a bubble) ───────────────────────────
+function QuotedReply({
+  replyTo,
+  onJump,
+}: {
+  replyTo: ReplyPreview;
+  onJump?: () => void;
+}) {
+  const preview = replyTo.text?.trim()
+    ? replyTo.text
+    : replyTo.imageUrl
+      ? "📷 Photo"
+      : "Message";
+  return (
+    <button
+      type="button"
+      className="cw-quoted"
+      onClick={onJump}
+      title={onJump ? "Go to message" : undefined}
+    >
+      <span className="cw-quoted-bar" aria-hidden />
+      <span className="cw-quoted-meta">
+        <span className="cw-quoted-name">{replyTo.senderName}</span>
+        <span className="cw-quoted-text">{preview}</span>
+      </span>
+      {replyTo.imageUrl ? (
+        <img src={replyTo.imageUrl} alt="" className="cw-quoted-thumb" />
+      ) : null}
+    </button>
+  );
+}
+
 // ── Message bubble + reactions ───────────────────────────────────────
 function MessageBubble({
   msg,
   conversationId,
   bubbleClassName,
+  isMine = false,
+  onReply,
+  onJumpToQuoted,
   children,
 }: {
   msg: Message;
   conversationId: string;
   bubbleClassName: string;
+  isMine?: boolean;
+  onReply?: (msg: Message) => void;
+  onJumpToQuoted?: (messageId: string) => void;
   children: ReactNode;
 }) {
   const { reactMessage } = useMessenger();
@@ -136,21 +174,52 @@ function MessageBubble({
         </div>
       ) : null}
 
-      <div
-        className={bubbleClassName}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setPickerOpen(true);
-        }}
-        onPointerDown={() => {
-          clearLongPress();
-          longPressTimer.current = setTimeout(() => setPickerOpen(true), 480);
-        }}
-        onPointerUp={clearLongPress}
-        onPointerCancel={clearLongPress}
-        onPointerLeave={clearLongPress}
-      >
-        {children}
+      <div className={`cw-bubble-line${isMine ? " cw-bubble-line--mine" : ""}`}>
+        <div
+          className={bubbleClassName}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setPickerOpen(true);
+          }}
+          onPointerDown={() => {
+            clearLongPress();
+            longPressTimer.current = setTimeout(() => setPickerOpen(true), 480);
+          }}
+          onPointerUp={clearLongPress}
+          onPointerCancel={clearLongPress}
+          onPointerLeave={clearLongPress}
+        >
+          {msg.replyTo ? (
+            <QuotedReply
+              replyTo={msg.replyTo}
+              onJump={
+                onJumpToQuoted
+                  ? () => onJumpToQuoted(msg.replyTo!.messageId)
+                  : undefined
+              }
+            />
+          ) : null}
+          {children}
+        </div>
+
+        {onReply ? (
+          <button
+            type="button"
+            className={`cw-reply-action${showQuickBar ? " cw-reply-action--visible" : ""}`}
+            aria-label="Reply"
+            title="Reply"
+            onClick={() => {
+              onReply(msg);
+              setPickerOpen(false);
+              setHoverQuick(false);
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden>
+              <polyline points="9 17 4 12 9 7" />
+              <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+            </svg>
+          </button>
+        ) : null}
       </div>
 
       {msg.reactions.length > 0 ? (
@@ -205,6 +274,7 @@ function ChatWindow({
   const [hasMore, setHasMore] = useState(true);
   const [minimized, setMinimized] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
 
   // Image state
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
@@ -258,6 +328,11 @@ function ChatWindow({
     if (!minimized) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, minimized]);
 
+  // Focus the composer the moment the user picks a message to reply to.
+  useEffect(() => {
+    if (replyTarget) inputRef.current?.focus();
+  }, [replyTarget]);
+
   // Mark as read whenever new messages land while the window is visible.
   // This covers the case where the window is already open when a message arrives
   // — the conversation.id effect above only fires on window open, not on new msgs.
@@ -297,12 +372,36 @@ function ChatWindow({
     setUploadError(null);
   }
 
+  function jumpToMessage(messageId: string) {
+    const el = scrollRef.current?.querySelector<HTMLElement>(
+      `[data-cw-msg-id="${messageId}"]`,
+    );
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("cw-msg--flash");
+    setTimeout(() => el.classList.remove("cw-msg--flash"), 1200);
+  }
+
+  // Snap to the newest message. Used after sending so the view always lands on
+  // the message you just sent — even when you'd scrolled up to reply to an
+  // older one. Waits a frame so the appended bubble is laid out first.
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      else bottomRef.current?.scrollIntoView();
+    });
+  }
+
   async function handleSend() {
     const trimmed = text.trim();
     if (!trimmed && !pendingImage) return;
 
+    const replyToId = replyTarget?.id ?? null;
+
     setText("");
     setShowEmoji(false);
+    setReplyTarget(null);
     setTyping(conversation.id, false);
 
     if (pendingImage) {
@@ -313,19 +412,22 @@ function ChatWindow({
         // This avoids any CORS issues with direct R2 presigned URLs in production.
         const publicUrl = await uploadImage(pendingImage.file);
 
-        await sendMessage(conversation.id, trimmed, publicUrl);
+        await sendMessage(conversation.id, trimmed, publicUrl, replyToId);
 
         URL.revokeObjectURL(pendingImage.previewUrl);
         setPendingImage(null);
+        scrollToBottom();
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Image upload failed.";
         setUploadError(msg + " Please try again.");
         setText(trimmed); // restore caption text
+        if (replyTarget) setReplyTarget(replyTarget); // restore reply context
       } finally {
         setUploading(false);
       }
     } else {
-      await sendMessage(conversation.id, trimmed);
+      await sendMessage(conversation.id, trimmed, undefined, replyToId);
+      scrollToBottom();
     }
   }
 
@@ -506,6 +608,7 @@ function ChatWindow({
               return (
                 <div
                   key={msg.id}
+                  data-cw-msg-id={msg.id}
                   className={[
                     "cw-msg",
                     isMine ? "cw-msg--mine" : isModeratorMsg ? "cw-msg--moderator" : "cw-msg--theirs",
@@ -533,6 +636,9 @@ function ChatWindow({
                       <MessageBubble
                         msg={msg}
                         conversationId={conversation.id}
+                        isMine={isMine}
+                        onReply={setReplyTarget}
+                        onJumpToQuoted={jumpToMessage}
                         bubbleClassName={[
                           "cw-bubble",
                           "cw-bubble--img",
@@ -550,6 +656,9 @@ function ChatWindow({
                       <MessageBubble
                         msg={msg}
                         conversationId={conversation.id}
+                        isMine={isMine}
+                        onReply={setReplyTarget}
+                        onJumpToQuoted={jumpToMessage}
                         bubbleClassName={[
                           "cw-bubble",
                           `cw-bubble--${bubbleSide}`,
@@ -634,6 +743,38 @@ function ChatWindow({
                   </svg>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Reply preview bar */}
+          {replyTarget && (
+            <div className="cw-reply-bar">
+              <span className="cw-reply-bar-accent" aria-hidden />
+              <div className="cw-reply-bar-meta">
+                <span className="cw-reply-bar-name">
+                  Replying to {replyTarget.senderId === user?.id ? "yourself" : replyTarget.senderName}
+                </span>
+                <span className="cw-reply-bar-text">
+                  {replyTarget.text?.trim()
+                    ? replyTarget.text
+                    : replyTarget.imageUrl
+                      ? "📷 Photo"
+                      : "Message"}
+                </span>
+              </div>
+              {replyTarget.imageUrl ? (
+                <img src={replyTarget.imageUrl} alt="" className="cw-reply-bar-thumb" />
+              ) : null}
+              <button
+                type="button"
+                className="cw-reply-bar-close"
+                aria-label="Cancel reply"
+                onClick={() => setReplyTarget(null)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" width="14" height="14" aria-hidden>
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
             </div>
           )}
 

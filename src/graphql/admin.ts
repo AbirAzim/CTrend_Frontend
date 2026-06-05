@@ -355,14 +355,21 @@ export const ADMIN_MODERATOR_THREAD_MESSAGES = gql`
       sentByAdminEmail
       text
       imageUrl
+      replyTo {
+        messageId
+        senderId
+        senderName
+        text
+        imageUrl
+      }
       createdAt
     }
   }
 `;
 
 export const SEND_MODERATOR_MESSAGES = gql`
-  mutation SendModeratorMessages($userIds: [ID!]!, $text: String!, $imageUrl: String) {
-    sendModeratorMessages(userIds: $userIds, text: $text, imageUrl: $imageUrl) {
+  mutation SendModeratorMessages($userIds: [ID!]!, $text: String!, $imageUrl: String, $replyToId: ID) {
+    sendModeratorMessages(userIds: $userIds, text: $text, imageUrl: $imageUrl, replyToId: $replyToId) {
       id
       conversationId
       text
@@ -403,8 +410,31 @@ export const ADMIN_MODERATOR_USER_MESSAGE = gql`
         sentByAdminEmail
         text
         imageUrl
+        replyTo {
+          messageId
+          senderId
+          senderName
+          text
+          imageUrl
+        }
         createdAt
       }
+    }
+  }
+`;
+
+export const PLATFORM_SETTINGS = gql`
+  query PlatformSettings {
+    platformSettings {
+      allowUserGlobalPosts
+    }
+  }
+`;
+
+export const SET_ALLOW_USER_GLOBAL_POSTS = gql`
+  mutation SetAllowUserGlobalPosts($enabled: Boolean!) {
+    setAllowUserGlobalPosts(enabled: $enabled) {
+      allowUserGlobalPosts
     }
   }
 `;

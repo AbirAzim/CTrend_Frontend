@@ -39,6 +39,7 @@ function typeIcon(type: string, referenceType?: string | null): string {
     case "FRIEND_REQUEST":   return "👋";
     case "FRIEND_REQUEST_ACCEPTED": return "🤝";
     case "NEW_POST_FRIEND":  return "✨";
+    case "USER_GLOBAL_POST": return "🌍";
     case "POST_HYPE":        return "❤️";
     case "POST_VOTE":        return "🗳️";
     case "POST_COMMENT":     return "💭";
@@ -186,7 +187,10 @@ export function NotificationBell() {
       navigate(`/post/${n.postId}#comment-${n.commentId}`);
       return;
     }
-    if (n.type === "ANNOUNCEMENT" && (n.postId || n.referenceId)) {
+    if (
+      (n.type === "ANNOUNCEMENT" || n.type === "USER_GLOBAL_POST") &&
+      (n.postId || n.referenceId)
+    ) {
       navigate(`/post/${n.postId ?? n.referenceId}`);
       return;
     }
