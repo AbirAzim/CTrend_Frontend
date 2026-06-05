@@ -1,0 +1,71 @@
+# React Change Log 4 — Chat reply system & fixes
+
+Continuation of `react_change_3/`. Tracks **Messenger-style reply (quote)** support
+across the user chat and the admin moderator chat, plus follow-up bug fixes
+(notification delivery, vote-tie rendering) — web + backend.
+
+Overall plan: [`../PHASES.md`](../PHASES.md).
+
+## Workflow
+
+1. Implement + verify on **web** and **CTrend backend**.
+2. Add a dated entry here (use [`TEMPLATE.md`](./TEMPLATE.md)).
+3. Deploy backend before frontend (new GraphQL field + mutation arg).
+
+## Index — 2026-06-04
+
+| Doc | Topic |
+|-----|--------|
+| [chat-reply-system.md](./2026-06-04_chat-reply-system.md) | Reply to a specific message (quote snippet, reply bar, jump-to-original) in user DMs + admin moderator chat |
+
+## Index — 2026-06-05
+
+| Doc | Topic |
+|-----|--------|
+| [notification-ws-resilience.md](./2026-06-05_notification-ws-resilience.md) | Fix bell notifications (hype/comment/vote) "sometimes not coming" — WS reconnect + refetch on (re)connect/visibility |
+| [vote-tie-no-dim.md](./2026-06-05_vote-tie-no-dim.md) | Don't dim compare options on a tie — tie-aware winner predicates (both share top = both win) |
+| [friends-tabs-and-live-moves.md](./2026-06-05_friends-tabs-and-live-moves.md) | Friends page: separate Incoming/Sent tabs + instant animated moves between Suggestions/Requests/Friends (optimistic pins, 8s peer poll, rollback) |
+| [connections-received-sent-separate-tabs.md](./2026-06-05_connections-received-sent-separate-tabs.md) | **User ask:** Received + Sent as **separate top-level tabs** (Profile Connections + Friends page) — not one Requests tab with INCOMING/SENT sections |
+| [user-global-platform-posts.md](./2026-06-05_user-global-platform-posts.md) | Admin toggle (default OFF) for normal users to post globally — user name/avatar on feed + `USER_GLOBAL_POST` notifications vs admin `SYSTEM` / **Ke Jitbe** brand |
+| [admin-post-management-scope-tabs.md](./2026-06-05_admin-post-management-scope-tabs.md) | Post management split into **Admin Post Management** (SYSTEM) and **User Post Management** (user global broadcasts) via a `scope` filter |
+
+## Backend (CTrend repo)
+
+- `messages/message.schema.ts` — `ReplyPreview` embedded doc + `replyTo` on `Message`
+- `messages/graphql/message.types.ts` — `MessageReplyPreviewGql` + `replyTo` on `MessageGql`
+- `messages/messages.service.ts` — `buildReplySnapshot`, `replyPreviewToGql`, `replyToId` through `sendMessage` / `sendModeratorMessage(s)`, `replyTo` in `messageToGql`
+- `messages/messages.resolver.ts` — `replyToId` arg on the three send mutations
+- `platform-settings/` — `allowUserGlobalPosts`, `platformSettings`, `setAllowUserGlobalPosts`
+- `posts/post.schema.ts` — `isUserGlobalBroadcast`; `posts/dto/create-post.input.ts` — `broadcastGlobally`
+- `posts/posts.service.ts` — create validation + `notifyAllUsersOfUserGlobalPost` fan-out
+- `feed/feed.service.ts` — global user posts in feed filter
+- `notifications/notification.schema.ts` — `USER_GLOBAL_POST`
+- `posts/dto/admin-platform-posts.input.ts` — `scope` (`admin` | `user`) filter
+- `posts/posts.service.ts` — `buildPlatformPostsFilter` scope branch (SYSTEM vs user global) + threaded through list/count
+- `posts/posts.resolver.ts` — pass `scope` from admin posts query/filter inputs
+
+## Web (this repo)
+
+- `graphql/messages.ts` — `replyTo` selection + `$replyToId` on `SEND_MESSAGE`
+- `graphql/admin.ts` — `replyTo` on thread/subscription messages + `$replyToId` on `SEND_MODERATOR_MESSAGES`
+- `context/MessengerContext.tsx` — `ReplyPreview` type, `replyTo` on `Message`, `sendMessage(..., replyToId)`
+- `components/MessengerPanel.tsx` — standalone reply arrow beside each bubble (not in the emoji tray), quoted bubble, composer reply bar, jump-to-original
+- `pages/AdminMessagesTab.tsx` — reply UX for admin moderator chat (per-row hover reply button)
+- `index.css` — side reply action (`cw-bubble-line` / `cw-reply-action`), quoted snippet, reply bar, and flash-highlight styles (`cw-*` + `admin-mod-*`)
+- `context/NotificationContext.tsx` — WS reconnect + refetch-on-(re)connect/visibility so the bell doesn't miss real-time hype/comment/vote notifications
+- `components/FeedPostCard.tsx` — tie-aware winner predicates so equal-percentage compare options don't dim on a tie
+- `pages/FriendsPage.tsx` — Incoming/Sent sub-tabs + animated view-model engine (optimistic pins, peer poll, rollback) for instant moves between Suggestions/Requests/Friends
+- `index.css` — friends tab counts, sub-tabs, panel + list-item enter/leave animations, action-button accents
+- `pages/ProfilePage.tsx` — Connections: **Friends | Received | Sent | Suggestions** (see connections doc)
+- `pages/FriendsPage.tsx` — top-level **My Friends | Received | Sent | Suggestions** (see connections doc)
+- `index.css` — scrollable 4-tab bars, incoming alert badge on friends tabs
+- `graphql/admin.ts` — `PLATFORM_SETTINGS`, `SET_ALLOW_USER_GLOBAL_POSTS`
+- `graphql/feed.ts` — `isUserGlobalBroadcast`, `authorProfileImageUrl`
+- `pages/AdminPage.tsx` — global user posts toggle + Details panel
+- `pages/CreatePostPage.tsx` — **Post globally** when setting enabled
+- `components/FeedPostCard.tsx` — **Global** badge (distinct from platform **Platform** badge)
+- `components/NotificationBell.tsx` — `USER_GLOBAL_POST` handling
+- `lib/mapGqlPostToFeedView.ts`, `types/feed.ts` — global broadcast fields
+- `index.css` — admin global-posts card, user-global feed/create styles
+- `pages/AdminPage.tsx` — Post management **Admin / User** scope sub-tabs (`scope` filter, scoped count/CTA)
+- `index.css` — `admin-subtabs` / `admin-subtab` segmented control
