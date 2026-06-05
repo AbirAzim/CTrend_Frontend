@@ -956,17 +956,17 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 32 — Vote-Tie No-Dim (tie-aware winners) — NOT STARTED
+### ✅ PHASE 32 — Vote-Tie No-Dim (tie-aware winners) — COMPLETE 2026-06-05 (device-tested)
 
 **Source docs:** `2026-06-05_vote-tie-no-dim.md`
 
 **Goal:** On a closed poll that ended in a tie, **both** top options stay bright + crowned instead of both getting the loser scrim.
 
-- [ ] **No GraphQL/shared change** — pure `mobile/components/FeedPostCard.tsx` logic (post-detail reuses the same card, so both are fixed).
-- [ ] **Replace `binaryWinnerSide`** (returns `null` when `up===down`) with `isBinaryWinnerSide(side)` → `true` for **both** sides on a tie, else the higher side.
-- [ ] **Replace `multiWinnerIndex`** (returns `null` when >1 share top) with `isMultiWinnerIndex(idx)` → `true` for **every** option whose pct equals the top pct; genuinely lower options stay dimmed.
-- [ ] **Apply at all call sites** — binary image cells, multi image cells, and the binary details-breakdown row (winner-glow vs loser-dim / badge logic). Both crowned cells show the 👑 WINNER badge; neither gets the opacity/loser-scrim dim.
-- [ ] **Footer copy** (optional parity) — tie summary reads "Tie · {pct}% each" where the winner summary is shown.
+- [x] **No GraphQL/shared change** — pure `mobile/components/FeedPostCard.tsx` logic (post-detail reuses the same card, so both are fixed).
+- [x] **Replaced `binaryWinner` value** (returned `null` when `up===down`) with tie-aware `isBinaryWinnerSide(side)` → `true` for **both** sides on a tie, else the higher side; used at the binary image cells.
+- [x] **Multi cells already tie-aware** — used `stat?.count === maxCount` (count-based), so multiple options sharing the top count both crown + neither dims. No change needed (mobile had no separate `multiWinnerIndex` to replace).
+- [x] **Footer copy** already correct — `computeWinnerSummary` returns "Tie · 50% each" (binary) / "Tie at X%" (multi).
+- [x] **Bug fix (device test round 1):** the animated **vote-dim** (`cellOpacity[i]=0.55`, set when you vote the other side) stayed stuck on the non-chosen winner after close → one tie winner looked dim. Fixed: closed posts drop the inline animated opacity and rely solely on the static winner/loser style (also fixes a latent loser-you-voted-for not dimming).
 
 **APIs:** none.
 
@@ -1309,4 +1309,6 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 27 | Winner/claim visibility — `voteWinner`+claim fields on profile (voted/drops) + admin posts queries; `ProfileCompareCard` winner/claimed/claimable wrap pills; admin posts winner row (PersonLink + claimed/unclaimed pill); `FeedCampaignFilter` helper text. APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 28 | Image focal editor — `imageFocalX/Y` on options (feed/detail/saved queries + type + mapper); new `lib/imageFocal.ts` + drag-based `ImagePositionEditor`; create screen per-slot focal + "⊹ Position" trigger; `FeedPostCard` applies `contentPosition` on binary + multi compare images. APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 29 | Comment reactions — audit found ~90% already built (post-detail FB-style picker/pills/replies). Closed 2 gaps: React chip now one-tap quick-react + long-press tray; added "{n} reactions" total to summary. Shared GraphQL already complete; signed-out N/A (detail auth-gated). APK installed on Pixel 6 — ⏳ awaiting device test |
+| 2026-06-05 | Planning | react_change_4 analyzed — Phases 31–37 added to MOBILE_PROGRESS.md (chat reply/quote, vote-tie no-dim, notification delivery resilience, connections received/sent tabs, friends live animated moves, user global platform posts, admin post-management scope tabs). Each phase has device test cases; awaiting per-phase testing. |
+| 2026-06-05 | Phase 32 | Vote-tie no-dim — tie-aware `isBinaryWinnerSide` predicate in `mobile/components/FeedPostCard.tsx` (binary `null`-on-tie bug); multi cells + footer already tie-aware. Round-2 fix: closed posts drop the stuck animated vote-dim (`cellOpacity`) so the non-chosen tie winner renders bright. APK installed on Pixel 6 — ✅ device-tested |
 | 2026-06-02 | Phase 30 | Brand avatar + announce nav + scheduled time — `scheduledAt` added to feed/detail queries (mapper already had it; FeedPostCard already shows scheduled time + platform logo); notifications: `ANNOUNCEMENT`→post nav + `BRAND_NOTIF_TYPES` render brand logo avatar for system-generated rows. APK installed on Pixel 6 — ⏳ awaiting device test. **react_change_3 mobile port code-complete (22–30).** |

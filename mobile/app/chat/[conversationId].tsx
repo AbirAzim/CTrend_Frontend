@@ -45,6 +45,14 @@ import { clearConversationNotification } from "../../lib/messageNotifications";
 
 type MessageReaction = { emoji: string; count: number };
 
+type ReplyPreview = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  imageUrl?: string | null;
+};
+
 type Message = {
   id: string;
   conversationId: string;
@@ -56,8 +64,16 @@ type Message = {
   readBy: Array<{ userId: string; readAt: string }>;
   reactions?: MessageReaction[] | null;
   viewerReaction?: string | null;
+  replyTo?: ReplyPreview | null;
   createdAt: string;
 };
+
+/** Snippet text for a quoted message: trimmed text, else "📷 Photo". */
+function replySnippet(text?: string | null, imageUrl?: string | null): string {
+  if (text && text.trim()) return text.trim();
+  if (imageUrl) return "📷 Photo";
+  return "";
+}
 
 type MessagesData = { messages: Message[] };
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string } };
@@ -106,26 +122,36 @@ function MessageBubble({
   showAvatar,
   colors,
   isReacting,
+  isReplying,
+  isFlashing,
+  onTap,
   onLongPress,
   onReact,
+  onReply,
   onImagePress,
+  onJumpToOriginal,
 }: {
   msg: Message;
   isOwn: boolean;
   showAvatar: boolean;
   colors: ReturnType<typeof useTheme>["colors"];
   isReacting: boolean;
+  isReplying: boolean;
+  isFlashing: boolean;
+  onTap: () => void;
   onLongPress: () => void;
   onReact: (emoji: string) => void;
+  onReply: () => void;
   onImagePress: (uri: string) => void;
+  onJumpToOriginal: (messageId: string) => void;
 }) {
   const avatar = normalizeProfileImageUrl(msg.senderAvatar);
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
   const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
 
   return (
-    <View>
-      {/* Quick-react emoji picker — shown above bubble on long-press */}
+    <View style={isFlashing ? styles.bubbleFlash : undefined}>
+      {/* Long-press action tray — Reply + quick-react emojis above the bubble */}
       {isReacting && (
         <View
           style={[
@@ -152,6 +178,15 @@ function MessageBubble({
       )}
 
       <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
+        {/* Standalone reply arrow — inner side of own bubbles (Messenger-style).
+            Single-tap shows it on text; for images (tap opens the photo) it rides
+            along with the long-press tray so images stay replyable. */}
+        {isOwn && (isReplying || (isReacting && !!msg.imageUrl)) && (
+          <Pressable style={styles.sideReply} onPress={onReply} hitSlop={6}>
+            <Text style={[styles.sideReplyText, { color: colors.text }]}>↩</Text>
+          </Pressable>
+        )}
+
         {/* Other-side avatar */}
         {!isOwn && (
           <View style={styles.bubbleAvatarSlot}>
@@ -170,6 +205,43 @@ function MessageBubble({
           {/* Sender name (group chats or first in sequence) */}
           {!isOwn && showAvatar && (
             <Text style={[styles.bubbleSender, { color: colors.accent }]}>{msg.senderName}</Text>
+          )}
+
+          {/* Quoted reply snippet — tap to jump to the original */}
+          {msg.replyTo && (
+            <Pressable
+              onPress={() => onJumpToOriginal(msg.replyTo!.messageId)}
+              style={[
+                styles.quoted,
+                {
+                  borderLeftColor: isOwn ? "rgba(255,255,255,0.7)" : colors.accent,
+                  backgroundColor: isOwn ? "rgba(255,255,255,0.16)" : colors.section,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.quotedName, { color: isOwn ? "rgba(255,255,255,0.95)" : colors.accent }]}
+                numberOfLines={1}
+              >
+                {msg.replyTo.senderName}
+              </Text>
+              <View style={styles.quotedBody}>
+                {msg.replyTo.imageUrl ? (
+                  <Image
+                    source={{ uri: msg.replyTo.imageUrl }}
+                    style={styles.quotedThumb}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : null}
+                <Text
+                  style={[styles.quotedText, { color: isOwn ? "rgba(255,255,255,0.85)" : colors.muted }]}
+                  numberOfLines={1}
+                >
+                  {replySnippet(msg.replyTo.text, msg.replyTo.imageUrl)}
+                </Text>
+              </View>
+            </Pressable>
           )}
 
           {/* Image bubble */}
@@ -197,6 +269,7 @@ function MessageBubble({
           ) : (
             /* Text bubble */
             <Pressable
+              onPress={onTap}
               onLongPress={onLongPress}
               delayLongPress={480}
               style={[
@@ -239,6 +312,13 @@ function MessageBubble({
             {isOwn && msg.readBy.length > 1 ? "  ✓✓" : ""}
           </Text>
         </View>
+
+        {/* Standalone reply arrow — inner side of others' bubbles (Messenger-style) */}
+        {!isOwn && (isReplying || (isReacting && !!msg.imageUrl)) && (
+          <Pressable style={styles.sideReply} onPress={onReply} hitSlop={6}>
+            <Text style={[styles.sideReplyText, { color: colors.text }]}>↩</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -266,10 +346,20 @@ export default function ChatScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
+  const [activeReplyMsgId, setActiveReplyMsgId] = useState<string | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ReplyPreview | null>(null);
+  const [flashMsgId, setFlashMsgId] = useState<string | null>(null);
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const listRef = useRef<FlatList<Message>>(null);
+
+  // Clear any in-progress reply when switching conversations
+  useEffect(() => {
+    setReplyTarget(null);
+  }, [conversationId]);
 
   // ── Fetch conversation metadata for header ──────────────────────────────────
   const { data: convsData } = useQuery<ConversationsData>(MY_CONVERSATIONS, {
@@ -351,6 +441,30 @@ export default function ChatScreen() {
 
     setActiveReactMsgId(null);
     void reactMessage({ variables: { messageId: msg.id, emoji: emojiToSend } }).catch(() => {});
+  }
+
+  // ── Reply to a message ──────────────────────────────────────────────────────
+  function handleReply(msg: Message) {
+    setReplyTarget({
+      messageId: msg.id,
+      senderId: msg.senderId,
+      senderName: msg.senderName,
+      text: msg.text,
+      imageUrl: msg.imageUrl ?? null,
+    });
+    setActiveReactMsgId(null);
+    setActiveReplyMsgId(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  // ── Jump to a quoted original + flash it ────────────────────────────────────
+  function handleJumpToOriginal(messageId: string) {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx < 0) return; // original not loaded into the window — no-op
+    listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+    setFlashMsgId(messageId);
+    if (flashTimeout.current) clearTimeout(flashTimeout.current);
+    flashTimeout.current = setTimeout(() => setFlashMsgId(null), 1200);
   }
 
   // ── New message subscription ────────────────────────────────────────────────
@@ -509,13 +623,21 @@ export default function ChatScreen() {
       }
 
       setText("");
+      const replyToId = replyTarget?.messageId;
+      setReplyTarget(null);
       await sendMessage({
         variables: {
           conversationId,
           text: msgText || " ",
           ...(uploadedUrl ? { imageUrl: uploadedUrl } : {}),
+          ...(replyToId ? { replyToId } : {}),
         },
       });
+      // Snap to the newest message (offset 0 on the inverted list), even if the
+      // user had scrolled up to reply to an older message.
+      requestAnimationFrame(() =>
+        listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      );
     } catch { /* message failed silently */ }
     finally {
       setSending(false);
@@ -606,12 +728,22 @@ export default function ChatScreen() {
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             data={messages}
             keyExtractor={(m) => m.id}
             inverted
             contentContainerStyle={styles.messagesList}
             onEndReached={() => void handleLoadMore()}
             onEndReachedThreshold={0.3}
+            onScrollToIndexFailed={(info) => {
+              // Inverted lists can fail to scroll to an unmeasured row; retry by offset.
+              setTimeout(() => {
+                listRef.current?.scrollToOffset({
+                  offset: info.averageItemLength * info.index,
+                  animated: true,
+                });
+              }, 60);
+            }}
             ListFooterComponent={
               loadingMore
                 ? <ActivityIndicator color={colors.accent} style={{ marginVertical: 8 }} />
@@ -630,6 +762,7 @@ export default function ChatScreen() {
                 !prevMsg || prevMsg.senderId !== msg.senderId
               );
               const isReacting = activeReactMsgId === msg.id;
+              const isReplying = activeReplyMsgId === msg.id;
               return (
                 <MessageBubble
                   msg={msg}
@@ -637,9 +770,22 @@ export default function ChatScreen() {
                   showAvatar={showAvatar}
                   colors={colors}
                   isReacting={isReacting}
-                  onLongPress={() => setActiveReactMsgId(isReacting ? null : msg.id)}
+                  isReplying={isReplying}
+                  isFlashing={flashMsgId === msg.id}
+                  onTap={() => {
+                    // Single tap → toggle the reply arrow; close the emoji tray.
+                    setActiveReactMsgId(null);
+                    setActiveReplyMsgId(isReplying ? null : msg.id);
+                  }}
+                  onLongPress={() => {
+                    // Long press → toggle the emoji tray; close the reply arrow.
+                    setActiveReplyMsgId(null);
+                    setActiveReactMsgId(isReacting ? null : msg.id);
+                  }}
                   onReact={(emoji) => handleReact(msg, emoji)}
+                  onReply={() => handleReply(msg)}
                   onImagePress={(uri) => setViewerUri(uri)}
+                  onJumpToOriginal={handleJumpToOriginal}
                 />
               );
             }}
@@ -672,6 +818,27 @@ export default function ChatScreen() {
                 </Pressable>
               ))}
             </ScrollView>
+          </View>
+        )}
+
+        {/* Reply bar — shows the message being replied to, above the composer */}
+        {replyTarget && (
+          <View style={[styles.replyBar, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
+            <View style={[styles.replyBarAccent, { backgroundColor: colors.accent }]} />
+            <View style={styles.replyBarBody}>
+              <Text style={[styles.replyBarTitle, { color: colors.accent }]} numberOfLines={1}>
+                Replying to {replyTarget.senderId === user?.id ? "yourself" : replyTarget.senderName}
+              </Text>
+              <Text style={[styles.replyBarText, { color: colors.muted }]} numberOfLines={1}>
+                {replySnippet(replyTarget.text, replyTarget.imageUrl)}
+              </Text>
+            </View>
+            {replyTarget.imageUrl ? (
+              <Image source={{ uri: replyTarget.imageUrl }} style={styles.replyBarThumb} contentFit="cover" cachePolicy="memory-disk" />
+            ) : null}
+            <Pressable style={styles.replyBarClose} onPress={() => setReplyTarget(null)} hitSlop={8}>
+              <Text style={[styles.replyBarCloseText, { color: colors.muted }]}>✕</Text>
+            </Pressable>
           </View>
         )}
 
@@ -873,6 +1040,60 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   quickReactCloseText: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700" },
+
+  // Standalone Messenger-style reply arrow beside the bubble
+  sideReply: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginHorizontal: 4,
+    backgroundColor: "rgba(120,120,140,0.18)",
+  },
+  sideReplyText: { fontSize: 15, fontWeight: "700", opacity: 0.85 },
+
+  // Quoted reply snippet inside a bubble
+  bubbleFlash: { backgroundColor: "rgba(99,102,241,0.18)", borderRadius: 12 },
+  quoted: {
+    maxWidth: "100%",
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginBottom: 3,
+  },
+  quotedName: { fontSize: 11, fontWeight: "800", marginBottom: 1 },
+  quotedBody: { flexDirection: "row", alignItems: "center", gap: 6 },
+  quotedThumb: { width: 22, height: 22, borderRadius: 4 },
+  quotedText: { fontSize: 12, flexShrink: 1 },
+
+  // Reply bar above the composer
+  replyBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  replyBarAccent: { width: 3, alignSelf: "stretch", borderRadius: 2 },
+  replyBarBody: { flex: 1 },
+  replyBarTitle: { fontSize: 12, fontWeight: "800" },
+  replyBarText: { fontSize: 12, marginTop: 1 },
+  replyBarThumb: { width: 34, height: 34, borderRadius: 6 },
+  replyBarClose: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  replyBarCloseText: { fontSize: 13, fontWeight: "700" },
 
   // Reaction strip
   reactionStrip: {
