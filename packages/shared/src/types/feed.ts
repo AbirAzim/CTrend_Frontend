@@ -13,6 +13,8 @@ export type FeedPostView = {
   authorDisplayName: string | null;
   authorEmail?: string | null;
   authorProfileImageUrl?: string | null;
+  /** True when a normal user opted to broadcast this post platform-wide (Phase 36). Distinct from `postType: "system"` (admin Ke Jitbe). */
+  isUserGlobalBroadcast?: boolean | null;
   /** All post images from API (`imageUrls: [String!]!`). Order matters for compare / gallery. */
   imageUrls: string[];
   /**

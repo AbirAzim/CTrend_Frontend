@@ -51,6 +51,16 @@ export function reconnectWs(): void {
   _wsClient?.terminate();
 }
 
+/**
+ * Subscribe to graphql-ws (re)connection. Fires every time the socket becomes
+ * connected — used to recover notifications missed while the socket was down
+ * (the in-process PubSub has no replay). Returns an unsubscribe function.
+ */
+export function onWsConnected(cb: () => void): () => void {
+  if (!_wsClient) return () => {};
+  return _wsClient.on("connected", () => cb());
+}
+
 const link = wsLink
   ? split(
       ({ query }) => {

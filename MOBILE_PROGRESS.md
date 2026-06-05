@@ -930,19 +930,19 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 31 — Chat Reply / Quote (Messenger-style) — NOT STARTED
+### ✅ PHASE 31 — Chat Reply / Quote (Messenger-style) — COMPLETE 2026-06-05 (device-tested)
 
 **Source docs:** `2026-06-04_chat-reply-system.md`
 
 **Goal:** Reply to a specific message in a DM — quoted snippet inside the bubble, a reply bar above the composer, and tap-to-jump to the original.
 
-- [ ] **Shared GraphQL** (`packages/shared/src/graphql/messages.ts`) — add `replyTo { messageId senderId senderName text imageUrl }` selection to `GET_MESSAGES`, `SEND_MESSAGE`, `MESSAGE_RECEIVED`; add `$replyToId: ID` arg to `SEND_MESSAGE`.
-- [ ] **types** — add `ReplyPreview` type + `replyTo?` on the message view type used by `chat/[conversationId].tsx`.
-- [ ] **Reply gesture** — long-press a bubble → action tray → **"↩ Reply"** (alongside the existing Phase-18 reaction picker). Selecting sets `replyTarget` state.
-- [ ] **Reply bar** — above the composer: "Replying to {name}" + snippet (text or "📷 Photo") + **×** cancel; auto-focus input. Clears on thread switch and after send.
-- [ ] **Send** — pass `replyToId` to `sendMessage`; on success `flatList.scrollToOffset({offset:0})` (inverted list → newest) on next frame even if scrolled up.
-- [ ] **Quoted snippet in bubble** — render `replyTo` (sender name + text / 📷 thumbnail) as a small inset card above the message text, both own + other bubbles.
-- [ ] **Jump-to-original** — tap a quoted snippet → `scrollToIndex` to that `messageId` + brief highlight flash (Animated bg). Guard for not-yet-loaded messages (load older or no-op).
+- [x] **Shared GraphQL** (`packages/shared/src/graphql/messages.ts`) — added `replyTo { messageId senderId senderName text imageUrl }` selection to `GET_MESSAGES`, `SEND_MESSAGE`, `MESSAGE_RECEIVED`; added `$replyToId: ID` arg to `SEND_MESSAGE`.
+- [x] **types** — added `ReplyPreview` type + `replyTo?` on `Message` + `replySnippet()` helper in `chat/[conversationId].tsx`.
+- [x] **Reply gesture (Messenger-style, per user):** **single tap** a text bubble → standalone **↩ arrow beside the bubble** (inner side: left of own, right of others'); **long press** → emoji reaction tray. Mutually exclusive. Image bubbles: tap opens the photo, long-press shows emoji tray **+** reply arrow (so images stay replyable). Reply NOT inside the emoji tray.
+- [x] **Reply bar** — above the composer: "Replying to {name}" + snippet (text or "📷 Photo" + thumbnail) + **✕** cancel; auto-focuses input. Clears on thread switch (`useEffect` on conversationId) and after send.
+- [x] **Send** — passes `replyToId`; on success `listRef.scrollToOffset({offset:0})` via `requestAnimationFrame` (inverted list → newest) even if scrolled up.
+- [x] **Quoted snippet in bubble** — renders `replyTo` (sender name + text / 📷 thumbnail) as an inset card above the message, themed for own vs other bubbles.
+- [x] **Jump-to-original** — tap a quoted snippet → `scrollToIndex` (+`onScrollToIndexFailed` offset fallback) + 1.2s highlight flash (`flashMsgId`). No-op if original isn't in the loaded window.
 
 **APIs:** `SEND_MESSAGE(replyToId)`, `replyTo` on `GET_MESSAGES`/`MESSAGE_RECEIVED` — backend deployed.
 
@@ -978,7 +978,7 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 ---
 
-### ❌ PHASE 33 — Notification Delivery Resilience (foreground/reconnect refetch) — NOT STARTED
+### ✅ PHASE 33 — Notification Delivery Resilience (foreground/reconnect refetch) — COMPLETE 2026-06-05 (device test bundled w/ 34)
 
 **Source docs:** `2026-06-05_notification-ws-resilience.md`
 
@@ -986,10 +986,10 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 
 > Web fix is WS-sub-specific and doesn't 1:1 apply (mobile uses FCM data pushes + the in-app notification subscription). This phase ports the *transferable* part: refetch on foreground + on WS reconnect.
 
-- [ ] **App-foreground refetch** — `AppState` listener (`active`): refetch `MY_NOTIFICATIONS` + unread-count query so the badge/list catch up immediately on resume.
-- [ ] **WS reconnect refetch** — hook into the shared Apollo `graphql-ws` client's reconnect (or re-subscribe) for `NEW_NOTIFICATION_SUB`; on (re)connect, refetch the notification list once.
-- [ ] **Auth (re)connect** — ensure the WS reconnects with a fresh token after login (avoid the stale-auth socket that drops events) — confirm current mobile apolloClient already does this; add `reconnectWs()` on auth if not.
-- [ ] **Keep existing poll** as a safety net (don't remove); these changes just make recovery happen on foreground/reconnect instead of only on the next poll.
+- [x] **App-foreground refetch** — `NotificationResilience` component in `_layout.tsx`: `AppState` listener (`active`) → `client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT, MY_NOTIFICATIONS] })`.
+- [x] **WS reconnect refetch** — new `onWsConnected(cb)` helper in `lib/apolloClient.ts` (subscribes to graphql-ws `connected` event, returns unsubscribe); `NotificationResilience` refetches the bell queries on every (re)connect.
+- [x] **Auth (re)connect** — already handled: `AuthContext.setSession`/`logout` call `reconnectWs()` (fresh authenticated socket), closing the stale-auth-drops-everything gap.
+- [x] **Keep existing poll/push** — unchanged safety nets; FCM push remains the primary delivery path. `MY_NOTIFICATIONS` only refetches when the notifications screen is mounted (else no-op; badge still refreshes).
 
 **APIs:** `MY_NOTIFICATIONS`, unread-count, `NEW_NOTIFICATION_SUB` (existing).
 
@@ -1310,5 +1310,7 @@ The specified child already has a parent. You must call removeView() on the chil
 | 2026-06-02 | Phase 28 | Image focal editor — `imageFocalX/Y` on options (feed/detail/saved queries + type + mapper); new `lib/imageFocal.ts` + drag-based `ImagePositionEditor`; create screen per-slot focal + "⊹ Position" trigger; `FeedPostCard` applies `contentPosition` on binary + multi compare images. APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-02 | Phase 29 | Comment reactions — audit found ~90% already built (post-detail FB-style picker/pills/replies). Closed 2 gaps: React chip now one-tap quick-react + long-press tray; added "{n} reactions" total to summary. Shared GraphQL already complete; signed-out N/A (detail auth-gated). APK installed on Pixel 6 — ⏳ awaiting device test |
 | 2026-06-05 | Planning | react_change_4 analyzed — Phases 31–37 added to MOBILE_PROGRESS.md (chat reply/quote, vote-tie no-dim, notification delivery resilience, connections received/sent tabs, friends live animated moves, user global platform posts, admin post-management scope tabs). Each phase has device test cases; awaiting per-phase testing. |
+| 2026-06-05 | Phase 33 | Notification delivery resilience — new `onWsConnected()` helper in `lib/apolloClient.ts`; `NotificationResilience` component in `_layout.tsx` refetches `UNREAD_NOTIFICATION_COUNT`+`MY_NOTIFICATIONS` on AppState→active and WS (re)connect; `reconnectWs()` on auth already covered the stale-auth socket. APK installed on Pixel 6 — ✅ (bundled device test with Phase 34) |
+| 2026-06-05 | Phase 31 | Chat reply/quote — shared `replyTo`+`$replyToId` on messages GraphQL; `chat/[conversationId].tsx`: single-tap → Messenger-style side ↩ arrow (left of own / right of others'), long-press → emoji tray (mutually exclusive); reply bar above composer; quoted snippet in bubble; tap-to-jump + flash; scroll-snap on send; images keep tap-to-view + arrow rides long-press tray. APK installed on Pixel 6 — ✅ device-tested |
 | 2026-06-05 | Phase 32 | Vote-tie no-dim — tie-aware `isBinaryWinnerSide` predicate in `mobile/components/FeedPostCard.tsx` (binary `null`-on-tie bug); multi cells + footer already tie-aware. Round-2 fix: closed posts drop the stuck animated vote-dim (`cellOpacity`) so the non-chosen tie winner renders bright. APK installed on Pixel 6 — ✅ device-tested |
 | 2026-06-02 | Phase 30 | Brand avatar + announce nav + scheduled time — `scheduledAt` added to feed/detail queries (mapper already had it; FeedPostCard already shows scheduled time + platform logo); notifications: `ANNOUNCEMENT`→post nav + `BRAND_NOTIF_TYPES` render brand logo avatar for system-generated rows. APK installed on Pixel 6 — ⏳ awaiting device test. **react_change_3 mobile port code-complete (22–30).** |

@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { AppState, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { apolloClient } from "../lib/apolloClient";
+import { apolloClient, onWsConnected } from "../lib/apolloClient";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import { TabBarProvider } from "../context/TabBarContext";
@@ -16,7 +16,7 @@ import { NotificationProvider, useNotification, type NotifToast } from "../conte
 import { OfflineBanner } from "../components/OfflineBanner";
 import { InAppNotificationBanner } from "../components/InAppNotificationBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
-import { NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
+import { MY_NOTIFICATIONS, NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { MESSAGE_RECEIVED, MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { GET_USER_PROFILE } from "@ctrend/shared/graphql/friends";
@@ -192,6 +192,44 @@ function GlobalNotificationSubscription() {
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
     },
   });
+
+  return null;
+}
+
+/**
+ * Notification delivery resilience (Phase 33).
+ *
+ * The bell is delivered live over the `newNotification` WS subscription, but the
+ * in-process PubSub has no replay, so anything fired while the socket was down
+ * (backgrounded app, lost network) is lost until something refetches. We recover
+ * by refetching the bell queries when:
+ *   • the app returns to the foreground (AppState → active), and
+ *   • the WS (re)connects.
+ * `reconnectWs()` on login/logout (AuthContext) already prevents the stale-auth
+ * socket that would silently drop every event. MY_NOTIFICATIONS only refetches
+ * when the notifications screen is mounted (otherwise it's a no-op).
+ */
+function NotificationResilience() {
+  const { isAuthenticated } = useAuth();
+  const client = useApolloClient();
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const refetchBell = () =>
+      void client
+        .refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT, MY_NOTIFICATIONS] })
+        .catch(() => {});
+
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refetchBell();
+    });
+    const unsubWs = onWsConnected(refetchBell);
+
+    return () => {
+      appStateSub.remove();
+      unsubWs();
+    };
+  }, [isAuthenticated, client]);
 
   return null;
 }
@@ -410,6 +448,7 @@ export default function RootLayout() {
                       <NotificationResponseHandler />
                       <BadgeSync />
                       <GlobalNotificationSubscription />
+                      <NotificationResilience />
                       <GlobalMessageSubscription />
                       <Stack screenOptions={{ headerShown: false }} />
                       <OfflineBanner />
