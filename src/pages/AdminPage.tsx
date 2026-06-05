@@ -2034,8 +2034,11 @@ type PostVotingFilter = "all" | "live" | "closed";
 type PostSortBy = "createdAt" | "votes" | "caption" | "updatedAt";
 type PostSortOrder = "asc" | "desc";
 
+type PostScope = "admin" | "user";
+
 function PostsTab() {
   const navigate = useNavigate();
+  const [scope, setScope] = useState<PostScope>("admin");
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<PostStatusFilter>("all");
@@ -2058,10 +2061,11 @@ function PostsTab() {
       status: statusFilter === "all" ? undefined : statusFilter,
       categoryId: categoryFilter === "all" ? undefined : categoryFilter,
       votingFilter: votingFilter === "all" ? undefined : votingFilter,
+      scope,
       sortBy,
       sortOrder,
     }),
-    [searchTerm, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder],
+    [searchTerm, statusFilter, categoryFilter, votingFilter, scope, sortBy, sortOrder],
   );
 
   const countFilter = useMemo(
@@ -2070,13 +2074,14 @@ function PostsTab() {
       status: listFilter.status,
       categoryId: listFilter.categoryId,
       votingFilter: listFilter.votingFilter,
+      scope: listFilter.scope,
     }),
     [listFilter],
   );
 
   useEffect(() => {
     setSkip(0);
-  }, [searchTerm, statusFilter, categoryFilter, votingFilter, sortBy, sortOrder]);
+  }, [searchTerm, statusFilter, categoryFilter, votingFilter, scope, sortBy, sortOrder]);
 
   const { data, loading, error, refetch } = useQuery<{
     adminPlatformPosts: PlatformPostRow[];
@@ -2133,14 +2138,41 @@ function PostsTab() {
     <div className="admin-tab-panel">
       <AdminSectionHead
         title="Post management"
-        subtitle="Platform-wide polls — search, filter, open a post, or edit as any admin."
+        subtitle={
+          scope === "admin"
+            ? "Admin platform-wide polls — search, filter, open a post, or edit as any admin."
+            : "Normal-user posts broadcast platform-wide — search, filter, open, or remove."
+        }
         action={
-          <Link to="/create" className="admin-btn-cta">
-            <span className="admin-btn-cta-icon" aria-hidden>+</span>
-            New platform post
-          </Link>
+          scope === "admin" ? (
+            <Link to="/create" className="admin-btn-cta">
+              <span className="admin-btn-cta-icon" aria-hidden>+</span>
+              New platform post
+            </Link>
+          ) : undefined
         }
       />
+
+      <div className="admin-subtabs" role="tablist" aria-label="Post management scope">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "admin"}
+          className={`admin-subtab${scope === "admin" ? " is-active" : ""}`}
+          onClick={() => setScope("admin")}
+        >
+          Admin Post Management
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "user"}
+          className={`admin-subtab${scope === "user" ? " is-active" : ""}`}
+          onClick={() => setScope("user")}
+        >
+          User Post Management
+        </button>
+      </div>
 
       <div className="admin-posts-summary">
         <div className="admin-posts-summary-card">
