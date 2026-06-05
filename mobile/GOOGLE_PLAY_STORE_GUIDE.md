@@ -168,29 +168,50 @@ A public **Terms of Service** page is built into the web app:
 
 Deploy with the web app to **`kejitbe.app`**. Sign-up page links to Terms + Privacy.
 
-### 3.3 Delete account / data (if you collect personal data)
+### 3.3 Delete account / data
 
-> **Not implemented yet** — depends on your answers below and whether the backend exposes a delete-account API.
+Google Play requires a way for users to **request account and data deletion** when you collect personal data (email sign-up, profile, posts, etc.). Ke Jitbe meets this via **documented email support** — no in-app delete button yet.
 
-Play Console → **App content → Data safety** must match reality. If users can register, you typically need:
+| Item | Status |
+|------|--------|
+| **How users delete** | Email **`badhonkhanbk007@gmail.com`** (or `VITE_PRIVACY_CONTACT_EMAIL` in production `.env`) |
+| **Documented in** | `/privacy` §6 (access, correction, deletion) · `/terms` §11 (account and data deletion) |
+| **In-app “Delete account”** | ❌ Not built yet |
+| **Backend `deleteAccount` API** | ❌ Not in GraphQL yet — you process requests manually (or add API later) |
 
-- A way to request account deletion (in-app or support email), and
-- Accurate answers in the Data safety form.
+**What to tell users (already on legal pages):**
+
+1. Email from the address on the account (or explain if they lost access).
+2. Ask to delete the Ke Jitbe account and associated personal data.
+3. CTrend verifies and deletes within a reasonable period (retain only what law/security requires).
+
+**Play Console → App content → Data safety**
+
+When asked whether users can request **account or data deletion**, answer **Yes**, and provide:
+
+| Field | Value |
+|-------|--------|
+| **Deletion method** | Users request deletion by email |
+| **Deletion URL or email** | `badhonkhanbk007@gmail.com` (or link to `https://kejitbe.app/privacy` §6 and `https://kejitbe.app/terms` §11) |
+
+Also declare that data is **encrypted in transit** (HTTPS) and whether it is **shared** with service providers (Google Sign-In, Firebase FCM, cloud host) — see [§14.6](#146-data-safety).
+
+**Optional later:** Add Settings → **Delete my account** in web/mobile when the backend exposes `deleteAccount` / `deleteUser` GraphQL; then update Data safety to “in-app deletion” and keep email as a fallback.
 
 ---
 
-### 3 — Questions for you (before Terms & account deletion)
+### 3 — Open items checklist
 
-Please confirm these before we add Terms of Service or in-app account deletion:
-
-1. **Legal entity name** — ✅ **CTrend** (sole developer, **Bangladesh**, no registered company)
-2. **Contact email** — ✅ **`badhonkhanbk007@gmail.com`** (set `VITE_PRIVACY_CONTACT_EMAIL` in `.env`)
-3. **Production domain** — ✅ **`https://kejitbe.app`** (privacy: `/privacy`, terms: `/terms`)
-4. **Terms of Service** — ✅ **`/terms`** page implemented (`TermsOfServicePage.tsx`)
-5. **Account deletion** — Does the backend already have `deleteAccount` / `deleteUser` GraphQL? Or email-only deletion via support for now?
-6. **Minimum age** — ✅ **13+** (stated on `/privacy` §8)
-7. **User-generated content** — ✅ **Moderated** — users can **Report** posts (web + mobile); reports go to **Ke Jitbe Moderator** thread for admin review (`packages/shared/src/lib/submitContentReport.ts`)
-8. **Paid features / ads** — Free app only, no ads? (Affects Terms + Data safety.)
+| # | Item | Status |
+|---|------|--------|
+| 1 | Legal entity — **CTrend**, Bangladesh | ✅ |
+| 2 | Contact email — **`badhonkhanbk007@gmail.com`** | ✅ Set `VITE_PRIVACY_CONTACT_EMAIL` in `.env` before deploy |
+| 3 | Domain — **`https://kejitbe.app`** (`/privacy`, `/terms`) | ✅ Pages built — deploy to go live |
+| 4 | Terms of Service | ✅ `/terms` |
+| 5 | Account deletion | ✅ **Email support** (Play-compliant); in-app/API later |
+| 6 | Minimum age | ✅ **13+** worldwide |
+| 7 | UGC moderation | ✅ Report + Admin Reports |
+| 8 | Paid / ads | ✅ **Free, no ads** (stated in `/terms` §8) |
 
 ---
 
@@ -643,6 +664,8 @@ Declare data collected:
 | Device IDs (push token) | Yes |
 
 Mark whether data is shared, encrypted in transit, and if users can request deletion.
+
+**Account / data deletion (Ke Jitbe):** select **Yes** — users email **`badhonkhanbk007@gmail.com`** (documented on `/privacy` and `/terms`). Deletion is not in-app yet.
 
 ### 14.7 Government apps / Financial / Health
 
