@@ -99,6 +99,22 @@ function getCompareRows(n: number): number[] {
 const GREEN = '#22c55e';
 const ORANGE = '#f97316';
 
+// Per-option live-split bar colors — 10 distinct hues, matching the web
+// `cx-pulse-fill--opt-0..9` palette (lighter gradient stop used as a solid bar).
+// Indexed by option index % 10.
+const MULTI_SPLIT_COLORS = [
+	'#34d399', // 0 emerald
+	'#fb923c', // 1 orange
+	'#a78bfa', // 2 violet
+	'#fb7185', // 3 rose
+	'#fbbf24', // 4 amber
+	'#22d3ee', // 5 cyan
+	'#a3e635', // 6 lime
+	'#14b8a6', // 7 teal
+	'#38bdf8', // 8 sky
+	'#e879f9', // 9 fuchsia
+];
+
 type Props = {
 	post: FeedPostView;
 	/** "detail" = rendered on the full-page post screen (skips live sub, hides Full-page chip). */
@@ -2039,7 +2055,11 @@ function FeedPostCardComponent({
 									<View
 										style={[
 											st.optionBarFill,
-											{ flex: pct || 1, backgroundColor: '#8b5cf6' },
+											{
+													flex: pct || 1,
+													backgroundColor:
+														MULTI_SPLIT_COLORS[stat.index % 10],
+												},
 										]}
 									/>
 									<View style={[st.optionBarEmpty, { flex: 100 - pct || 1 }]} />
