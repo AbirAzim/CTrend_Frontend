@@ -2315,7 +2315,7 @@ function FeedPostCardComponent({
 							style={[styles.menuRow, { borderBottomColor: colors.border }]}
 							onPress={() => {
 								setMoreMenuVisible(false);
-								router.push(`/tabs/create?editId=${post.id}` as `/${string}`);
+								router.push({ pathname: '/tabs/create', params: { editId: post.id } });
 							}}>
 							<Text style={[styles.menuRowText, { color: colors.text }]}>
 								✏️ Edit post
