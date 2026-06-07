@@ -1,10 +1,11 @@
 import notifee, { AndroidImportance, AuthorizationStatus, EventType } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import { NativeModules } from "react-native";
 import { router } from "expo-router";
 import { apolloClient } from "./apolloClient";
 import { SEND_MESSAGE, MARK_CONVERSATION_READ, REACT_MESSAGE } from "@ctrend/shared/graphql/messages";
+import { PLAY_STORE_CLOSED_TESTING_URL } from "@ctrend/shared/lib/appUpdate";
 import { setPendingChatNavigation } from "./activeConversation";
 // Brand logo shown as the notification large icon when there's no actor avatar
 // (e.g. system/announcement notifications) — mirrors the in-app notification list.
@@ -265,12 +266,29 @@ const ANNOUNCEMENT_NOTIF_TYPES = new Set([
   "ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM",
 ]);
 
+export function isAndroidUpdateNotification(data: NotifNavData): boolean {
+  return (data.referenceType ?? "").toLowerCase() === "android_update_required";
+}
+
+export function openAndroidUpdateLink(): void {
+  void Linking.openURL(PLAY_STORE_CLOSED_TESTING_URL);
+}
+
+/** Returns true when the tap was handled (Play Store link), false to continue in-app routing. */
+export function handleAndroidUpdateNotificationTap(data: NotifNavData): boolean {
+  if (!isAndroidUpdateNotification(data)) return false;
+  openAndroidUpdateLink();
+  return true;
+}
+
 /**
  * Resolves the in-app route for a notification payload — shared by every tap path
  * (Notifee foreground/background/cold-start and the Expo fallback handler).
  * Mirrors the in-app notification list's `navigateFromNotif`.
  */
 export function resolveNotificationRoute(data: NotifNavData): string | null {
+  if (isAndroidUpdateNotification(data)) return null;
+
   // Chat messages
   const chatId =
     (data.type === "MESSAGE" && data.conversationId) ||
@@ -292,7 +310,9 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
   }
   if (POST_NOTIF_TYPES.has(nt) && postTarget) return `/post/${postTarget}`;
   if (PROFILE_NOTIF_TYPES.has(nt) && data.referenceId) return `/profile/${data.referenceId}`;
-  if (ANNOUNCEMENT_NOTIF_TYPES.has(nt)) return postTarget ? `/post/${postTarget}` : "/notifications";
+  if (ANNOUNCEMENT_NOTIF_TYPES.has(nt)) {
+    return postTarget ? `/post/${postTarget}` : "/notifications";
+  }
 
   // Fallback by data shape (unknown/missing type)
   if (postTarget) return postRoute(`/post/${postTarget}`);
@@ -302,6 +322,7 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
 
 /** Navigates to the route for a tapped notification (foreground path). */
 export function navigateForNotification(data: NotifNavData) {
+  if (handleAndroidUpdateNotificationTap(data)) return;
   const route = resolveNotificationRoute(data);
   if (!route) return;
   if (route.startsWith("/chat/")) clearConversationNotification(route.slice("/chat/".length));
