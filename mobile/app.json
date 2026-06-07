@@ -2,14 +2,14 @@
   "expo": {
     "name": "Ke Jitbe",
     "slug": "ke-jitbe",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "scheme": "ctrend",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.ctrend.app",
-      "versionCode": 10,
+      "versionCode": 12,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",

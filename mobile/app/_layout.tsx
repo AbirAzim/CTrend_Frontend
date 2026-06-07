@@ -455,12 +455,15 @@ function NotificationResponseHandler() {
 }
 
 function ForceUpdateGate() {
-  const { needsUpdate, installedVersionCode, minRequiredVersionCode } = useForceUpdateRequired();
+  const { needsUpdate, installedVersionCode, minRequiredVersionCode, updateTitle, updateBody } =
+    useForceUpdateRequired();
   return (
     <ForceUpdateModal
       visible={needsUpdate}
       installedVersionCode={installedVersionCode}
       minRequiredVersionCode={minRequiredVersionCode}
+      title={updateTitle}
+      body={updateBody}
     />
   );
 }
@@ -485,8 +488,8 @@ export default function RootLayout() {
                       <GlobalMessageSubscription />
                       <Stack screenOptions={{ headerShown: false }} />
                       <OfflineBanner />
-                      <ForceUpdateGate />
                       <InAppNotificationBanner />
+                      <ForceUpdateGate />
                     </View>
                   </KeyboardProvider>
                 </NotificationProvider>

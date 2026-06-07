@@ -27,6 +27,17 @@ else
   echo "WARN: mobile/.env not found — using embedded defaults" >&2
 fi
 
+echo "==> Verifying versionCode sync (app.json / build.gradle / appUpdate.ts)..."
+APP_JSON_CODE=$(grep -oP '"versionCode":\s*\K[0-9]+' "$ROOT/mobile/app.json" | head -1)
+GRADLE_CODE=$(grep -oP 'versionCode\s+\K[0-9]+' "$ROOT/mobile/android/app/build.gradle" | head -1)
+BUNDLED_CODE=$(grep -oP 'BUNDLED_ANDROID_VERSION_CODE = \K[0-9]+' "$ROOT/packages/shared/src/lib/appUpdate.ts" | head -1)
+if [[ "$APP_JSON_CODE" != "$GRADLE_CODE" || "$APP_JSON_CODE" != "$BUNDLED_CODE" ]]; then
+  echo "ERROR: versionCode mismatch — app.json=$APP_JSON_CODE build.gradle=$GRADLE_CODE appUpdate.ts=$BUNDLED_CODE" >&2
+  echo "Sync all three before building. See mobile/GOOGLE_PLAY_STORE_GUIDE.md" >&2
+  exit 1
+fi
+echo "✓ versionCode $APP_JSON_CODE (all sources match)"
+
 echo "==> Verifying JS bundle..."
 npx expo export:embed --eager --platform android --dev false 2>&1 | tail -5
 
