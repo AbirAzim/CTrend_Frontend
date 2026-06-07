@@ -1011,6 +1011,19 @@ export default function PostDetailScreen() {
             <FeedPostCard post={post} variant="detail" onCommentsPress={scrollToComments} />
           ) : null}
 
+          {/* Owner-only edit shortcut — visible right on the full view. */}
+          {post && user && post.authorId === user.id ? (
+            <View style={st.ownerActions}>
+              <TouchableOpacity
+                style={st.ownerBtn}
+                onPress={() => router.push({ pathname: "/tabs/create", params: { editId: post.id } })}
+                accessibilityLabel="Edit this post"
+              >
+                <Text style={st.ownerBtnText}>✏️ Edit post</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {/* Comments — onLayout tracks section Y for deep-link scrolling */}
           {(() => {
             const PREVIEW = 5;
