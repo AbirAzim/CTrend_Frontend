@@ -41,7 +41,6 @@ import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import type { FeedPostView } from '@ctrend/shared/types/feed';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { FeedInlineComments } from './FeedInlineComments';
 import type { ColorPalette } from '../context/ThemeContext';
 import { useSounds } from '../context/SoundContext';
 import { useTabBar } from '../context/TabBarContext';
@@ -1012,8 +1011,6 @@ function FeedPostCardComponent({
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
-	const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
-	const [focusComposerOnOpen, setFocusComposerOnOpen] = useState(false);
 	const [commentCountOverride, setCommentCountOverride] = useState<number | null>(null);
 
 	function openComments(focusComposer: boolean) {
@@ -1021,20 +1018,24 @@ function FeedPostCardComponent({
 			router.push('/auth/login');
 			return;
 		}
-		setFocusComposerOnOpen(focusComposer);
-		setCommentsOpen(true);
-	}
-
-	function closeComments() {
-		setCommentsOpen(false);
-		setFocusComposerOnOpen(false);
+		const params = new URLSearchParams();
+		if (focusComposer) params.set('focus', '1');
+		if (highlightCommentId) params.set('commentId', highlightCommentId);
+		const qs = params.toString();
+		router.push(
+			(`/comments/${post.id}${qs ? `?${qs}` : ''}` as `/${string}`),
+		);
 	}
 
 	useEffect(() => {
-		if (initialCommentsOpen) {
-			setCommentsOpen(true);
-			setFocusComposerOnOpen(false);
-		}
+		if (!initialCommentsOpen) return;
+		const params = new URLSearchParams();
+		if (highlightCommentId) params.set('commentId', highlightCommentId);
+		const qs = params.toString();
+		router.push(
+			(`/comments/${post.id}${qs ? `?${qs}` : ''}` as `/${string}`),
+		);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link once
 	}, [initialCommentsOpen, post.id]);
 
 	function goToPost() {
@@ -2205,7 +2206,7 @@ function FeedPostCardComponent({
 						onPress: () => openComments(false),
 						count: commentCount,
 						isComment: true,
-						active: commentsOpen,
+						active: false,
 					},
 					{
 						i: 1,
@@ -2386,19 +2387,7 @@ function FeedPostCardComponent({
 				);
 			})()}
 
-			{/* Comments bottom sheet (feed + detail) */}
-			{commentsOpen ? (
-				<FeedInlineComments
-					postId={post.id}
-					onClose={closeComments}
-					focusComposerOnOpen={focusComposerOnOpen}
-					highlightCommentId={highlightCommentId}
-					onCommentAdded={() =>
-						setCommentCountOverride((c) => (c ?? (post.commentCount ?? 0)) + 1)
-					}
-				/>
-			) : null}
-
+			{/* Comments open on /comments/[postId] screen (full-screen route) */}
 			<FeedVotersPanel
 				visible={votersVisible}
 				onClose={() => setVotersVisible(false)}

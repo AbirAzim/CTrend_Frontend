@@ -1000,7 +1000,9 @@ export default function ChatScreen() {
               styles.sendBtn,
               { backgroundColor: canSend ? colors.accent : colors.section },
             ]}
-            onPress={() => void handleSend()}
+            onPressIn={() => {
+              if (canSend) void handleSend();
+            }}
             disabled={!canSend}
           >
             {sending || imageUploading ? (
