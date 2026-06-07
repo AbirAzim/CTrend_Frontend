@@ -5,6 +5,7 @@ import { useLazyQuery, useQuery, useSubscription } from "@apollo/client";
 import { useMessenger, type Conversation, type Message, type ReplyPreview } from "../context/MessengerContext";
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
+import { LinkifiedText } from "./LinkifiedText";
 import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
 import { useImageUpload } from "../lib/useImageUpload";
 import {
@@ -44,7 +45,7 @@ function ImageBubble({ src, caption }: { src: string; caption?: string }) {
           onClick={() => setOpen(true)}
           loading="lazy"
         />
-        {caption && <p className="cw-bubble-caption">{caption}</p>}
+        {caption && <p className="cw-bubble-caption"><LinkifiedText text={caption} /></p>}
       </div>
       {open && (
         <div className="cw-lightbox" onClick={() => setOpen(false)}>
@@ -666,7 +667,7 @@ function ChatWindow({
                           isGroupStart &&  isMine ? "cw-bubble--tail-right" : "",
                         ].filter(Boolean).join(" ")}
                       >
-                        {msg.text}
+                        <LinkifiedText text={msg.text ?? ""} />
                         <span className="cw-bubble-time">
                           {formatRelativeTime(msg.createdAt)}
                         </span>

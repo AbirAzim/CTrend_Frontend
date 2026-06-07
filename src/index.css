@@ -17718,6 +17718,14 @@ a.cx-profile-btn-accent {
   white-space: nowrap;
   vertical-align: bottom;
 }
+/* Clickable links inside message bubbles. */
+.cw-bubble-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+.cw-msg--mine .cw-bubble-link { color: #fff; }
 /* Reveal the timestamp on the whole bubble row (wrap), not just the bubble,
    so moving the cursor from the bubble to the side reply arrow doesn't toggle
    the time on/off and reflow the row out from under the pointer. */

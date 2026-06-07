@@ -37,12 +37,14 @@ import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { MODERATOR_BRAND_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import { LinkText } from "../../components/LinkText";
 import logoAsset from "../../assets/logo.png";
 
 // Official platform sender id used for moderator/admin broadcast messages.
 const MODERATOR_SENDER_ID = "moderator";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useBackToFeed } from "../../hooks/useBackToFeed";
 import { useSounds } from "../../context/SoundContext";
 import { clearConversationNotification } from "../../lib/messageNotifications";
 
@@ -271,7 +273,11 @@ function MessageBubble({
                 cachePolicy="memory-disk"
               />
               {msg.text ? (
-                <Text style={[styles.bubbleImgCaption, { color: "#fff" }]}>{msg.text}</Text>
+                <LinkText
+                  text={msg.text}
+                  style={[styles.bubbleImgCaption, { color: "#fff" }]}
+                  linkColor="#fff"
+                />
               ) : null}
             </Pressable>
           ) : (
@@ -287,9 +293,11 @@ function MessageBubble({
                   : [{ backgroundColor: colors.card, borderColor: colors.border }, styles.bubbleOther],
               ]}
             >
-              <Text style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text }]}>
-                {msg.text}
-              </Text>
+              <LinkText
+                text={msg.text}
+                style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text }]}
+                linkColor={isOwn ? "#fff" : colors.accent}
+              />
             </Pressable>
           )}
 
@@ -340,6 +348,7 @@ export default function ChatScreen() {
   const { colors } = useTheme();
   const { playNotification } = useSounds();
   const insets = useSafeAreaInsets();
+  const goBack = useBackToFeed(); // cold-start from a notification → back to feed
 
   const [messages, setMessages] = useState<Message[]>([]);
   const seenIds = useRef(new Set<string>());
@@ -700,7 +709,7 @@ export default function ChatScreen() {
           { paddingTop: insets.top + 6, borderBottomColor: colors.border, backgroundColor: colors.bg },
         ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={goBack} style={styles.backBtn}>
           <Text style={[styles.backText, { color: colors.accent }]}>‹</Text>
         </Pressable>
 
