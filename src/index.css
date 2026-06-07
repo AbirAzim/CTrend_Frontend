@@ -92,7 +92,9 @@
   --cx-rose: #fb7185;
   --cx-rose-soft: #f43f5e;
   --cx-accent-rgb: 129 140 248;
-  --cx-ink-rgb: 7 12 24;
+  /* RGB of --cx-ink (#e7e9f2). Must track --cx-ink so muted/placeholder text
+     built with rgb(var(--cx-ink-rgb) / α) stays visible in dark mode. */
+  --cx-ink-rgb: 231 233 242;
   --cx-rose-rgb: 251 113 133;
   --ig-border: rgb(148 163 184 / 0.26);
   --ig-text: #e7e9f2;
@@ -17720,12 +17722,16 @@ a.cx-profile-btn-accent {
 }
 /* Clickable links inside message bubbles. */
 .cw-bubble-link {
-  color: inherit;
+  color: #0a84ff;
   text-decoration: underline;
   text-underline-offset: 2px;
   word-break: break-word;
 }
-.cw-msg--mine .cw-bubble-link { color: #fff; }
+.cw-bubble-link:hover { text-decoration: underline; opacity: 0.85; }
+/* Lighter blue on the sender's (accent-colored) bubble and in dark mode. */
+.cw-msg--mine .cw-bubble-link { color: #cfe4ff; }
+:root[data-theme="dark"] .cw-bubble-link { color: #4aa3ff; }
+:root[data-theme="dark"] .cw-msg--mine .cw-bubble-link { color: #cfe4ff; }
 /* Reveal the timestamp on the whole bubble row (wrap), not just the bubble,
    so moving the cursor from the bubble to the side reply arrow doesn't toggle
    the time on/off and reflow the row out from under the pointer. */

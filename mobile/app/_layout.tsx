@@ -14,6 +14,8 @@ import { TabBarProvider } from "../context/TabBarContext";
 import { SoundProvider, useSounds } from "../context/SoundContext";
 import { NotificationProvider, useNotification, type NotifToast } from "../context/NotificationContext";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { ForceUpdateModal } from "../components/ForceUpdateModal";
+import { useForceUpdateRequired } from "../hooks/useForceUpdateRequired";
 import { InAppNotificationBanner } from "../components/InAppNotificationBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { MY_NOTIFICATIONS, NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
@@ -452,6 +454,17 @@ function NotificationResponseHandler() {
   return null;
 }
 
+function ForceUpdateGate() {
+  const { needsUpdate, installedVersionCode, minRequiredVersionCode } = useForceUpdateRequired();
+  return (
+    <ForceUpdateModal
+      visible={needsUpdate}
+      installedVersionCode={installedVersionCode}
+      minRequiredVersionCode={minRequiredVersionCode}
+    />
+  );
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
@@ -472,6 +485,7 @@ export default function RootLayout() {
                       <GlobalMessageSubscription />
                       <Stack screenOptions={{ headerShown: false }} />
                       <OfflineBanner />
+                      <ForceUpdateGate />
                       <InAppNotificationBanner />
                     </View>
                   </KeyboardProvider>
