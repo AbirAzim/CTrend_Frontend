@@ -6,6 +6,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Platform,
@@ -20,8 +21,10 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  DELETE_MESSAGE,
   GET_MESSAGES,
   MARK_CONVERSATION_READ,
+  MESSAGE_DELETED_SUB,
   MESSAGE_REACTION_CHANGED,
   MESSAGE_REACTION_EMOJIS,
   MESSAGE_RECEIVED,
@@ -68,6 +71,7 @@ type Message = {
   senderAvatar?: string | null;
   text: string;
   imageUrl?: string | null;
+  deleted?: boolean | null;
   readBy: Array<{ userId: string; readAt: string }>;
   reactions?: MessageReaction[] | null;
   viewerReaction?: string | null;
@@ -137,6 +141,7 @@ function MessageBubble({
   onReply,
   onImagePress,
   onJumpToOriginal,
+  onDelete,
 }: {
   msg: Message;
   isOwn: boolean;
@@ -151,11 +156,28 @@ function MessageBubble({
   onReply: () => void;
   onImagePress: (uri: string) => void;
   onJumpToOriginal: (messageId: string) => void;
+  onDelete: () => void;
 }) {
   const isModerator = msg.senderId === MODERATOR_SENDER_ID;
   const avatar = isModerator ? null : normalizeProfileImageUrl(msg.senderAvatar);
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
   const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
+
+  // Deleted ("unsent") message → muted placeholder, no reactions/reply/tray.
+  if (msg.deleted) {
+    return (
+      <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
+        {!isOwn && <View style={styles.bubbleAvatarSlot} />}
+        <View style={[styles.bubbleGroup, isOwn ? { alignItems: "flex-end" } : { alignItems: "flex-start" }]}>
+          <View style={[styles.bubble, styles.bubbleDeleted, { borderColor: colors.border }]}>
+            <Text style={[styles.deletedText, { color: colors.muted }]}>
+              🚫 {isOwn ? "You unsent this message" : "Message deleted"}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={isFlashing ? styles.bubbleFlash : undefined}>
@@ -179,6 +201,11 @@ function MessageBubble({
               <Text style={styles.quickReactEmoji}>{emoji}</Text>
             </Pressable>
           ))}
+          {isOwn && (
+            <Pressable style={styles.quickReactClose} onPress={onDelete}>
+              <Text style={styles.quickReactCloseText}>🗑</Text>
+            </Pressable>
+          )}
           <Pressable style={styles.quickReactClose} onPress={onLongPress}>
             <Text style={styles.quickReactCloseText}>✕</Text>
           </Pressable>
@@ -276,7 +303,7 @@ function MessageBubble({
                 <LinkText
                   text={msg.text}
                   style={[styles.bubbleImgCaption, { color: "#fff" }]}
-                  linkColor="#fff"
+                  linkColor="#7fd4ff"
                 />
               ) : null}
             </Pressable>
@@ -296,7 +323,7 @@ function MessageBubble({
               <LinkText
                 text={msg.text}
                 style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text }]}
-                linkColor={isOwn ? "#fff" : colors.accent}
+                linkColor={isOwn ? "#cfe4ff" : "#0a84ff"}
               />
             </Pressable>
           )}
@@ -425,6 +452,37 @@ export default function ChatScreen() {
   const [setTypingMut] = useMutation(SET_TYPING);
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [reactMessage] = useMutation(REACT_MESSAGE);
+  const [deleteMessageMut] = useMutation(DELETE_MESSAGE);
+
+  // ── Delete ("unsend") own message ──────────────────────────────────────────
+  const markMessageDeleted = useCallback((id: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? { ...m, deleted: true, text: "", imageUrl: null, reactions: [], viewerReaction: null }
+          : m,
+      ),
+    );
+  }, []);
+
+  function handleDeleteMessage(msg: Message) {
+    setActiveReactMsgId(null);
+    Alert.alert(
+      "Delete message?",
+      "This message will be removed for everyone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            markMessageDeleted(msg.id); // optimistic
+            void deleteMessageMut({ variables: { messageId: msg.id } }).catch(() => {});
+          },
+        },
+      ],
+    );
+  }
 
   // ── React to a message (optimistic) ────────────────────────────────────────
   function handleReact(msg: Message, emoji: string) {
@@ -504,6 +562,19 @@ export default function ChatScreen() {
       void markRead({ variables: { conversationId }, refetchQueries: [MY_CONVERSATIONS] });
     },
   });
+
+  // ── Message deleted subscription (real-time "message deleted") ───────────────
+  useSubscription<{ messageDeleted: { id: string; conversationId: string } }>(
+    MESSAGE_DELETED_SUB,
+    {
+      skip: !conversationId,
+      onData: ({ data }) => {
+        const ev = data.data?.messageDeleted;
+        if (!ev || ev.conversationId !== conversationId) return;
+        markMessageDeleted(ev.id);
+      },
+    },
+  );
 
   // ── Reaction changed subscription ───────────────────────────────────────────
   useSubscription<ReactionChangedData>(MESSAGE_REACTION_CHANGED, {
@@ -813,6 +884,7 @@ export default function ChatScreen() {
                   onReply={() => handleReply(msg)}
                   onImagePress={(uri) => setViewerUri(uri)}
                   onJumpToOriginal={handleJumpToOriginal}
+                  onDelete={() => handleDeleteMessage(msg)}
                 />
               );
             }}
@@ -1029,6 +1101,8 @@ const styles = StyleSheet.create({
   },
   bubbleOwn: { borderBottomRightRadius: 4, borderColor: "transparent" },
   bubbleOther: { borderBottomLeftRadius: 4 },
+  bubbleDeleted: { backgroundColor: "transparent", borderStyle: "dashed" },
+  deletedText: { fontSize: 14, fontStyle: "italic" },
   bubbleText: { fontSize: 15, lineHeight: 21 },
   bubbleTime: { fontSize: 10, marginTop: 3, marginHorizontal: 4 },
   bubbleImg: {
