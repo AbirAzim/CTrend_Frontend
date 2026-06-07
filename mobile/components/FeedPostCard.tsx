@@ -30,6 +30,7 @@ import {
 	SET_POST_HYPE,
 	SET_POST_KEEP,
 	POST_VOTE_UPDATED,
+	POST_UPDATED,
 	DELETE_POST,
 	EXTEND_POST_VOTING,
 	FEED_POSTS,
@@ -98,6 +99,22 @@ function getCompareRows(n: number): number[] {
 
 const GREEN = '#22c55e';
 const ORANGE = '#f97316';
+
+// Per-option live-split bar colors — 10 distinct hues, matching the web
+// `cx-pulse-fill--opt-0..9` palette (lighter gradient stop used as a solid bar).
+// Indexed by option index % 10.
+const MULTI_SPLIT_COLORS = [
+	'#34d399', // 0 emerald
+	'#fb923c', // 1 orange
+	'#a78bfa', // 2 violet
+	'#fb7185', // 3 rose
+	'#fbbf24', // 4 amber
+	'#22d3ee', // 5 cyan
+	'#a3e635', // 6 lime
+	'#14b8a6', // 7 teal
+	'#38bdf8', // 8 sky
+	'#e879f9', // 9 fuchsia
+];
 
 type Props = {
 	post: FeedPostView;
@@ -1063,6 +1080,19 @@ function FeedPostCardComponent({
 				isVotingOpen: next.isVotingOpen ?? null,
 				votingEndsAt: next.votingEndsAt ?? null,
 			});
+		},
+	});
+
+	// Live post edits — Apollo auto-merges the returned full post into the cache,
+	// so images/caption/options/end-date update in place (feed + detail). Clear
+	// optimistic vote state so a vote-reset edit reflects server truth.
+	useSubscription<{ postUpdated?: { id: string } }>(POST_UPDATED, {
+		variables: { postId: post.id },
+		onData: ({ data }) => {
+			const next = data.data?.postUpdated;
+			if (!next || next.id !== post.id) return;
+			if (voteInFlight.current || Date.now() < voteGuardUntil.current) return;
+			setOptimisticVote(null);
 		},
 	});
 
@@ -2039,7 +2069,11 @@ function FeedPostCardComponent({
 									<View
 										style={[
 											st.optionBarFill,
-											{ flex: pct || 1, backgroundColor: '#8b5cf6' },
+											{
+													flex: pct || 1,
+													backgroundColor:
+														MULTI_SPLIT_COLORS[stat.index % 10],
+												},
 										]}
 									/>
 									<View style={[st.optionBarEmpty, { flex: 100 - pct || 1 }]} />
@@ -2277,6 +2311,16 @@ function FeedPostCardComponent({
 						<View
 							style={[styles.menuHandle, { backgroundColor: colors.border }]}
 						/>
+						<Pressable
+							style={[styles.menuRow, { borderBottomColor: colors.border }]}
+							onPress={() => {
+								setMoreMenuVisible(false);
+								router.push({ pathname: '/tabs/create', params: { editId: post.id } });
+							}}>
+							<Text style={[styles.menuRowText, { color: colors.text }]}>
+								✏️ Edit post
+							</Text>
+						</Pressable>
 						{activeIsVotingOpen && (
 							<Pressable
 								style={[styles.menuRow, { borderBottomColor: colors.border }]}

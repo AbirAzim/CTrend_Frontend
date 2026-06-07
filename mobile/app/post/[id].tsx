@@ -834,6 +834,7 @@ export default function PostDetailScreen() {
   const scrollRef = useRef<typeof ScrollView>(null);
   const [optimisticComments, setOptimisticComments] = useState<GqlComment[]>([]);
   const [showAllComments, setShowAllComments] = useState(false);
+  const [commentsCollapsed, setCommentsCollapsed] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(deepLinkCommentId ?? null);
 
@@ -858,6 +859,7 @@ export default function PostDetailScreen() {
 
   // Scroll to the comments section — used by the post card's Comments chip
   const scrollToComments = useCallback(() => {
+    setCommentsCollapsed(false);
     const y = Math.max(0, commentsSectionY.current - 60);
     (scrollRef.current as unknown as { scrollTo: (opts: { y: number; animated: boolean }) => void })
       ?.scrollTo({ y, animated: true });
@@ -1009,6 +1011,19 @@ export default function PostDetailScreen() {
             <FeedPostCard post={post} variant="detail" onCommentsPress={scrollToComments} />
           ) : null}
 
+          {/* Owner-only edit shortcut — visible right on the full view. */}
+          {post && user && post.authorId === user.id ? (
+            <View style={st.ownerActions}>
+              <TouchableOpacity
+                style={st.ownerBtn}
+                onPress={() => router.push({ pathname: "/tabs/create", params: { editId: post.id } })}
+                accessibilityLabel="Edit this post"
+              >
+                <Text style={st.ownerBtnText}>✏️ Edit post</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {/* Comments — onLayout tracks section Y for deep-link scrolling */}
           {(() => {
             const PREVIEW = 5;
@@ -1023,12 +1038,20 @@ export default function PostDetailScreen() {
 
             return (
               <View onLayout={(e) => { commentsSectionY.current = e.nativeEvent.layout.y; }}>
-                <View style={st.sectionHeader}>
-                  <Text style={st.sectionTitle}>COMMENTS</Text>
-                  {totalCount > 0 ? <Text style={st.commentCount}>{totalCount}</Text> : null}
-                </View>
+                <Pressable
+                  style={st.sectionHeader}
+                  onPress={() => setCommentsCollapsed((v) => !v)}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={st.sectionTitle}>COMMENTS</Text>
+                    {totalCount > 0 ? <Text style={st.commentCount}>{totalCount}</Text> : null}
+                  </View>
+                  <Text style={st.commentCount}>
+                    {commentsCollapsed ? "Show ▾" : "Hide ▴"}
+                  </Text>
+                </Pressable>
 
-                {commentsLoading && totalCount === 0 ? (
+                {commentsCollapsed ? null : commentsLoading && totalCount === 0 ? (
                   <View style={st.loadingRow}>
                     <ActivityIndicator color={colors.accent} />
                   </View>

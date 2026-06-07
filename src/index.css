@@ -11456,6 +11456,7 @@ a.cx-profile-btn-accent {
 }
 
 .cx-edit-item-thumb {
+  position: relative;
   width: 96px;
   height: 96px;
   border-radius: 10px;
@@ -11465,6 +11466,40 @@ a.cx-profile-btn-accent {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Locked (already-voted) compare items in the edit modal */
+.cx-edit-item--locked {
+  opacity: 0.85;
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+}
+
+.cx-edit-item-lock {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.95rem;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 6px;
+  padding: 1px 4px;
+  line-height: 1;
+}
+
+.cx-edit-locked-note {
+  margin: -2px 0 8px;
+}
+
+.cx-edit-toggle-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cx-edit-toggle-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .cx-edit-item-thumb img {

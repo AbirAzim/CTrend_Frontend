@@ -1,7 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -23,6 +23,7 @@ const CARD_W = (SCREEN_W - 48) / 2; // 2 cols with 16px margins + 16px gap
 
 type SavedPost = {
   id: string;
+  authorId?: string | null;
   imageUrls?: string[] | null;
   caption?: string | null;
   isVotingOpen?: boolean | null;
@@ -37,10 +38,12 @@ type SavedData = { mySavedPosts: SavedPost[] };
 
 function KeptCard({ post }: { post: SavedPost }) {
   const { colors } = useTheme();
+  const { user } = useAuth();
   const img0 = post.imageUrls?.[0];
   const img1 = post.imageUrls?.[1];
   const totalVotes = post.upvoteCount + post.downvoteCount;
   const isOpen = post.isVotingOpen !== false;
+  const isOwner = !!user && !!post.authorId && post.authorId === user.id;
 
   return (
     <Pressable
@@ -49,6 +52,17 @@ function KeptCard({ post }: { post: SavedPost }) {
     >
       {/* Image area — 120px tall, two thumbs side by side */}
       <View style={st.imgArea}>
+        {/* Owner shortcut — jump straight to the edit screen (skips full view). */}
+        {isOwner ? (
+          <Pressable
+            style={st.editBtn}
+            hitSlop={8}
+            onPress={() => router.push({ pathname: "/tabs/create", params: { editId: post.id } })}
+            accessibilityLabel="Edit this post"
+          >
+            <Text style={st.editBtnText}>✏️</Text>
+          </Pressable>
+        ) : null}
         {img0 ? (
           <Image
             source={{ uri: img0 }}
@@ -100,6 +114,19 @@ const st = StyleSheet.create({
     marginBottom: 16,
   },
   imgArea: { flexDirection: "row", height: 110 },
+  editBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    zIndex: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editBtnText: { fontSize: 14 },
   img: { flex: 1, height: 110, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   info: { padding: 8, gap: 4 },
   caption: { fontSize: 12, fontWeight: "600", lineHeight: 16 },
@@ -114,8 +141,12 @@ const st = StyleSheet.create({
 export default function KeepsScreen() {
   const { isAuthenticated, hydrated } = useAuth();
   const { colors } = useTheme();
-  const { setSavedCount } = useTabBar();
+  const { setSavedCount, translateY } = useTabBar();
   const insets = useSafeAreaInsets();
+
+  // This screen doesn't hide the footer on scroll, so pin it visible on focus —
+  // otherwise it inherits a hidden state left behind by the feed/profile scroll.
+  useFocusEffect(useCallback(() => { translateY.setValue(0); }, [translateY]));
 
   const { data, loading, error, refetch } = useQuery<SavedData>(MY_SAVED_POSTS, {
     fetchPolicy: "cache-and-network",

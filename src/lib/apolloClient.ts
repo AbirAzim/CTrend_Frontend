@@ -79,7 +79,33 @@ const link = wsLink
     )
   : authLink.concat(httpLink);
 
-export const cache = new InMemoryCache();
+export const cache = new InMemoryCache({
+  typePolicies: {
+    Query: {
+      fields: {
+        // Infinite-scroll feed: one cached list per filter, with pages merged by
+        // their `skip` offset. This lets `fetchMore` append the next page and the
+        // 20s poll refresh the head in place, instead of each (skip/take) combo
+        // becoming a separate list or the poll overwriting the appended pages.
+        feedPosts: {
+          keyArgs: ["campaignId", "scope", "sort"],
+          merge(
+            existing: readonly unknown[] = [],
+            incoming: readonly unknown[],
+            { args }: { args: Record<string, unknown> | null },
+          ) {
+            const merged = existing.slice();
+            const start = typeof args?.skip === "number" ? args.skip : 0;
+            for (let i = 0; i < incoming.length; i++) {
+              merged[start + i] = incoming[i];
+            }
+            return merged;
+          },
+        },
+      },
+    },
+  },
+});
 
 export const apolloClient = new ApolloClient({
   link,
