@@ -29,8 +29,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_MAX_H = Math.round(SCREEN_H * 0.86);
-const LIST_MAX_H = Math.round(SCREEN_H * 0.5);
+/** Facebook opens comments nearly full-screen — leave a small peek of the post behind. */
+const SHEET_HEIGHT = Math.round(SCREEN_H * 0.94);
 
 type GqlComment = {
 	id: string;
@@ -53,10 +53,48 @@ type GqlComment = {
 
 type CommentsData = { commentsByPost: GqlComment[] };
 
-/**
- * Facebook-style comments bottom sheet. Opens on demand (Discuss / Write a comment)
- * — no inline gap on the post card. Composer keyboard only when user taps the field.
- */
+type FbPalette = {
+	sheet: string;
+	composerBar: string;
+	bubble: string;
+	input: string;
+	border: string;
+	text: string;
+	subtext: string;
+	meta: string;
+	link: string;
+	backdrop: string;
+};
+
+function fbPalette(isDark: boolean): FbPalette {
+	if (isDark) {
+		return {
+			sheet: '#18191a',
+			composerBar: '#242526',
+			bubble: '#3a3b3c',
+			input: '#3a3b3c',
+			border: '#3e4042',
+			text: '#e4e6eb',
+			subtext: '#b0b3b8',
+			meta: '#8a8d91',
+			link: '#2d88ff',
+			backdrop: 'rgba(0,0,0,0.65)',
+		};
+	}
+	return {
+		sheet: '#ffffff',
+		composerBar: '#ffffff',
+		bubble: '#f0f2f5',
+		input: '#f0f2f5',
+		border: '#ced0d4',
+		text: '#050505',
+		subtext: '#65676b',
+		meta: '#65676b',
+		link: '#1877f2',
+		backdrop: 'rgba(0,0,0,0.45)',
+	};
+}
+
 export function FeedInlineComments({
 	postId,
 	onClose,
@@ -70,10 +108,11 @@ export function FeedInlineComments({
 	focusComposerOnOpen?: boolean;
 	highlightCommentId?: string | null;
 }) {
-	const { colors } = useTheme();
+	const { isDark } = useTheme();
 	const { isAuthenticated, user } = useAuth();
 	const insets = useSafeAreaInsets();
-	const st = makeStyles(colors);
+	const fb = fbPalette(isDark);
+	const st = makeStyles(fb);
 
 	const [text, setText] = useState('');
 	const [sending, setSending] = useState(false);
@@ -99,6 +138,9 @@ export function FeedInlineComments({
 	const ordered = [...topLevel].sort(
 		(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
+
+	const displayName =
+		user?.displayName?.trim() || user?.username?.trim() || 'You';
 
 	useEffect(() => {
 		if (!focusComposerOnOpen) return;
@@ -217,7 +259,7 @@ export function FeedInlineComments({
 
 	const canSend = !!text.trim() && !sending && isAuthenticated;
 	const userAvatar = normalizeProfileImageUrl(user?.profileImageUrl);
-	const userInitial = (user?.displayName ?? user?.username ?? '?').slice(0, 1).toUpperCase();
+	const userInitial = displayName.slice(0, 1).toUpperCase();
 
 	function renderComment(c: GqlComment, isReply: boolean) {
 		const name =
@@ -226,6 +268,7 @@ export function FeedInlineComments({
 		const isOwn = !!user?.id && c.author?.id === user.id;
 		const isEditing = editingId === c.id;
 		const isHighlighted = highlightCommentId === c.id;
+		const timeLabel = formatRelativeTime(c.createdAt);
 
 		return (
 			<View
@@ -255,14 +298,13 @@ export function FeedInlineComments({
 						)}
 					</View>
 				</Pressable>
+
 				<View style={st.bodyCol}>
 					<View style={st.bubble}>
-						<Text style={st.bubbleName}>
-							{name}
-							{c.replyToName ? (
-								<Text style={st.replyingTo}> · ↩ {c.replyToName}</Text>
-							) : null}
-						</Text>
+						<Text style={st.bubbleName}>{name}</Text>
+						{c.replyToName ? (
+							<Text style={st.replyingTo}>Replying to {c.replyToName}</Text>
+						) : null}
 						{isEditing ? (
 							<View style={st.editBox}>
 								<TextInput
@@ -272,7 +314,7 @@ export function FeedInlineComments({
 									multiline
 									autoFocus
 									maxLength={1000}
-									placeholderTextColor={colors.muted}
+									placeholderTextColor={fb.subtext}
 								/>
 								<View style={st.editActions}>
 									<Pressable onPress={() => setEditingId(null)} hitSlop={6}>
@@ -290,23 +332,24 @@ export function FeedInlineComments({
 							</Text>
 						)}
 					</View>
+
 					{!isEditing && (
 						<View style={st.metaRow}>
-							<Text style={st.time}>{formatRelativeTime(c.createdAt)}</Text>
-							<Pressable onPress={() => handleLike(c)} hitSlop={6}>
+							<Text style={st.time}>{timeLabel}</Text>
+							<Pressable onPress={() => handleLike(c)} hitSlop={8}>
 								<Text style={[st.metaBtn, c.viewerHasLiked && st.metaBtnLiked]}>
-									Like{c.likeCount > 0 ? ` · ${c.likeCount}` : ''}
+									Like
 								</Text>
 							</Pressable>
-							<Pressable onPress={() => startReply(c)} hitSlop={6}>
+							<Pressable onPress={() => startReply(c)} hitSlop={8}>
 								<Text style={st.metaBtn}>Reply</Text>
 							</Pressable>
 							{isOwn && (
 								<>
-									<Pressable onPress={() => startEdit(c)} hitSlop={6}>
+									<Pressable onPress={() => startEdit(c)} hitSlop={8}>
 										<Text style={st.metaBtn}>Edit</Text>
 									</Pressable>
-									<Pressable onPress={() => confirmDelete(c)} hitSlop={6}>
+									<Pressable onPress={() => confirmDelete(c)} hitSlop={8}>
 										<Text style={[st.metaBtn, st.metaBtnDelete]}>Delete</Text>
 									</Pressable>
 								</>
@@ -314,6 +357,19 @@ export function FeedInlineComments({
 						</View>
 					)}
 				</View>
+
+				{!isEditing && c.likeCount > 0 ? (
+					<View style={st.likePill}>
+						<Text style={st.likePillIcon}>👍</Text>
+						<Text style={st.likePillCount}>{c.likeCount}</Text>
+					</View>
+				) : (
+					<Pressable style={st.likeBtn} onPress={() => handleLike(c)} hitSlop={8}>
+						<Text style={[st.likeBtnIcon, c.viewerHasLiked && st.likeBtnIconActive]}>
+							{c.viewerHasLiked ? '👍' : '👍🏻'}
+						</Text>
+					</Pressable>
+				)}
 			</View>
 		);
 	}
@@ -327,9 +383,9 @@ export function FeedInlineComments({
 			onRequestClose={onClose}
 		>
 			<View style={st.backdrop}>
-				<Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+				<Pressable style={st.backdropTap} onPress={onClose} />
 				<KeyboardAvoidingView behavior='padding' keyboardVerticalOffset={0} style={st.kav}>
-					<View style={[st.sheet, { maxHeight: SHEET_MAX_H, paddingBottom: 0 }]}>
+					<View style={[st.sheet, { height: SHEET_HEIGHT, paddingBottom: 0 }]}>
 						<View style={st.grabber} />
 						<View style={st.header}>
 							<Text style={st.headerTitle}>Comments</Text>
@@ -337,43 +393,47 @@ export function FeedInlineComments({
 								<Text style={st.headerCount}>{ordered.length}</Text>
 							) : null}
 							<View style={{ flex: 1 }} />
-							<Pressable onPress={onClose} hitSlop={10} style={st.closeBtn}>
+							<Pressable onPress={onClose} hitSlop={12} style={st.closeBtn}>
 								<Text style={st.closeBtnText}>✕</Text>
 							</Pressable>
 						</View>
 
-						{loading && all.length === 0 ? (
-							<ActivityIndicator color={colors.accent} style={{ marginVertical: 24 }} />
-						) : ordered.length === 0 ? (
-							<View style={st.emptyWrap}>
-								<Text style={st.emptyTitle}>No comments yet</Text>
-								<Text style={st.empty}>Be the first to share your thoughts.</Text>
-							</View>
-						) : (
-							<ScrollView
-								ref={listRef}
-								style={[st.list, { maxHeight: LIST_MAX_H }]}
-								contentContainerStyle={st.listContent}
-								keyboardShouldPersistTaps='handled'
-								showsVerticalScrollIndicator={false}
-							>
-								{ordered.map((c) => {
-									const replies = all
-										.filter((r) => r.parentId === c.id)
-										.sort(
-											(a, b) =>
-												new Date(a.createdAt).getTime() -
-												new Date(b.createdAt).getTime(),
+						<View style={st.listWrap}>
+							{loading && all.length === 0 ? (
+								<View style={st.centerState}>
+									<ActivityIndicator color={fb.link} />
+								</View>
+							) : ordered.length === 0 ? (
+								<View style={st.centerState}>
+									<Text style={st.emptyTitle}>No comments yet</Text>
+									<Text style={st.empty}>Be the first to comment.</Text>
+								</View>
+							) : (
+								<ScrollView
+									ref={listRef}
+									style={st.list}
+									contentContainerStyle={st.listContent}
+									keyboardShouldPersistTaps='handled'
+									showsVerticalScrollIndicator
+								>
+									{ordered.map((c) => {
+										const replies = all
+											.filter((r) => r.parentId === c.id)
+											.sort(
+												(a, b) =>
+													new Date(a.createdAt).getTime() -
+													new Date(b.createdAt).getTime(),
+											);
+										return (
+											<View key={c.id}>
+												{renderComment(c, false)}
+												{replies.map((r) => renderComment(r, true))}
+											</View>
 										);
-									return (
-										<View key={c.id}>
-											{renderComment(c, false)}
-											{replies.map((r) => renderComment(r, true))}
-										</View>
-									);
-								})}
-							</ScrollView>
-						)}
+									})}
+								</ScrollView>
+							)}
+						</View>
 
 						{replyTarget ? (
 							<View style={st.replyBanner}>
@@ -386,7 +446,7 @@ export function FeedInlineComments({
 							</View>
 						) : null}
 
-						<View style={[st.composer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+						<View style={[st.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
 							<View style={st.composerAvatar}>
 								{userAvatar ? (
 									<Image
@@ -407,10 +467,10 @@ export function FeedInlineComments({
 										replyTarget
 											? `Reply to ${replyTarget.name}…`
 											: isAuthenticated
-												? 'Write a comment…'
+												? `Comment as ${displayName}`
 												: 'Log in to comment'
 									}
-									placeholderTextColor={colors.muted}
+									placeholderTextColor={fb.subtext}
 									value={text}
 									onChangeText={setText}
 									editable={isAuthenticated && !sending}
@@ -420,22 +480,20 @@ export function FeedInlineComments({
 										if (!isAuthenticated) router.push('/auth/login');
 									}}
 								/>
-								{(text.trim() || sending) && (
-									<Pressable
-										style={st.postBtn}
-										onPress={() => void handleSend()}
-										disabled={!canSend}
-									>
-										{sending ? (
-											<ActivityIndicator size='small' color={colors.accent} />
-										) : (
-											<Text style={[st.postBtnText, !canSend && { opacity: 0.4 }]}>
-												Post
-											</Text>
-										)}
-									</Pressable>
-								)}
 							</View>
+							{(text.trim() || sending) && (
+								<Pressable
+									style={st.sendBtn}
+									onPress={() => void handleSend()}
+									disabled={!canSend}
+								>
+									{sending ? (
+										<ActivityIndicator size='small' color={fb.link} />
+									) : (
+										<Text style={[st.sendBtnIcon, !canSend && { opacity: 0.35 }]}>➤</Text>
+									)}
+								</Pressable>
+							)}
 						</View>
 					</View>
 				</KeyboardAvoidingView>
@@ -444,169 +502,215 @@ export function FeedInlineComments({
 	);
 }
 
-function makeStyles(c: ReturnType<typeof useTheme>['colors']) {
+function makeStyles(fb: FbPalette) {
 	return StyleSheet.create({
 		backdrop: {
 			flex: 1,
 			justifyContent: 'flex-end',
-			backgroundColor: 'rgba(0,0,0,0.5)',
+			backgroundColor: fb.backdrop,
+		},
+		backdropTap: {
+			flex: 1,
 		},
 		kav: { width: '100%' },
 		sheet: {
 			width: '100%',
-			backgroundColor: c.bg,
-			borderTopLeftRadius: 16,
-			borderTopRightRadius: 16,
-			paddingHorizontal: 12,
-			paddingTop: 8,
+			backgroundColor: fb.sheet,
+			borderTopLeftRadius: 12,
+			borderTopRightRadius: 12,
+			overflow: 'hidden',
 		},
 		grabber: {
 			alignSelf: 'center',
-			width: 36,
+			width: 40,
 			height: 4,
 			borderRadius: 2,
-			backgroundColor: c.border,
-			marginBottom: 10,
+			backgroundColor: fb.border,
+			marginTop: 8,
+			marginBottom: 4,
 		},
 		header: {
 			flexDirection: 'row',
 			alignItems: 'center',
 			gap: 8,
-			paddingBottom: 10,
+			paddingHorizontal: 14,
+			paddingVertical: 10,
 			borderBottomWidth: StyleSheet.hairlineWidth,
-			borderBottomColor: c.border,
+			borderBottomColor: fb.border,
 		},
-		headerTitle: { fontSize: 16, fontWeight: '800', color: c.text },
+		headerTitle: { fontSize: 17, fontWeight: '700', color: fb.text },
 		headerCount: {
 			fontSize: 13,
-			fontWeight: '700',
-			color: c.muted,
-			backgroundColor: c.section,
-			paddingHorizontal: 8,
-			paddingVertical: 2,
-			borderRadius: 10,
-			overflow: 'hidden',
+			fontWeight: '600',
+			color: fb.subtext,
 		},
-		closeBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-		closeBtnText: { fontSize: 18, fontWeight: '600', color: c.subtext },
-		emptyWrap: { paddingVertical: 20, paddingHorizontal: 8, alignItems: 'center', gap: 4 },
-		emptyTitle: { fontSize: 15, fontWeight: '800', color: c.text },
-		empty: { fontSize: 13, color: c.muted, textAlign: 'center' },
-		list: { flexGrow: 0 },
-		listContent: { gap: 12, paddingVertical: 12 },
-		row: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+		closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+		closeBtnText: { fontSize: 22, fontWeight: '400', color: fb.subtext, lineHeight: 24 },
+		listWrap: {
+			flex: 1,
+			minHeight: 0,
+		},
+		list: {
+			flex: 1,
+		},
+		listContent: {
+			paddingHorizontal: 12,
+			paddingVertical: 10,
+			gap: 4,
+		},
+		centerState: {
+			flex: 1,
+			alignItems: 'center',
+			justifyContent: 'center',
+			paddingHorizontal: 24,
+			gap: 6,
+		},
+		emptyTitle: { fontSize: 16, fontWeight: '700', color: fb.text },
+		empty: { fontSize: 14, color: fb.subtext, textAlign: 'center' },
+		row: {
+			flexDirection: 'row',
+			gap: 8,
+			alignItems: 'flex-start',
+			paddingVertical: 8,
+		},
 		rowHighlighted: {
-			backgroundColor: c.accent + '18',
+			backgroundColor: fb.link + '18',
 			marginHorizontal: -8,
 			paddingHorizontal: 8,
-			paddingVertical: 6,
 			borderRadius: 8,
 		},
-		replyRow: { marginLeft: 40 },
+		replyRow: { marginLeft: 44 },
 		avatar: {
-			width: 36,
-			height: 36,
-			borderRadius: 18,
-			backgroundColor: '#312e81',
+			width: 40,
+			height: 40,
+			borderRadius: 20,
+			backgroundColor: '#3a3b3c',
 			alignItems: 'center',
 			justifyContent: 'center',
 			overflow: 'hidden',
 		},
-		avatarSm: { width: 28, height: 28, borderRadius: 14 },
-		avatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-		bodyCol: { flex: 1, gap: 4 },
+		avatarSm: { width: 32, height: 32, borderRadius: 16 },
+		avatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+		bodyCol: { flex: 1, gap: 4, paddingRight: 4 },
 		bubble: {
-			backgroundColor: c.section,
+			backgroundColor: fb.bubble,
 			borderRadius: 18,
 			paddingHorizontal: 12,
 			paddingVertical: 8,
 			alignSelf: 'flex-start',
 			maxWidth: '100%',
 		},
-		bubbleName: { fontSize: 13, fontWeight: '800', color: c.text, marginBottom: 2 },
-		replyingTo: { fontSize: 12, fontWeight: '600', color: c.accent },
-		content: { fontSize: 15, color: c.text, lineHeight: 20 },
-		editedTag: { fontSize: 11, color: c.muted, fontStyle: 'italic' },
-		metaRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 4, flexWrap: 'wrap' },
-		time: { fontSize: 12, fontWeight: '600', color: c.muted },
-		metaBtn: { fontSize: 12, fontWeight: '700', color: c.subtext },
-		metaBtnLiked: { color: '#1877f2' },
-		metaBtnDelete: { color: '#ef4444' },
+		bubbleName: { fontSize: 13, fontWeight: '700', color: fb.text, marginBottom: 1 },
+		replyingTo: { fontSize: 12, fontWeight: '600', color: fb.link, marginBottom: 2 },
+		content: { fontSize: 15, color: fb.text, lineHeight: 20 },
+		editedTag: { fontSize: 12, color: fb.meta, fontStyle: 'italic' },
+		metaRow: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			gap: 16,
+			marginLeft: 12,
+			marginTop: 2,
+			flexWrap: 'wrap',
+		},
+		time: { fontSize: 12, fontWeight: '600', color: fb.meta },
+		metaBtn: { fontSize: 12, fontWeight: '700', color: fb.meta },
+		metaBtnLiked: { color: fb.link },
+		metaBtnDelete: { color: '#f02849' },
+		likeBtn: {
+			width: 32,
+			alignItems: 'center',
+			paddingTop: 10,
+		},
+		likeBtnIcon: { fontSize: 16, opacity: 0.45 },
+		likeBtnIconActive: { opacity: 1 },
+		likePill: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			gap: 2,
+			alignSelf: 'flex-start',
+			marginTop: 10,
+			backgroundColor: fb.sheet,
+			borderRadius: 10,
+			paddingHorizontal: 4,
+			paddingVertical: 2,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: fb.border,
+		},
+		likePillIcon: { fontSize: 11 },
+		likePillCount: { fontSize: 11, fontWeight: '700', color: fb.subtext },
 		replyBanner: {
 			flexDirection: 'row',
 			alignItems: 'center',
 			justifyContent: 'space-between',
-			paddingHorizontal: 10,
-			paddingVertical: 6,
-			backgroundColor: c.section,
-			borderRadius: 8,
-			marginTop: 4,
-			marginBottom: 4,
+			paddingHorizontal: 14,
+			paddingVertical: 8,
+			backgroundColor: fb.composerBar,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: fb.border,
 		},
-		replyBannerText: { fontSize: 12, color: c.subtext, flex: 1 },
-		replyBannerName: { fontWeight: '800', color: c.text },
-		replyBannerCancel: { fontSize: 14, color: c.subtext, fontWeight: '700', paddingLeft: 8 },
+		replyBannerText: { fontSize: 13, color: fb.subtext, flex: 1 },
+		replyBannerName: { fontWeight: '700', color: fb.text },
+		replyBannerCancel: { fontSize: 16, color: fb.subtext, fontWeight: '600', paddingLeft: 8 },
 		editBox: { gap: 6, marginTop: 2 },
 		editInput: {
-			backgroundColor: c.inputBg,
-			borderWidth: 1,
-			borderColor: c.border,
+			backgroundColor: fb.input,
 			borderRadius: 10,
 			paddingHorizontal: 10,
 			paddingVertical: 8,
 			fontSize: 14,
-			color: c.text,
+			color: fb.text,
 			minWidth: 180,
 			maxHeight: 120,
 		},
 		editActions: { flexDirection: 'row', gap: 18, justifyContent: 'flex-end' },
-		editCancel: { fontSize: 13, fontWeight: '700', color: c.subtext },
-		editSave: { fontSize: 13, fontWeight: '800', color: c.accent },
+		editCancel: { fontSize: 13, fontWeight: '700', color: fb.subtext },
+		editSave: { fontSize: 13, fontWeight: '800', color: fb.link },
 		composer: {
 			flexDirection: 'row',
 			alignItems: 'flex-end',
 			gap: 8,
-			paddingTop: 10,
+			paddingHorizontal: 12,
+			paddingTop: 8,
 			borderTopWidth: StyleSheet.hairlineWidth,
-			borderTopColor: c.border,
-			backgroundColor: c.bg,
+			borderTopColor: fb.border,
+			backgroundColor: fb.composerBar,
 		},
 		composerAvatar: {
-			width: 34,
-			height: 34,
-			borderRadius: 17,
-			backgroundColor: '#312e81',
+			width: 36,
+			height: 36,
+			borderRadius: 18,
+			backgroundColor: '#3a3b3c',
 			alignItems: 'center',
 			justifyContent: 'center',
 			overflow: 'hidden',
-			marginBottom: 4,
+			marginBottom: 2,
 		},
-		composerAvatarText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+		composerAvatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 		composerPill: {
 			flex: 1,
-			flexDirection: 'row',
-			alignItems: 'flex-end',
-			backgroundColor: c.section,
-			borderRadius: 22,
-			borderWidth: 1,
-			borderColor: c.border,
-			paddingLeft: 14,
-			paddingRight: 4,
+			backgroundColor: fb.input,
+			borderRadius: 20,
+			paddingHorizontal: 14,
 			minHeight: 40,
+			justifyContent: 'center',
 		},
 		input: {
-			flex: 1,
 			fontSize: 15,
-			color: c.text,
+			color: fb.text,
 			maxHeight: 100,
-			paddingTop: 9,
-			paddingBottom: 9,
+			paddingVertical: 9,
 		},
-		postBtn: {
-			paddingHorizontal: 10,
-			paddingVertical: 10,
-			alignSelf: 'flex-end',
+		sendBtn: {
+			width: 36,
+			height: 36,
+			alignItems: 'center',
+			justifyContent: 'center',
+			marginBottom: 2,
 		},
-		postBtnText: { fontSize: 14, fontWeight: '800', color: c.accent },
+		sendBtnIcon: {
+			fontSize: 22,
+			fontWeight: '700',
+			color: fb.link,
+		},
 	});
 }
