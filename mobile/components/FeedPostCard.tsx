@@ -2344,6 +2344,8 @@ function FeedPostCardComponent({
 				const userInitial = (user?.displayName ?? user?.username ?? '?')
 					.slice(0, 1)
 					.toUpperCase();
+				const userLabel =
+					user?.displayName?.trim() || user?.username?.trim() || 'You';
 				return (
 					<>
 						{commentCount > 0 ? (
@@ -2375,7 +2377,9 @@ function FeedPostCardComponent({
 								)}
 							</View>
 							<View style={st.commentStubPill}>
-								<Text style={st.commentStubPlaceholder}>Write a comment…</Text>
+								<Text style={st.commentStubPlaceholder}>
+									{isAuthenticated ? `Comment as ${userLabel}` : 'Write a comment…'}
+								</Text>
 							</View>
 						</Pressable>
 					</>
