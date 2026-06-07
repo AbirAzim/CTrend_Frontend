@@ -2,8 +2,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +22,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
-import { CATEGORIES, CREATE_POST, FEED_POSTS } from "@ctrend/shared/graphql/feed";
+import { CATEGORIES, CREATE_POST, FEED_POSTS, GET_POST_BY_ID, UPDATE_POST } from "@ctrend/shared/graphql/feed";
 import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
@@ -43,6 +43,17 @@ type ActiveCampaignsData = { activeCampaigns: CampaignOption[] };
 type AdminCampaignsData = { campaigns: CampaignOption[] };
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 
+type EditPostData = {
+  id: string;
+  caption?: string | null;
+  imageUrls?: (string | null)[] | null;
+  options?: { label?: string | null; imageFocalX?: number | null; imageFocalY?: number | null }[] | null;
+  category?: { id: string } | null;
+  campaign?: { id: string } | null;
+  votingEndsAt?: string | null;
+  isUserGlobalBroadcast?: boolean | null;
+};
+
 type Slot = {
   id: string;
   localUri: string | null;
@@ -53,6 +64,8 @@ type Slot = {
   label: string;
   imageFocalX: number;
   imageFocalY: number;
+  /** Existing option on a post being edited — locked to protect its votes. */
+  locked?: boolean;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -212,7 +225,8 @@ export default function CreateScreen() {
   const { isAuthenticated, hydrated, user } = useAuth();
   const { colors } = useTheme();
   const isAdmin = user?.role?.toLowerCase() === "admin";
-  const { platform: platformParam } = useLocalSearchParams<{ platform?: string }>();
+  const { platform: platformParam, editId } = useLocalSearchParams<{ platform?: string; editId?: string }>();
+  const isEdit = Boolean(editId);
 
   const [slots, setSlots] = useState<Slot[]>([makeSlot("1"), makeSlot("2")]);
   const [caption, setCaption] = useState("");
@@ -243,15 +257,17 @@ export default function CreateScreen() {
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
 
-  // Hide the floating tab bar while on this screen so footer is unobstructed
+  // Hide the floating tab bar while this screen is focused so its own action
+  // buttons are unobstructed; restore it on blur. Focus-based (not mount-based)
+  // because this tab screen stays mounted between visits.
   const { translateY } = useTabBar();
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     const TAB_TOTAL = 64 + 14 + insets.bottom;
     Animated.timing(translateY, { toValue: TAB_TOTAL, duration: 180, useNativeDriver: true }).start();
     return () => {
       Animated.timing(translateY, { toValue: 0, duration: 180, useNativeDriver: true }).start();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [translateY, insets.bottom]));
 
   const { data: catData, loading: catLoading } = useQuery<CategoriesData>(CATEGORIES, {
     fetchPolicy: "cache-first", skip: !isAuthenticated,
@@ -284,10 +300,55 @@ export default function CreateScreen() {
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [createPost, { loading: submitting }] = useMutation(CREATE_POST);
   const [createSystemPost, { loading: submittingSystem }] = useMutation(CREATE_SYSTEM_POST);
+  const [updatePost, { loading: updating }] = useMutation(UPDATE_POST);
+
+  // Edit mode: load the post being edited and hydrate the form once.
+  const { data: editData } = useQuery<{ getPostById: EditPostData | null }>(GET_POST_BY_ID, {
+    variables: { id: editId },
+    fetchPolicy: "cache-and-network",
+    skip: !isEdit || !isAuthenticated,
+  });
+  const editLoadedRef = useRef(false);
+  useEffect(() => {
+    const post = editData?.getPostById;
+    if (!isEdit || !post || editLoadedRef.current) return;
+    editLoadedRef.current = true;
+    setCaption(post.caption ?? "");
+    setCategoryId(post.category?.id ?? "");
+    setCampaignId(post.campaign?.id ?? "");
+    setBroadcastGlobally(Boolean(post.isUserGlobalBroadcast));
+    const urls = (post.imageUrls ?? []).filter((u): u is string => Boolean(u));
+    if (urls.length >= 2) {
+      setSlots(urls.map((url, i) => ({
+        ...makeSlot(`edit-${i}`),
+        publicUrl: url,
+        label: post.options?.[i]?.label ?? "",
+        imageFocalX: post.options?.[i]?.imageFocalX ?? DEFAULT_IMAGE_FOCAL,
+        imageFocalY: post.options?.[i]?.imageFocalY ?? DEFAULT_IMAGE_FOCAL,
+        locked: true,
+      })));
+    }
+    if (post.votingEndsAt) {
+      const d = new Date(post.votingEndsAt);
+      if (!Number.isNaN(d.getTime())) {
+        setDeadlineEnabled(true);
+        setDeadlinePreset(null);
+        setDeadlineCustom(d);
+      }
+    }
+  }, [editData, isEdit]);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.replace("/auth/login" as never);
   }, [hydrated, isAuthenticated]);
+
+  // This screen lives in the tab navigator, so it stays mounted between visits.
+  // Re-sync when the editId param changes: clear the form when returning to
+  // "create" mode, or allow the edit form to re-hydrate for a different post.
+  useEffect(() => {
+    if (editId) editLoadedRef.current = false;
+    else resetForm();
+  }, [editId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hydrated || !isAuthenticated) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
@@ -301,7 +362,28 @@ export default function CreateScreen() {
   }
   function removeSlot(id: string) {
     if (slots.length <= 2) return;
-    setSlots((prev) => prev.filter((s) => s.id !== id));
+    setSlots((prev) => prev.filter((s) => (s.id === id ? !s.locked : true)));
+  }
+
+  // Clear the form back to a blank draft (after a successful launch, or when the
+  // tab-mounted screen returns to create mode from edit mode).
+  function resetForm() {
+    editLoadedRef.current = false;
+    setSlots([makeSlot("1"), makeSlot("2")]);
+    setCaption("");
+    setCategoryId("");
+    setCampaignId("");
+    setPlatformWide(platformParam === "1");
+    setBroadcastGlobally(false);
+    setSubmitError(null);
+    setDeadlineEnabled(false);
+    setDeadlinePreset(24);
+    setScheduleEnabled(false);
+    setSchedulePreset(24);
+    const dl = new Date(); dl.setDate(dl.getDate() + 1); dl.setHours(20, 0, 0, 0);
+    setDeadlineCustom(dl);
+    const sc = new Date(); sc.setDate(sc.getDate() + 1); sc.setHours(10, 0, 0, 0);
+    setScheduleCustom(sc);
   }
 
   // ── Image pick + upload ───────────────────────────────────────────────────
@@ -380,6 +462,33 @@ export default function CreateScreen() {
       imageFocalX: s.imageFocalX,
       imageFocalY: s.imageFocalY,
     }));
+
+    // ── Edit mode: update the existing post instead of creating a new one ──
+    if (isEdit && editId) {
+      const updateInput: Record<string, unknown> = {
+        categoryId,
+        imageUrls,
+        options,
+        // Always send caption so clearing it persists; "" clears the campaign too.
+        caption: caption.trim() || undefined,
+        campaignId,
+      };
+      const wasGlobal = Boolean(editData?.getPostById?.isUserGlobalBroadcast);
+      if (!isAdmin && allowUserGlobalPosts && broadcastGlobally !== wasGlobal) {
+        updateInput.broadcastGlobally = broadcastGlobally;
+      }
+      if (deadlineEnabled) {
+        updateInput.votingEndsAt = deadlinePreset !== null ? hoursFromNow(deadlinePreset) : deadlineCustom.toISOString();
+      }
+      try {
+        await updatePost({ variables: { postId: editId, input: updateInput } });
+        router.back();
+      } catch (err: unknown) {
+        setSubmitError(getApolloErrorMessage(err));
+      }
+      return;
+    }
+
     const input: Record<string, unknown> = { categoryId, imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
     if (campaignId) input.campaignId = campaignId;
@@ -399,6 +508,7 @@ export default function CreateScreen() {
     try {
       const mutFn = isAdmin && platformWide ? createSystemPost : createPost;
       await mutFn({ variables: { input }, refetchQueries: isAdmin && platformWide ? [] : [{ query: FEED_POSTS }] });
+      resetForm();
       router.replace("/tabs");
     } catch (err: unknown) {
       setSubmitError(getApolloErrorMessage(err));
@@ -414,7 +524,7 @@ export default function CreateScreen() {
     ]);
   }
 
-  const isSubmitting = submitting || submittingSystem;
+  const isSubmitting = submitting || submittingSystem || updating;
   const slotW = (SW - 16 * 2 - 12) / 2;
 
   return (
@@ -428,22 +538,30 @@ export default function CreateScreen() {
         {/* ── Header ── */}
         <View style={st.topRow}>
           <View style={{ width: 40 }} />
-          <Text style={[st.screenTitle, { color: colors.text }]}>New Compare</Text>
+          <Text style={[st.screenTitle, { color: colors.text }]}>{isEdit ? "Edit Compare" : "New Compare"}</Text>
           <View style={{ width: 40 }} />
         </View>
 
         {/* ── Image slots (2-col grid) ── */}
         <View style={{ gap: 12 }}>
+          {isEdit && (
+            <Text style={[st.lockedNote, { color: colors.muted, backgroundColor: colors.section, borderColor: colors.border }]}>
+              🔒 Existing options are locked to protect their votes. You can add new
+              options below — changing an existing image would reset all votes.
+            </Text>
+          )}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {slots.map((slot, idx) => {
               const imgSrc = slot.localUri ?? (slot.publicUrl && !slot.pasteUrl ? slot.publicUrl : null);
               const hasImage = imgSrc || (slot.pasteUrl && slot.publicUrl);
+              const locked = Boolean(slot.locked);
               return (
                 <View key={slot.id} style={{ width: slotW, gap: 6 }}>
                   {/* Image tile */}
                   <Pressable
                     style={[st.slotTile, { borderColor: slot.error ? "#ef4444" : hasImage ? colors.accent + "66" : colors.border }]}
-                    onPress={() => openImageOptions(slot.id)}
+                    onPress={locked ? undefined : () => openImageOptions(slot.id)}
+                    disabled={locked}
                   >
                     {hasImage ? (
                       <Image source={{ uri: imgSrc ?? slot.publicUrl ?? "" }} style={st.slotImg} contentFit="cover" />
@@ -462,12 +580,17 @@ export default function CreateScreen() {
                         <Text style={st.slotOverlayText}>Uploading…</Text>
                       </View>
                     )}
-                    {slot.publicUrl && !slot.uploading && (
+                    {slot.publicUrl && !slot.uploading && !locked && (
                       <View style={st.slotDone}>
                         <Text style={st.slotDoneText}>✓</Text>
                       </View>
                     )}
-                    {slots.length > 2 && (
+                    {locked && (
+                      <View style={st.slotLock}>
+                        <Text style={st.slotLockText}>🔒</Text>
+                      </View>
+                    )}
+                    {slots.length > 2 && !locked && (
                       <Pressable style={st.slotRemove} onPress={() => removeSlot(slot.id)} hitSlop={6}>
                         <Text style={st.slotRemoveText}>✕</Text>
                       </Pressable>
@@ -475,7 +598,7 @@ export default function CreateScreen() {
                   </Pressable>
                   {slot.error ? <Text style={st.slotError}>{slot.error}</Text> : null}
                   {/* Position editor trigger */}
-                  {hasImage && (slot.localUri || slot.publicUrl) ? (
+                  {!locked && hasImage && (slot.localUri || slot.publicUrl) ? (
                     <Pressable
                       style={[st.positionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
                       onPress={() => setPositionSlotId(slot.id)}
@@ -485,27 +608,30 @@ export default function CreateScreen() {
                       </Text>
                     </Pressable>
                   ) : null}
-                  {/* Paste URL */}
-                  <TextInput
-                    style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
-                    value={slot.pasteUrl}
-                    onChangeText={(v) => {
-                      patchSlot(slot.id, { pasteUrl: v });
-                      if (v.trim().startsWith("http")) void applyPasteUrl(slot.id, v);
-                    }}
-                    placeholder="or paste URL"
-                    placeholderTextColor={colors.muted}
-                    autoCapitalize="none"
-                    keyboardType="url"
-                  />
+                  {/* Paste URL — new options only */}
+                  {!locked && (
+                    <TextInput
+                      style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                      value={slot.pasteUrl}
+                      onChangeText={(v) => {
+                        patchSlot(slot.id, { pasteUrl: v });
+                        if (v.trim().startsWith("http")) void applyPasteUrl(slot.id, v);
+                      }}
+                      placeholder="or paste URL"
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="none"
+                      keyboardType="url"
+                    />
+                  )}
                   {/* Label */}
                   <TextInput
-                    style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                    style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: locked ? colors.muted : colors.text }]}
                     value={slot.label}
                     onChangeText={(v) => patchSlot(slot.id, { label: v })}
                     placeholder="Label…"
                     placeholderTextColor={colors.muted}
                     maxLength={40}
+                    editable={!locked}
                   />
                 </View>
               );
@@ -523,7 +649,7 @@ export default function CreateScreen() {
         {/* ── Settings card ── */}
         <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Admin: post type */}
-          {isAdmin && (
+          {isAdmin && !isEdit && (
             <View style={[st.settingRow, { borderBottomColor: colors.border }]}>
               <Text style={[st.settingKey, { color: colors.text }]}>Post type</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
@@ -676,20 +802,22 @@ export default function CreateScreen() {
             >
               {isSubmitting && !scheduleEnabled
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={st.launchBtnText}>{isAdmin && platformWide ? "Launch platform-wide →" : "Launch it →"}</Text>
+                : <Text style={st.launchBtnText}>{isEdit ? "Save changes" : isAdmin && platformWide ? "Launch platform-wide →" : "Launch it →"}</Text>
               }
             </Pressable>
-            <Pressable
-              style={[st.scheduleBtn, { borderColor: colors.border, backgroundColor: scheduleEnabled ? colors.accent + "18" : colors.section }]}
-              onPress={() => setScheduleEnabled((v) => !v)}
-            >
-              <Text style={{ fontSize: 14 }}>🕐</Text>
-              <Text style={[st.scheduleBtnText, { color: scheduleEnabled ? colors.accent : colors.text }]}>
-                {scheduleEnabled ? "Cancel" : "Schedule"}
-              </Text>
-            </Pressable>
+            {!isEdit && (
+              <Pressable
+                style={[st.scheduleBtn, { borderColor: colors.border, backgroundColor: scheduleEnabled ? colors.accent + "18" : colors.section }]}
+                onPress={() => setScheduleEnabled((v) => !v)}
+              >
+                <Text style={{ fontSize: 14 }}>🕐</Text>
+                <Text style={[st.scheduleBtnText, { color: scheduleEnabled ? colors.accent : colors.text }]}>
+                  {scheduleEnabled ? "Cancel" : "Schedule"}
+                </Text>
+              </Pressable>
+            )}
           </View>
-          {scheduleEnabled && (
+          {!isEdit && scheduleEnabled && (
             <Pressable
               style={[st.confirmScheduleBtn, { backgroundColor: colors.accent }, isSubmitting && { opacity: 0.6 }]}
               onPress={() => void handleSubmit(true)}
@@ -818,6 +946,9 @@ const st = StyleSheet.create({
   slotDoneText: { color: "#fff", fontSize: 12, fontWeight: "800" },
   slotRemove: { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
   slotRemoveText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  slotLock: { position: "absolute", bottom: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
+  slotLockText: { fontSize: 11 },
+  lockedNote: { fontSize: 12, lineHeight: 17, borderWidth: 1, borderRadius: 10, padding: 10 },
   slotError: { color: "#f87171", fontSize: 10, textAlign: "center" },
   slotInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12 },
   positionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignItems: "center" },

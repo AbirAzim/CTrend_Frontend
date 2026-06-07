@@ -30,6 +30,7 @@ import {
 	SET_POST_HYPE,
 	SET_POST_KEEP,
 	POST_VOTE_UPDATED,
+	POST_UPDATED,
 	DELETE_POST,
 	EXTEND_POST_VOTING,
 	FEED_POSTS,
@@ -1079,6 +1080,19 @@ function FeedPostCardComponent({
 				isVotingOpen: next.isVotingOpen ?? null,
 				votingEndsAt: next.votingEndsAt ?? null,
 			});
+		},
+	});
+
+	// Live post edits — Apollo auto-merges the returned full post into the cache,
+	// so images/caption/options/end-date update in place (feed + detail). Clear
+	// optimistic vote state so a vote-reset edit reflects server truth.
+	useSubscription<{ postUpdated?: { id: string } }>(POST_UPDATED, {
+		variables: { postId: post.id },
+		onData: ({ data }) => {
+			const next = data.data?.postUpdated;
+			if (!next || next.id !== post.id) return;
+			if (voteInFlight.current || Date.now() < voteGuardUntil.current) return;
+			setOptimisticVote(null);
 		},
 	});
 
@@ -2297,6 +2311,16 @@ function FeedPostCardComponent({
 						<View
 							style={[styles.menuHandle, { backgroundColor: colors.border }]}
 						/>
+						<Pressable
+							style={[styles.menuRow, { borderBottomColor: colors.border }]}
+							onPress={() => {
+								setMoreMenuVisible(false);
+								router.push(`/tabs/create?editId=${post.id}` as `/${string}`);
+							}}>
+							<Text style={[styles.menuRowText, { color: colors.text }]}>
+								✏️ Edit post
+							</Text>
+						</Pressable>
 						{activeIsVotingOpen && (
 							<Pressable
 								style={[styles.menuRow, { borderBottomColor: colors.border }]}

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,8 +22,11 @@ import {
 import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import { MODERATOR_BRAND_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import logoAsset from "../../assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,7 +193,12 @@ export default function MessagesScreen() {
   const { isAuthenticated, hydrated, user } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { translateY } = useTabBar();
   const [showNewDm, setShowNewDm] = useState(false);
+
+  // This screen doesn't hide the footer on scroll, so pin it visible on focus —
+  // otherwise it inherits a hidden state left behind by the feed/profile scroll.
+  useFocusEffect(useCallback(() => { translateY.setValue(0); }, [translateY]));
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -305,10 +313,13 @@ export default function MessagesScreen() {
             }
             renderItem={({ item: conv }) => {
             const other = otherParticipant(conv, myId);
-            const name = convDisplayName(conv, myId);
-            const avatar = normalizeProfileImageUrl(other?.avatarUrl);
+            // Official platform conversation — show the brand identity + logo, not
+            // a regular user's name/avatar (mirrors web MessengerPanel).
+            const isModerator = conv.type?.toLowerCase() === "moderator";
+            const name = isModerator ? MODERATOR_BRAND_NAME : convDisplayName(conv, myId);
+            const avatar = isModerator ? null : normalizeProfileImageUrl(other?.avatarUrl);
             const initial = name.slice(0, 1).toUpperCase();
-            const isOnline = other ? onlineSet.has(other.id) : false;
+            const isOnline = !isModerator && other ? onlineSet.has(other.id) : false;
             const unread = conv.unreadCount > 0;
             const preview = conv.lastMessageText ?? "No messages yet";
             const time = conv.lastMessageAt
@@ -321,10 +332,12 @@ export default function MessagesScreen() {
               >
                 {/* Avatar */}
                 <View style={{ position: "relative", marginRight: 12 }}>
-                  <View style={[styles.convAvatar, { overflow: "hidden" }]}>
-                    {avatar
-                      ? <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                      : <Text style={styles.convAvatarText}>{initial}</Text>
+                  <View style={[styles.convAvatar, { overflow: "hidden" }, isModerator && styles.convAvatarOfficial]}>
+                    {isModerator
+                      ? <Image source={logoAsset} style={styles.convAvatarLogo} contentFit="contain" />
+                      : avatar
+                        ? <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                        : <Text style={styles.convAvatarText}>{initial}</Text>
                     }
                   </View>
                   {isOnline && <View style={styles.onlineDot} />}
@@ -423,6 +436,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   convAvatarText: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  convAvatarOfficial: { backgroundColor: "#fff" },
+  convAvatarLogo: { width: "78%", height: "78%" },
   onlineDot: {
     position: "absolute",
     bottom: 1,

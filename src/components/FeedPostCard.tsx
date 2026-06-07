@@ -27,6 +27,7 @@ import {
   FEED_POSTS,
   GET_POST_BY_ID,
   MY_SAVED_POSTS,
+  POST_UPDATED,
   POST_VOTE_UPDATED,
   REMOVE_VOTE,
   SET_POST_HYPE,
@@ -423,6 +424,19 @@ function FeedPostCardComponent({
       }
       setVoteFx(true);
       setTimeout(() => setVoteFx(false), 280);
+    },
+  });
+
+  // Live post edits — Apollo auto-merges the returned full post into the cache,
+  // so images/caption/options/end-date update in place. Clear any optimistic
+  // vote state so a vote-reset edit (changed image) reflects server truth.
+  useSubscription<{ postUpdated?: { id: string } }>(POST_UPDATED, {
+    variables: { postId: post.id },
+    onData: ({ data }) => {
+      const next = data.data?.postUpdated;
+      if (!next || next.id !== post.id) return;
+      if (voteInFlight.current || Date.now() < voteGuardUntilRef.current) return;
+      setOptimisticVote(null);
     },
   });
 

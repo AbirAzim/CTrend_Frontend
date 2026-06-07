@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { PressableScale } from "../../components/PressableScale";
 import logoAsset from "../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
 
@@ -106,6 +106,7 @@ function FeedTopBar() {
 }
 
 const TAB_BAR_H = 64 + 14; // pill height + bottom margin
+const PAGE_SIZE = 20; // posts per page (matches backend `take` default)
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -119,6 +120,10 @@ export default function FeedScreen() {
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
+  // Infinite scroll: guard against overlapping/needless page fetches.
+  const loadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const serverCountRef = useRef(0);
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const y = e.nativeEvent.contentOffset.y;
@@ -143,10 +148,10 @@ export default function FeedScreen() {
     }
   }
 
-  const { data, loading, error, refetch, networkStatus } = useQuery<FeedData>(
+  const { data, loading, error, refetch, fetchMore, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
     {
-      variables: { campaignId },
+      variables: { campaignId, skip: 0, take: PAGE_SIZE },
       fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
       pollInterval: 20000,
@@ -158,7 +163,27 @@ export default function FeedScreen() {
   useEffect(() => {
     setLiveQueue([]);
     setRemovedIds(new Set());
+    hasMoreRef.current = true;
+    loadingMoreRef.current = false;
   }, [campaignId]);
+
+  // Prefetch the next page well before the user hits the bottom so the feed
+  // always feels like it has more — no visible "loading" at the end.
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current) return;
+    const skip = serverCountRef.current;
+    if (skip === 0) return; // first page still loading
+    loadingMoreRef.current = true;
+    try {
+      const res = await fetchMore({ variables: { campaignId, skip, take: PAGE_SIZE } });
+      const total = res.data?.feedPosts?.length ?? skip;
+      if (total - skip < PAGE_SIZE) hasMoreRef.current = false; // last page reached
+    } catch {
+      // transient failure — allow a later retry
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, [fetchMore, campaignId]);
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
   const { data: meData } = useQuery<{ me: UserRow }>(ME, {
@@ -209,9 +234,19 @@ export default function FeedScreen() {
     });
   }, [data, meData, friendsData, suggestionsData, requestsData]);
 
-  const knownIds = new Set(apiPosts.map((p) => p.id));
-  const allPosts: FeedPostView[] = [...liveQueue.filter((p) => !knownIds.has(p.id)), ...apiPosts];
-  const posts = allPosts.filter((p) => !removedIds.has(p.id));
+  // Server-side count drives the next page's `skip` (excludes locally-prepended
+  // live-queue posts, which aren't part of the server's offset window).
+  serverCountRef.current = data?.feedPosts?.length ?? 0;
+
+  // Live-queue posts first, then the paged server list. Dedupe by id (offset
+  // paging + live/polled inserts can briefly surface the same post twice) and
+  // drop locally-removed ones.
+  const seenIds = new Set<string>();
+  const posts: FeedPostView[] = [...liveQueue, ...apiPosts].filter((p) => {
+    if (removedIds.has(p.id) || seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+    return true;
+  });
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     onData: ({ data: sub }) => {
@@ -268,6 +303,10 @@ export default function FeedScreen() {
           initialNumToRender={4}
           maxToRenderPerBatch={4}
           windowSize={7}
+          onEndReached={() => void loadMore()}
+          // ~2 screens of runway so the next page lands well before the bottom
+          // (around the 15th of 20 posts), keeping the feed seamless.
+          onEndReachedThreshold={2}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

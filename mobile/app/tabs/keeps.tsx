@@ -1,7 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -114,8 +114,12 @@ const st = StyleSheet.create({
 export default function KeepsScreen() {
   const { isAuthenticated, hydrated } = useAuth();
   const { colors } = useTheme();
-  const { setSavedCount } = useTabBar();
+  const { setSavedCount, translateY } = useTabBar();
   const insets = useSafeAreaInsets();
+
+  // This screen doesn't hide the footer on scroll, so pin it visible on focus —
+  // otherwise it inherits a hidden state left behind by the feed/profile scroll.
+  useFocusEffect(useCallback(() => { translateY.setValue(0); }, [translateY]));
 
   const { data, loading, error, refetch } = useQuery<SavedData>(MY_SAVED_POSTS, {
     fetchPolicy: "cache-and-network",

@@ -36,6 +36,11 @@ import {
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import { MODERATOR_BRAND_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import logoAsset from "../../assets/logo.png";
+
+// Official platform sender id used for moderator/admin broadcast messages.
+const MODERATOR_SENDER_ID = "moderator";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useSounds } from "../../context/SoundContext";
@@ -145,7 +150,8 @@ function MessageBubble({
   onImagePress: (uri: string) => void;
   onJumpToOriginal: (messageId: string) => void;
 }) {
-  const avatar = normalizeProfileImageUrl(msg.senderAvatar);
+  const isModerator = msg.senderId === MODERATOR_SENDER_ID;
+  const avatar = isModerator ? null : normalizeProfileImageUrl(msg.senderAvatar);
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
   const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
 
@@ -191,10 +197,12 @@ function MessageBubble({
         {!isOwn && (
           <View style={styles.bubbleAvatarSlot}>
             {showAvatar && (
-              <View style={[styles.bubbleAvatar, { overflow: "hidden" }]}>
-                {avatar
-                  ? <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                  : <Text style={styles.bubbleAvatarText}>{initial}</Text>
+              <View style={[styles.bubbleAvatar, { overflow: "hidden" }, isModerator && styles.bubbleAvatarOfficial]}>
+                {isModerator
+                  ? <Image source={logoAsset} style={styles.bubbleAvatarLogo} contentFit="contain" />
+                  : avatar
+                    ? <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                    : <Text style={styles.bubbleAvatarText}>{initial}</Text>
                 }
               </View>
             )}
@@ -369,10 +377,14 @@ export default function ChatScreen() {
   const conv = convsData?.myConversations.find((c) => c.id === conversationId);
   const otherParticipants = (conv?.participants ?? []).filter((p) => p.id !== user?.id);
   const otherParticipant = otherParticipants[0] ?? null;
-  const headerName = conv?.name?.trim()
-    || otherParticipants.map((p) => p.displayName?.trim() || "User").join(", ")
-    || "Chat";
-  const headerAvatar = normalizeProfileImageUrl(otherParticipant?.avatarUrl);
+  // Official platform conversation — brand identity + logo, not a regular user.
+  const isModeratorConvo = conv?.type?.toLowerCase() === "moderator";
+  const headerName = isModeratorConvo
+    ? MODERATOR_BRAND_NAME
+    : conv?.name?.trim()
+      || otherParticipants.map((p) => p.displayName?.trim() || "User").join(", ")
+      || "Chat";
+  const headerAvatar = isModeratorConvo ? null : normalizeProfileImageUrl(otherParticipant?.avatarUrl);
   const headerInitial = headerName.slice(0, 1).toUpperCase();
 
   // ── Load initial messages ───────────────────────────────────────────────────
@@ -698,16 +710,22 @@ export default function ChatScreen() {
           disabled={!otherParticipant?.id}
           hitSlop={4}
         >
-          <View style={[styles.headerAvatar, { overflow: "hidden" }]}>
-            {headerAvatar
-              ? <Image source={{ uri: headerAvatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-              : <Text style={styles.headerAvatarText}>{headerInitial}</Text>
+          <View style={[styles.headerAvatar, { overflow: "hidden" }, isModeratorConvo && styles.headerAvatarOfficial]}>
+            {isModeratorConvo
+              ? <Image source={logoAsset} style={styles.headerAvatarLogo} contentFit="contain" />
+              : headerAvatar
+                ? <Image source={{ uri: headerAvatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                : <Text style={styles.headerAvatarText}>{headerInitial}</Text>
             }
           </View>
 
           <View style={styles.headerMeta}>
             <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{headerName}</Text>
-            {otherParticipants.length === 1 && (
+            {isModeratorConvo ? (
+              <Text style={[styles.headerStatus, { color: colors.muted }]} numberOfLines={1}>
+                🛡 Official team · not a regular user
+              </Text>
+            ) : otherParticipants.length === 1 && (
               <Text style={[styles.headerStatus, { color: partnerOnline ? "#22c55e" : colors.muted }]}>
                 {partnerOnline ? "● Online" : "Offline"}
               </Text>
@@ -967,6 +985,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  headerAvatarOfficial: { backgroundColor: "#fff" },
+  headerAvatarLogo: { width: "78%", height: "78%" },
   headerMeta: { flex: 1 },
   headerName: { fontSize: 16, fontWeight: "800" },
   headerStatus: { fontSize: 12, fontWeight: "600", marginTop: 1 },
@@ -988,6 +1008,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bubbleAvatarText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  bubbleAvatarOfficial: { backgroundColor: "#fff" },
+  bubbleAvatarLogo: { width: "78%", height: "78%" },
   bubbleGroup: { maxWidth: "72%" },
   bubbleSender: { fontSize: 11, fontWeight: "700", marginBottom: 2, marginLeft: 4 },
   bubble: {

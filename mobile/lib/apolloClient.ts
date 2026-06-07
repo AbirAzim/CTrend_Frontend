@@ -77,5 +77,31 @@ const link = wsLink
 
 export const apolloClient = new ApolloClient({
   link,
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          // Infinite-scroll feed: one cached list per filter, with pages merged
+          // by their `skip` offset. This lets `fetchMore` append the next page
+          // and the 20s poll refresh the head in place, instead of each
+          // (skip/take) combination becoming a separate list or overwriting it.
+          feedPosts: {
+            keyArgs: ["campaignId", "scope", "sort"],
+            merge(
+              existing: readonly unknown[] = [],
+              incoming: readonly unknown[],
+              { args }: { args: Record<string, unknown> | null },
+            ) {
+              const merged = existing.slice();
+              const start = typeof args?.skip === "number" ? args.skip : 0;
+              for (let i = 0; i < incoming.length; i++) {
+                merged[start + i] = incoming[i];
+              }
+              return merged;
+            },
+          },
+        },
+      },
+    },
+  }),
 });

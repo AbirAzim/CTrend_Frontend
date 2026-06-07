@@ -301,6 +301,7 @@ export function ProfilePage() {
     campaign?: { id: string; name?: string | null; slug?: string | null } | null;
     votingEndsAt?: string | null;
     isVotingOpen?: boolean | null;
+    isUserGlobalBroadcast?: boolean | null;
   } | null>(null);
   const [friendsPage, setFriendsPage] = useState(0);
   const [incomingPage, setIncomingPage] = useState(0);
