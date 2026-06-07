@@ -1,4 +1,4 @@
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   PLAY_STORE_CLOSED_TESTING_URL,
@@ -14,23 +14,36 @@ type Props = {
   visible: boolean;
   installedVersionCode: number;
   minRequiredVersionCode: number;
+  title: string;
+  body: string;
 };
 
+/**
+ * Full-screen blocking overlay (not RN Modal — Modal can fail to appear over
+ * navigation / keyboard providers on some Android builds).
+ */
 export function ForceUpdateModal({
   visible,
   installedVersionCode,
   minRequiredVersionCode,
+  title,
+  body,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => {}}>
+    <View
+      style={[st.overlay, { backgroundColor: colors.bg }]}
+      accessibilityViewIsModal
+      importantForAccessibility="yes"
+    >
       <View
         style={[
           st.root,
           {
-            backgroundColor: colors.bg,
             paddingTop: insets.top + 24,
             paddingBottom: insets.bottom + 24,
           },
@@ -40,10 +53,8 @@ export function ForceUpdateModal({
           <Text style={st.emoji} accessibilityLabel="Update required">
             ⬆️
           </Text>
-          <Text style={[st.title, { color: colors.text }]}>Update required</Text>
-          <Text style={[st.body, { color: colors.subtext }]}>
-            A newer version of Ke Jitbe is available. Please update to continue using the app.
-          </Text>
+          <Text style={[st.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[st.body, { color: colors.subtext }]}>{body}</Text>
           <Text style={[st.meta, { color: colors.muted }]}>
             Your version: {installedVersionCode} · Required: {minRequiredVersionCode}+
           </Text>
@@ -68,11 +79,16 @@ export function ForceUpdateModal({
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999999,
+    elevation: 999999,
+  },
   root: {
     flex: 1,
     paddingHorizontal: 20,

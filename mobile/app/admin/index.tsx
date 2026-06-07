@@ -24,8 +24,9 @@ import {
   PLATFORM_SETTINGS,
   SET_ALLOW_USER_GLOBAL_POSTS,
   SET_MIN_ANDROID_VERSION_CODE,
+  PUBLISH_ANDROID_UPDATE_NOTICE,
 } from "@ctrend/shared/graphql/admin";
-import { BUNDLED_ANDROID_VERSION_CODE } from "@ctrend/shared/lib/appUpdate";
+import { BUNDLED_ANDROID_VERSION_CODE, PLAY_STORE_CLOSED_TESTING_URL } from "@ctrend/shared/lib/appUpdate";
 import { SEND_ADMIN_BROADCAST as BROADCAST } from "@ctrend/shared/graphql/notifications";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
@@ -105,36 +106,67 @@ export default function AdminUsersScreen() {
 
   // Platform setting: allow normal users to broadcast posts globally (Phase 36)
   const { data: settingsData } = useQuery<{
-    platformSettings: { allowUserGlobalPosts: boolean; minAndroidVersionCode: number };
+    platformSettings: {
+      allowUserGlobalPosts: boolean;
+      minAndroidVersionCode: number;
+      androidUpdateTitle: string;
+      androidUpdateBody: string;
+    };
   }>(PLATFORM_SETTINGS, { fetchPolicy: "cache-and-network" });
   const allowGlobal = Boolean(settingsData?.platformSettings?.allowUserGlobalPosts);
   const minAndroidVersion = settingsData?.platformSettings?.minAndroidVersionCode ?? 0;
   const [setAllowGlobal, { loading: savingGlobal }] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
-  const [setMinAndroidVersion, { loading: savingMinVersion }] = useMutation(SET_MIN_ANDROID_VERSION_CODE);
+  const [setMinAndroidVersion, { loading: disablingUpdate }] = useMutation(SET_MIN_ANDROID_VERSION_CODE);
+  const [publishUpdate, { loading: publishingUpdate }] = useMutation(PUBLISH_ANDROID_UPDATE_NOTICE);
   const [globalDetails, setGlobalDetails] = useState(false);
   const [minVersionInput, setMinVersionInput] = useState(String(BUNDLED_ANDROID_VERSION_CODE));
+  const [updateTitleInput, setUpdateTitleInput] = useState("Update required");
+  const [updateBodyInput, setUpdateBodyInput] = useState(
+    `A new version of Ke Jitbe is available. Please update from Google Play.\n\nClosed testing: ${PLAY_STORE_CLOSED_TESTING_URL}`,
+  );
 
   useEffect(() => {
-    setMinVersionInput(String(minAndroidVersion));
-  }, [minAndroidVersion]);
+    setMinVersionInput(String(minAndroidVersion || BUNDLED_ANDROID_VERSION_CODE));
+    const s = settingsData?.platformSettings;
+    if (s?.androidUpdateTitle?.trim()) setUpdateTitleInput(s.androidUpdateTitle);
+    if (s?.androidUpdateBody?.trim()) setUpdateBodyInput(s.androidUpdateBody);
+  }, [minAndroidVersion, settingsData?.platformSettings]);
 
-  async function handleSaveMinVersion() {
+  async function handlePublishUpdateNotice() {
     const code = parseInt(minVersionInput.trim(), 10);
-    if (!Number.isFinite(code) || code < 0) {
-      Alert.alert("Invalid version", "Enter a version code ≥ 0. Use 0 to disable force update.");
+    if (!Number.isFinite(code) || code <= 0) {
+      Alert.alert("Invalid version", "Enter the minimum versionCode for this release (e.g. 11 or 12).");
+      return;
+    }
+    if (!updateTitleInput.trim() || !updateBodyInput.trim()) {
+      Alert.alert("Missing text", "Enter a title and message for the update modal.");
       return;
     }
     try {
-      await setMinAndroidVersion({
-        variables: { versionCode: code },
+      const { data: pubData } = await publishUpdate({
+        variables: {
+          title: updateTitleInput.trim(),
+          body: updateBodyInput.trim(),
+          minVersionCode: code,
+        },
         refetchQueries: [{ query: PLATFORM_SETTINGS }],
       });
-      showToast(
-        code === 0 ? "Force update disabled" : `Force update set to version ${code}+`,
-        "success",
-      );
+      const count = (pubData as { publishAndroidUpdateNotice?: number })?.publishAndroidUpdateNotice ?? 0;
+      showToast(`Update notice live · notified ${count} outdated Android user${count === 1 ? "" : "s"}`, "success");
     } catch {
-      showToast("Could not update min Android version", "error");
+      showToast("Could not publish update notice", "error");
+    }
+  }
+
+  async function handleDisableForceUpdate() {
+    try {
+      await setMinAndroidVersion({
+        variables: { versionCode: 0 },
+        refetchQueries: [{ query: PLATFORM_SETTINGS }],
+      });
+      showToast("Force update disabled", "success");
+    } catch {
+      showToast("Could not disable force update", "error");
     }
   }
 
@@ -274,31 +306,63 @@ export default function AdminUsersScreen() {
         </View>
 
         <View style={[st.globalCard, { borderColor: colors.border, backgroundColor: colors.inputBg }]}>
-          <Text style={[st.globalTitle, { color: colors.text }]}>⬆️ Force Android update</Text>
+          <Text style={[st.globalTitle, { color: colors.text }]}>⬆️ Android update notice</Text>
           <Text style={[st.globalStatus, { color: colors.muted }]}>
-            Users below this versionCode see a blocking update popup until they update from Play.
+            Outdated Android users see a blocking modal until they update. Push + in-app alert sent only
+            to users below the min version (not up-to-date users).
           </Text>
+          {minAndroidVersion > 0 && (
+            <Text style={[st.globalStatus, { color: colors.accent, marginTop: 4 }]}>
+              Active: min version {minAndroidVersion}+
+            </Text>
+          )}
+          <TextInput
+            style={[st.modalInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, marginTop: 8 }]}
+            placeholder="Modal title"
+            placeholderTextColor={colors.muted}
+            value={updateTitleInput}
+            onChangeText={setUpdateTitleInput}
+          />
+          <TextInput
+            style={[st.modalInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, height: 88, marginTop: 8 }]}
+            placeholder="Modal message…"
+            placeholderTextColor={colors.muted}
+            value={updateBodyInput}
+            onChangeText={setUpdateBodyInput}
+            multiline
+          />
           <View style={st.minVersionRow}>
             <TextInput
               style={[st.minVersionInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
               value={minVersionInput}
               onChangeText={setMinVersionInput}
               keyboardType="number-pad"
-              placeholder="0 = off"
+              placeholder="Min versionCode"
               placeholderTextColor={colors.muted}
             />
             <Pressable
-              style={[st.minVersionSave, { backgroundColor: colors.accent, opacity: savingMinVersion ? 0.6 : 1 }]}
-              onPress={() => void handleSaveMinVersion()}
-              disabled={savingMinVersion}
+              style={[st.minVersionSave, { backgroundColor: colors.accent, opacity: publishingUpdate ? 0.6 : 1 }]}
+              onPress={() => void handlePublishUpdateNotice()}
+              disabled={publishingUpdate}
             >
-              <Text style={st.minVersionSaveText}>{savingMinVersion ? "…" : "Save"}</Text>
+              <Text style={st.minVersionSaveText}>{publishingUpdate ? "…" : "Publish"}</Text>
             </Pressable>
           </View>
           <Text style={[st.globalDetailsText, { color: colors.muted, marginTop: 8 }]}>
-            Current release build: {BUNDLED_ANDROID_VERSION_CODE}. After uploading a new closed/production
-            release, set this to the new versionCode so older installs are prompted to update.
+            Current release build: {BUNDLED_ANDROID_VERSION_CODE}. Set min to that versionCode after Play
+            rollout. Very old installs (before v8) must update via Play first — then future notices work in-app.
           </Text>
+          {minAndroidVersion > 0 && (
+            <Pressable
+              style={[st.disableUpdateBtn, { borderColor: colors.border }]}
+              onPress={() => void handleDisableForceUpdate()}
+              disabled={disablingUpdate}
+            >
+              <Text style={[st.disableUpdateText, { color: colors.muted }]}>
+                {disablingUpdate ? "…" : "Turn off force update"}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -482,6 +546,8 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     },
     minVersionSave: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
     minVersionSaveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
+    disableUpdateBtn: { marginTop: 10, borderWidth: 1, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
+    disableUpdateText: { fontSize: 12, fontWeight: "600" },
     list: { padding: 12, gap: 8 },
     empty: { textAlign: "center", padding: 24, fontSize: 14 },
     pageInfo: { textAlign: "center", fontSize: 12, paddingTop: 12, paddingBottom: 4 },

@@ -1,9 +1,12 @@
 import { ApolloClient, InMemoryCache, split } from "@apollo/client";
+import { onError } from "@apollo/client/link/error";
 import { HttpLink } from "@apollo/client/link/http";
 import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { createClient } from "graphql-ws";
+import { getAndroidClientHeaders } from "./androidVersion";
+import { setForceUpdateFromGraphqlError } from "./forceUpdateState";
 import { readStoredToken } from "./authStorage";
 
 const HTTP_URL = process.env.EXPO_PUBLIC_GRAPHQL_HTTP;
@@ -14,12 +17,33 @@ if (!HTTP_URL) {
 }
 const WS_URL = process.env.EXPO_PUBLIC_GRAPHQL_WS;
 
-// AsyncStorage reads are async — setContext supports async functions
+const forceUpdateErrorLink = onError(({ graphQLErrors }) => {
+  for (const err of graphQLErrors ?? []) {
+    const ext = err.extensions as Record<string, unknown> | undefined;
+    if (ext?.code === "ANDROID_UPDATE_REQUIRED") {
+      setForceUpdateFromGraphqlError({
+        minRequiredVersionCode: parseVersionExt(ext.minAndroidVersionCode),
+        title: String(ext.title ?? "Update required"),
+        body: String(
+          ext.body ??
+            "A newer version of Ke Jitbe is available. Please update from Google Play.",
+        ),
+      });
+    }
+  }
+});
+
+function parseVersionExt(value: unknown): number {
+  const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 const authLink = setContext(async (_, { headers }) => {
   const token = await readStoredToken();
   return {
     headers: {
       ...headers,
+      ...getAndroidClientHeaders(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   };
@@ -39,7 +63,10 @@ const wsLink = WS_URL
           keepAlive: 30_000,
           connectionParams: async () => {
             const token = await readStoredToken();
-            return token ? { Authorization: `Bearer ${token}` } : {};
+            return {
+              ...getAndroidClientHeaders(),
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            };
           },
         });
         return _wsClient;
@@ -51,15 +78,12 @@ export function reconnectWs(): void {
   _wsClient?.terminate();
 }
 
-/**
- * Subscribe to graphql-ws (re)connection. Fires every time the socket becomes
- * connected — used to recover notifications missed while the socket was down
- * (the in-process PubSub has no replay). Returns an unsubscribe function.
- */
 export function onWsConnected(cb: () => void): () => void {
   if (!_wsClient) return () => {};
   return _wsClient.on("connected", () => cb());
 }
+
+const httpChain = authLink.concat(forceUpdateErrorLink).concat(httpLink);
 
 const link = wsLink
   ? split(
@@ -71,9 +95,9 @@ const link = wsLink
         );
       },
       wsLink,
-      authLink.concat(httpLink),
+      httpChain,
     )
-  : authLink.concat(httpLink);
+  : httpChain;
 
 export const apolloClient = new ApolloClient({
   link,
@@ -81,10 +105,6 @@ export const apolloClient = new ApolloClient({
     typePolicies: {
       Query: {
         fields: {
-          // Infinite-scroll feed: one cached list per filter, with pages merged
-          // by their `skip` offset. This lets `fetchMore` append the next page
-          // and the 20s poll refresh the head in place, instead of each
-          // (skip/take) combination becoming a separate list or overwriting it.
           feedPosts: {
             keyArgs: ["campaignId", "scope", "sort"],
             merge(

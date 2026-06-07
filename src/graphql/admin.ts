@@ -428,6 +428,8 @@ export const PLATFORM_SETTINGS = gql`
     platformSettings {
       allowUserGlobalPosts
       minAndroidVersionCode
+      androidUpdateTitle
+      androidUpdateBody
     }
   }
 `;
@@ -437,6 +439,8 @@ export const SET_ALLOW_USER_GLOBAL_POSTS = gql`
     setAllowUserGlobalPosts(enabled: $enabled) {
       allowUserGlobalPosts
       minAndroidVersionCode
+      androidUpdateTitle
+      androidUpdateBody
     }
   }
 `;
@@ -446,6 +450,22 @@ export const SET_MIN_ANDROID_VERSION_CODE = gql`
     setMinAndroidVersionCode(versionCode: $versionCode) {
       allowUserGlobalPosts
       minAndroidVersionCode
+      androidUpdateTitle
+      androidUpdateBody
     }
+  }
+`;
+
+export const PUBLISH_ANDROID_UPDATE_NOTICE = gql`
+  mutation PublishAndroidUpdateNotice(
+    $title: String!
+    $body: String!
+    $minVersionCode: Int!
+  ) {
+    publishAndroidUpdateNotice(
+      title: $title
+      body: $body
+      minVersionCode: $minVersionCode
+    )
   }
 `;
