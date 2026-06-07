@@ -274,6 +274,9 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
   // Chat messages
   const chatId =
     (data.type === "MESSAGE" && data.conversationId) ||
+    (data.type === "MESSAGE" &&
+      data.referenceType === "moderator_conversation" &&
+      data.referenceId) ||
     (data.referenceType === "CONVERSATION" && data.referenceId) ||
     (data.referenceType === "MESSAGE" && data.referenceId) ||
     null;
@@ -284,7 +287,9 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
   const postTarget = data.postId || (refType === "POST" ? data.referenceId : undefined) || null;
   const postRoute = (base: string) => (data.commentId ? `${base}?commentId=${data.commentId}` : base);
 
-  if (COMMENT_NOTIF_TYPES.has(nt) && postTarget) return postRoute(`/post/${postTarget}`);
+  if (COMMENT_NOTIF_TYPES.has(nt) && postTarget) {
+    return postRoute(`/comments/${postTarget}`);
+  }
   if (POST_NOTIF_TYPES.has(nt) && postTarget) return `/post/${postTarget}`;
   if (PROFILE_NOTIF_TYPES.has(nt) && data.referenceId) return `/profile/${data.referenceId}`;
   if (ANNOUNCEMENT_NOTIF_TYPES.has(nt)) return postTarget ? `/post/${postTarget}` : "/notifications";

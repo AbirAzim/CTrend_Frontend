@@ -315,7 +315,9 @@ function ChatView({
           />
           <Pressable
             style={[st.sendBtn, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
-            onPress={() => void handleSend()}
+            onPressIn={() => {
+              if (!isBusy && (messageText.trim() || pendingImageUrl)) void handleSend();
+            }}
             disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
           >
             {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.sendBtnText}>Send</Text>}
@@ -618,7 +620,9 @@ export default function AdminMessagesScreen() {
             />
             <Pressable
               style={[st.sendBtn, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
-              onPress={() => void handleSendNew()}
+              onPressIn={() => {
+                if (!isBusy && (messageText.trim() || pendingImageUrl)) void handleSendNew();
+              }}
               disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
             >
               {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.sendBtnText}>Send</Text>}

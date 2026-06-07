@@ -4,17 +4,18 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
 	ActivityIndicator,
-	Alert,
-	Dimensions,
-	Modal,
+	Keyboard,
 	Pressable,
-	ScrollView,
 	StyleSheet,
 	Text,
 	TextInput,
 	View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import {
+	KeyboardAwareScrollView,
+	KeyboardStickyView,
+	type KeyboardAwareScrollViewRef,
+} from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	COMMENTS_BY_POST,
@@ -27,10 +28,7 @@ import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-
-const { height: SCREEN_H } = Dimensions.get('window');
-/** Facebook opens comments nearly full-screen — leave a small peek of the post behind. */
-const SHEET_HEIGHT = Math.round(SCREEN_H * 0.94);
+import { AppConfirmDialog } from './AppDialog';
 
 type GqlComment = {
 	id: string;
@@ -119,9 +117,13 @@ export function FeedInlineComments({
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [editText, setEditText] = useState('');
 	const [replyTarget, setReplyTarget] = useState<{ id: string; name: string } | null>(null);
+	const [deleteTarget, setDeleteTarget] = useState<GqlComment | null>(null);
 	const inputRef = useRef<TextInput>(null);
-	const listRef = useRef<ScrollView>(null);
+	const listRef = useRef<KeyboardAwareScrollViewRef>(null);
 	const commentOffsets = useRef<Record<string, number>>({});
+	const textRef = useRef('');
+	const replyTargetRef = useRef<{ id: string; name: string } | null>(null);
+	replyTargetRef.current = replyTarget;
 
 	const { data, loading, refetch } = useQuery<CommentsData>(COMMENTS_BY_POST, {
 		variables: { postId },
@@ -144,7 +146,7 @@ export function FeedInlineComments({
 
 	useEffect(() => {
 		if (!focusComposerOnOpen) return;
-		const t = setTimeout(() => inputRef.current?.focus(), 320);
+		const t = setTimeout(() => inputRef.current?.focus(), 280);
 		return () => clearTimeout(t);
 	}, [focusComposerOnOpen]);
 
@@ -158,12 +160,13 @@ export function FeedInlineComments({
 	}, [highlightCommentId, loading, ordered.length]);
 
 	async function handleSend() {
-		const content = text.trim();
+		const content = textRef.current.trim();
 		if (!content || sending) return;
 		if (!isAuthenticated) {
 			router.push('/auth/login');
 			return;
 		}
+		const parent = replyTargetRef.current;
 		setSending(true);
 		try {
 			await commentPost({
@@ -171,14 +174,16 @@ export function FeedInlineComments({
 					postId,
 					input: {
 						content,
-						...(replyTarget ? { parentId: replyTarget.id } : {}),
+						...(parent ? { parentId: parent.id } : {}),
 					},
 				},
 			});
 			setText('');
+			textRef.current = '';
 			setReplyTarget(null);
 			await refetch();
 			onCommentAdded?.();
+			Keyboard.dismiss();
 			setTimeout(() => listRef.current?.scrollTo({ y: 0, animated: true }), 100);
 		} catch {
 			/* keep text for retry */
@@ -186,6 +191,14 @@ export function FeedInlineComments({
 			setSending(false);
 		}
 	}
+
+	function trySend() {
+		if (!textRef.current.trim() || sending || !isAuthenticated) return;
+		// Fire on touch-down (before TextInput blur / keyboard dismiss steals the tap).
+		void handleSend();
+	}
+
+	const composerPadBottom = Math.max(insets.bottom, 8);
 
 	function startReply(c: GqlComment) {
 		if (!isAuthenticated) {
@@ -231,30 +244,16 @@ export function FeedInlineComments({
 	}
 
 	function confirmDelete(c: GqlComment) {
-		const isTopLevel = !c.parentId;
-		Alert.alert(
-			'Delete comment?',
-			isTopLevel
-				? 'This comment and all its replies will be removed.'
-				: 'This comment will be removed.',
-			[
-				{ text: 'Cancel', style: 'cancel' },
-				{
-					text: 'Delete',
-					style: 'destructive',
-					onPress: () => {
-						void (async () => {
-							try {
-								await deleteComment({ variables: { commentId: c.id } });
-								await refetch();
-							} catch {
-								/* ignore */
-							}
-						})();
-					},
-				},
-			],
-		);
+		setDeleteTarget(c);
+	}
+
+	async function performDelete(c: GqlComment) {
+		try {
+			await deleteComment({ variables: { commentId: c.id } });
+			await refetch();
+		} catch {
+			/* ignore */
+		}
 	}
 
 	const canSend = !!text.trim() && !sending && isAuthenticated;
@@ -375,169 +374,173 @@ export function FeedInlineComments({
 	}
 
 	return (
-		<Modal
-			visible
-			transparent
-			statusBarTranslucent
-			animationType='slide'
-			onRequestClose={onClose}
-		>
-			<View style={st.backdrop}>
-				<Pressable style={st.backdropTap} onPress={onClose} />
-				<KeyboardAvoidingView behavior='padding' keyboardVerticalOffset={0} style={st.kav}>
-					<View style={[st.sheet, { height: SHEET_HEIGHT, paddingBottom: 0 }]}>
-						<View style={st.grabber} />
-						<View style={st.header}>
-							<Text style={st.headerTitle}>Comments</Text>
-							{ordered.length > 0 ? (
-								<Text style={st.headerCount}>{ordered.length}</Text>
-							) : null}
-							<View style={{ flex: 1 }} />
-							<Pressable onPress={onClose} hitSlop={12} style={st.closeBtn}>
-								<Text style={st.closeBtnText}>✕</Text>
+		<>
+			<View style={[st.screen, { backgroundColor: fb.sheet }]}>
+				<View style={[st.header, { paddingTop: insets.top + 6 }]}>
+					<Pressable onPress={onClose} hitSlop={12} style={st.backBtn}>
+						<Text style={[st.backBtnText, { color: fb.link }]}>‹</Text>
+					</Pressable>
+					<Text style={st.headerTitle}>Comments</Text>
+					{ordered.length > 0 ? (
+						<Text style={st.headerCount}>{ordered.length}</Text>
+					) : null}
+					<View style={{ flex: 1 }} />
+					<Pressable onPress={onClose} hitSlop={12} style={st.closeBtn}>
+						<Text style={st.closeBtnText}>✕</Text>
+					</Pressable>
+				</View>
+
+				<View style={st.listWrap}>
+					{loading && all.length === 0 ? (
+						<View style={st.centerState}>
+							<ActivityIndicator color={fb.link} />
+						</View>
+					) : ordered.length === 0 ? (
+						<View style={st.centerState}>
+							<Text style={st.emptyTitle}>No comments yet</Text>
+							<Text style={st.empty}>Be the first to comment.</Text>
+						</View>
+					) : (
+						<KeyboardAwareScrollView
+							ref={listRef}
+							style={st.list}
+							contentContainerStyle={st.listContent}
+							keyboardShouldPersistTaps='always'
+							showsVerticalScrollIndicator
+							bottomOffset={80}
+						>
+							{ordered.map((c) => {
+								const replies = all
+									.filter((r) => r.parentId === c.id)
+									.sort(
+										(a, b) =>
+											new Date(a.createdAt).getTime() -
+											new Date(b.createdAt).getTime(),
+									);
+								return (
+									<View key={c.id}>
+										{renderComment(c, false)}
+										{replies.map((r) => renderComment(r, true))}
+									</View>
+								);
+							})}
+						</KeyboardAwareScrollView>
+					)}
+				</View>
+
+				<KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+					{replyTarget ? (
+						<View style={st.replyBanner}>
+							<Text style={st.replyBannerText} numberOfLines={1}>
+								Replying to{' '}
+								<Text style={st.replyBannerName}>{replyTarget.name}</Text>
+							</Text>
+							<Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
+								<Text style={st.replyBannerCancel}>✕</Text>
 							</Pressable>
 						</View>
+					) : null}
 
-						<View style={st.listWrap}>
-							{loading && all.length === 0 ? (
-								<View style={st.centerState}>
-									<ActivityIndicator color={fb.link} />
-								</View>
-							) : ordered.length === 0 ? (
-								<View style={st.centerState}>
-									<Text style={st.emptyTitle}>No comments yet</Text>
-									<Text style={st.empty}>Be the first to comment.</Text>
-								</View>
-							) : (
-								<ScrollView
-									ref={listRef}
-									style={st.list}
-									contentContainerStyle={st.listContent}
-									keyboardShouldPersistTaps='handled'
-									showsVerticalScrollIndicator
-								>
-									{ordered.map((c) => {
-										const replies = all
-											.filter((r) => r.parentId === c.id)
-											.sort(
-												(a, b) =>
-													new Date(a.createdAt).getTime() -
-													new Date(b.createdAt).getTime(),
-											);
-										return (
-											<View key={c.id}>
-												{renderComment(c, false)}
-												{replies.map((r) => renderComment(r, true))}
-											</View>
-										);
-									})}
-								</ScrollView>
-							)}
-						</View>
-
-						{replyTarget ? (
-							<View style={st.replyBanner}>
-								<Text style={st.replyBannerText} numberOfLines={1}>
-									Replying to <Text style={st.replyBannerName}>{replyTarget.name}</Text>
-								</Text>
-								<Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
-									<Text style={st.replyBannerCancel}>✕</Text>
-								</Pressable>
-							</View>
-						) : null}
-
-						<View style={[st.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-							<View style={st.composerAvatar}>
-								{userAvatar ? (
-									<Image
-										source={{ uri: userAvatar }}
-										style={StyleSheet.absoluteFill}
-										contentFit='cover'
-										cachePolicy='memory-disk'
-									/>
-								) : (
-									<Text style={st.composerAvatarText}>{userInitial}</Text>
-								)}
-							</View>
-							<View style={st.composerPill}>
-								<TextInput
-									ref={inputRef}
-									style={st.input}
-									placeholder={
-										replyTarget
-											? `Reply to ${replyTarget.name}…`
-											: isAuthenticated
-												? `Comment as ${displayName}`
-												: 'Log in to comment'
-									}
-									placeholderTextColor={fb.subtext}
-									value={text}
-									onChangeText={setText}
-									editable={isAuthenticated && !sending}
-									multiline
-									maxLength={1000}
-									onPressIn={() => {
-										if (!isAuthenticated) router.push('/auth/login');
-									}}
+					<View style={[st.composer, { paddingBottom: composerPadBottom }]}>
+						<View style={st.composerAvatar}>
+							{userAvatar ? (
+								<Image
+									source={{ uri: userAvatar }}
+									style={StyleSheet.absoluteFill}
+									contentFit='cover'
+									cachePolicy='memory-disk'
 								/>
-							</View>
-							{(text.trim() || sending) && (
-								<Pressable
-									style={st.sendBtn}
-									onPress={() => void handleSend()}
-									disabled={!canSend}
-								>
-									{sending ? (
-										<ActivityIndicator size='small' color={fb.link} />
-									) : (
-										<Text style={[st.sendBtnIcon, !canSend && { opacity: 0.35 }]}>➤</Text>
-									)}
-								</Pressable>
+							) : (
+								<Text style={st.composerAvatarText}>{userInitial}</Text>
 							)}
 						</View>
+						<View style={st.composerPill}>
+							<TextInput
+								ref={inputRef}
+								style={st.input}
+								placeholder={
+									replyTarget
+										? `Reply to ${replyTarget.name}…`
+										: isAuthenticated
+											? `Comment as ${displayName}`
+											: 'Log in to comment'
+								}
+								placeholderTextColor={fb.subtext}
+								value={text}
+								onChangeText={(value) => {
+									textRef.current = value;
+									setText(value);
+								}}
+								editable={isAuthenticated && !sending}
+								multiline
+								maxLength={1000}
+								blurOnSubmit={false}
+								onPressIn={() => {
+									if (!isAuthenticated) router.push('/auth/login');
+								}}
+							/>
+						</View>
+						<Pressable
+							style={[st.postBtn, !canSend && st.postBtnDisabled]}
+							onPressIn={trySend}
+							hitSlop={10}
+							accessibilityRole='button'
+							accessibilityLabel='Post comment'
+						>
+							{sending ? (
+								<ActivityIndicator size='small' color='#fff' />
+							) : (
+								<Text style={[st.postBtnText, !canSend && st.postBtnTextDisabled]}>
+									➤
+								</Text>
+							)}
+						</Pressable>
 					</View>
-				</KeyboardAvoidingView>
+				</KeyboardStickyView>
 			</View>
-		</Modal>
+
+			<AppConfirmDialog
+				visible={deleteTarget !== null}
+				title='Delete comment?'
+				message={
+					deleteTarget && !deleteTarget.parentId
+						? 'This comment and all its replies will be removed.'
+						: 'This comment will be removed.'
+				}
+				confirmLabel='Delete'
+				destructive
+				onCancel={() => setDeleteTarget(null)}
+				onConfirm={() => {
+					const target = deleteTarget;
+					setDeleteTarget(null);
+					if (target) void performDelete(target);
+				}}
+			/>
+		</>
 	);
 }
 
 function makeStyles(fb: FbPalette) {
 	return StyleSheet.create({
-		backdrop: {
+		screen: {
 			flex: 1,
-			justifyContent: 'flex-end',
-			backgroundColor: fb.backdrop,
-		},
-		backdropTap: {
-			flex: 1,
-		},
-		kav: { width: '100%' },
-		sheet: {
-			width: '100%',
-			backgroundColor: fb.sheet,
-			borderTopLeftRadius: 12,
-			borderTopRightRadius: 12,
-			overflow: 'hidden',
-		},
-		grabber: {
-			alignSelf: 'center',
-			width: 40,
-			height: 4,
-			borderRadius: 2,
-			backgroundColor: fb.border,
-			marginTop: 8,
-			marginBottom: 4,
 		},
 		header: {
 			flexDirection: 'row',
 			alignItems: 'center',
 			gap: 8,
 			paddingHorizontal: 14,
-			paddingVertical: 10,
+			paddingBottom: 10,
 			borderBottomWidth: StyleSheet.hairlineWidth,
 			borderBottomColor: fb.border,
 		},
+		backBtn: {
+			width: 36,
+			height: 36,
+			alignItems: 'center',
+			justifyContent: 'center',
+		},
+		backBtnText: { fontSize: 28, fontWeight: '300', lineHeight: 32 },
 		headerTitle: { fontSize: 17, fontWeight: '700', color: fb.text },
 		headerCount: {
 			fontSize: 13,
@@ -557,6 +560,7 @@ function makeStyles(fb: FbPalette) {
 			paddingHorizontal: 12,
 			paddingVertical: 10,
 			gap: 4,
+			paddingBottom: 16,
 		},
 		centerState: {
 			flex: 1,
@@ -700,17 +704,25 @@ function makeStyles(fb: FbPalette) {
 			maxHeight: 100,
 			paddingVertical: 9,
 		},
-		sendBtn: {
+		postBtn: {
 			width: 36,
 			height: 36,
+			borderRadius: 18,
 			alignItems: 'center',
 			justifyContent: 'center',
+			backgroundColor: fb.link,
 			marginBottom: 2,
 		},
-		sendBtnIcon: {
-			fontSize: 22,
+		postBtnDisabled: {
+			opacity: 0.35,
+		},
+		postBtnText: {
+			fontSize: 20,
 			fontWeight: '700',
-			color: fb.link,
+			color: '#fff',
+		},
+		postBtnTextDisabled: {
+			opacity: 0.6,
 		},
 	});
 }
