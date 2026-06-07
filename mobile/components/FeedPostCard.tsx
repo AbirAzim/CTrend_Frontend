@@ -1011,7 +1011,6 @@ function FeedPostCardComponent({
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
-	const [commentCountOverride, setCommentCountOverride] = useState<number | null>(null);
 
 	function openComments(focusComposer: boolean) {
 		if (!isAuthenticated) {
@@ -2168,7 +2167,7 @@ function FeedPostCardComponent({
 			) : null}
 
 			{(() => {
-				const commentCount = commentCountOverride ?? (post.commentCount ?? 0);
+				const commentCount = post.commentCount ?? 0;
 				const votersTotal = isBinary ? binaryTotal : multiTotal;
 				const hasCompare = Boolean(compareUrls);
 
@@ -2340,7 +2339,7 @@ function FeedPostCardComponent({
 			})()}
 
 			{(() => {
-				const commentCount = commentCountOverride ?? (post.commentCount ?? 0);
+				const commentCount = post.commentCount ?? 0;
 				const userAvatar = normalizeProfileImageUrl(user?.profileImageUrl);
 				const userInitial = (user?.displayName ?? user?.username ?? '?')
 					.slice(0, 1)
@@ -2689,7 +2688,7 @@ function FeedVotersPanel({
 			}
 		},
 		[client, postId, activeTab, debouncedSearch],
-	); // eslint-disable-line react-hooks/exhaustive-deps
+	);
 
 	useEffect(() => {
 		if (!visible) return;
