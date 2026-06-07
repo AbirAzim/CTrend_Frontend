@@ -34,6 +34,7 @@ export const GET_MESSAGES = gql`
       senderAvatar
       text
       imageUrl
+      deleted
       readBy {
         userId
         readAt
@@ -113,6 +114,7 @@ export const SEND_MESSAGE = gql`
       senderAvatar
       text
       imageUrl
+      deleted
       readBy {
         userId
         readAt
@@ -148,6 +150,31 @@ export const REACT_MESSAGE = gql`
   }
 `;
 
+export const DELETE_MESSAGE = gql`
+  mutation DeleteMessage($messageId: ID!) {
+    deleteMessage(messageId: $messageId) {
+      id
+      conversationId
+      deleted
+      text
+      imageUrl
+    }
+  }
+`;
+
+export const MESSAGE_DELETED_SUB = gql`
+  subscription MessageDeleted {
+    messageDeleted {
+      id
+      conversationId
+      senderId
+      deleted
+      text
+      imageUrl
+    }
+  }
+`;
+
 export const MARK_CONVERSATION_READ = gql`
   mutation MarkConversationRead($conversationId: ID!) {
     markConversationRead(conversationId: $conversationId)
@@ -170,6 +197,7 @@ export const MESSAGE_RECEIVED = gql`
       senderAvatar
       text
       imageUrl
+      deleted
       readBy {
         userId
         readAt

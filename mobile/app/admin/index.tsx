@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,9 @@ import {
   INVITE_USERS_BULK,
   PLATFORM_SETTINGS,
   SET_ALLOW_USER_GLOBAL_POSTS,
+  SET_MIN_ANDROID_VERSION_CODE,
 } from "@ctrend/shared/graphql/admin";
+import { BUNDLED_ANDROID_VERSION_CODE } from "@ctrend/shared/lib/appUpdate";
 import { SEND_ADMIN_BROADCAST as BROADCAST } from "@ctrend/shared/graphql/notifications";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
@@ -102,13 +104,39 @@ export default function AdminUsersScreen() {
   const [broadcastMut, { loading: broadcasting }] = useMutation(BROADCAST);
 
   // Platform setting: allow normal users to broadcast posts globally (Phase 36)
-  const { data: settingsData } = useQuery<{ platformSettings: { allowUserGlobalPosts: boolean } }>(
-    PLATFORM_SETTINGS,
-    { fetchPolicy: "cache-and-network" },
-  );
+  const { data: settingsData } = useQuery<{
+    platformSettings: { allowUserGlobalPosts: boolean; minAndroidVersionCode: number };
+  }>(PLATFORM_SETTINGS, { fetchPolicy: "cache-and-network" });
   const allowGlobal = Boolean(settingsData?.platformSettings?.allowUserGlobalPosts);
+  const minAndroidVersion = settingsData?.platformSettings?.minAndroidVersionCode ?? 0;
   const [setAllowGlobal, { loading: savingGlobal }] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
+  const [setMinAndroidVersion, { loading: savingMinVersion }] = useMutation(SET_MIN_ANDROID_VERSION_CODE);
   const [globalDetails, setGlobalDetails] = useState(false);
+  const [minVersionInput, setMinVersionInput] = useState(String(BUNDLED_ANDROID_VERSION_CODE));
+
+  useEffect(() => {
+    setMinVersionInput(String(minAndroidVersion));
+  }, [minAndroidVersion]);
+
+  async function handleSaveMinVersion() {
+    const code = parseInt(minVersionInput.trim(), 10);
+    if (!Number.isFinite(code) || code < 0) {
+      Alert.alert("Invalid version", "Enter a version code ≥ 0. Use 0 to disable force update.");
+      return;
+    }
+    try {
+      await setMinAndroidVersion({
+        variables: { versionCode: code },
+        refetchQueries: [{ query: PLATFORM_SETTINGS }],
+      });
+      showToast(
+        code === 0 ? "Force update disabled" : `Force update set to version ${code}+`,
+        "success",
+      );
+    } catch {
+      showToast("Could not update min Android version", "error");
+    }
+  }
 
   async function handleToggleGlobal(next: boolean) {
     try {
@@ -243,6 +271,34 @@ export default function AdminUsersScreen() {
               Platform posts (📢). Default is OFF — turning it off blocks new global user posts.
             </Text>
           )}
+        </View>
+
+        <View style={[st.globalCard, { borderColor: colors.border, backgroundColor: colors.inputBg }]}>
+          <Text style={[st.globalTitle, { color: colors.text }]}>⬆️ Force Android update</Text>
+          <Text style={[st.globalStatus, { color: colors.muted }]}>
+            Users below this versionCode see a blocking update popup until they update from Play.
+          </Text>
+          <View style={st.minVersionRow}>
+            <TextInput
+              style={[st.minVersionInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
+              value={minVersionInput}
+              onChangeText={setMinVersionInput}
+              keyboardType="number-pad"
+              placeholder="0 = off"
+              placeholderTextColor={colors.muted}
+            />
+            <Pressable
+              style={[st.minVersionSave, { backgroundColor: colors.accent, opacity: savingMinVersion ? 0.6 : 1 }]}
+              onPress={() => void handleSaveMinVersion()}
+              disabled={savingMinVersion}
+            >
+              <Text style={st.minVersionSaveText}>{savingMinVersion ? "…" : "Save"}</Text>
+            </Pressable>
+          </View>
+          <Text style={[st.globalDetailsText, { color: colors.muted, marginTop: 8 }]}>
+            Current release build: {BUNDLED_ANDROID_VERSION_CODE}. After uploading a new closed/production
+            release, set this to the new versionCode so older installs are prompted to update.
+          </Text>
         </View>
       </View>
 
@@ -414,6 +470,18 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     globalStatus: { fontSize: 11, fontWeight: "600", marginTop: 2 },
     globalDetailsToggle: { fontSize: 12, fontWeight: "700" },
     globalDetailsText: { fontSize: 12, lineHeight: 17 },
+    minVersionRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+    minVersionInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+    minVersionSave: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
+    minVersionSaveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
     list: { padding: 12, gap: 8 },
     empty: { textAlign: "center", padding: 24, fontSize: 14 },
     pageInfo: { textAlign: "center", fontSize: 12, paddingTop: 12, paddingBottom: 4 },

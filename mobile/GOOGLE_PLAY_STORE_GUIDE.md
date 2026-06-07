@@ -731,7 +731,17 @@ Always test on **Internal testing** before production.
 3. Copy the **opt-in URL** and open it on each tester's phone.
 4. Accept invite → install from Play Store (internal track).
 
-Verify the build from Play matches your local release tests ([§11](#11-test-the-release-build-locally)).
+### 15.2 Closed testing release (required before production for new accounts)
+
+1. Play Console → **Testing → Closed testing** (Alpha).
+2. **Create new release** → upload `app-release.aab` from `./scripts/build-mobile-aab-release.sh`.
+3. **Release name:** match `versionName (versionCode)` — e.g. `1.0.7 (8)`.
+4. **Release notes** → **Save** → **Review release** → **Start rollout to Closed testing**.
+5. **Testers** tab → email list → share opt-in URL:
+   **https://play.google.com/apps/testing/com.ctrend.app**
+6. After rollout: Admin app → **Force Android update** → set min `versionCode` to this release.
+
+Public store listing (after production): **https://play.google.com/store/apps/details?id=com.ctrend.app**
 
 ---
 
@@ -798,18 +808,48 @@ You'll get email for approval or requested changes.
 ## 18. Every future update
 
 ```bash
-# 1. Bump versions in mobile/android/app/build.gradle
-#    versionCode 2
-#    versionName "1.0.1"
+# 1. Bump versions (all three must match):
+#    mobile/android/app/build.gradle  → versionCode + versionName
+#    mobile/app.json                  → version + android.versionCode
+#    packages/shared/src/lib/appUpdate.ts → BUNDLED_ANDROID_VERSION_CODE
 
-# 2. Update mobile/app.json "version" if desired
+# 2. Build release AAB + optional device APK (from repo root):
+./scripts/build-mobile-aab-release.sh
 
-# 3. Build new AAB (see §10)
+# 3. Play Console → Testing → Closed testing → Create new release → upload AAB
+#    Release name example: 1.0.7 (8)
 
-# 4. Play Console → Production → Create new release → upload AAB
+# 4. Add "What's new" release notes → Save → Review → Start rollout
 
-# 5. Add "What's new" release notes
+# 5. Force-update older installs (after rollout is live):
+#    Admin app → Force Android update → set min versionCode to this release (e.g. 8)
+#    Users below that code see a blocking popup with:
+#      • https://play.google.com/store/apps/details?id=com.ctrend.app
+#      • https://play.google.com/apps/testing/com.ctrend.app  (closed testers)
 ```
+
+### 18.1 Closed testing links (Ke Jitbe)
+
+| Track | URL |
+|-------|-----|
+| **Production listing** | https://play.google.com/store/apps/details?id=com.ctrend.app |
+| **Closed testing opt-in** | https://play.google.com/apps/testing/com.ctrend.app |
+
+Testers on the closed track install/update from Play after opting in. The in-app update
+popup shows **both** links so production users and closed testers each have a path.
+
+### 18.2 Force update (min Android version)
+
+After each Play release:
+
+1. Deploy backend with `platformSettings.minAndroidVersionCode` (if not already live).
+2. Upload and roll out the new AAB on **Closed testing** (or Production).
+3. In the **Admin** app → **Force Android update**, set the minimum `versionCode` to the
+   new build (e.g. `8` for `1.0.7 (8)`).
+4. Set `0` to disable force update.
+
+Users on an older `versionCode` see a full-screen **Update required** dialog until they
+update from Google Play.
 
 Never decrease `versionCode`. Never lose the upload/release keystore.
 

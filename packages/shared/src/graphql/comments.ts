@@ -6,10 +6,13 @@ export const COMMENTS_BY_POST = gql`
       id
       content
       createdAt
+      editedAt
       likeCount
       viewerHasLiked
       postId
       parentId
+      replyToName
+      replyToUserId
       viewerReaction
       reactions {
         emoji
@@ -45,6 +48,23 @@ export const SET_COMMENT_LIKE = gql`
       likeCount
       viewerHasLiked
     }
+  }
+`;
+
+export const EDIT_COMMENT = gql`
+  mutation EditComment($commentId: ID!, $content: String!) {
+    editComment(commentId: $commentId, content: $content) {
+      id
+      content
+      editedAt
+    }
+  }
+`;
+
+/** Returns the ids removed (the comment + its replies if it was top-level). */
+export const DELETE_COMMENT = gql`
+  mutation DeleteComment($commentId: ID!) {
+    deleteComment(commentId: $commentId)
   }
 `;
 

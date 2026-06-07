@@ -371,6 +371,7 @@ export const PLATFORM_SETTINGS = gql`
   query PlatformSettings {
     platformSettings {
       allowUserGlobalPosts
+      minAndroidVersionCode
     }
   }
 `;
@@ -379,6 +380,16 @@ export const SET_ALLOW_USER_GLOBAL_POSTS = gql`
   mutation SetAllowUserGlobalPosts($enabled: Boolean!) {
     setAllowUserGlobalPosts(enabled: $enabled) {
       allowUserGlobalPosts
+      minAndroidVersionCode
+    }
+  }
+`;
+
+export const SET_MIN_ANDROID_VERSION_CODE = gql`
+  mutation SetMinAndroidVersionCode($versionCode: Int!) {
+    setMinAndroidVersionCode(versionCode: $versionCode) {
+      allowUserGlobalPosts
+      minAndroidVersionCode
     }
   }
 `;

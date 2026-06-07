@@ -120,8 +120,10 @@ type Props = {
 	post: FeedPostView;
 	/** "detail" = rendered on the full-page post screen (skips live sub, hides Full-page chip). */
 	variant?: 'feed' | 'detail';
-	/** On the detail page, the Comments chip scrolls to the comments section instead of navigating. */
-	onCommentsPress?: () => void;
+	/** Open comments sheet on mount (e.g. comment deep-link). */
+	initialCommentsOpen?: boolean;
+	/** Scroll to / highlight this comment when the sheet opens. */
+	highlightCommentId?: string | null;
 };
 
 type VoteLiveState = {
@@ -606,6 +608,52 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			lineHeight: 11,
 			fontVariant: ['tabular-nums'] as const,
 		},
+		commentComposerStub: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 10,
+			marginHorizontal: 12,
+			marginBottom: 10,
+			paddingVertical: 4,
+		},
+		commentStubAvatar: {
+			width: 32,
+			height: 32,
+			borderRadius: 16,
+			backgroundColor: '#312e81',
+			alignItems: 'center' as const,
+			justifyContent: 'center' as const,
+			overflow: 'hidden' as const,
+		},
+		commentStubAvatarText: {
+			color: '#fff',
+			fontSize: 13,
+			fontWeight: '700' as const,
+		},
+		commentStubPill: {
+			flex: 1,
+			borderRadius: 20,
+			backgroundColor: c.section,
+			borderWidth: 1,
+			borderColor: c.border,
+			paddingHorizontal: 14,
+			paddingVertical: 10,
+		},
+		commentStubPlaceholder: {
+			fontSize: 14,
+			color: c.muted,
+			fontWeight: '500' as const,
+		},
+		commentCountLink: {
+			marginHorizontal: 12,
+			marginBottom: 6,
+			paddingVertical: 2,
+		},
+		commentCountLinkText: {
+			fontSize: 13,
+			fontWeight: '700' as const,
+			color: c.subtext,
+		},
 		// Voters sheet
 		votersOverlay: {
 			flex: 1,
@@ -895,7 +943,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 function FeedPostCardComponent({
 	post,
 	variant = 'feed',
-	onCommentsPress,
+	initialCommentsOpen = false,
+	highlightCommentId = null,
 }: Props) {
 	const isDetail = variant === 'detail';
 	const { user, isAuthenticated } = useAuth();
@@ -963,9 +1012,30 @@ function FeedPostCardComponent({
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
-	// Inline comments panel (feed only) — toggled by the 💬 chip instead of navigating.
-	const [commentsOpen, setCommentsOpen] = useState(false);
+	const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
+	const [focusComposerOnOpen, setFocusComposerOnOpen] = useState(false);
 	const [commentCountOverride, setCommentCountOverride] = useState<number | null>(null);
+
+	function openComments(focusComposer: boolean) {
+		if (!isAuthenticated) {
+			router.push('/auth/login');
+			return;
+		}
+		setFocusComposerOnOpen(focusComposer);
+		setCommentsOpen(true);
+	}
+
+	function closeComments() {
+		setCommentsOpen(false);
+		setFocusComposerOnOpen(false);
+	}
+
+	useEffect(() => {
+		if (initialCommentsOpen) {
+			setCommentsOpen(true);
+			setFocusComposerOnOpen(false);
+		}
+	}, [initialCommentsOpen, post.id]);
 
 	function goToPost() {
 		if (!isAuthenticated) {
@@ -2131,14 +2201,11 @@ function FeedPostCardComponent({
 					{
 						i: 0,
 						icon: '💬',
-						accessLabel: commentsOpen ? 'Hide comments' : 'Comments',
-						// In the feed, toggle inline comments instead of navigating to the full page.
-						onPress: isDetail
-							? (onCommentsPress ?? goToPost)
-							: () => setCommentsOpen((v) => !v),
+						accessLabel: 'View comments',
+						onPress: () => openComments(false),
 						count: commentCount,
 						isComment: true,
-						active: !isDetail && commentsOpen,
+						active: commentsOpen,
 					},
 					{
 						i: 1,
@@ -2271,12 +2338,57 @@ function FeedPostCardComponent({
 				);
 			})()}
 
-			{/* ── Voters panel ── */}
-			{/* Inline comments (feed only) */}
-			{!isDetail && commentsOpen ? (
+			{(() => {
+				const commentCount = commentCountOverride ?? (post.commentCount ?? 0);
+				const userAvatar = normalizeProfileImageUrl(user?.profileImageUrl);
+				const userInitial = (user?.displayName ?? user?.username ?? '?')
+					.slice(0, 1)
+					.toUpperCase();
+				return (
+					<>
+						{commentCount > 0 ? (
+							<Pressable
+								style={st.commentCountLink}
+								onPress={() => openComments(false)}
+								accessibilityLabel={`View all ${commentCount} comments`}
+							>
+								<Text style={st.commentCountLinkText}>
+									View all {commentCount} comment{commentCount !== 1 ? 's' : ''}
+								</Text>
+							</Pressable>
+						) : null}
+						<Pressable
+							style={st.commentComposerStub}
+							onPress={() => openComments(true)}
+							accessibilityLabel='Write a comment'
+						>
+							<View style={st.commentStubAvatar}>
+								{userAvatar ? (
+									<Image
+										source={{ uri: userAvatar }}
+										style={StyleSheet.absoluteFill}
+										contentFit='cover'
+										cachePolicy='memory-disk'
+									/>
+								) : (
+									<Text style={st.commentStubAvatarText}>{userInitial}</Text>
+								)}
+							</View>
+							<View style={st.commentStubPill}>
+								<Text style={st.commentStubPlaceholder}>Write a comment…</Text>
+							</View>
+						</Pressable>
+					</>
+				);
+			})()}
+
+			{/* Comments bottom sheet (feed + detail) */}
+			{commentsOpen ? (
 				<FeedInlineComments
 					postId={post.id}
-					onClose={() => setCommentsOpen(false)}
+					onClose={closeComments}
+					focusComposerOnOpen={focusComposerOnOpen}
+					highlightCommentId={highlightCommentId}
 					onCommentAdded={() =>
 						setCommentCountOverride((c) => (c ?? (post.commentCount ?? 0)) + 1)
 					}
