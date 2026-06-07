@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 import { NativeModules } from "react-native";
 import { router } from "expo-router";
 import { apolloClient } from "./apolloClient";
-import { SEND_MESSAGE, MARK_CONVERSATION_READ } from "@ctrend/shared/graphql/messages";
+import { SEND_MESSAGE, MARK_CONVERSATION_READ, REACT_MESSAGE } from "@ctrend/shared/graphql/messages";
 import { setPendingChatNavigation } from "./activeConversation";
 // Brand logo shown as the notification large icon when there's no actor avatar
 // (e.g. system/announcement notifications) — mirrors the in-app notification list.
@@ -12,7 +12,24 @@ import BRAND_LOGO from "../assets/logo.png";
 
 export const REPLY_ACTION_ID = "reply";
 export const MARK_READ_ACTION_ID = "mark_read";
+export const LIKE_ACTION_ID = "like";
+// Emoji sent when the user taps "Like" on a chat notification — must be one of
+// MESSAGE_REACTION_EMOJIS so the backend accepts it.
+export const LIKE_EMOJI = "👍";
 export const CHANNEL_ID = "default"; // MAX importance channel created by usePushNotifications
+
+// Reply (inline text input) + Like action buttons shown on chat notifications (Android).
+const MESSAGE_NOTIF_ACTIONS = [
+  {
+    title: "Reply",
+    pressAction: { id: REPLY_ACTION_ID },
+    input: { allowFreeFormInput: true, placeholder: "Reply…" },
+  },
+  {
+    title: `${LIKE_EMOJI} Like`,
+    pressAction: { id: LIKE_ACTION_ID },
+  },
+];
 
 const _iconCache = new Map<string, string>();
 
@@ -80,6 +97,7 @@ export async function postOrUpdateMessageNotification(
   senderName: string,
   senderAvatar: string | null,
   messageText: string,
+  messageId?: string | null,
 ) {
   const existing = convNotifState.get(conversationId);
   const messages = [
@@ -99,7 +117,11 @@ export async function postOrUpdateMessageNotification(
       id: notifId,
       title: senderName,
       body: messageText,
-      data: { type: "MESSAGE", conversationId: String(conversationId) },
+      data: {
+        type: "MESSAGE",
+        conversationId: String(conversationId),
+        messageId: messageId ? String(messageId) : "",
+      },
       android: {
         channelId: CHANNEL_ID,
         importance: AndroidImportance.HIGH,
@@ -110,6 +132,10 @@ export async function postOrUpdateMessageNotification(
           ? { largeIcon: senderAvatar, circularLargeIcon: true }
           : {}),
         pressAction: { id: "default" },
+        // Like needs a messageId target; Reply only needs the conversation.
+        actions: messageId
+          ? MESSAGE_NOTIF_ACTIONS
+          : MESSAGE_NOTIF_ACTIONS.filter((a) => a.pressAction.id !== LIKE_ACTION_ID),
         autoCancel: true,
         showTimestamp: true,
       },
@@ -128,7 +154,11 @@ export async function postOrUpdateMessageNotification(
       content: {
         title: senderName,
         body: messageText,
-        data: { type: "MESSAGE", conversationId: String(conversationId) },
+        data: {
+          type: "MESSAGE",
+          conversationId: String(conversationId),
+          messageId: messageId ? String(messageId) : "",
+        },
         sound: true,
       },
       trigger: Platform.OS === "android" ? { channelId: CHANNEL_ID } : null,
@@ -210,6 +240,7 @@ export type NotifNavData = {
   type?: string;          // routing discriminator: "MESSAGE" | "BELL"
   notifType?: string;     // original notification type, e.g. POST_COMMENT, POST_HYPE
   conversationId?: string;
+  messageId?: string;     // target message for the chat "Like" action
   referenceType?: string;
   referenceId?: string;
   postId?: string;
@@ -284,6 +315,18 @@ export async function handleInlineReply(conversationId: string, text: string): P
   }
 }
 
+/** Reacts to a message with 👍 when the user taps "Like" on its notification. */
+export async function handleLikeAction(messageId: string): Promise<void> {
+  try {
+    await apolloClient.mutate({
+      mutation: REACT_MESSAGE,
+      variables: { messageId, emoji: LIKE_EMOJI },
+    });
+  } catch (e) {
+    console.warn("[notifee] like reaction failed:", e);
+  }
+}
+
 export async function handleMarkReadAction(conversationId: string): Promise<void> {
   try {
     await apolloClient.mutate({
@@ -316,11 +359,27 @@ export function registerNotifeeHandlers() {
   if (_foregroundHandlerRegistered) return;
   _foregroundHandlerRegistered = true;
 
-  // Notifee foreground handler — routes any Notifee-posted notification tap.
-  notifee.onForegroundEvent(({ type, detail }) => {
-    if (type !== EventType.PRESS) return;
+  // Notifee foreground handler — routes taps and reply/like actions while the app is open.
+  notifee.onForegroundEvent(async ({ type, detail }) => {
     const data = detail.notification?.data as NotifNavData | undefined;
     if (!data) return;
+
+    // Reply / Like action buttons on a chat notification.
+    if (type === EventType.ACTION_PRESS && data.type === "MESSAGE" && data.conversationId) {
+      const actionId = detail.pressAction?.id;
+      if (actionId === REPLY_ACTION_ID && detail.input?.trim()) {
+        await handleInlineReply(data.conversationId, detail.input.trim());
+      } else if (actionId === LIKE_ACTION_ID && data.messageId) {
+        await handleLikeAction(data.messageId);
+      } else if (actionId === MARK_READ_ACTION_ID) {
+        await handleMarkReadAction(data.conversationId);
+      }
+      // Clear the notification (also dismisses the inline-reply spinner).
+      if (detail.notification?.id) await notifee.cancelNotification(detail.notification.id);
+      return;
+    }
+
+    if (type !== EventType.PRESS) return;
     if (data.type === "MESSAGE" && data.conversationId) {
       navigateToChat(data.conversationId);
       return;

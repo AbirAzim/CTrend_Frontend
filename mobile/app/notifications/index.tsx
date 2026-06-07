@@ -39,6 +39,7 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import logoAsset from "../../assets/logo.png";
 import { useTheme } from "../../context/ThemeContext";
+import { useBackToFeed } from "../../hooks/useBackToFeed";
 import type { ColorPalette } from "../../context/ThemeContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -428,6 +429,7 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const goBack = useBackToFeed(); // cold-start from a notification → back to feed
 
   // Clear app icon badge when user opens the notifications screen
   useEffect(() => {
@@ -619,7 +621,7 @@ export default function NotificationsScreen() {
           headerStyle: { backgroundColor: colors.topbar },
           headerTitleStyle: { color: colors.text },
           headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()} style={st.headerBtn}>
+            <TouchableOpacity onPress={goBack} style={st.headerBtn}>
               <Text style={st.headerBtnText}>← Back</Text>
             </TouchableOpacity>
           ),

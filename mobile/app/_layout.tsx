@@ -30,8 +30,10 @@ import {
   handleNotifeeBackgroundPress,
   handleInlineReply,
   handleMarkReadAction,
+  handleLikeAction,
   REPLY_ACTION_ID,
   MARK_READ_ACTION_ID,
+  LIKE_ACTION_ID,
   type NotifNavData,
 } from "../lib/messageNotifications";
 import {
@@ -55,11 +57,16 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       return;
     }
     if (type === EventType.ACTION_PRESS) {
-      if (detail.pressAction?.id === REPLY_ACTION_ID && detail.input?.trim()) {
+      const actionId = detail.pressAction?.id;
+      if (actionId === REPLY_ACTION_ID && detail.input?.trim()) {
         await handleInlineReply(conversationId, detail.input.trim());
-      } else if (detail.pressAction?.id === MARK_READ_ACTION_ID) {
+      } else if (actionId === LIKE_ACTION_ID && data.messageId) {
+        await handleLikeAction(data.messageId);
+      } else if (actionId === MARK_READ_ACTION_ID) {
         await handleMarkReadAction(conversationId);
       }
+      // Clear the notification — also dismisses the inline-reply progress spinner.
+      if (detail.notification?.id) await notifee.cancelNotification(detail.notification.id);
     }
     return;
   }
@@ -70,6 +77,10 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
     setPendingNavigationRoute(resolveNotificationRoute(data));
   }
 });
+
+// NOTE: background/killed chat pushes are rendered natively by CtrendMessagingService
+// (Reply/👍 Like included). Expo's FCM service is removed in AndroidManifest, so a JS
+// background notification task would never fire — the native path is the source of truth.
 
 function AppStatusBar() {
   const { isDark } = useTheme();
@@ -254,7 +265,6 @@ function isViewingConversation(conversationId: string, pathname: string): boolea
 // Fires for incoming chat messages on every screen.
 function GlobalMessageSubscription() {
   const { isAuthenticated, user } = useAuth();
-  const { showToast } = useNotification();
   const { playMessage } = useSounds();
   const client = useApolloClient();
   const pathname = usePathname();
@@ -289,26 +299,24 @@ function GlobalMessageSubscription() {
       const senderAvatar = msg.senderAvatar || null;
 
       if (!alreadyInChat) {
-        playMessage();
-        void initMessageNotifications();
+        // Only render from JS while the app is foreground. When backgrounded or
+        // killed the native CtrendMessagingService renders the push itself (same
+        // Reply/👍 Like actions), so posting here too would be a duplicate.
+        if (AppState.currentState === "active") {
+          playMessage();
+          void initMessageNotifications();
 
-        // Notifee MessagingStyle notification with sender avatar
-        void postOrUpdateMessageNotification(
-          msg.conversationId,
-          senderName,
-          senderAvatar,
-          body,
-        );
+          // Notifee notification with sender avatar + Reply/👍 Like actions.
+          void postOrUpdateMessageNotification(
+            msg.conversationId,
+            senderName,
+            senderAvatar,
+            body,
+            msg.id,
+          );
+        }
 
-        showToast({
-          id: msg.id,
-          type: "NEW_MESSAGE",
-          title: senderName,
-          body,
-          referenceId: msg.conversationId,
-          referenceType: "CONVERSATION",
-          postId: null,
-        });
+        // No in-app envelope banner / no duplicate toast — one notification only.
 
         void client.refetchQueries({ include: [MY_CONVERSATIONS] });
       }

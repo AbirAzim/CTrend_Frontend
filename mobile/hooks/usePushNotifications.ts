@@ -6,13 +6,33 @@ import { Platform } from "react-native";
 import { REGISTER_PUSH_TOKEN } from "@ctrend/shared/graphql/notifications";
 
 // Show system banner/sound/badge for push notifications arriving while app is open.
+// Chat messages are excluded: while the app is open they are rendered by Notifee
+// (with Reply/👍 Like) via the GraphQL subscription, so showing the raw FCM copy
+// here would be a duplicate notification.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data as
+      | { type?: string; conversationId?: string; referenceType?: string }
+      | undefined;
+    const isChatMessage =
+      data?.type === "MESSAGE" ||
+      !!data?.conversationId ||
+      (data?.referenceType ?? "").toUpperCase() === "CONVERSATION";
+    if (isChatMessage) {
+      return {
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: true,
+      };
+    }
+    return {
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 async function getPushToken(): Promise<{ token: string; type: "expo" | "device" } | null> {

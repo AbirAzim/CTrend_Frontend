@@ -27,6 +27,7 @@ import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
+import { useBackToFeed } from "../../hooks/useBackToFeed";
 import { useTheme } from "../../context/ThemeContext";
 import type { ColorPalette } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
@@ -888,6 +889,9 @@ export default function PostDetailScreen() {
     }
   }, [hydrated, isAuthenticated]);
 
+  // Back falls through to the feed when opened cold from a notification.
+  const goBack = useBackToFeed();
+
   // Show spinner until auth is known or while redirecting
   if (!hydrated || !isAuthenticated) {
     return (
@@ -980,7 +984,7 @@ export default function PostDetailScreen() {
           headerStyle: { backgroundColor: colors.topbar },
           headerTitleStyle: { color: colors.text },
           headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()} style={st.headerBack}>
+            <TouchableOpacity onPress={goBack} style={st.headerBack}>
               <Text style={st.headerBackText}>← Back</Text>
             </TouchableOpacity>
           ),

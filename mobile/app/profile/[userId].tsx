@@ -23,6 +23,7 @@ import { USER_POSTS } from "@ctrend/shared/graphql/profile";
 import { ONLINE_USER_IDS, START_DIRECT_CONVERSATION } from "@ctrend/shared/graphql/messages";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
+import { useBackToFeed } from "../../hooks/useBackToFeed";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
 
@@ -178,6 +179,7 @@ export default function UserProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { showToast, ToastView } = useToast();
+  const goBack = useBackToFeed(); // cold-start from a notification → back to feed
   const [dmLoading, setDmLoading] = useState(false);
   const [startDm] = useMutation<StartDmData>(START_DIRECT_CONVERSATION);
 
@@ -255,7 +257,7 @@ export default function UserProfileScreen() {
           { paddingTop: insets.top + 8, borderBottomColor: colors.border, backgroundColor: colors.bg },
         ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={goBack} style={styles.backBtn}>
           <Text style={[styles.backText, { color: colors.accent }]}>‹ Back</Text>
         </Pressable>
         <Text style={[styles.topbarTitle, { color: colors.text }]} numberOfLines={1}>
@@ -272,7 +274,7 @@ export default function UserProfileScreen() {
         <View style={styles.center}>
           <Text style={{ fontSize: 36, marginBottom: 12 }}>🔍</Text>
           <Text style={[styles.errorText, { color: colors.text }]}>User not found</Text>
-          <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Pressable onPress={goBack} style={{ marginTop: 16 }}>
             <Text style={{ color: colors.accent, fontWeight: "700" }}>Go back</Text>
           </Pressable>
         </View>
