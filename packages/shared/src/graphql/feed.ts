@@ -28,8 +28,8 @@ export const POST_VOTE_WINNER_FIELDS = `
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
-  query FeedPosts($campaignId: ID) {
-    feedPosts(campaignId: $campaignId) {
+  query FeedPosts($campaignId: ID, $skip: Int, $take: Int) {
+    feedPosts(campaignId: $campaignId, skip: $skip, take: $take) {
       id
       type
       authorId
@@ -79,6 +79,11 @@ export const GET_POST_BY_ID = gql`
     getPostById(id: $id) {
       id
       type
+      category {
+        id
+        name
+        slug
+      }
       authorId
       authorUsername
       authorDisplayName
@@ -314,6 +319,51 @@ export const POST_VOTE_UPDATED = gql`
         count
         percentage
       }
+    }
+  }
+`;
+
+/**
+ * Live post edits — emitted whenever an author/admin edits a post. Returns the
+ * full post shape so Apollo merges it into the normalized cache by id, updating
+ * the feed and the detail view in real time.
+ */
+export const POST_UPDATED = gql`
+  subscription PostUpdated($postId: ID!) {
+    postUpdated(postId: $postId) {
+      id
+      type
+      isUserGlobalBroadcast
+      imageUrls
+      caption
+      scheduledAt
+      upvoteCount
+      downvoteCount
+      viewerVote
+      votingEndsAt
+      isVotingOpen
+      endingSoonLeadMinutes
+      commentCount
+      myVoteAnonymous
+      mySelectedOptionIndex
+      optionStats {
+        index
+        label
+        count
+        percentage
+      }
+      options {
+        label
+        imageFocalX
+        imageFocalY
+      }
+      category {
+        id
+        name
+        slug
+      }
+      ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;

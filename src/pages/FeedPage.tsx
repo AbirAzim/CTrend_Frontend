@@ -1,5 +1,5 @@
 import { useApolloClient, useLazyQuery, useMutation, useQuery, useSubscription } from "@apollo/client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "../graphql/feed";
@@ -46,6 +46,7 @@ function friendInitial(f: FriendRow): string {
 }
 
 const SIDE_PREVIEW_LIMIT = 3;
+const PAGE_SIZE = 20; // posts per server page (matches backend `take` default)
 
 function FriendMessageButton({ userId }: { userId: string }) {
   const { openChat, ensureConversation } = useMessenger();
@@ -108,16 +109,19 @@ export function FeedPage() {
   const [isCampaignFilterDockVisible, setIsCampaignFilterDockVisible] = useState(true);
   const lastScrollYRef = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadingMoreRef = useRef(false);
+  const [hasMore, setHasMore] = useState(true);
   const [isWideScreen, setIsWideScreen] = useState(() =>
     typeof window === "undefined"
       ? true
       : window.matchMedia("(min-width: 980px)").matches,
   );
 
-  const { data, loading, error, refetch: refetchFeed } = useQuery(FEED_POSTS, {
-    variables: { campaignId: activeCampaignId || null },
+  const { data, loading, error, refetch: refetchFeed, fetchMore: fetchMoreFeed } = useQuery(FEED_POSTS, {
+    variables: { campaignId: activeCampaignId || null, skip: 0, take: PAGE_SIZE },
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
+    notifyOnNetworkStatusChange: true,
     // 20-second poll fallback so feed stays fresh even when the WS subscription
     // is suppressed (Safari background tab, network glitch, etc.). Cheap because
     // Apollo dedupes the network response into the same cache the subscription
@@ -204,16 +208,41 @@ export function FeedPage() {
     ? data.feedPosts.map(mapGqlPostToFeedView)
     : null;
 
+  // Number of posts the server has returned so far — drives the next page's
+  // `skip` (excludes locally-prepended live-queue posts).
+  const serverCount: number = (data?.feedPosts as unknown[] | undefined)?.length ?? 0;
+
+  // Fetch the next server page. Called well before the user hits the bottom so
+  // the feed always has more ready — no visible "loading" at the end.
+  const loadMoreFromServer = useCallback(async () => {
+    if (useMockFeed || loadingMoreRef.current || !hasMore || serverCount === 0) return;
+    loadingMoreRef.current = true;
+    try {
+      const res = await fetchMoreFeed({
+        variables: { campaignId: activeCampaignId || null, skip: serverCount, take: PAGE_SIZE },
+      });
+      const total = (res.data?.feedPosts as unknown[] | undefined)?.length ?? serverCount;
+      if (total - serverCount < PAGE_SIZE) setHasMore(false); // last page reached
+    } catch {
+      // transient failure — allow a later retry
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, [useMockFeed, hasMore, serverCount, fetchMoreFeed, activeCampaignId]);
+
   const basePostsRaw: FeedPostView[] = useMockFeed
     ? mockPostsAsFeed()
     : (apiPosts ?? []);
 
-  // Prepend subscription-delivered posts, excluding any already in the API results
-  const knownIds = new Set(basePostsRaw.map((p) => p.id));
-  const postsRaw: FeedPostView[] = [
-    ...liveQueue.filter((p) => !knownIds.has(p.id) && !removedIds.has(p.id)),
-    ...basePostsRaw.filter((p) => !removedIds.has(p.id)),
-  ];
+  // Live-queue posts first, then the paged API list. Dedupe by id (offset paging
+  // + live/polled inserts can briefly surface the same post twice) and drop
+  // locally-removed ones.
+  const seenIds = new Set<string>();
+  const postsRaw: FeedPostView[] = [...liveQueue, ...basePostsRaw].filter((p) => {
+    if (removedIds.has(p.id) || seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+    return true;
+  });
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
@@ -331,21 +360,30 @@ export function FeedPage() {
     },
   });
 
+  const moreServerPages = !useMockFeed && hasMore;
   useEffect(() => {
-    if (posts.length <= visibleCount) return;
+    // Keep the observer attached while there are more posts to reveal client-side
+    // OR more server pages to fetch — so infinite scroll never stalls.
+    if (posts.length <= visibleCount && !moreServerPages) return;
     const target = loadMoreRef.current;
     if (!target) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + 6, posts.length));
+        if (!entries[0]?.isIntersecting) return;
+        // Reveal more already-loaded posts...
+        setVisibleCount((prev) => Math.min(prev + 6, posts.length));
+        // ...and prefetch the next server page as we near the end of what's loaded,
+        // so the feed always feels like it has more (no visible loader).
+        if (posts.length - visibleCount <= PAGE_SIZE) {
+          void loadMoreFromServer();
         }
       },
+      // 600px runway → the next page lands before the sentinel reaches the viewport.
       { rootMargin: "600px 0px" },
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [posts.length, visibleCount]);
+  }, [posts.length, visibleCount, moreServerPages, loadMoreFromServer]);
 
   useEffect(() => {
     setVisibleCount((prev) => Math.min(Math.max(8, prev), Math.max(8, posts.length)));
@@ -355,6 +393,8 @@ export function FeedPage() {
     setLiveQueue([]);
     setRemovedIds(new Set());
     setVisibleCount(8);
+    setHasMore(true);
+    loadingMoreRef.current = false;
   }, [activeCampaignId]);
 
   useEffect(() => {
@@ -609,10 +649,10 @@ export function FeedPage() {
             voteMode={useMockFeed ? "local" : "api"}
           />
         ))}
-        {visiblePosts.length < posts.length ? (
-          <div ref={loadMoreRef} className="ig-feed-status">
-            Loading more posts…
-          </div>
+        {visiblePosts.length < posts.length || moreServerPages ? (
+          // Invisible sentinel — prefetch fires ~600px ahead so the user never
+          // sees a "loading" state at the end of the feed.
+          <div ref={loadMoreRef} aria-hidden style={{ height: 1 }} />
         ) : null}
 
         {friendError ? (

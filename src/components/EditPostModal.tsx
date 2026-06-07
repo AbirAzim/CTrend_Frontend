@@ -19,6 +19,7 @@ type EditablePost = {
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
   endingSoonLeadMinutes?: number | null;
+  isUserGlobalBroadcast?: boolean | null;
 };
 
 type Props = {
@@ -61,9 +62,15 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     imageUrl: url,
     label: post.options?.[i]?.label ?? `Option ${i + 1}`,
   }));
+  // Items already on the post are locked (editing/removing them would invalidate
+  // existing votes). Only newly added items (index >= lockedCount) are editable.
+  const lockedCount = initialItems.length;
 
   const [caption, setCaption] = useState(post.caption ?? "");
   const [items, setItems] = useState<CompareItem[]>(initialItems);
+  const [broadcastGlobally, setBroadcastGlobally] = useState(
+    Boolean(post.isUserGlobalBroadcast),
+  );
   const [categoryId, setCategoryId] = useState(post.category?.id ?? "");
   const [campaignId, setCampaignId] = useState(post.campaign?.id ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -193,6 +200,11 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             endingSoonLeadMinutes: isAdmin
               ? Math.max(1, Math.min(1440, Math.round(endingSoonLeadMinutes || 5)))
               : undefined,
+            broadcastGlobally: isAdmin
+              ? undefined
+              : broadcastGlobally !== Boolean(post.isUserGlobalBroadcast)
+                ? broadcastGlobally
+                : undefined,
           },
         },
       });
@@ -265,6 +277,24 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
               {post.campaign?.name && campaignId === post.campaign.id ? (
                 <span className="muted small">Currently linked to {post.campaign.name}</span>
               ) : null}
+            </label>
+          )}
+
+          {!isAdmin && (
+            <label className="cx-edit-label cx-edit-toggle-row">
+              <span>
+                <strong>Post platform-wide (global)</strong>
+                <span className="muted small">
+                  {broadcastGlobally
+                    ? "Everyone can see and vote — not just your friends."
+                    : "Only your friends can see and vote on this post."}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={broadcastGlobally}
+                onChange={(e) => setBroadcastGlobally(e.target.checked)}
+              />
             </label>
           )}
 
@@ -354,68 +384,87 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             Compare Items
             <span className="cx-edit-item-count">{items.length} / 10</span>
           </p>
+          <p className="muted small cx-edit-locked-note">
+            🔒 Existing options are locked to protect votes. You can add new
+            options below — changing an existing image would reset all votes.
+          </p>
 
           <div className="cx-edit-items">
-            {items.map((item, idx) => (
-              <div key={idx} className="cx-edit-item">
-                <div className="cx-edit-item-thumb">
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="" />
-                  ) : (
-                    <span className="cx-edit-item-placeholder">📷</span>
-                  )}
-                </div>
-                <div className="cx-edit-item-fields">
-                  <div className="cx-edit-item-url-row">
+            {items.map((item, idx) => {
+              const locked = idx < lockedCount;
+              return (
+                <div
+                  key={idx}
+                  className={`cx-edit-item${locked ? " cx-edit-item--locked" : ""}`}
+                >
+                  <div className="cx-edit-item-thumb">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt="" />
+                    ) : (
+                      <span className="cx-edit-item-placeholder">📷</span>
+                    )}
+                    {locked && (
+                      <span className="cx-edit-item-lock" title="Locked — has votes" aria-hidden>🔒</span>
+                    )}
+                  </div>
+                  <div className="cx-edit-item-fields">
+                    <div className="cx-edit-item-url-row">
+                      <input
+                        type="url"
+                        className="cx-edit-input"
+                        value={item.imageUrl}
+                        onChange={(e) => setItemField(idx, "imageUrl", e.target.value)}
+                        placeholder="Image URL"
+                        disabled={locked}
+                      />
+                      {!locked && (
+                        <>
+                          <button
+                            type="button"
+                            className="cx-edit-upload-btn"
+                            title="Upload image"
+                            disabled={uploadingIdx !== null}
+                            onClick={() => fileRefs.current[idx]?.click()}
+                          >
+                            {uploadingIdx === idx ? "…" : "📁"}
+                          </button>
+                          <input
+                            ref={(el) => { fileRefs.current[idx] = el; }}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) void handleFileUpload(idx, f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
                     <input
-                      type="url"
+                      type="text"
                       className="cx-edit-input"
-                      value={item.imageUrl}
-                      onChange={(e) => setItemField(idx, "imageUrl", e.target.value)}
-                      placeholder="Image URL"
-                    />
-                    <button
-                      type="button"
-                      className="cx-edit-upload-btn"
-                      title="Upload image"
-                      disabled={uploadingIdx !== null}
-                      onClick={() => fileRefs.current[idx]?.click()}
-                    >
-                      {uploadingIdx === idx ? "…" : "📁"}
-                    </button>
-                    <input
-                      ref={(el) => { fileRefs.current[idx] = el; }}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void handleFileUpload(idx, f);
-                        e.target.value = "";
-                      }}
+                      value={item.label}
+                      onChange={(e) => setItemField(idx, "label", e.target.value)}
+                      placeholder={`Label for option ${idx + 1}`}
+                      maxLength={200}
+                      disabled={locked}
                     />
                   </div>
-                  <input
-                    type="text"
-                    className="cx-edit-input"
-                    value={item.label}
-                    onChange={(e) => setItemField(idx, "label", e.target.value)}
-                    placeholder={`Label for option ${idx + 1}`}
-                    maxLength={200}
-                  />
+                  {!locked && (
+                    <button
+                      type="button"
+                      className="cx-edit-remove-btn"
+                      onClick={() => removeItem(idx)}
+                      aria-label={`Remove option ${idx + 1}`}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-                {items.length > 2 && (
-                  <button
-                    type="button"
-                    className="cx-edit-remove-btn"
-                    onClick={() => removeItem(idx)}
-                    aria-label={`Remove option ${idx + 1}`}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {items.length < 10 && (
