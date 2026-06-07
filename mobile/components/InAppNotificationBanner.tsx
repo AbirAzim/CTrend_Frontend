@@ -4,13 +4,14 @@ import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNotification, type NotifToast } from "../context/NotificationContext";
+import { openAndroidUpdateLink } from "../lib/messageNotifications";
 import { useTheme } from "../context/ThemeContext";
 import logoAsset from "../assets/logo.png";
 
 const POST_NOTIF_TYPES = new Set([
   "POST_HYPE", "POST_COMMENT", "NEW_POST_FRIEND",
   "COMMENT_REPLY", "COMMENT_REACTION", "NEW_COMMENT",
-  "USER_GLOBAL_POST", "ANNOUNCEMENT",
+  "USER_GLOBAL_POST",
   "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
 ]);
 
@@ -39,6 +40,10 @@ function notifIcon(type: string): string {
 }
 
 function handleToastTap(toast: NotifToast) {
+  if ((toast.referenceType ?? "").toLowerCase() === "android_update_required") {
+    openAndroidUpdateLink();
+    return;
+  }
   if (toast.type === "NEW_MESSAGE" || toast.referenceType === "CONVERSATION") {
     if (toast.referenceId) router.push(`/chat/${toast.referenceId}` as `/${string}`);
     return;
