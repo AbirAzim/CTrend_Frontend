@@ -72,7 +72,12 @@ type NotifData = {
 
 // ─── Icon mapping ─────────────────────────────────────────────────────────────
 
-function notifIcon(type: string): string {
+function isOfficialAdminMessage(notif: GqlNotification): boolean {
+  return notif.type === "MESSAGE" && notif.referenceType === "moderator_conversation";
+}
+
+function notifIcon(type: string, referenceType?: string | null): string {
+  if (type === "MESSAGE" && referenceType === "moderator_conversation") return "🛡";
   switch (type) {
     case "NEW_COMMENT":
     case "POST_COMMENT": return "💬";
@@ -110,12 +115,24 @@ const BRAND_NOTIF_TYPES = new Set([
   "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
 ]);
 
+const COMMENT_NOTIF_TYPES = new Set([
+  "POST_COMMENT", "NEW_COMMENT", "COMMENT_REPLY", "COMMENT_REACTION", "COMMENT_LIKE",
+]);
+
 function navigateFromNotif(notif: GqlNotification) {
+  if (notif.type === "MESSAGE" && notif.referenceId) {
+    router.push(`/chat/${notif.referenceId}` as `/${string}`);
+    return;
+  }
   if (POST_NOTIF_TYPES.has(notif.type)) {
     const targetId = notif.postId ?? notif.referenceId;
     if (targetId) {
-      const suffix = notif.commentId ? `?commentId=${notif.commentId}` : "";
-      router.push(`/post/${targetId}${suffix}` as `/${string}`);
+      if (notif.commentId || COMMENT_NOTIF_TYPES.has(notif.type)) {
+        const suffix = notif.commentId ? `?commentId=${notif.commentId}` : "";
+        router.push(`/comments/${targetId}${suffix}` as `/${string}`);
+      } else {
+        router.push(`/post/${targetId}` as `/${string}`);
+      }
     }
     return;
   }
@@ -277,7 +294,8 @@ function NotifRow({
     ? normalizeProfileImageUrl(notif.latestActorAvatar)
     : null;
   // Platform/system notifications use the brand logo avatar instead of a generic emoji.
-  const useBrandAvatar = !avatarUrl && BRAND_NOTIF_TYPES.has(notif.type);
+  const useBrandAvatar =
+    !avatarUrl && (BRAND_NOTIF_TYPES.has(notif.type) || isOfficialAdminMessage(notif));
 
   // ── Swipe RIGHT to archive ────────────────────────────────────────────────
   const translateX = useRef(new Animated.Value(0)).current;
@@ -330,19 +348,19 @@ function NotifRow({
           <View style={st.iconWrapOuter}>
             <Image source={{ uri: avatarUrl }} style={st.avatarImg} contentFit="cover" cachePolicy="memory-disk" />
             <View style={st.typeBadge}>
-              <Text style={st.typeBadgeText}>{notifIcon(notif.type)}</Text>
+              <Text style={st.typeBadgeText}>{notifIcon(notif.type, notif.referenceType)}</Text>
             </View>
           </View>
         ) : useBrandAvatar ? (
           <View style={st.iconWrapOuter}>
             <Image source={logoAsset} style={st.avatarImg} contentFit="cover" cachePolicy="memory-disk" />
             <View style={st.typeBadge}>
-              <Text style={st.typeBadgeText}>{notifIcon(notif.type)}</Text>
+              <Text style={st.typeBadgeText}>{notifIcon(notif.type, notif.referenceType)}</Text>
             </View>
           </View>
         ) : (
           <View style={st.iconWrap}>
-            <Text style={st.iconText}>{notifIcon(notif.type)}</Text>
+            <Text style={st.iconText}>{notifIcon(notif.type, notif.referenceType)}</Text>
           </View>
         )}
 
@@ -350,7 +368,9 @@ function NotifRow({
         <View style={st.content}>
           {/* Title + unread dot inline */}
           <View style={st.titleLine}>
-            <Text style={st.title} numberOfLines={1}>{notif.title}</Text>
+            <Text style={st.title} numberOfLines={1}>
+              {isOfficialAdminMessage(notif) ? "Official admin message" : notif.title}
+            </Text>
             {!notif.read && <View style={st.unreadDot} />}
           </View>
 

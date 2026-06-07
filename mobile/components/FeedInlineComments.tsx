@@ -4,17 +4,18 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
 	ActivityIndicator,
-	Alert,
-	Dimensions,
-	Modal,
+	Keyboard,
 	Pressable,
-	ScrollView,
 	StyleSheet,
 	Text,
 	TextInput,
 	View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import {
+	KeyboardAwareScrollView,
+	KeyboardStickyView,
+	type KeyboardAwareScrollViewRef,
+} from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	COMMENTS_BY_POST,
@@ -27,10 +28,7 @@ import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-
-const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_MAX_H = Math.round(SCREEN_H * 0.86);
-const LIST_MAX_H = Math.round(SCREEN_H * 0.5);
+import { AppConfirmDialog } from './AppDialog';
 
 type GqlComment = {
 	id: string;
@@ -53,10 +51,48 @@ type GqlComment = {
 
 type CommentsData = { commentsByPost: GqlComment[] };
 
-/**
- * Facebook-style comments bottom sheet. Opens on demand (Discuss / Write a comment)
- * — no inline gap on the post card. Composer keyboard only when user taps the field.
- */
+type FbPalette = {
+	sheet: string;
+	composerBar: string;
+	bubble: string;
+	input: string;
+	border: string;
+	text: string;
+	subtext: string;
+	meta: string;
+	link: string;
+	backdrop: string;
+};
+
+function fbPalette(isDark: boolean): FbPalette {
+	if (isDark) {
+		return {
+			sheet: '#18191a',
+			composerBar: '#242526',
+			bubble: '#3a3b3c',
+			input: '#3a3b3c',
+			border: '#3e4042',
+			text: '#e4e6eb',
+			subtext: '#b0b3b8',
+			meta: '#8a8d91',
+			link: '#2d88ff',
+			backdrop: 'rgba(0,0,0,0.65)',
+		};
+	}
+	return {
+		sheet: '#ffffff',
+		composerBar: '#ffffff',
+		bubble: '#f0f2f5',
+		input: '#f0f2f5',
+		border: '#ced0d4',
+		text: '#050505',
+		subtext: '#65676b',
+		meta: '#65676b',
+		link: '#1877f2',
+		backdrop: 'rgba(0,0,0,0.45)',
+	};
+}
+
 export function FeedInlineComments({
 	postId,
 	onClose,
@@ -70,19 +106,24 @@ export function FeedInlineComments({
 	focusComposerOnOpen?: boolean;
 	highlightCommentId?: string | null;
 }) {
-	const { colors } = useTheme();
+	const { isDark } = useTheme();
 	const { isAuthenticated, user } = useAuth();
 	const insets = useSafeAreaInsets();
-	const st = makeStyles(colors);
+	const fb = fbPalette(isDark);
+	const st = makeStyles(fb);
 
 	const [text, setText] = useState('');
 	const [sending, setSending] = useState(false);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [editText, setEditText] = useState('');
 	const [replyTarget, setReplyTarget] = useState<{ id: string; name: string } | null>(null);
+	const [deleteTarget, setDeleteTarget] = useState<GqlComment | null>(null);
 	const inputRef = useRef<TextInput>(null);
-	const listRef = useRef<ScrollView>(null);
+	const listRef = useRef<KeyboardAwareScrollViewRef>(null);
 	const commentOffsets = useRef<Record<string, number>>({});
+	const textRef = useRef('');
+	const replyTargetRef = useRef<{ id: string; name: string } | null>(null);
+	replyTargetRef.current = replyTarget;
 
 	const { data, loading, refetch } = useQuery<CommentsData>(COMMENTS_BY_POST, {
 		variables: { postId },
@@ -100,9 +141,12 @@ export function FeedInlineComments({
 		(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 	);
 
+	const displayName =
+		user?.displayName?.trim() || user?.username?.trim() || 'You';
+
 	useEffect(() => {
 		if (!focusComposerOnOpen) return;
-		const t = setTimeout(() => inputRef.current?.focus(), 320);
+		const t = setTimeout(() => inputRef.current?.focus(), 280);
 		return () => clearTimeout(t);
 	}, [focusComposerOnOpen]);
 
@@ -116,12 +160,13 @@ export function FeedInlineComments({
 	}, [highlightCommentId, loading, ordered.length]);
 
 	async function handleSend() {
-		const content = text.trim();
+		const content = textRef.current.trim();
 		if (!content || sending) return;
 		if (!isAuthenticated) {
 			router.push('/auth/login');
 			return;
 		}
+		const parent = replyTargetRef.current;
 		setSending(true);
 		try {
 			await commentPost({
@@ -129,14 +174,16 @@ export function FeedInlineComments({
 					postId,
 					input: {
 						content,
-						...(replyTarget ? { parentId: replyTarget.id } : {}),
+						...(parent ? { parentId: parent.id } : {}),
 					},
 				},
 			});
 			setText('');
+			textRef.current = '';
 			setReplyTarget(null);
 			await refetch();
 			onCommentAdded?.();
+			Keyboard.dismiss();
 			setTimeout(() => listRef.current?.scrollTo({ y: 0, animated: true }), 100);
 		} catch {
 			/* keep text for retry */
@@ -144,6 +191,14 @@ export function FeedInlineComments({
 			setSending(false);
 		}
 	}
+
+	function trySend() {
+		if (!textRef.current.trim() || sending || !isAuthenticated) return;
+		// Fire on touch-down (before TextInput blur / keyboard dismiss steals the tap).
+		void handleSend();
+	}
+
+	const composerPadBottom = Math.max(insets.bottom, 8);
 
 	function startReply(c: GqlComment) {
 		if (!isAuthenticated) {
@@ -189,35 +244,21 @@ export function FeedInlineComments({
 	}
 
 	function confirmDelete(c: GqlComment) {
-		const isTopLevel = !c.parentId;
-		Alert.alert(
-			'Delete comment?',
-			isTopLevel
-				? 'This comment and all its replies will be removed.'
-				: 'This comment will be removed.',
-			[
-				{ text: 'Cancel', style: 'cancel' },
-				{
-					text: 'Delete',
-					style: 'destructive',
-					onPress: () => {
-						void (async () => {
-							try {
-								await deleteComment({ variables: { commentId: c.id } });
-								await refetch();
-							} catch {
-								/* ignore */
-							}
-						})();
-					},
-				},
-			],
-		);
+		setDeleteTarget(c);
+	}
+
+	async function performDelete(c: GqlComment) {
+		try {
+			await deleteComment({ variables: { commentId: c.id } });
+			await refetch();
+		} catch {
+			/* ignore */
+		}
 	}
 
 	const canSend = !!text.trim() && !sending && isAuthenticated;
 	const userAvatar = normalizeProfileImageUrl(user?.profileImageUrl);
-	const userInitial = (user?.displayName ?? user?.username ?? '?').slice(0, 1).toUpperCase();
+	const userInitial = displayName.slice(0, 1).toUpperCase();
 
 	function renderComment(c: GqlComment, isReply: boolean) {
 		const name =
@@ -226,6 +267,7 @@ export function FeedInlineComments({
 		const isOwn = !!user?.id && c.author?.id === user.id;
 		const isEditing = editingId === c.id;
 		const isHighlighted = highlightCommentId === c.id;
+		const timeLabel = formatRelativeTime(c.createdAt);
 
 		return (
 			<View
@@ -255,14 +297,13 @@ export function FeedInlineComments({
 						)}
 					</View>
 				</Pressable>
+
 				<View style={st.bodyCol}>
 					<View style={st.bubble}>
-						<Text style={st.bubbleName}>
-							{name}
-							{c.replyToName ? (
-								<Text style={st.replyingTo}> · ↩ {c.replyToName}</Text>
-							) : null}
-						</Text>
+						<Text style={st.bubbleName}>{name}</Text>
+						{c.replyToName ? (
+							<Text style={st.replyingTo}>Replying to {c.replyToName}</Text>
+						) : null}
 						{isEditing ? (
 							<View style={st.editBox}>
 								<TextInput
@@ -272,7 +313,7 @@ export function FeedInlineComments({
 									multiline
 									autoFocus
 									maxLength={1000}
-									placeholderTextColor={colors.muted}
+									placeholderTextColor={fb.subtext}
 								/>
 								<View style={st.editActions}>
 									<Pressable onPress={() => setEditingId(null)} hitSlop={6}>
@@ -290,23 +331,24 @@ export function FeedInlineComments({
 							</Text>
 						)}
 					</View>
+
 					{!isEditing && (
 						<View style={st.metaRow}>
-							<Text style={st.time}>{formatRelativeTime(c.createdAt)}</Text>
-							<Pressable onPress={() => handleLike(c)} hitSlop={6}>
+							<Text style={st.time}>{timeLabel}</Text>
+							<Pressable onPress={() => handleLike(c)} hitSlop={8}>
 								<Text style={[st.metaBtn, c.viewerHasLiked && st.metaBtnLiked]}>
-									Like{c.likeCount > 0 ? ` · ${c.likeCount}` : ''}
+									Like
 								</Text>
 							</Pressable>
-							<Pressable onPress={() => startReply(c)} hitSlop={6}>
+							<Pressable onPress={() => startReply(c)} hitSlop={8}>
 								<Text style={st.metaBtn}>Reply</Text>
 							</Pressable>
 							{isOwn && (
 								<>
-									<Pressable onPress={() => startEdit(c)} hitSlop={6}>
+									<Pressable onPress={() => startEdit(c)} hitSlop={8}>
 										<Text style={st.metaBtn}>Edit</Text>
 									</Pressable>
-									<Pressable onPress={() => confirmDelete(c)} hitSlop={6}>
+									<Pressable onPress={() => confirmDelete(c)} hitSlop={8}>
 										<Text style={[st.metaBtn, st.metaBtnDelete]}>Delete</Text>
 									</Pressable>
 								</>
@@ -314,299 +356,373 @@ export function FeedInlineComments({
 						</View>
 					)}
 				</View>
+
+				{!isEditing && c.likeCount > 0 ? (
+					<View style={st.likePill}>
+						<Text style={st.likePillIcon}>👍</Text>
+						<Text style={st.likePillCount}>{c.likeCount}</Text>
+					</View>
+				) : (
+					<Pressable style={st.likeBtn} onPress={() => handleLike(c)} hitSlop={8}>
+						<Text style={[st.likeBtnIcon, c.viewerHasLiked && st.likeBtnIconActive]}>
+							{c.viewerHasLiked ? '👍' : '👍🏻'}
+						</Text>
+					</Pressable>
+				)}
 			</View>
 		);
 	}
 
 	return (
-		<Modal
-			visible
-			transparent
-			statusBarTranslucent
-			animationType='slide'
-			onRequestClose={onClose}
-		>
-			<View style={st.backdrop}>
-				<Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-				<KeyboardAvoidingView behavior='padding' keyboardVerticalOffset={0} style={st.kav}>
-					<View style={[st.sheet, { maxHeight: SHEET_MAX_H, paddingBottom: 0 }]}>
-						<View style={st.grabber} />
-						<View style={st.header}>
-							<Text style={st.headerTitle}>Comments</Text>
-							{ordered.length > 0 ? (
-								<Text style={st.headerCount}>{ordered.length}</Text>
-							) : null}
-							<View style={{ flex: 1 }} />
-							<Pressable onPress={onClose} hitSlop={10} style={st.closeBtn}>
-								<Text style={st.closeBtnText}>✕</Text>
+		<>
+			<View style={[st.screen, { backgroundColor: fb.sheet }]}>
+				<View style={[st.header, { paddingTop: insets.top + 6 }]}>
+					<Pressable onPress={onClose} hitSlop={12} style={st.backBtn}>
+						<Text style={[st.backBtnText, { color: fb.link }]}>‹</Text>
+					</Pressable>
+					<Text style={st.headerTitle}>Comments</Text>
+					{ordered.length > 0 ? (
+						<Text style={st.headerCount}>{ordered.length}</Text>
+					) : null}
+					<View style={{ flex: 1 }} />
+					<Pressable onPress={onClose} hitSlop={12} style={st.closeBtn}>
+						<Text style={st.closeBtnText}>✕</Text>
+					</Pressable>
+				</View>
+
+				<View style={st.listWrap}>
+					{loading && all.length === 0 ? (
+						<View style={st.centerState}>
+							<ActivityIndicator color={fb.link} />
+						</View>
+					) : ordered.length === 0 ? (
+						<View style={st.centerState}>
+							<Text style={st.emptyTitle}>No comments yet</Text>
+							<Text style={st.empty}>Be the first to comment.</Text>
+						</View>
+					) : (
+						<KeyboardAwareScrollView
+							ref={listRef}
+							style={st.list}
+							contentContainerStyle={st.listContent}
+							keyboardShouldPersistTaps='always'
+							showsVerticalScrollIndicator
+							bottomOffset={80}
+						>
+							{ordered.map((c) => {
+								const replies = all
+									.filter((r) => r.parentId === c.id)
+									.sort(
+										(a, b) =>
+											new Date(a.createdAt).getTime() -
+											new Date(b.createdAt).getTime(),
+									);
+								return (
+									<View key={c.id}>
+										{renderComment(c, false)}
+										{replies.map((r) => renderComment(r, true))}
+									</View>
+								);
+							})}
+						</KeyboardAwareScrollView>
+					)}
+				</View>
+
+				<KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+					{replyTarget ? (
+						<View style={st.replyBanner}>
+							<Text style={st.replyBannerText} numberOfLines={1}>
+								Replying to{' '}
+								<Text style={st.replyBannerName}>{replyTarget.name}</Text>
+							</Text>
+							<Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
+								<Text style={st.replyBannerCancel}>✕</Text>
 							</Pressable>
 						</View>
+					) : null}
 
-						{loading && all.length === 0 ? (
-							<ActivityIndicator color={colors.accent} style={{ marginVertical: 24 }} />
-						) : ordered.length === 0 ? (
-							<View style={st.emptyWrap}>
-								<Text style={st.emptyTitle}>No comments yet</Text>
-								<Text style={st.empty}>Be the first to share your thoughts.</Text>
-							</View>
-						) : (
-							<ScrollView
-								ref={listRef}
-								style={[st.list, { maxHeight: LIST_MAX_H }]}
-								contentContainerStyle={st.listContent}
-								keyboardShouldPersistTaps='handled'
-								showsVerticalScrollIndicator={false}
-							>
-								{ordered.map((c) => {
-									const replies = all
-										.filter((r) => r.parentId === c.id)
-										.sort(
-											(a, b) =>
-												new Date(a.createdAt).getTime() -
-												new Date(b.createdAt).getTime(),
-										);
-									return (
-										<View key={c.id}>
-											{renderComment(c, false)}
-											{replies.map((r) => renderComment(r, true))}
-										</View>
-									);
-								})}
-							</ScrollView>
-						)}
-
-						{replyTarget ? (
-							<View style={st.replyBanner}>
-								<Text style={st.replyBannerText} numberOfLines={1}>
-									Replying to <Text style={st.replyBannerName}>{replyTarget.name}</Text>
-								</Text>
-								<Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
-									<Text style={st.replyBannerCancel}>✕</Text>
-								</Pressable>
-							</View>
-						) : null}
-
-						<View style={[st.composer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-							<View style={st.composerAvatar}>
-								{userAvatar ? (
-									<Image
-										source={{ uri: userAvatar }}
-										style={StyleSheet.absoluteFill}
-										contentFit='cover'
-										cachePolicy='memory-disk'
-									/>
-								) : (
-									<Text style={st.composerAvatarText}>{userInitial}</Text>
-								)}
-							</View>
-							<View style={st.composerPill}>
-								<TextInput
-									ref={inputRef}
-									style={st.input}
-									placeholder={
-										replyTarget
-											? `Reply to ${replyTarget.name}…`
-											: isAuthenticated
-												? 'Write a comment…'
-												: 'Log in to comment'
-									}
-									placeholderTextColor={colors.muted}
-									value={text}
-									onChangeText={setText}
-									editable={isAuthenticated && !sending}
-									multiline
-									maxLength={1000}
-									onPressIn={() => {
-										if (!isAuthenticated) router.push('/auth/login');
-									}}
+					<View style={[st.composer, { paddingBottom: composerPadBottom }]}>
+						<View style={st.composerAvatar}>
+							{userAvatar ? (
+								<Image
+									source={{ uri: userAvatar }}
+									style={StyleSheet.absoluteFill}
+									contentFit='cover'
+									cachePolicy='memory-disk'
 								/>
-								{(text.trim() || sending) && (
-									<Pressable
-										style={st.postBtn}
-										onPress={() => void handleSend()}
-										disabled={!canSend}
-									>
-										{sending ? (
-											<ActivityIndicator size='small' color={colors.accent} />
-										) : (
-											<Text style={[st.postBtnText, !canSend && { opacity: 0.4 }]}>
-												Post
-											</Text>
-										)}
-									</Pressable>
-								)}
-							</View>
+							) : (
+								<Text style={st.composerAvatarText}>{userInitial}</Text>
+							)}
 						</View>
+						<View style={st.composerPill}>
+							<TextInput
+								ref={inputRef}
+								style={st.input}
+								placeholder={
+									replyTarget
+										? `Reply to ${replyTarget.name}…`
+										: isAuthenticated
+											? `Comment as ${displayName}`
+											: 'Log in to comment'
+								}
+								placeholderTextColor={fb.subtext}
+								value={text}
+								onChangeText={(value) => {
+									textRef.current = value;
+									setText(value);
+								}}
+								editable={isAuthenticated && !sending}
+								multiline
+								maxLength={1000}
+								blurOnSubmit={false}
+								onPressIn={() => {
+									if (!isAuthenticated) router.push('/auth/login');
+								}}
+							/>
+						</View>
+						<Pressable
+							style={[st.postBtn, !canSend && st.postBtnDisabled]}
+							onPressIn={trySend}
+							hitSlop={10}
+							accessibilityRole='button'
+							accessibilityLabel='Post comment'
+						>
+							{sending ? (
+								<ActivityIndicator size='small' color='#fff' />
+							) : (
+								<Text style={[st.postBtnText, !canSend && st.postBtnTextDisabled]}>
+									➤
+								</Text>
+							)}
+						</Pressable>
 					</View>
-				</KeyboardAvoidingView>
+				</KeyboardStickyView>
 			</View>
-		</Modal>
+
+			<AppConfirmDialog
+				visible={deleteTarget !== null}
+				title='Delete comment?'
+				message={
+					deleteTarget && !deleteTarget.parentId
+						? 'This comment and all its replies will be removed.'
+						: 'This comment will be removed.'
+				}
+				confirmLabel='Delete'
+				destructive
+				onCancel={() => setDeleteTarget(null)}
+				onConfirm={() => {
+					const target = deleteTarget;
+					setDeleteTarget(null);
+					if (target) void performDelete(target);
+				}}
+			/>
+		</>
 	);
 }
 
-function makeStyles(c: ReturnType<typeof useTheme>['colors']) {
+function makeStyles(fb: FbPalette) {
 	return StyleSheet.create({
-		backdrop: {
+		screen: {
 			flex: 1,
-			justifyContent: 'flex-end',
-			backgroundColor: 'rgba(0,0,0,0.5)',
-		},
-		kav: { width: '100%' },
-		sheet: {
-			width: '100%',
-			backgroundColor: c.bg,
-			borderTopLeftRadius: 16,
-			borderTopRightRadius: 16,
-			paddingHorizontal: 12,
-			paddingTop: 8,
-		},
-		grabber: {
-			alignSelf: 'center',
-			width: 36,
-			height: 4,
-			borderRadius: 2,
-			backgroundColor: c.border,
-			marginBottom: 10,
 		},
 		header: {
 			flexDirection: 'row',
 			alignItems: 'center',
 			gap: 8,
+			paddingHorizontal: 14,
 			paddingBottom: 10,
 			borderBottomWidth: StyleSheet.hairlineWidth,
-			borderBottomColor: c.border,
+			borderBottomColor: fb.border,
 		},
-		headerTitle: { fontSize: 16, fontWeight: '800', color: c.text },
-		headerCount: {
-			fontSize: 13,
-			fontWeight: '700',
-			color: c.muted,
-			backgroundColor: c.section,
-			paddingHorizontal: 8,
-			paddingVertical: 2,
-			borderRadius: 10,
-			overflow: 'hidden',
-		},
-		closeBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-		closeBtnText: { fontSize: 18, fontWeight: '600', color: c.subtext },
-		emptyWrap: { paddingVertical: 20, paddingHorizontal: 8, alignItems: 'center', gap: 4 },
-		emptyTitle: { fontSize: 15, fontWeight: '800', color: c.text },
-		empty: { fontSize: 13, color: c.muted, textAlign: 'center' },
-		list: { flexGrow: 0 },
-		listContent: { gap: 12, paddingVertical: 12 },
-		row: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-		rowHighlighted: {
-			backgroundColor: c.accent + '18',
-			marginHorizontal: -8,
-			paddingHorizontal: 8,
-			paddingVertical: 6,
-			borderRadius: 8,
-		},
-		replyRow: { marginLeft: 40 },
-		avatar: {
+		backBtn: {
 			width: 36,
 			height: 36,
-			borderRadius: 18,
-			backgroundColor: '#312e81',
+			alignItems: 'center',
+			justifyContent: 'center',
+		},
+		backBtnText: { fontSize: 28, fontWeight: '300', lineHeight: 32 },
+		headerTitle: { fontSize: 17, fontWeight: '700', color: fb.text },
+		headerCount: {
+			fontSize: 13,
+			fontWeight: '600',
+			color: fb.subtext,
+		},
+		closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+		closeBtnText: { fontSize: 22, fontWeight: '400', color: fb.subtext, lineHeight: 24 },
+		listWrap: {
+			flex: 1,
+			minHeight: 0,
+		},
+		list: {
+			flex: 1,
+		},
+		listContent: {
+			paddingHorizontal: 12,
+			paddingVertical: 10,
+			gap: 4,
+			paddingBottom: 16,
+		},
+		centerState: {
+			flex: 1,
+			alignItems: 'center',
+			justifyContent: 'center',
+			paddingHorizontal: 24,
+			gap: 6,
+		},
+		emptyTitle: { fontSize: 16, fontWeight: '700', color: fb.text },
+		empty: { fontSize: 14, color: fb.subtext, textAlign: 'center' },
+		row: {
+			flexDirection: 'row',
+			gap: 8,
+			alignItems: 'flex-start',
+			paddingVertical: 8,
+		},
+		rowHighlighted: {
+			backgroundColor: fb.link + '18',
+			marginHorizontal: -8,
+			paddingHorizontal: 8,
+			borderRadius: 8,
+		},
+		replyRow: { marginLeft: 44 },
+		avatar: {
+			width: 40,
+			height: 40,
+			borderRadius: 20,
+			backgroundColor: '#3a3b3c',
 			alignItems: 'center',
 			justifyContent: 'center',
 			overflow: 'hidden',
 		},
-		avatarSm: { width: 28, height: 28, borderRadius: 14 },
-		avatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-		bodyCol: { flex: 1, gap: 4 },
+		avatarSm: { width: 32, height: 32, borderRadius: 16 },
+		avatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+		bodyCol: { flex: 1, gap: 4, paddingRight: 4 },
 		bubble: {
-			backgroundColor: c.section,
+			backgroundColor: fb.bubble,
 			borderRadius: 18,
 			paddingHorizontal: 12,
 			paddingVertical: 8,
 			alignSelf: 'flex-start',
 			maxWidth: '100%',
 		},
-		bubbleName: { fontSize: 13, fontWeight: '800', color: c.text, marginBottom: 2 },
-		replyingTo: { fontSize: 12, fontWeight: '600', color: c.accent },
-		content: { fontSize: 15, color: c.text, lineHeight: 20 },
-		editedTag: { fontSize: 11, color: c.muted, fontStyle: 'italic' },
-		metaRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 4, flexWrap: 'wrap' },
-		time: { fontSize: 12, fontWeight: '600', color: c.muted },
-		metaBtn: { fontSize: 12, fontWeight: '700', color: c.subtext },
-		metaBtnLiked: { color: '#1877f2' },
-		metaBtnDelete: { color: '#ef4444' },
+		bubbleName: { fontSize: 13, fontWeight: '700', color: fb.text, marginBottom: 1 },
+		replyingTo: { fontSize: 12, fontWeight: '600', color: fb.link, marginBottom: 2 },
+		content: { fontSize: 15, color: fb.text, lineHeight: 20 },
+		editedTag: { fontSize: 12, color: fb.meta, fontStyle: 'italic' },
+		metaRow: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			gap: 16,
+			marginLeft: 12,
+			marginTop: 2,
+			flexWrap: 'wrap',
+		},
+		time: { fontSize: 12, fontWeight: '600', color: fb.meta },
+		metaBtn: { fontSize: 12, fontWeight: '700', color: fb.meta },
+		metaBtnLiked: { color: fb.link },
+		metaBtnDelete: { color: '#f02849' },
+		likeBtn: {
+			width: 32,
+			alignItems: 'center',
+			paddingTop: 10,
+		},
+		likeBtnIcon: { fontSize: 16, opacity: 0.45 },
+		likeBtnIconActive: { opacity: 1 },
+		likePill: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			gap: 2,
+			alignSelf: 'flex-start',
+			marginTop: 10,
+			backgroundColor: fb.sheet,
+			borderRadius: 10,
+			paddingHorizontal: 4,
+			paddingVertical: 2,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: fb.border,
+		},
+		likePillIcon: { fontSize: 11 },
+		likePillCount: { fontSize: 11, fontWeight: '700', color: fb.subtext },
 		replyBanner: {
 			flexDirection: 'row',
 			alignItems: 'center',
 			justifyContent: 'space-between',
-			paddingHorizontal: 10,
-			paddingVertical: 6,
-			backgroundColor: c.section,
-			borderRadius: 8,
-			marginTop: 4,
-			marginBottom: 4,
+			paddingHorizontal: 14,
+			paddingVertical: 8,
+			backgroundColor: fb.composerBar,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: fb.border,
 		},
-		replyBannerText: { fontSize: 12, color: c.subtext, flex: 1 },
-		replyBannerName: { fontWeight: '800', color: c.text },
-		replyBannerCancel: { fontSize: 14, color: c.subtext, fontWeight: '700', paddingLeft: 8 },
+		replyBannerText: { fontSize: 13, color: fb.subtext, flex: 1 },
+		replyBannerName: { fontWeight: '700', color: fb.text },
+		replyBannerCancel: { fontSize: 16, color: fb.subtext, fontWeight: '600', paddingLeft: 8 },
 		editBox: { gap: 6, marginTop: 2 },
 		editInput: {
-			backgroundColor: c.inputBg,
-			borderWidth: 1,
-			borderColor: c.border,
+			backgroundColor: fb.input,
 			borderRadius: 10,
 			paddingHorizontal: 10,
 			paddingVertical: 8,
 			fontSize: 14,
-			color: c.text,
+			color: fb.text,
 			minWidth: 180,
 			maxHeight: 120,
 		},
 		editActions: { flexDirection: 'row', gap: 18, justifyContent: 'flex-end' },
-		editCancel: { fontSize: 13, fontWeight: '700', color: c.subtext },
-		editSave: { fontSize: 13, fontWeight: '800', color: c.accent },
+		editCancel: { fontSize: 13, fontWeight: '700', color: fb.subtext },
+		editSave: { fontSize: 13, fontWeight: '800', color: fb.link },
 		composer: {
 			flexDirection: 'row',
 			alignItems: 'flex-end',
 			gap: 8,
-			paddingTop: 10,
+			paddingHorizontal: 12,
+			paddingTop: 8,
 			borderTopWidth: StyleSheet.hairlineWidth,
-			borderTopColor: c.border,
-			backgroundColor: c.bg,
+			borderTopColor: fb.border,
+			backgroundColor: fb.composerBar,
 		},
 		composerAvatar: {
-			width: 34,
-			height: 34,
-			borderRadius: 17,
-			backgroundColor: '#312e81',
+			width: 36,
+			height: 36,
+			borderRadius: 18,
+			backgroundColor: '#3a3b3c',
 			alignItems: 'center',
 			justifyContent: 'center',
 			overflow: 'hidden',
-			marginBottom: 4,
+			marginBottom: 2,
 		},
-		composerAvatarText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+		composerAvatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 		composerPill: {
 			flex: 1,
-			flexDirection: 'row',
-			alignItems: 'flex-end',
-			backgroundColor: c.section,
-			borderRadius: 22,
-			borderWidth: 1,
-			borderColor: c.border,
-			paddingLeft: 14,
-			paddingRight: 4,
+			backgroundColor: fb.input,
+			borderRadius: 20,
+			paddingHorizontal: 14,
 			minHeight: 40,
+			justifyContent: 'center',
 		},
 		input: {
-			flex: 1,
 			fontSize: 15,
-			color: c.text,
+			color: fb.text,
 			maxHeight: 100,
-			paddingTop: 9,
-			paddingBottom: 9,
+			paddingVertical: 9,
 		},
 		postBtn: {
-			paddingHorizontal: 10,
-			paddingVertical: 10,
-			alignSelf: 'flex-end',
+			width: 36,
+			height: 36,
+			borderRadius: 18,
+			alignItems: 'center',
+			justifyContent: 'center',
+			backgroundColor: fb.link,
+			marginBottom: 2,
 		},
-		postBtnText: { fontSize: 14, fontWeight: '800', color: c.accent },
+		postBtnDisabled: {
+			opacity: 0.35,
+		},
+		postBtnText: {
+			fontSize: 20,
+			fontWeight: '700',
+			color: '#fff',
+		},
+		postBtnTextDisabled: {
+			opacity: 0.6,
+		},
 	});
 }

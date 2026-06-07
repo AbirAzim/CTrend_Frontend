@@ -28,6 +28,7 @@ import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/ad
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { ImagePositionEditor } from "../../components/ImagePositionEditor";
+import { AppActionSheet } from "../../components/AppDialog";
 import { hasCustomFocal, DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -239,6 +240,7 @@ export default function CreateScreen() {
   const [campaignId, setCampaignId] = useState("");
   const [campaignModal, setCampaignModal] = useState(false);
   const [positionSlotId, setPositionSlotId] = useState<string | null>(null);
+  const [imageSheetSlotId, setImageSheetSlotId] = useState<string | null>(null);
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
@@ -430,22 +432,12 @@ export default function CreateScreen() {
   }
 
   function openImageOptions(slotId: string) {
-    const slot = slotsRef.current.find((s) => s.id === slotId);
-    if (slot?.localUri || slot?.publicUrl) {
-      Alert.alert("Image options", undefined, [
-        { text: "Replace from gallery", onPress: () => void pickAndUpload(slotId, false) },
-        { text: "Take new photo", onPress: () => void pickAndUpload(slotId, true) },
-        { text: "Remove", style: "destructive", onPress: () => patchSlot(slotId, { localUri: null, publicUrl: null, pasteUrl: "", error: null }) },
-        { text: "Cancel", style: "cancel" },
-      ]);
-    } else {
-      Alert.alert("Add image", undefined, [
-        { text: "Choose from gallery", onPress: () => void pickAndUpload(slotId, false) },
-        { text: "Take a photo", onPress: () => void pickAndUpload(slotId, true) },
-        { text: "Cancel", style: "cancel" },
-      ]);
-    }
+    setImageSheetSlotId(slotId);
   }
+
+  const imageSheetSlot = imageSheetSlotId
+    ? slots.find((s) => s.id === imageSheetSlotId)
+    : null;
 
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(isSchedule: boolean) {
@@ -918,6 +910,48 @@ export default function CreateScreen() {
           />
         );
       })()}
+
+      <AppActionSheet
+        visible={imageSheetSlotId !== null}
+        title={imageSheetSlot?.localUri || imageSheetSlot?.publicUrl ? "Image options" : "Add image"}
+        onClose={() => setImageSheetSlotId(null)}
+        actions={
+          imageSheetSlot?.localUri || imageSheetSlot?.publicUrl
+            ? [
+                {
+                  label: "Replace from gallery",
+                  onPress: () => void pickAndUpload(imageSheetSlotId!, false),
+                },
+                {
+                  label: "Take new photo",
+                  onPress: () => void pickAndUpload(imageSheetSlotId!, true),
+                },
+                {
+                  label: "Remove",
+                  destructive: true,
+                  onPress: () =>
+                    patchSlot(imageSheetSlotId!, {
+                      localUri: null,
+                      publicUrl: null,
+                      pasteUrl: "",
+                      error: null,
+                    }),
+                },
+                { label: "Cancel", cancel: true, onPress: () => {} },
+              ]
+            : [
+                {
+                  label: "Choose from gallery",
+                  onPress: () => void pickAndUpload(imageSheetSlotId!, false),
+                },
+                {
+                  label: "Take a photo",
+                  onPress: () => void pickAndUpload(imageSheetSlotId!, true),
+                },
+                { label: "Cancel", cancel: true, onPress: () => {} },
+              ]
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
