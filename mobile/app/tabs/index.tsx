@@ -67,10 +67,12 @@ function FeedTopBar() {
 
       {/* Action icons */}
       <View style={styles.actions}>
-        {/* Search */}
-        <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
-          <Ionicons name="search" size={19} color={colors.text} />
-        </PressableScale>
+        {/* Search — signed-in only */}
+        {isAuthenticated && (
+          <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
+            <Ionicons name="search" size={19} color={colors.text} />
+          </PressableScale>
+        )}
 
         {/* Theme toggle */}
         <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
@@ -80,24 +82,35 @@ function FeedTopBar() {
         {/* Create + Admin live in the bottom nav (Create FAB + Admin shield), so they're
             intentionally not duplicated here. */}
 
-        {/* Notification bell */}
-        <PressableScale style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
-          <Ionicons name="notifications" size={19} color="#f87171" />
-          {unreadCount > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
-            </View>
-          )}
-        </PressableScale>
-
-        {/* Logout */}
+        {/* Notification bell — signed-in only */}
         {isAuthenticated && (
+          <PressableScale style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
+            <Ionicons name="notifications" size={19} color="#f87171" />
+            {unreadCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
+              </View>
+            )}
+          </PressableScale>
+        )}
+
+        {/* Logout (signed-in) / Log in (guest) */}
+        {isAuthenticated ? (
           <PressableScale
             style={[styles.circleBtn, styles.circleBtnLogout]}
             onPress={() => void handleLogout()}
             hitSlop={6}
           >
             <Ionicons name="log-out-outline" size={19} color="#fca5a5" />
+          </PressableScale>
+        ) : (
+          <PressableScale
+            style={[styles.circleBtn, styles.circleBtnLogin]}
+            onPress={() => router.push("/auth/login")}
+            hitSlop={6}
+          >
+            <Ionicons name="log-in-outline" size={19} color="#fff" />
+            <Text style={styles.loginLabel}>Log in</Text>
           </PressableScale>
         )}
       </View>
@@ -364,6 +377,14 @@ const styles = StyleSheet.create({
   },
   circleBtnBell: { backgroundColor: "rgba(239,68,68,0.14)" },
   circleBtnLogout: { backgroundColor: "rgba(127,29,29,0.5)" },
+  circleBtnLogin: {
+    width: "auto",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#ec4899",
+  },
+  loginLabel: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
   iconSymbol: { fontSize: 15, color: "#e2e8f0" },
   bellSymbol: { fontSize: 15 },
   logoutSymbol: { fontSize: 17, color: "#fca5a5", fontWeight: "700" },

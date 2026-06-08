@@ -32,7 +32,7 @@ type StatusFilter = "all" | "PUBLISHED" | "SCHEDULED";
 type VotingFilter = "all" | "live" | "closed";
 type SortBy = "createdAt" | "updatedAt" | "votes" | "caption";
 type SortOrder = "asc" | "desc";
-type PostScope = "admin" | "user";
+type PostScope = "admin" | "user" | "user-all";
 
 type Person = {
   id: string;
@@ -265,7 +265,9 @@ export default function AdminPostsScreen() {
             <Text style={[st.sectionSub, { color: colors.muted }]}>
               {scope === "admin"
                 ? "Admin platform-wide polls — search, filter, open, or edit."
-                : "User global broadcasts — search, filter, open, or remove."}
+                : scope === "user"
+                  ? "User global broadcasts — search, filter, open, or remove."
+                  : "Normal (friend-only) user posts — not in the public feed."}
             </Text>
           </View>
           {scope === "admin" ? (
@@ -282,6 +284,7 @@ export default function AdminPostsScreen() {
           {([
             ["admin", "Admin posts"],
             ["user", "User global"],
+            ["user-all", "User normal"],
           ] as const).map(([key, label]) => {
             const active = scope === key;
             return (
@@ -363,7 +366,11 @@ export default function AdminPostsScreen() {
           contentContainerStyle={st.list}
           ListEmptyComponent={
             <Text style={[st.empty, { color: colors.muted }]}>
-              {scope === "admin" ? "No admin platform posts found" : "No user global posts found"}
+              {scope === "admin"
+                ? "No admin platform posts found"
+                : scope === "user"
+                  ? "No user global posts found"
+                  : "No normal user posts found"}
             </Text>
           }
           ListFooterComponent={

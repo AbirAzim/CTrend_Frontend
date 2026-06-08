@@ -9,17 +9,34 @@ import { useAuth } from "../context/AuthContext";
 
 type CompareItem = { imageUrl: string; label: string };
 
+type PollOption = {
+  label: string;
+  imageUrl?: string | null;
+  imageFocalX?: number | null;
+  imageFocalY?: number | null;
+};
+
 type EditablePost = {
   id: string;
+  format?: string | null;
   caption?: string | null;
   imageUrls: string[];
-  options?: Array<{ label?: string | null }> | null;
+  options?: Array<{
+    label?: string | null;
+    imageUrl?: string | null;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }> | null;
   category?: { id: string; name?: string | null } | null;
   campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   votingEndsAt?: string | null;
   isVotingOpen?: boolean | null;
   endingSoonLeadMinutes?: number | null;
   isUserGlobalBroadcast?: boolean | null;
+  /** "scheduled" while queued for a future go-live; "published" once live. */
+  status?: string | null;
+  /** ISO go-live time — only meaningful while status === "scheduled". */
+  scheduledAt?: string | null;
 };
 
 type Props = {
@@ -57,6 +74,10 @@ function formatDeadline(iso?: string | null): string {
 export function EditPostModal({ post, onClose, onSaved }: Props) {
   const { user } = useAuth();
   const isAdmin = user?.role?.toLowerCase() === "admin";
+  const isPoll = (post.format ?? "").toLowerCase() === "poll";
+  // A post still queued for a future go-live: the schedule time can be changed.
+  // Once published it can't, but the voting deadline (end time) still can.
+  const isScheduled = (post.status ?? "").toLowerCase() === "scheduled";
 
   const initialItems: CompareItem[] = post.imageUrls.map((url, i) => ({
     imageUrl: url,
@@ -66,8 +87,19 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   // existing votes). Only newly added items (index >= lockedCount) are editable.
   const lockedCount = initialItems.length;
 
+  // Poll options carry their own (optional) thumbnail. Labels stay editable;
+  // images are locked because changing them would invalidate existing votes.
+  const initialPollOptions: PollOption[] = (post.options ?? []).map((o, i) => ({
+    label: o.label ?? `Option ${i + 1}`,
+    imageUrl: o.imageUrl ?? null,
+    imageFocalX: o.imageFocalX ?? null,
+    imageFocalY: o.imageFocalY ?? null,
+  }));
+  const pollLockedCount = initialPollOptions.length;
+
   const [caption, setCaption] = useState(post.caption ?? "");
   const [items, setItems] = useState<CompareItem[]>(initialItems);
+  const [pollOptions, setPollOptions] = useState<PollOption[]>(initialPollOptions);
   const [broadcastGlobally, setBroadcastGlobally] = useState(
     Boolean(post.isUserGlobalBroadcast),
   );
@@ -78,6 +110,11 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const [extendPreset, setExtendPreset] = useState("");
   const [extendDraft, setExtendDraft] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState(post.votingEndsAt ?? null);
+  const [scheduledAt, setScheduledAt] = useState(
+    isScheduled && post.scheduledAt
+      ? toLocalDateTimeInputValue(new Date(post.scheduledAt))
+      : "",
+  );
   const [endingSoonLeadMinutes, setEndingSoonLeadMinutes] = useState(
     post.endingSoonLeadMinutes ?? 5,
   );
@@ -130,6 +167,24 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   function removeItem(idx: number) {
     if (items.length <= 2) return;
     setItems((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function setPollLabel(idx: number, value: string) {
+    setPollOptions((prev) =>
+      prev.map((opt, i) => (i === idx ? { ...opt, label: value } : opt)),
+    );
+  }
+
+  function addPollOption() {
+    if (pollOptions.length >= 10) return;
+    setPollOptions((prev) => [...prev, { label: "" }]);
+  }
+
+  function removePollOption(idx: number) {
+    // Existing options are locked (removing them would shift vote indices);
+    // only newly added rows can be removed.
+    if (idx < pollLockedCount || pollOptions.length <= 2) return;
+    setPollOptions((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function handleFileUpload(idx: number, file: File) {
@@ -185,6 +240,79 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
 
   async function handleSave() {
     setError(null);
+
+    // Reschedule (only for not-yet-published posts). Published posts never
+    // send scheduledAt, so their go-live time is immutable.
+    let scheduledAtInput: string | undefined;
+    if (isScheduled) {
+      const trimmed = scheduledAt.trim();
+      if (!trimmed) {
+        setError("Pick a date and time for this post to go live.");
+        return;
+      }
+      const when = new Date(trimmed);
+      if (Number.isNaN(when.getTime())) {
+        setError("Invalid schedule time.");
+        return;
+      }
+      if (when.getTime() <= Date.now()) {
+        setError("Schedule time must be in the future.");
+        return;
+      }
+      scheduledAtInput = when.toISOString();
+    }
+
+    const sharedInput = {
+      caption: caption.trim() || undefined,
+      categoryId: categoryId || undefined,
+      campaignId: campaignId.trim(),
+      ...(scheduledAtInput ? { scheduledAt: scheduledAtInput } : {}),
+      endingSoonLeadMinutes: isAdmin
+        ? Math.max(1, Math.min(1440, Math.round(endingSoonLeadMinutes || 5)))
+        : undefined,
+      broadcastGlobally: isAdmin
+        ? undefined
+        : broadcastGlobally !== Boolean(post.isUserGlobalBroadcast)
+          ? broadcastGlobally
+          : undefined,
+    };
+
+    if (isPoll) {
+      const labeled = pollOptions.filter((o) => o.label.trim().length > 0);
+      if (labeled.length < 2) {
+        setError("A poll needs at least 2 options with labels.");
+        return;
+      }
+      try {
+        await updatePostMut({
+          variables: {
+            postId: post.id,
+            input: {
+              ...sharedInput,
+              // Preserve each option's existing image/focal point — only labels
+              // change here, so votes are never reset. Body images (imageUrls)
+              // are intentionally omitted so they stay untouched.
+              options: labeled.map((o) => ({
+                label: o.label.trim() || "Option",
+                ...(o.imageUrl
+                  ? {
+                      imageUrl: o.imageUrl,
+                      imageFocalX: o.imageFocalX ?? undefined,
+                      imageFocalY: o.imageFocalY ?? undefined,
+                    }
+                  : {}),
+              })),
+            },
+          },
+        });
+        onSaved();
+        onClose();
+      } catch (err: unknown) {
+        setError(getApolloErrorMessage(err));
+      }
+      return;
+    }
+
     if (items.length < 2) { setError("At least 2 compare items are required."); return; }
     if (items.some((it) => !it.imageUrl.trim())) { setError("Every compare item needs an image."); return; }
     try {
@@ -192,19 +320,9 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
         variables: {
           postId: post.id,
           input: {
-            caption: caption.trim() || undefined,
+            ...sharedInput,
             imageUrls: items.map((it) => it.imageUrl.trim()),
             options: items.map((it) => ({ label: it.label.trim() || "Option" })),
-            categoryId: categoryId || undefined,
-            campaignId: campaignId.trim(),
-            endingSoonLeadMinutes: isAdmin
-              ? Math.max(1, Math.min(1440, Math.round(endingSoonLeadMinutes || 5)))
-              : undefined,
-            broadcastGlobally: isAdmin
-              ? undefined
-              : broadcastGlobally !== Boolean(post.isUserGlobalBroadcast)
-                ? broadcastGlobally
-                : undefined,
           },
         },
       });
@@ -220,12 +338,15 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
       className="cx-modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Edit compare post"
+      aria-label={isPoll ? "Edit poll post" : "Edit compare post"}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="cx-modal-card cx-edit-post-modal">
         <div className="cx-modal-head">
-          <h2 className="cx-modal-title">Edit Compare</h2>
+          <h2 className="cx-modal-title">
+            {isScheduled ? "Edit Scheduled " : "Edit "}
+            {isPoll ? "Poll" : "Compare"}
+          </h2>
           <button type="button" className="cx-modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
@@ -236,7 +357,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
               className="cx-edit-textarea"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="What's this compare about?"
+              placeholder={isPoll ? "What's this poll about?" : "What's this compare about?"}
               rows={2}
               maxLength={1000}
             />
@@ -298,7 +419,28 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             </label>
           )}
 
-          {post.isVotingOpen !== false && (
+          {isScheduled && (
+            <div className="cx-extend-section cx-edit-extend-section">
+              <p className="cx-extend-label">
+                Go-live time
+                <span className="cx-edit-deadline-current muted small">
+                  Not published yet — change when this post goes live.
+                </span>
+              </p>
+              <DateTimePicker
+                id="edit-scheduled-at"
+                label="Publish at"
+                value={scheduledAt}
+                minDate={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+                onChange={(v) => {
+                  setScheduledAt(v);
+                  setError(null);
+                }}
+              />
+            </div>
+          )}
+
+          {!isScheduled && post.isVotingOpen !== false && (
             <div className="cx-extend-section cx-edit-extend-section">
               <p className="cx-extend-label">
                 Voting deadline
@@ -380,6 +522,83 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             </label>
           ) : null}
 
+          {isPoll ? (
+            <>
+              {post.imageUrls.length > 0 && (
+                <>
+                  <p className="cx-edit-section-label">Poll photos</p>
+                  <p className="muted small cx-edit-locked-note">
+                    🔒 Photos can't be changed after posting — they're tied to
+                    existing votes.
+                  </p>
+                  <div className="cx-edit-poll-photos">
+                    {post.imageUrls.map((url, i) => (
+                      <div className="cx-edit-poll-photo" key={i}>
+                        <img src={url} alt="" />
+                        <span className="cx-edit-item-lock" title="Locked" aria-hidden>🔒</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <p className="cx-edit-section-label">
+                Poll Options
+                <span className="cx-edit-item-count">{pollOptions.length} / 10</span>
+              </p>
+              <p className="muted small cx-edit-locked-note">
+                Edit option labels freely — votes stay intact. Option photos are
+                locked and can't be changed.
+              </p>
+
+              <div className="cx-edit-items">
+                {pollOptions.map((opt, idx) => {
+                  const locked = idx < pollLockedCount;
+                  return (
+                    <div key={idx} className="cx-edit-item cx-edit-item--poll">
+                      <div className="cx-edit-item-thumb">
+                        {opt.imageUrl ? (
+                          <img src={opt.imageUrl} alt="" />
+                        ) : (
+                          <span className="cx-edit-item-placeholder">📊</span>
+                        )}
+                        {opt.imageUrl && (
+                          <span className="cx-edit-item-lock" title="Photo locked" aria-hidden>🔒</span>
+                        )}
+                      </div>
+                      <div className="cx-edit-item-fields">
+                        <input
+                          type="text"
+                          className="cx-edit-input"
+                          value={opt.label}
+                          onChange={(e) => setPollLabel(idx, e.target.value)}
+                          placeholder={`Option ${idx + 1} label`}
+                          maxLength={200}
+                        />
+                      </div>
+                      {!locked && (
+                        <button
+                          type="button"
+                          className="cx-edit-remove-btn"
+                          onClick={() => removePollOption(idx)}
+                          aria-label={`Remove option ${idx + 1}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {pollOptions.length < 10 && (
+                <button type="button" className="cx-edit-add-btn" onClick={addPollOption}>
+                  + Add poll option
+                </button>
+              )}
+            </>
+          ) : (
+            <>
           <p className="cx-edit-section-label">
             Compare Items
             <span className="cx-edit-item-count">{items.length} / 10</span>
@@ -471,6 +690,8 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             <button type="button" className="cx-edit-add-btn" onClick={addItem}>
               + Add compare item
             </button>
+          )}
+            </>
           )}
 
           {error && (

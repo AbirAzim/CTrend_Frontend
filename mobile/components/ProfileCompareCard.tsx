@@ -9,6 +9,7 @@ import { useTheme } from "../context/ThemeContext";
 export type ProfileCompareCardPost = {
   id: string;
   imageUrls?: string[] | null;
+  format?: string | null;
   caption?: string | null;
   totalVotes?: number | null;
   upvoteCount: number;
@@ -53,6 +54,8 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
   const totalVotes = post.totalVotes ?? (post.upvoteCount + post.downvoteCount);
   const images = (post.imageUrls ?? []).slice(0, 4);
   const extraCount = Math.max(0, (post.imageUrls?.length ?? 0) - 4);
+  const isPoll = String(post.format ?? "").toLowerCase() === "poll";
+  const optionCount = (post.options ?? []).filter((o) => o.label?.trim()).length;
 
   const pulseOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -95,7 +98,23 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
 
       {/* Media strip */}
       <View style={st.media}>
-        {images.length === 0 ? (
+        {isPoll ? (
+          <View style={[st.pollMedia, { backgroundColor: colors.accent + "1f" }]}>
+            <View style={[st.pollBadge, { backgroundColor: colors.accent + "28" }]}>
+              <Text style={[st.pollBadgeText, { color: colors.accent }]}>📊 POLL</Text>
+            </View>
+            <View style={st.pollBars}>
+              <View style={[st.pollBar, { width: "90%", backgroundColor: colors.accent + "a6" }]} />
+              <View style={[st.pollBar, { width: "62%", backgroundColor: colors.accent + "80" }]} />
+              <View style={[st.pollBar, { width: "40%", backgroundColor: colors.accent + "59" }]} />
+            </View>
+            {optionCount > 0 ? (
+              <Text style={[st.pollCount, { color: colors.muted }]}>
+                {optionCount} {optionCount === 1 ? "option" : "options"}
+              </Text>
+            ) : null}
+          </View>
+        ) : images.length === 0 ? (
           <View style={[st.emptyMedia, { backgroundColor: colors.section }]}>
             <Text style={st.emptyIcon}>📷</Text>
           </View>
@@ -110,7 +129,7 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
             />
           ))
         )}
-        {extraCount > 0 && (
+        {!isPoll && extraCount > 0 && (
           <View style={st.moreBadge}>
             <Text style={st.moreText}>+{extraCount}</Text>
           </View>
@@ -234,6 +253,37 @@ const st = StyleSheet.create({
     justifyContent: "center",
   },
   emptyIcon: { fontSize: 22, opacity: 0.35 },
+  // Poll posts have no hero image — branded preview tile instead of 📷.
+  pollMedia: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+  },
+  pollBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  pollBadgeText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  pollBars: {
+    gap: 5,
+    maxWidth: 130,
+    alignSelf: "stretch",
+  },
+  pollBar: {
+    height: 7,
+    borderRadius: 999,
+  },
+  pollCount: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
   thumb: { flex: 1, height: 120 },
   moreBadge: {
     position: "absolute",

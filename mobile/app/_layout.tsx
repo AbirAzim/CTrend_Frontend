@@ -26,6 +26,7 @@ import {
   postOrUpdateMessageNotification,
   postBellNotification,
   resolveNotificationRoute,
+  handleAndroidUpdateNotificationTap,
   clearConversationNotification,
   initMessageNotifications,
   registerNotifeeHandlers,
@@ -76,6 +77,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   // Bell notifications (likes, comments, friend requests, votes, …):
   // stash the resolved route to navigate once the app is active.
   if (data.type === "BELL" && type === EventType.PRESS) {
+    if (handleAndroidUpdateNotificationTap(data)) return;
     setPendingNavigationRoute(resolveNotificationRoute(data));
   }
 });
@@ -388,6 +390,7 @@ function AppServices() {
         return;
       }
       if (data.type === "BELL") {
+        if (handleAndroidUpdateNotificationTap(data)) return;
         const route = resolveNotificationRoute(data);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (route) setTimeout(() => router.push(route as any), 400);
@@ -436,6 +439,7 @@ function NotificationResponseHandler() {
       // Small delay lets Expo Router finish mounting the initial route so the
       // back stack is never empty (avoids "stuck with no back button" on cold start).
       setTimeout(() => {
+        if (handleAndroidUpdateNotificationTap(data)) return;
         const route = resolveNotificationRoute(data);
         if (!route) { router.push("/notifications"); return; }
         if (route.startsWith("/chat/")) {

@@ -37,6 +37,7 @@ export const MY_VOTED_POSTS = gql`
     myVotedPosts(anonymousOnly: $anonymousOnly) {
       id
       imageUrls
+      format
       caption
       createdAt
       totalVotes
@@ -67,6 +68,7 @@ export const MY_VOTED_POSTS = gql`
         id
         name
         slug
+        color
       }
     }
   }
@@ -78,6 +80,7 @@ export const USER_POSTS = gql`
     getPostsByUser(userId: $userId) {
       id
       imageUrls
+      format
       caption
       createdAt
       totalVotes
@@ -110,6 +113,7 @@ export const USER_POSTS = gql`
         id
         name
         slug
+        color
       }
     }
   }

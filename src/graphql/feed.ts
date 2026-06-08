@@ -38,6 +38,7 @@ export const FEED_POSTS = gql`
     feedPosts(campaignId: $campaignId, skip: $skip, take: $take) {
       id
       type
+      format
       authorId
       authorUsername
       authorDisplayName
@@ -72,6 +73,12 @@ export const FEED_POSTS = gql`
         percentage
       }
       ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
+      }
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
@@ -83,6 +90,7 @@ export const GET_POST_BY_ID = gql`
     getPostById(id: $id) {
       id
       type
+      format
       authorId
       authorUsername
       authorDisplayName
@@ -117,6 +125,12 @@ export const GET_POST_BY_ID = gql`
         percentage
       }
       ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
+      }
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
@@ -181,6 +195,7 @@ export const MY_SAVED_POSTS = gql`
       authorEmail
       authorProfileImageUrl
       imageUrls
+      format
       caption
       createdAt
       upvoteCount
@@ -219,11 +234,15 @@ export const UPDATE_POST = gql`
       id
       imageUrls
       caption
+      isUserGlobalBroadcast
+      status
+      scheduledAt
       ${POST_OPTION_FIELDS}
       category {
         id
         name
         slug
+        color
       }
       isVotingOpen
       votingEndsAt
@@ -274,16 +293,31 @@ export const MY_SCHEDULED_POSTS = gql`
   query MyScheduledPosts {
     myScheduledPosts {
       id
+      format
       contentText
+      caption
       imageUrls
       options {
         label
         imageUrl
+        imageFocalX
+        imageFocalY
       }
       category {
         id
         name
+        slug
+        color
       }
+      campaign {
+        id
+        name
+        slug
+      }
+      votingEndsAt
+      isVotingOpen
+      endingSoonLeadMinutes
+      isUserGlobalBroadcast
       status
       scheduledAt
       createdAt
@@ -303,6 +337,8 @@ export const CATEGORIES = gql`
     categories: getAllCategories {
       id
       name
+      slug
+      color
     }
   }
 `;
@@ -349,6 +385,7 @@ export const POST_UPDATED = gql`
     postUpdated(postId: $postId) {
       id
       type
+      format
       isUserGlobalBroadcast
       imageUrls
       caption
@@ -372,8 +409,15 @@ export const POST_UPDATED = gql`
         id
         name
         slug
+        color
       }
       ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
+      }
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }

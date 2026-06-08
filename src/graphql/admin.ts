@@ -7,16 +7,18 @@ export const CREATE_CATEGORY = gql`
       id
       name
       slug
+      color
     }
   }
 `;
 
 export const UPDATE_CATEGORY = gql`
-  mutation UpdateCategory($id: ID!, $name: String!) {
-    updateCategory(id: $id, name: $name) {
+  mutation UpdateCategory($id: ID!, $name: String!, $color: String) {
+    updateCategory(id: $id, name: $name, color: $color) {
       id
       name
       slug
+      color
     }
   }
 `;
@@ -198,6 +200,7 @@ export const ADMIN_PLATFORM_POSTS = gql`
     adminPlatformPosts(query: $query, skip: $skip, take: $take) {
       id
       type
+      format
       caption
       imageUrls
       createdAt
@@ -241,6 +244,8 @@ export const ADMIN_PLATFORM_POSTS = gql`
       options {
         label
         imageUrl
+        imageFocalX
+        imageFocalY
       }
       optionStats {
         index

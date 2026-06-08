@@ -4,10 +4,15 @@ export type PostStatus = "published" | "scheduled";
 
 export type FeedPostType = "user" | "system" | "org";
 
+/** Voting layout: `compare` = side-by-side image grid; `poll` = stacked option rows. */
+export type PostFormat = "compare" | "poll";
+
 export type FeedPostView = {
   id: string;
   /** API post type — `system` = platform-wide Ke Jitbe polls. */
   postType?: FeedPostType | null;
+  /** Voting layout. Defaults to `compare` for legacy posts. */
+  format?: PostFormat | null;
   /** Normal user posted to everyone (admin toggle); shows user name/avatar, not platform brand. */
   isUserGlobalBroadcast?: boolean | null;
   authorId?: string | null;
@@ -63,11 +68,21 @@ export type FeedPostView = {
   /** Option titles from API `options` (same order as voting indices / compare columns). */
   postOptions?: {
     label: string;
+    /** Optional per-option thumbnail (poll rows; mixed text/image allowed). */
+    imageUrl?: string | null;
     imageFocalX?: number | null;
     imageFocalY?: number | null;
   }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  /** Post category (e.g. Sports, Tech) shown as a chip on the card. */
+  category?: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    /** Admin-assigned accent color (hex); falls back to a derived color. */
+    color?: string | null;
+  } | null;
   campaign?: FeedPostCampaignView | null;
   voteWinner?: FeedPostVoteWinnerView | null;
 };

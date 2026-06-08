@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   FlatList,
+  Linking,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -15,7 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ARCHIVE_NOTIFICATION,
   MARK_ALL_NOTIFICATIONS_READ,
@@ -37,7 +37,9 @@ import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
 import { CLAIM_POST_VOTE_PRIZE } from "@ctrend/shared/graphql/feed";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import { PLAY_STORE_CLOSED_TESTING_URL } from "@ctrend/shared/lib/appUpdate";
 import logoAsset from "../../assets/logo.png";
+import { BottomNav } from "../../components/BottomNav";
 import { useTheme } from "../../context/ThemeContext";
 import { useBackToFeed } from "../../hooks/useBackToFeed";
 import type { ColorPalette } from "../../context/ThemeContext";
@@ -106,7 +108,7 @@ const POST_NOTIF_TYPES = new Set([
   "POST_HYPE", "POST_COMMENT", "NEW_POST_FRIEND",
   "COMMENT_REPLY", "COMMENT_REACTION", "NEW_COMMENT",
   "VOTE_ENDED", "VOTE_WINNER", "VOTE_PRIZE_CLAIMED", "POST_WINNER",
-  "ANNOUNCEMENT", "USER_GLOBAL_POST",
+  "USER_GLOBAL_POST",
 ]);
 
 /** System/platform-generated notifications that should show the brand logo avatar (not a generic emoji). */
@@ -120,6 +122,10 @@ const COMMENT_NOTIF_TYPES = new Set([
 ]);
 
 function navigateFromNotif(notif: GqlNotification) {
+  if ((notif.referenceType ?? "").toLowerCase() === "android_update_required") {
+    void Linking.openURL(PLAY_STORE_CLOSED_TESTING_URL);
+    return;
+  }
   if (notif.type === "MESSAGE" && notif.referenceId) {
     router.push(`/chat/${notif.referenceId}` as `/${string}`);
     return;
@@ -154,6 +160,7 @@ function navigateFromNotif(notif: GqlNotification) {
 function makeStyles(c: ColorPalette, isDark: boolean) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: c.bg },
+    contentArea: { flex: 1 },
     headerBtn: { paddingHorizontal: 8 },
     headerBtnText: { fontSize: 13, color: c.accent, fontWeight: "700" },
 
@@ -446,7 +453,6 @@ function NotifRow({
 const PAGE_SIZE = 20;
 
 export default function NotificationsScreen() {
-  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const goBack = useBackToFeed(); // cold-start from a notification → back to feed
@@ -632,7 +638,7 @@ export default function NotificationsScreen() {
   const unreadCount = items.filter((n) => !n.read).length;
 
   return (
-    <View style={[st.flex, { paddingBottom: insets.bottom }]}>
+    <View style={st.flex}>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -657,6 +663,7 @@ export default function NotificationsScreen() {
         }}
       />
 
+      <View style={st.contentArea}>
       {loading && items.length === 0 ? (
         <View style={st.loadingWrap}>
           <ActivityIndicator color={colors.accent} />
@@ -693,6 +700,9 @@ export default function NotificationsScreen() {
           }
         />
       )}
+      </View>
+
+      <BottomNav />
     </View>
   );
 }

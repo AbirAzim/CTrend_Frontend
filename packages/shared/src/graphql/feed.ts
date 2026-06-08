@@ -38,9 +38,11 @@ export const FEED_POSTS = gql`
       authorEmail
       authorProfileImageUrl
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       createdAt
+      status
       scheduledAt
       upvoteCount
       downvoteCount
@@ -64,6 +66,7 @@ export const FEED_POSTS = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -83,6 +86,7 @@ export const GET_POST_BY_ID = gql`
         id
         name
         slug
+        color
       }
       authorId
       authorUsername
@@ -91,9 +95,11 @@ export const GET_POST_BY_ID = gql`
       authorEmail
       authorProfileImageUrl
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       createdAt
+      status
       scheduledAt
       upvoteCount
       downvoteCount
@@ -117,6 +123,7 @@ export const GET_POST_BY_ID = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -174,9 +181,11 @@ export const MY_SAVED_POSTS = gql`
       authorEmail
       authorProfileImageUrl
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       createdAt
+      status
       scheduledAt
       upvoteCount
       downvoteCount
@@ -200,6 +209,7 @@ export const MY_SAVED_POSTS = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -269,6 +279,8 @@ export const MY_SCHEDULED_POSTS = gql`
       category {
         id
         name
+        slug
+        color
       }
       status
       scheduledAt
@@ -334,6 +346,7 @@ export const POST_UPDATED = gql`
       id
       type
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       scheduledAt
@@ -354,6 +367,7 @@ export const POST_UPDATED = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -361,6 +375,7 @@ export const POST_UPDATED = gql`
         id
         name
         slug
+        color
       }
       ${POST_CAMPAIGN_FIELDS}
       ${POST_VOTE_WINNER_FIELDS}
@@ -409,7 +424,10 @@ export const UPDATE_POST = gql`
       caption
       imageUrls
       options { label imageUrl }
-      category { id name }
+      category { id name slug color }
+      isUserGlobalBroadcast
+      status
+      scheduledAt
     }
   }
 `;

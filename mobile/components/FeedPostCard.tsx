@@ -57,6 +57,7 @@ import {
 } from '@ctrend/shared/lib/contentReport';
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
+import { categoryChipColors } from '../lib/categoryColor';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Card has marginHorizontal:12 on each side, so its inner content is narrower
@@ -274,6 +275,17 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: c.text,
 			letterSpacing: 0.1,
 		},
+		// Dim per-category chip after the post-type badge; tap reveals tooltip.
+		catChip: {
+			position: 'relative' as const,
+			borderRadius: 999,
+			paddingHorizontal: 8,
+			paddingVertical: 1,
+		},
+		catChipText: {
+			fontSize: 10,
+			fontWeight: '800' as const,
+		},
 		platformBadge: {
 			fontSize: 9,
 			fontWeight: '700' as const,
@@ -287,10 +299,12 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: c.accentLight,
 			overflow: 'hidden' as const,
 		},
+		// Platform (official "Ke Jitbe") posts: clean left accent stripe instead
+		// of a full purple border + flat tint, which framed the whole card oddly
+		// in light mode. The PLATFORM badge + brand avatar already mark these.
 		platformCard: {
-			borderColor: c.accentLight,
-			borderWidth: 1.5,
-			backgroundColor: c.accent + '14',
+			borderLeftWidth: 3,
+			borderLeftColor: c.accent,
 		},
 		globalBadge: {
 			fontSize: 9,
@@ -306,14 +320,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			backgroundColor: isDark ? 'rgba(16,185,129,0.14)' : 'rgba(22,163,74,0.1)',
 			overflow: 'hidden' as const,
 		},
+		// User-global posts: a subtle left accent stripe only (matches web
+		// `.ig-post--user-global`). A full green border + tint looked like a
+		// weird extra frame, especially in light mode.
 		userGlobalCard: {
-			borderColor: isDark ? 'rgba(52,211,153,0.5)' : 'rgba(22,163,74,0.45)',
-			borderWidth: 1.5,
-			backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(22,163,74,0.06)',
+			borderLeftWidth: 3,
+			borderLeftColor: isDark ? 'rgba(52,211,153,0.55)' : 'rgba(22,163,74,0.5)',
 		},
 		campaignCard: {
-			borderColor: isDark ? 'rgba(245,158,11,0.5)' : 'rgba(217,160,23,0.55)',
-			borderWidth: 1.5,
+			borderLeftWidth: 3,
+			borderLeftColor: isDark ? 'rgba(245,158,11,0.6)' : 'rgba(217,160,23,0.7)',
 		},
 		endingSoonBanner: {
 			flexDirection: 'row' as const,
@@ -511,6 +527,64 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		},
 		optionBarFill: { borderRadius: 2 },
 		optionBarEmpty: { backgroundColor: c.border },
+		// ── Poll format — stacked option rows (per-option colour + voter chip) ──
+		pollBodyMedia: { paddingHorizontal: 14, paddingBottom: 6, gap: 6 },
+		pollBodyImage: { width: '100%' as const, height: 200, borderRadius: 10 },
+		pollOptions: { paddingHorizontal: 14, paddingTop: 4, gap: 8 },
+		pollRow: {
+			position: 'relative' as const,
+			borderWidth: 1.5,
+			borderColor: c.border,
+			borderRadius: 12,
+			backgroundColor: c.section,
+			overflow: 'hidden' as const,
+		},
+		pollRowWinner: { borderColor: '#f59e0b' },
+		pollRowLoser: { opacity: 0.6 },
+		pollFill: {
+			position: 'absolute' as const,
+			left: 0,
+			top: 0,
+			bottom: 0,
+		},
+		pollRowContent: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 10,
+			paddingHorizontal: 12,
+			paddingVertical: 10,
+			minHeight: 46,
+		},
+		pollThumb: { width: 36, height: 36, borderRadius: 8 },
+		pollDot: {
+			width: 18,
+			height: 18,
+			borderRadius: 9,
+			borderWidth: 2,
+			borderColor: c.muted,
+		},
+		pollLabel: {
+			flex: 1,
+			fontSize: 14,
+			fontWeight: '600' as const,
+			color: c.text,
+		},
+		pollPct: {
+			fontSize: 14,
+			fontWeight: '800' as const,
+			color: c.text,
+		},
+		pollCheck: { fontSize: 15, fontWeight: '800' as const },
+		pollVotersChip: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 3,
+			borderWidth: 1,
+			borderRadius: 99,
+			paddingHorizontal: 9,
+			paddingVertical: 4,
+		},
+		pollVotersChipText: { fontSize: 12, fontWeight: '800' as const },
 		singleImg: { width: '100%' as const, height: 280 },
 		anonRow: {
 			flexDirection: 'row' as const,
@@ -984,9 +1058,14 @@ function FeedPostCardComponent({
 		setVotersVisible(true);
 	}
 
-	// Animation values — one per compare option (min 4). Sized from the post's
-	// option count so multi-option posts (5–10+) never index past the array.
-	const animSlots = Math.max(post.imageUrls?.length ?? 0, 4);
+	// Animation values — one per compare/poll option (min 4). Sized from the
+	// post's option count so multi-option posts (5–10+) and text polls (which
+	// have no images) never index past the array.
+	const animSlots = Math.max(
+		post.imageUrls?.length ?? 0,
+		post.postOptions?.length ?? 0,
+		4,
+	);
 	const cellScale = useRef(
 		Array.from({ length: animSlots }, () => new Animated.Value(1)),
 	).current;
@@ -1011,6 +1090,14 @@ function FeedPostCardComponent({
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
+	// Category chip: tap to reveal a small "Category" tooltip (auto-hides).
+	const [showCatTip, setShowCatTip] = useState(false);
+	const catTipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	function revealCategoryTip() {
+		setShowCatTip(true);
+		if (catTipTimer.current) clearTimeout(catTipTimer.current);
+		catTipTimer.current = setTimeout(() => setShowCatTip(false), 1800);
+	}
 
 	function openComments(focusComposer: boolean) {
 		if (!isAuthenticated) {
@@ -1119,6 +1206,17 @@ function FeedPostCardComponent({
 		return { size, start };
 	});
 	const multiTotal = activeStats?.reduce((sum, s) => sum + s.count, 0) ?? 0;
+
+	// ── Poll format — stacked text/thumbnail rows, each its own colour ──
+	const isPoll = post.format === 'poll';
+	const pollOptions = post.postOptions ?? [];
+	const pollOptionCount = isPoll
+		? Math.max(pollOptions.length, activeStats?.length ?? 0)
+		: 0;
+	const pollPick = isPoll ? activeMyIdx : null;
+	const pollHasVoted = pollPick !== null && pollPick !== undefined;
+	const pollShowResults = pollHasVoted || isVotingClosed;
+	const pollMaxCount = Math.max(0, ...(activeStats?.map((s) => s.count) ?? []));
 
 	useEffect(() => {
 		if (!activeVotingEndsAt || isVotingClosed) return;
@@ -1772,6 +1870,8 @@ function FeedPostCardComponent({
 		: (post.authorProfileImageUrl ?? null);
 	const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 	const campaign = post.campaign ?? null;
+	const categoryName = post.category?.name?.trim();
+	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
 		<View
@@ -1835,6 +1935,19 @@ function FeedPostCardComponent({
 							) : isUserGlobal ? (
 								<Text style={st.globalBadge}>🌍 Global</Text>
 							) : null}
+							{categoryName && catColors ? (
+								<Pressable
+									onPress={revealCategoryTip}
+									hitSlop={6}
+									accessibilityLabel={`Category: ${categoryName}`}
+									style={[st.catChip, { backgroundColor: catColors.bg }]}>
+									<Text
+										style={[st.catChipText, { color: catColors.text }]}
+										numberOfLines={1}>
+										{showCatTip ? '🏷 Category' : categoryName}
+									</Text>
+								</Pressable>
+							) : null}
 						</View>
 						{timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
 					</View>
@@ -1855,7 +1968,109 @@ function FeedPostCardComponent({
 			{post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
 
 			{/* Compare images */}
-			{compareUrls && !isBinary ? (
+			{isPoll ? (
+				<View>
+					{post.imageUrls.length > 0 ? (
+						<View style={st.pollBodyMedia}>
+							{post.imageUrls.map((url, bi) => (
+								<Image
+									key={`${post.id}-pbody-${bi}`}
+									source={{ uri: url }}
+									style={st.pollBodyImage}
+									contentFit='cover'
+									cachePolicy='memory-disk'
+								/>
+							))}
+						</View>
+					) : null}
+					<View style={st.pollOptions}>
+						{Array.from({ length: pollOptionCount }, (_, i) => {
+							const opt = pollOptions[i];
+							const stat = activeStats?.find((s) => s.index === i);
+							const pct = stat ? Math.round(stat.percentage) : 0;
+							const count = stat ? Math.round(stat.count) : 0;
+							const label = compareLabel(post, i);
+							const picked = pollPick === i;
+							const color = MULTI_SPLIT_COLORS[i % 10];
+							const thumb = opt?.imageUrl?.trim() || null;
+							const isWinner =
+								isVotingClosed &&
+								(stat?.count ?? 0) > 0 &&
+								stat?.count === pollMaxCount;
+							const isLoser = isVotingClosed && !isWinner;
+							return (
+								<Pressable
+									key={`${post.id}-poll-${i}`}
+									style={[
+										st.pollRow,
+										picked && { borderColor: color },
+										isWinner && st.pollRowWinner,
+										isLoser && st.pollRowLoser,
+									]}
+									onPress={() => handleCellTap(i)}
+									disabled={isVotingClosed}>
+									{pollShowResults ? (
+										<View
+											pointerEvents='none'
+											style={[
+												st.pollFill,
+												{
+													width: `${pct}%`,
+													backgroundColor: color,
+													opacity: picked ? 0.3 : 0.16,
+												},
+											]}
+										/>
+									) : null}
+									<View style={st.pollRowContent}>
+										{thumb ? (
+											<Image
+												source={{ uri: thumb }}
+												style={st.pollThumb}
+												contentFit='cover'
+												contentPosition={imageContentPosition(
+													opt?.imageFocalX,
+													opt?.imageFocalY,
+												)}
+												cachePolicy='memory-disk'
+											/>
+										) : (
+											<View
+												style={[
+													st.pollDot,
+													picked && {
+														borderColor: color,
+														backgroundColor: color,
+													},
+												]}
+											/>
+										)}
+										<Text style={st.pollLabel} numberOfLines={1}>
+											{isWinner ? '🥇 ' : ''}
+											{label}
+										</Text>
+										{pollShowResults ? (
+											<Text style={st.pollPct}>{pct}%</Text>
+										) : picked ? (
+											<Text style={[st.pollCheck, { color }]}>✓</Text>
+										) : null}
+										{pollShowResults ? (
+											<Pressable
+												style={[st.pollVotersChip, { borderColor: color }]}
+												onPress={() => openVoters(i)}
+												hitSlop={6}>
+												<Text style={[st.pollVotersChipText, { color }]}>
+													👥 {count}
+												</Text>
+											</Pressable>
+										) : null}
+									</View>
+								</Pressable>
+							);
+						})}
+					</View>
+				</View>
+			) : compareUrls && !isBinary ? (
 				/* ── Multi-option grid (3+ options) ── */
 				<View style={styles.multiGrid}>
 					{compareRowsWithStart.map(({ size, start }, rowIdx) => (
@@ -2039,7 +2254,7 @@ function FeedPostCardComponent({
 			) : null}
 
 			{/* Anonymous vote toggle — always visible while voting is open */}
-			{compareUrls && !isVotingClosed && isAuthenticated && (
+			{(compareUrls || isPoll) && !isVotingClosed && isAuthenticated && (
 				<View style={st.anonRow}>
 					<Text style={st.anonIcon}>👻</Text>
 					<Text style={st.anonLabel}>Vote anonymously</Text>
@@ -2053,12 +2268,14 @@ function FeedPostCardComponent({
 			)}
 
 			{/* Vote hint */}
-			{compareUrls && !isVotingClosed ? (
+			{(compareUrls || isPoll) && !isVotingClosed ? (
 				<View style={st.voteHintRow}>
 					<Text style={[st.voteHintText, hasVoted && st.voteHintRecorded]}>
 						{hasVoted
 							? '✓ Voted — tap again to unvote · tap other to switch'
-							: '👆 Tap an image to cast your vote'}
+							: isPoll
+								? '👆 Tap an option to cast your vote'
+								: '👆 Tap an image to cast your vote'}
 					</Text>
 				</View>
 			) : null}
@@ -2110,7 +2327,7 @@ function FeedPostCardComponent({
 			) : null}
 
 			{/* Multi-compare Live Split — only shown when expanded */}
-			{detailsExpanded && !isBinary && multiTotal > 0 ? (
+			{detailsExpanded && !isBinary && !isPoll && multiTotal > 0 ? (
 				<View style={st.liveSplit}>
 					<View style={st.liveSplitHeader}>
 						<Text style={st.liveSplitTitle}>LIVE SPLIT</Text>

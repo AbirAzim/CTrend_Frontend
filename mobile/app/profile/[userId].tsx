@@ -1,23 +1,33 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  LayoutAnimation,
+  type LayoutChangeEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  UIManager,
   View,
 } from "react-native";
+import type { ReactNode } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ADD_FRIEND,
   FRIENDSHIP_STATUS,
+  FRIEND_REQUESTS,
   GET_USER_PROFILE,
+  MY_FRIENDS,
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
+  USER_FRIENDS,
+  USER_VOTE_COUNT,
 } from "@ctrend/shared/graphql/friends";
 import { USER_POSTS } from "@ctrend/shared/graphql/profile";
 import { ONLINE_USER_IDS, START_DIRECT_CONVERSATION } from "@ctrend/shared/graphql/messages";
@@ -50,15 +60,42 @@ type PostThumb = {
 
 type FriendshipStatus = "FRIEND" | "PENDING_SENT" | "PENDING_RECEIVED" | "NONE";
 
+type FriendRow = {
+  id: string;
+  username?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+  profileImageUrl?: string | null;
+};
+
 type ProfileData = { getUserProfile: UserProfile };
 type StatusData = { friendshipStatus: string };
 type PostsData = { getPostsByUser: PostThumb[] };
 type OnlineData = { onlineUserIds: string[] };
 type StartDmData = { startDirectConversation: { id: string } };
+type UserFriendsData = { userFriends: FriendRow[] };
+type VoteCountData = { userVoteCount: number };
+type MyFriendsData = { myFriends: FriendRow[] };
+type RequestsData = { friendRequests: { requestedByMe: FriendRow[]; requestedMe: FriendRow[] } };
 
 const GRID_COLS = 3;
 const { width: SCREEN_W } = Dimensions.get("window");
 const THUMB_SIZE = Math.floor((SCREEN_W - 2) / GRID_COLS);
+// Thumb size when the grid lives inside a padded accordion card.
+const SCROLL_PAD = 20;
+const CARD_BODY_PAD = 12;
+const GRID_GAP = 4;
+const CARD_THUMB = Math.floor(
+  (SCREEN_W - SCROLL_PAD * 2 - CARD_BODY_PAD * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS,
+);
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function animateLayout() {
+  LayoutAnimation.configureNext(LayoutAnimation.create(180, "easeInEaseOut", "opacity"));
+}
 
 // ─── Friend action button ─────────────────────────────────────────────────────
 
@@ -171,6 +208,50 @@ function FriendButton({
   );
 }
 
+// ─── Collapsible accordion card ─────────────────────────────────────────────────
+
+function Section({
+  icon, title, subtitle, open, onToggle, colors, children, onLayout,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  open: boolean;
+  onToggle: () => void;
+  colors: ReturnType<typeof useTheme>["colors"];
+  children: ReactNode;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
+  return (
+    <View
+      style={[styles.accCard, { borderColor: colors.border, backgroundColor: colors.card }]}
+      onLayout={onLayout}
+    >
+      <Pressable
+        style={styles.accHead}
+        onPress={onToggle}
+        android_ripple={{ color: colors.accent + "11" }}
+      >
+        <View style={[styles.accIcon, { backgroundColor: colors.accent + "1a" }]}>
+          <Text style={{ fontSize: 16 }}>{icon}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.accTitle, { color: colors.text }]}>{title}</Text>
+          {subtitle ? (
+            <Text style={[styles.accSub, { color: colors.muted }]} numberOfLines={1}>{subtitle}</Text>
+          ) : null}
+        </View>
+        <View style={[styles.accChevron, { borderColor: colors.border, backgroundColor: open ? colors.accent + "14" : "transparent" }]}>
+          <Text style={{ color: open ? colors.accent : colors.muted, fontSize: 13, fontWeight: "800" }}>
+            {open ? "▾" : "▸"}
+          </Text>
+        </View>
+      </Pressable>
+      {open ? <View style={styles.accBody}>{children}</View> : null}
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function UserProfileScreen() {
@@ -216,6 +297,66 @@ export default function UserProfileScreen() {
     pollInterval: 30000,
   });
 
+  const { data: userFriendsData, loading: userFriendsLoading } = useQuery<UserFriendsData>(
+    USER_FRIENDS,
+    { variables: { userId }, skip: !userId || isOwnProfile || !isAuthenticated, fetchPolicy: "cache-and-network" },
+  );
+
+  const { data: voteCountData } = useQuery<VoteCountData>(
+    USER_VOTE_COUNT,
+    { variables: { userId }, skip: !userId || isOwnProfile || !isAuthenticated, fetchPolicy: "cache-and-network" },
+  );
+
+  // My own friends + pending-sent, to label rows in their friend list correctly.
+  const { data: myFriendsData } = useQuery<MyFriendsData>(MY_FRIENDS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-first",
+  });
+  const { data: myRequestsData } = useQuery<RequestsData>(FRIEND_REQUESTS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const [addFriendRow] = useMutation(ADD_FRIEND);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
+
+  // Accordion sections — collapsed by default for a clean first impression.
+  const [openPosts, setOpenPosts] = useState(false);
+  const [openFriends, setOpenFriends] = useState(false);
+  const [friendSearch, setFriendSearch] = useState("");
+
+  const scrollRef = useRef<ScrollView>(null);
+  const postsY = useRef(0);
+  const friendsY = useRef(0);
+
+  const togglePosts = () => { animateLayout(); setOpenPosts((v) => !v); };
+  const toggleFriends = () => { animateLayout(); setOpenFriends((v) => !v); };
+
+  // A stat tile → open its section and scroll it into view.
+  function jumpTo(which: "posts" | "friends") {
+    animateLayout();
+    if (which === "posts") setOpenPosts(true);
+    else setOpenFriends(true);
+    const yRef = which === "posts" ? postsY : friendsY;
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(yRef.current - 12, 0), animated: true });
+    }, 170);
+  }
+
+  async function sendFriendRequest(targetId: string) {
+    setAddingIds((s) => new Set(s).add(targetId));
+    try {
+      await addFriendRow({ variables: { userId: targetId } });
+      setPendingIds((s) => new Set(s).add(targetId));
+      showToast("Friend request sent ✓", "success");
+    } catch {
+      showToast("Failed to send request", "error");
+    } finally {
+      setAddingIds((s) => { const n = new Set(s); n.delete(targetId); return n; });
+    }
+  }
+
   if (isOwnProfile) {
     return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   }
@@ -226,6 +367,17 @@ export default function UserProfileScreen() {
   const posts = postsData?.getPostsByUser ?? [];
   const onlineSet = new Set(onlineData?.onlineUserIds ?? []);
   const isOnline = isFriend && Boolean(userId) && onlineSet.has(userId ?? "");
+  const userFriends = userFriendsData?.userFriends ?? [];
+  const voteCount = voteCountData?.userVoteCount ?? 0;
+  const myFriendIds = new Set((myFriendsData?.myFriends ?? []).map((f) => f.id));
+  const mySentIds = new Set((myRequestsData?.friendRequests?.requestedByMe ?? []).map((f) => f.id));
+  const friendQuery = friendSearch.trim().toLowerCase();
+  const shownFriends = friendQuery
+    ? userFriends.filter((f) =>
+        (f.displayName ?? "").toLowerCase().includes(friendQuery) ||
+        (f.username ?? "").toLowerCase().includes(friendQuery) ||
+        (f.email ?? "").toLowerCase().includes(friendQuery))
+    : userFriends;
 
   const name = profile?.displayName?.trim() || profile?.username || "User";
   const initial = name.slice(0, 1).toUpperCase();
@@ -280,6 +432,7 @@ export default function UserProfileScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: insets.bottom + 32 },
@@ -360,55 +513,180 @@ export default function UserProfileScreen() {
             </View>
           )}
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Posts grid */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Posts</Text>
-
-          {postsLoading && posts.length === 0 ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={colors.accent} />
+          {/* Stats — compares & friends jump to their sections */}
+          {isAuthenticated && (
+            <View style={[styles.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Pressable style={styles.stat} onPress={() => jumpTo("posts")} android_ripple={{ color: colors.accent + "18" }}>
+                <Text style={[styles.statValue, { color: colors.accent }]}>{posts.length}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>compares ›</Text>
+              </Pressable>
+              <View style={[styles.statSep, { backgroundColor: colors.border }]} />
+              <View style={styles.stat}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{voteCount}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>votes</Text>
+              </View>
+              <View style={[styles.statSep, { backgroundColor: colors.border }]} />
+              <Pressable style={styles.stat} onPress={() => jumpTo("friends")} android_ripple={{ color: colors.accent + "18" }}>
+                <Text style={[styles.statValue, { color: colors.accent }]}>{userFriends.length}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>friends ›</Text>
+              </Pressable>
             </View>
-          ) : posts.length === 0 ? (
-            <View style={[styles.center, { paddingVertical: 32 }]}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
-              <Text style={[styles.emptyText, { color: colors.muted }]}>No posts yet</Text>
-            </View>
-          ) : (
-            <View style={styles.grid}>
-              {posts.map((post) => {
-                const thumb = post.imageUrls?.[0];
-                return (
-                  <Pressable
-                    key={post.id}
-                    style={styles.gridItem}
-                    onPress={() => router.push(`/post/${post.id}` as `/${string}`)}
-                  >
-                    {thumb ? (
-                      <Image
-                        source={{ uri: thumb }}
-                        style={styles.gridThumb}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                      />
-                    ) : (
-                      <View style={[styles.gridThumb, { backgroundColor: colors.section, alignItems: "center", justifyContent: "center" }]}>
-                        <Text style={{ color: colors.muted, fontSize: 20 }}>🖼</Text>
-                      </View>
-                    )}
-                    {/* vote count overlay */}
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridOverlayText}>
-                        {post.upvoteCount + post.downvoteCount > 0
-                          ? `${post.upvoteCount + post.downvoteCount} votes`
-                          : ""}
+          )}
+
+          {/* Compares (collapsible) */}
+          {isAuthenticated && (
+            <Section
+              icon="📊"
+              title="Compares"
+              subtitle={posts.length > 0 ? `${posts.length} compare${posts.length === 1 ? "" : "s"} to explore` : "No compares yet"}
+              open={openPosts}
+              onToggle={togglePosts}
+              colors={colors}
+              onLayout={(e) => { postsY.current = e.nativeEvent.layout.y; }}
+            >
+              {postsLoading && posts.length === 0 ? (
+                <View style={[styles.center, { paddingVertical: 20 }]}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              ) : posts.length === 0 ? (
+                <View style={[styles.center, { paddingVertical: 24 }]}>
+                  <Text style={{ fontSize: 30, marginBottom: 6 }}>📭</Text>
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>No compares yet</Text>
+                </View>
+              ) : (
+                <View style={styles.gridCard}>
+                  {posts.map((post) => {
+                    const thumb = post.imageUrls?.[0];
+                    const votes = post.upvoteCount + post.downvoteCount;
+                    return (
+                      <Pressable
+                        key={post.id}
+                        style={styles.gridItemCard}
+                        onPress={() => router.push(`/post/${post.id}` as `/${string}`)}
+                      >
+                        {thumb ? (
+                          <Image
+                            source={{ uri: thumb }}
+                            style={styles.gridThumb}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                          />
+                        ) : (
+                          <View style={[styles.gridThumb, { backgroundColor: colors.section, alignItems: "center", justifyContent: "center" }]}>
+                            <Text style={{ color: colors.muted, fontSize: 20 }}>🖼</Text>
+                          </View>
+                        )}
+                        {votes > 0 && (
+                          <View style={styles.gridOverlay}>
+                            <Text style={styles.gridOverlayText}>{votes} votes</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </Section>
+          )}
+
+          {/* Friends (collapsible + search) */}
+          {isAuthenticated && (
+            <Section
+              icon="👥"
+              title="Friends"
+              subtitle={userFriends.length > 0 ? `${userFriends.length} friend${userFriends.length === 1 ? "" : "s"}` : "No friends yet"}
+              open={openFriends}
+              onToggle={toggleFriends}
+              colors={colors}
+              onLayout={(e) => { friendsY.current = e.nativeEvent.layout.y; }}
+            >
+              {userFriendsLoading && userFriends.length === 0 ? (
+                <View style={[styles.center, { paddingVertical: 20 }]}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              ) : userFriends.length === 0 ? (
+                <View style={[styles.center, { paddingVertical: 24 }]}>
+                  <Text style={{ fontSize: 28, marginBottom: 6 }}>👥</Text>
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>No friends to show yet</Text>
+                </View>
+              ) : (
+                <View style={{ alignSelf: "stretch" }}>
+                  {/* search */}
+                  <View style={[styles.searchWrap, { backgroundColor: colors.section, borderColor: colors.border }]}>
+                    <Text style={{ color: colors.muted, fontSize: 14 }}>🔍</Text>
+                    <TextInput
+                      style={[styles.searchInput, { color: colors.text }]}
+                      placeholder="Search friends"
+                      placeholderTextColor={colors.muted}
+                      value={friendSearch}
+                      onChangeText={setFriendSearch}
+                      autoCapitalize="none"
+                    />
+                    {friendSearch.length > 0 ? (
+                      <Pressable onPress={() => setFriendSearch("")} hitSlop={8}>
+                        <Text style={{ color: colors.muted, fontSize: 15 }}>✕</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  {shownFriends.length === 0 ? (
+                    <View style={[styles.center, { paddingVertical: 18 }]}>
+                      <Text style={[styles.emptyText, { color: colors.muted }]}>
+                        No friends match “{friendSearch.trim()}”
                       </Text>
                     </View>
-                  </Pressable>
-                );
-              })}
-            </View>
+                  ) : shownFriends.map((f) => {
+                    const fName = f.displayName?.trim() || f.username?.trim() || "User";
+                    const fInitial = fName.slice(0, 1).toUpperCase();
+                    const fAvatar = normalizeProfileImageUrl(f.profileImageUrl);
+                    const isMe = Boolean(user && f.id === user.id);
+                    const alreadyFriend = myFriendIds.has(f.id);
+                    const requested = mySentIds.has(f.id) || pendingIds.has(f.id);
+                    return (
+                      <View key={f.id} style={[styles.friendRow, { borderBottomColor: colors.border }]}>
+                        <Pressable
+                          style={styles.friendRowMain}
+                          onPress={() => router.push(`/profile/${f.id}` as `/${string}`)}
+                        >
+                          <View style={styles.friendAvatarWrap}>
+                            {fAvatar ? (
+                              <Image source={{ uri: fAvatar }} style={styles.friendAvatar} contentFit="cover" cachePolicy="memory-disk" />
+                            ) : (
+                              <View style={[styles.friendAvatar, styles.avatarFallback]}>
+                                <Text style={styles.friendAvatarInitial}>{fInitial}</Text>
+                              </View>
+                            )}
+                            {onlineSet.has(f.id) && <View style={styles.friendOnlineDot} />}
+                          </View>
+                          <Text style={[styles.friendName, { color: colors.text }]} numberOfLines={1}>{fName}</Text>
+                        </Pressable>
+                        {!isMe && (
+                          alreadyFriend ? (
+                            <View style={[styles.friendAddBtn, { borderColor: colors.border, backgroundColor: colors.section }]}>
+                              <Text style={[styles.friendAddText, { color: colors.muted }]}>✓ Friend</Text>
+                            </View>
+                          ) : requested ? (
+                            <View style={[styles.friendAddBtn, { borderColor: colors.border, backgroundColor: colors.section }]}>
+                              <Text style={[styles.friendAddText, { color: colors.muted }]}>Requested</Text>
+                            </View>
+                          ) : (
+                            <Pressable
+                              style={[styles.friendAddBtn, { backgroundColor: colors.accent }]}
+                              onPress={() => void sendFriendRequest(f.id)}
+                              disabled={addingIds.has(f.id)}
+                            >
+                              {addingIds.has(f.id)
+                                ? <ActivityIndicator size="small" color="#fff" />
+                                : <Text style={[styles.friendAddText, { color: "#fff" }]}>+ Add</Text>}
+                            </Pressable>
+                          )
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </Section>
           )}
         </ScrollView>
       )}
@@ -507,6 +785,88 @@ const styles = StyleSheet.create({
   },
   friendBtnText: { fontSize: 14, fontWeight: "700" },
   divider: { width: "100%", height: StyleSheet.hairlineWidth, marginBottom: 16 },
+  statsRow: {
+    flexDirection: "row",
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "space-around",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  stat: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "800" },
+  statLabel: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+  statSep: { width: StyleSheet.hairlineWidth, height: 28 },
+  friendsSection: { alignSelf: "stretch", marginTop: 20 },
+  friendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  friendRowMain: { flex: 1, flexDirection: "row", alignItems: "center" },
+  friendAvatarWrap: { position: "relative", marginRight: 12 },
+  friendAvatar: { width: 44, height: 44, borderRadius: 22 },
+  friendAvatarInitial: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  friendOnlineDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: "#22c55e",
+    borderWidth: 2,
+    borderColor: "#0a0a0a",
+  },
+  friendName: { flex: 1, fontSize: 15, fontWeight: "700" },
+  friendAddBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    minWidth: 76,
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  friendAddText: { fontSize: 13, fontWeight: "700" },
+  // Accordion card
+  accCard: {
+    alignSelf: "stretch",
+    borderWidth: 1,
+    borderRadius: 16,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  accHead: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  accIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  accTitle: { fontSize: 15.5, fontWeight: "800" },
+  accSub: { fontSize: 11.5, marginTop: 2 },
+  accChevron: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  accBody: { paddingHorizontal: CARD_BODY_PAD, paddingBottom: 12 },
+  // Card-fitted compares grid
+  gridCard: { flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP },
+  gridItemCard: {
+    width: CARD_THUMB,
+    height: CARD_THUMB,
+    borderRadius: 10,
+    overflow: "hidden",
+    position: "relative",
+  },
+  // Friends search
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    marginBottom: 12,
+  },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "800",

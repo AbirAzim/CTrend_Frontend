@@ -5,6 +5,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GOOGLE_LOGIN, LOGIN } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { PasswordField } from "../components/PasswordField";
 import {
   getNativeGoogleIdToken,
   isNativeGoogleAuthAvailable,
@@ -99,8 +100,7 @@ export function LoginPage() {
           </label>
           <label className="field">
             <span>Password</span>
-            <input
-              type="password"
+            <PasswordField
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

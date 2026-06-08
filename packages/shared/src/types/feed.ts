@@ -4,10 +4,15 @@ export type PostStatus = "published" | "scheduled";
 
 export type FeedPostType = "user" | "system" | "org";
 
+/** Post layout: `compare` = side-by-side images, `poll` = stacked option rows. */
+export type PostFormat = "compare" | "poll";
+
 export type FeedPostView = {
   id: string;
   /** API post type — `system` = platform-wide Ke Jitbe polls. */
   postType?: FeedPostType | null;
+  /** Post layout format (defaults to `compare` when absent). */
+  format?: PostFormat | null;
   authorId?: string | null;
   authorUsername: string;
   authorDisplayName: string | null;
@@ -60,11 +65,20 @@ export type FeedPostView = {
   /** Option titles + per-option image focal from API `options` (same order as voting indices / compare columns). */
   postOptions?: {
     label: string;
+    imageUrl?: string | null;
     imageFocalX?: number | null;
     imageFocalY?: number | null;
   }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  /** Post category shown as a chip on the card. */
+  category?: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    /** Admin-assigned accent color (hex); falls back to a derived color. */
+    color?: string | null;
+  } | null;
   /** Campaign this compare is linked to (Phase 22). */
   campaign?: FeedPostCampaignView | null;
   /** Random prize-draw winner after voting closes (Phase 24). */

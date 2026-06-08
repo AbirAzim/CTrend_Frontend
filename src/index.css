@@ -2749,6 +2749,53 @@ a.cx-friend-avatar:hover {
   font-size: 0.66rem;
   color: var(--ig-muted);
 }
+/* Per-category color tag after the post-type badge. `--cat-rgb` is set inline
+   per category (deterministic hue, or admin-assigned). color-mix keeps the tint
+   readable in BOTH themes: light = darker text on faint tint, dark = lighter
+   text on a stronger tint. Falls back to slate when no category color. */
+.cx-post-category {
+  --cat-rgb: 100 116 139;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, rgb(var(--cat-rgb)) 13%, transparent);
+  color: color-mix(in srgb, rgb(var(--cat-rgb)) 82%, #0f172a);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: default;
+}
+:root[data-theme="dark"] .cx-post-category {
+  background: color-mix(in srgb, rgb(var(--cat-rgb)) 26%, transparent);
+  color: color-mix(in srgb, rgb(var(--cat-rgb)) 72%, #ffffff);
+}
+.cx-post-category::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--ig-text);
+  color: var(--ig-surface);
+  font-size: 0.6rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 5;
+}
+.cx-post-category:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 
 .ig-more-btn {
   border: none;
@@ -5369,6 +5416,23 @@ a.cx-friend-avatar:hover {
 }
 
 .cx-fb-bubble-author:hover {
+  text-decoration: underline;
+}
+
+.cx-fb-bubble-replying-to {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgb(var(--cx-accent-rgb) / 0.95);
+  margin-bottom: 2px;
+}
+
+.cx-fb-bubble-replying-to a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cx-fb-bubble-replying-to a:hover {
   text-decoration: underline;
 }
 
@@ -8018,6 +8082,144 @@ a.cx-friend-avatar:hover {
   cursor: wait;
 }
 
+/* ── Scheduled tab inside the profile content card ── */
+.cx-scheduled-list {
+  list-style: none;
+  margin: 0;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cx-scheduled-card {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  background: var(--ig-card);
+  border: 1px solid var(--ig-border);
+  border-radius: var(--cx-radius-lg, 14px);
+  overflow: hidden;
+}
+
+.cx-scheduled-card-media {
+  flex-shrink: 0;
+  width: 96px;
+  display: flex;
+}
+
+.cx-scheduled-card-img {
+  flex: 1;
+  min-width: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.cx-scheduled-card-img + .cx-scheduled-card-img {
+  border-left: 2px solid var(--ig-white);
+}
+
+.cx-scheduled-card-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+  color: var(--ig-muted);
+}
+
+.cx-scheduled-card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cx-scheduled-card-caption {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--cx-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cx-scheduled-option-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cx-scheduled-option-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  color: var(--cx-accent-deep);
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.18);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-scheduled-countdown {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--cx-ink);
+}
+
+.cx-scheduled-date {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--ig-muted);
+  font-weight: 600;
+}
+
+.cx-scheduled-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cx-scheduled-edit-btn,
+.cx-scheduled-cancel-btn {
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: var(--cx-radius-pill);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cx-scheduled-edit-btn {
+  color: var(--cx-accent-deep);
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.25);
+}
+
+.cx-scheduled-edit-btn:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.18);
+}
+
+.cx-scheduled-cancel-btn {
+  color: #e53e3e;
+  background: rgb(229 62 62 / 0.08);
+  border: 1.5px solid rgb(229 62 62 / 0.25);
+}
+
+.cx-scheduled-cancel-btn:hover {
+  background: rgb(229 62 62 / 0.16);
+}
+
 /* ── App sound preferences (profile-aligned) ── */
 .cx-profile-quick-link {
   display: flex;
@@ -9587,7 +9789,7 @@ a.cx-action-chip {
 
 .cx-profile-stats-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin: 14px 0;
   max-width: 100%;
@@ -9632,6 +9834,142 @@ a.cx-action-chip {
 .cx-profile-stat--ghost strong {
   color: var(--ig-muted);
   font-size: 1.1rem;
+}
+
+/* Tappable stat (Friends → jumps to People) */
+.cx-profile-stat--btn {
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cx-profile-stat--btn:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--cx-accent-rgb) / 0.45);
+  box-shadow: 0 4px 14px rgb(var(--cx-accent-rgb) / 0.16);
+}
+
+.cx-profile-stat--btn span {
+  color: var(--cx-accent);
+}
+
+/* "+N more" interest expander */
+.cx-profile-interest-more {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+  background: transparent;
+  border: 1px dashed var(--ig-border);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.cx-profile-interest-more:hover {
+  color: var(--cx-accent);
+  border-color: rgb(var(--cx-accent-rgb) / 0.5);
+}
+
+/* ── Collapsible section toggle (Your content / People) ── */
+.cx-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  border-radius: 0;
+  transition: background 0.15s ease;
+}
+
+.cx-section-toggle:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.04);
+}
+
+.cx-section-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.cx-section-toggle-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cx-section-toggle-text strong {
+  font-family: var(--cx-font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ig-text);
+}
+
+.cx-section-toggle-badge {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--cx-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cx-section-toggle-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--ig-border);
+  color: var(--ig-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.cx-section-toggle--open .cx-section-toggle-chevron {
+  color: var(--cx-accent);
+  border-color: rgb(var(--cx-accent-rgb) / 0.4);
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+}
+
+/* Friends empty-state CTA */
+.cx-conn-empty--cta {
+  gap: 6px;
+}
+
+.cx-conn-empty-title {
+  margin: 4px 0 0;
+  font-family: var(--cx-font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ig-text);
+}
+
+.cx-conn-find-btn {
+  margin-top: 10px;
 }
 
 .cx-profile-actions {
@@ -10950,6 +11288,67 @@ a.cx-profile-btn-accent {
   font-weight: 700;
 }
 
+/* Poll posts have no hero image — give them a branded preview tile instead
+   of the empty camera placeholder. */
+.cx-kept-card-media--poll {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--cx-accent-rgb) / 0.18),
+    rgb(var(--cx-accent-rgb) / 0.06) 60%,
+    rgb(var(--cx-ink-rgb) / 0.08)
+  );
+}
+.cx-poll-card-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+}
+.cx-poll-card-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.16);
+  color: rgb(var(--cx-accent-rgb));
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cx-poll-card-preview-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  max-width: 130px;
+}
+.cx-poll-card-preview-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.5);
+}
+.cx-poll-card-preview-bar:nth-child(1) {
+  width: 90%;
+  background: rgb(var(--cx-accent-rgb) / 0.65);
+}
+.cx-poll-card-preview-bar:nth-child(2) {
+  width: 62%;
+}
+.cx-poll-card-preview-bar:nth-child(3) {
+  width: 40%;
+  background: rgb(var(--cx-accent-rgb) / 0.35);
+}
+.cx-poll-card-preview-count {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+}
+
 .cx-kept-card-info {
   padding: 8px 10px 10px;
 }
@@ -11489,6 +11888,43 @@ a.cx-profile-btn-accent {
 
 .cx-edit-locked-note {
   margin: -2px 0 8px;
+}
+
+/* Poll edit: compact rows (label-first, small locked thumbnail) */
+.cx-edit-item--poll {
+  align-items: center;
+}
+
+.cx-edit-item--poll .cx-edit-item-thumb {
+  width: 56px;
+  height: 56px;
+}
+
+.cx-edit-item--poll .cx-edit-item-placeholder {
+  font-size: 1.3rem;
+}
+
+.cx-edit-poll-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cx-edit-poll-photo {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgb(var(--cx-ink-rgb) / 0.07);
+}
+
+.cx-edit-poll-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .cx-edit-toggle-row {
@@ -12739,6 +13175,34 @@ a.cx-profile-btn-accent {
 .admin-table-email {
   font-size: 12px;
   color: var(--ig-text-secondary, #6b7280);
+}
+
+/* Category color picker cell */
+.admin-cat-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-cat-color-input {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ig-border);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.admin-cat-color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+.admin-cat-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+.admin-cat-color-input:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .admin-remove-btn {
@@ -18871,3 +19335,407 @@ a.cx-profile-btn-accent {
   background: rgb(var(--cx-accent-rgb) / 0.22);
 }
 
+
+/* ===== Poll format — stacked option rows (see FeedPostCard) ===== */
+.cx-poll-body-media {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cx-poll-body-image {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.cx-poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 4px;
+}
+/* Per-option accent — each poll row gets its own colour, like compare bars.
+   Falls back to the global accent if no --c{n} class is present. */
+.cx-poll-option--c0 { --cx-opt-rgb: 16 185 129; }
+.cx-poll-option--c1 { --cx-opt-rgb: 249 115 22; }
+.cx-poll-option--c2 { --cx-opt-rgb: 139 92 246; }
+.cx-poll-option--c3 { --cx-opt-rgb: 244 63 94; }
+.cx-poll-option--c4 { --cx-opt-rgb: 245 158 11; }
+.cx-poll-option--c5 { --cx-opt-rgb: 6 182 212; }
+.cx-poll-option--c6 { --cx-opt-rgb: 101 163 13; }
+.cx-poll-option--c7 { --cx-opt-rgb: 13 148 136; }
+.cx-poll-option--c8 { --cx-opt-rgb: 2 132 199; }
+.cx-poll-option--c9 { --cx-opt-rgb: 162 28 175; }
+.cx-poll-option {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1.5px solid var(--ig-border);
+  border-radius: 12px;
+  background: var(--ig-surface);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.cx-poll-option:disabled {
+  cursor: default;
+}
+.cx-poll-option:not(:disabled):hover {
+  border-color: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.55);
+}
+.cx-poll-option:not(:disabled):active {
+  transform: scale(0.99);
+}
+.cx-poll-option--picked {
+  border-color: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)));
+  box-shadow: 0 0 0 1px rgb(var(--cx-opt-rgb, var(--cx-accent-rgb))) inset;
+}
+.cx-poll-option-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.16);
+  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+  z-index: 0;
+}
+.cx-poll-option--picked .cx-poll-option-fill {
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.3);
+}
+.cx-poll-option-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+.cx-poll-option-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.cx-poll-option-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ig-border);
+  flex: 0 0 auto;
+}
+.cx-poll-option-radio--on {
+  border-color: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)));
+  background: radial-gradient(circle at center, rgb(var(--cx-opt-rgb, var(--cx-accent-rgb))) 0 5px, transparent 6px);
+}
+.cx-poll-option-label {
+  flex: 1 1 auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ig-text);
+  overflow-wrap: anywhere;
+}
+.cx-poll-option-pct {
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ig-text);
+}
+.cx-poll-option-check {
+  flex: 0 0 auto;
+  color: rgb(var(--cx-accent-rgb));
+  font-weight: 800;
+}
+.cx-poll-option--winner {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b inset;
+}
+.cx-poll-option--winner .cx-poll-option-fill {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.26), rgba(245, 158, 11, 0.14));
+}
+.cx-poll-option--loser {
+  opacity: 0.62;
+}
+.cx-poll-option-medal {
+  font-size: 13px;
+}
+.cx-poll-option--just-voted {
+  animation: cxPollPop 0.35s ease;
+}
+@keyframes cxPollPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+.cx-poll-option-wrap {
+  position: relative;
+}
+/* Reserve room on the right of the row so the % and the voters chip have
+   clear separation and never collide once results are shown. */
+.cx-poll-option-wrap--result .cx-poll-option-content {
+  padding-right: 74px;
+}
+/* Voter chip — user icon + live voter count, sits separated from the % and
+   opens the full voters list on tap. */
+.cx-poll-see-voters {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.4);
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  color: rgb(var(--cx-accent-rgb));
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.cx-poll-see-voters-count {
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.cx-poll-see-voters:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.16);
+  border-color: rgb(var(--cx-accent-rgb) / 0.6);
+}
+.cx-poll-see-voters:active {
+  transform: translateY(-50%) scale(0.96);
+}
+
+/* ===== Create page — format switcher + poll editor ===== */
+.ig-format-switch {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  margin-bottom: 14px;
+}
+.ig-format-switch-btn {
+  flex: 1 1 0;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ig-text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.ig-format-switch-btn--active {
+  background: var(--ig-surface);
+  color: var(--ig-text);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+.ig-poll-edit,
+.ig-poll-body-edit {
+  margin-bottom: 14px;
+}
+.ig-poll-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ig-poll-yesno-btn {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1.5px solid var(--ig-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ig-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ig-poll-yesno-btn:hover {
+  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+}
+.ig-poll-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ig-poll-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ig-poll-edit-thumb,
+.ig-poll-body-thumb {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--ig-border);
+  background: var(--ig-surface) center / cover no-repeat;
+  color: var(--ig-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ig-poll-edit-thumb--filled,
+.ig-poll-body-thumb--filled {
+  border-style: solid;
+}
+.ig-poll-edit-thumb-plus {
+  font-size: 20px;
+  line-height: 1;
+}
+.ig-poll-edit-label-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1.5px solid var(--ig-border);
+  border-radius: 10px;
+  background: var(--ig-surface);
+  color: var(--ig-text);
+  font-size: 14px;
+}
+.ig-poll-edit-remove,
+.ig-poll-body-remove {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgb(244 63 94 / 0.12);
+  color: #f43f5e;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ig-poll-body-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.ig-poll-body-cell {
+  position: relative;
+}
+.ig-poll-body-thumb {
+  width: 84px;
+  height: 84px;
+}
+.ig-poll-body-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+}
+.ig-poll-body-add {
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--ig-border);
+  background: transparent;
+  color: var(--ig-text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ig-poll-body-add span:first-child {
+  font-size: 20px;
+}
+
+/* Auto-linked URLs inside post captions (see lib/linkify). */
+.cx-post-link {
+  color: rgb(var(--cx-accent-rgb));
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.cx-post-link:hover {
+  text-decoration: underline;
+}
+
+/* ===== Create page — Friends / Global audience switch ===== */
+.ig-audience-switch {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ig-audience-option {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 11px 12px;
+  border: 1.5px solid var(--ig-border);
+  border-radius: 12px;
+  background: var(--ig-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.ig-audience-option:hover {
+  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+}
+.ig-audience-option--active {
+  border-color: rgb(var(--cx-accent-rgb));
+  box-shadow: 0 0 0 1px rgb(var(--cx-accent-rgb)) inset;
+  background: rgb(var(--cx-accent-rgb) / 0.06);
+}
+.ig-audience-option-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ig-text);
+}
+.ig-audience-option-sub {
+  font-size: 12px;
+  color: var(--ig-text-secondary);
+  line-height: 1.3;
+}
+
+/* ===== Password field with show/hide toggle (login + signup) ===== */
+.cx-password-field {
+  position: relative;
+  display: block;
+}
+.cx-password-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 2.6rem;
+}
+.cx-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ig-text-secondary, #6b7280);
+  cursor: pointer;
+  border-radius: 0.375rem;
+}
+.cx-password-toggle:hover {
+  color: var(--ig-text, #111);
+}
+.cx-password-toggle:focus-visible {
+  outline: 2px solid rgb(var(--cx-accent-rgb) / 0.45);
+  outline-offset: 1px;
+}
