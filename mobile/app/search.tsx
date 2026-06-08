@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GLOBAL_SEARCH } from "@ctrend/shared/graphql/search";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -117,7 +118,13 @@ function SectionHeader({ label, colors }: { label: string; colors: ReturnType<ty
 
 export default function SearchScreen() {
   const { colors } = useTheme();
+  const { isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
+
+  // Guard against deep links — search is signed-in only.
+  useEffect(() => {
+    if (!isAuthenticated) router.replace("/auth/login");
+  }, [isAuthenticated]);
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
