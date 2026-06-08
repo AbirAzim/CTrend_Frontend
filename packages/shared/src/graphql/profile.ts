@@ -68,6 +68,7 @@ export const MY_VOTED_POSTS = gql`
         id
         name
         slug
+        color
       }
     }
   }
@@ -112,6 +113,7 @@ export const USER_POSTS = gql`
         id
         name
         slug
+        color
       }
     }
   }

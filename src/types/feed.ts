@@ -75,6 +75,14 @@ export type FeedPostView = {
   }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  /** Post category (e.g. Sports, Tech) shown as a chip on the card. */
+  category?: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    /** Admin-assigned accent color (hex); falls back to a derived color. */
+    color?: string | null;
+  } | null;
   campaign?: FeedPostCampaignView | null;
   voteWinner?: FeedPostVoteWinnerView | null;
 };

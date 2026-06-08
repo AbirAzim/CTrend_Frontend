@@ -73,6 +73,12 @@ export const FEED_POSTS = gql`
         percentage
       }
       ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
+      }
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
@@ -119,6 +125,12 @@ export const GET_POST_BY_ID = gql`
         percentage
       }
       ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
+      }
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
@@ -227,6 +239,7 @@ export const UPDATE_POST = gql`
         id
         name
         slug
+        color
       }
       isVotingOpen
       votingEndsAt
@@ -286,6 +299,8 @@ export const MY_SCHEDULED_POSTS = gql`
       category {
         id
         name
+        slug
+        color
       }
       status
       scheduledAt
@@ -306,6 +321,8 @@ export const CATEGORIES = gql`
     categories: getAllCategories {
       id
       name
+      slug
+      color
     }
   }
 `;
@@ -376,8 +393,15 @@ export const POST_UPDATED = gql`
         id
         name
         slug
+        color
       }
       ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
+      }
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }

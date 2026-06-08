@@ -2749,6 +2749,53 @@ a.cx-friend-avatar:hover {
   font-size: 0.66rem;
   color: var(--ig-muted);
 }
+/* Per-category color tag after the post-type badge. `--cat-rgb` is set inline
+   per category (deterministic hue, or admin-assigned). color-mix keeps the tint
+   readable in BOTH themes: light = darker text on faint tint, dark = lighter
+   text on a stronger tint. Falls back to slate when no category color. */
+.cx-post-category {
+  --cat-rgb: 100 116 139;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, rgb(var(--cat-rgb)) 13%, transparent);
+  color: color-mix(in srgb, rgb(var(--cat-rgb)) 82%, #0f172a);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: default;
+}
+:root[data-theme="dark"] .cx-post-category {
+  background: color-mix(in srgb, rgb(var(--cat-rgb)) 26%, transparent);
+  color: color-mix(in srgb, rgb(var(--cat-rgb)) 72%, #ffffff);
+}
+.cx-post-category::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--ig-text);
+  color: var(--ig-surface);
+  font-size: 0.6rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 5;
+}
+.cx-post-category:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 
 .ig-more-btn {
   border: none;
@@ -12817,6 +12864,34 @@ a.cx-profile-btn-accent {
 .admin-table-email {
   font-size: 12px;
   color: var(--ig-text-secondary, #6b7280);
+}
+
+/* Category color picker cell */
+.admin-cat-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-cat-color-input {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ig-border);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.admin-cat-color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+.admin-cat-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+.admin-cat-color-input:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .admin-remove-btn {

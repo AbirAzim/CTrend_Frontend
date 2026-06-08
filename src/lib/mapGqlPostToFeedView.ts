@@ -76,6 +76,12 @@ export function mapGqlPostToFeedView(p: {
   }> | null;
   status?: string | null;
   scheduledAt?: string | null;
+  category?: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    color?: string | null;
+  } | null;
   campaign?: {
     id: string;
     name: string;
@@ -168,6 +174,14 @@ export function mapGqlPostToFeedView(p: {
     optionStats,
     postOptions,
     compareOptionLabels: null,
+    category: p.category
+      ? {
+          id: p.category.id,
+          name: p.category.name,
+          slug: p.category.slug ?? null,
+          color: p.category.color ?? null,
+        }
+      : null,
     campaign: p.campaign
       ? {
           id: p.campaign.id,
