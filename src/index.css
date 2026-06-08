@@ -9789,7 +9789,7 @@ a.cx-action-chip {
 
 .cx-profile-stats-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin: 14px 0;
   max-width: 100%;
@@ -9834,6 +9834,142 @@ a.cx-action-chip {
 .cx-profile-stat--ghost strong {
   color: var(--ig-muted);
   font-size: 1.1rem;
+}
+
+/* Tappable stat (Friends → jumps to People) */
+.cx-profile-stat--btn {
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cx-profile-stat--btn:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--cx-accent-rgb) / 0.45);
+  box-shadow: 0 4px 14px rgb(var(--cx-accent-rgb) / 0.16);
+}
+
+.cx-profile-stat--btn span {
+  color: var(--cx-accent);
+}
+
+/* "+N more" interest expander */
+.cx-profile-interest-more {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+  background: transparent;
+  border: 1px dashed var(--ig-border);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.cx-profile-interest-more:hover {
+  color: var(--cx-accent);
+  border-color: rgb(var(--cx-accent-rgb) / 0.5);
+}
+
+/* ── Collapsible section toggle (Your content / People) ── */
+.cx-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  border-radius: 0;
+  transition: background 0.15s ease;
+}
+
+.cx-section-toggle:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.04);
+}
+
+.cx-section-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.cx-section-toggle-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cx-section-toggle-text strong {
+  font-family: var(--cx-font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ig-text);
+}
+
+.cx-section-toggle-badge {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--cx-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cx-section-toggle-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--ig-border);
+  color: var(--ig-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.cx-section-toggle--open .cx-section-toggle-chevron {
+  color: var(--cx-accent);
+  border-color: rgb(var(--cx-accent-rgb) / 0.4);
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+}
+
+/* Friends empty-state CTA */
+.cx-conn-empty--cta {
+  gap: 6px;
+}
+
+.cx-conn-empty-title {
+  margin: 4px 0 0;
+  font-family: var(--cx-font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ig-text);
+}
+
+.cx-conn-find-btn {
+  margin-top: 10px;
 }
 
 .cx-profile-actions {
