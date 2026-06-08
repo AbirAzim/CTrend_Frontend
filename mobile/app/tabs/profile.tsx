@@ -1,20 +1,24 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
+  LayoutAnimation,
+  LayoutChangeEvent,
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,8 +45,16 @@ import ProfileCompareCard from "../../components/ProfileCompareCard";
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const CARD_W = Math.floor((SCREEN_W - 38) / 2); // 2×14 padding + 10 gap
 const TAB_BAR_H = 64 + 14;
-const SECTION_H = Math.round(SCREEN_H * 0.55);
-const PEOPLE_H = Math.round(SCREEN_H * 0.38);
+const SECTION_H = Math.round(SCREEN_H * 0.52);
+const PEOPLE_H = Math.round(SCREEN_H * 0.4);
+
+// Smooth height animation when expanding/collapsing accordion sections.
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+function animateLayout() {
+  LayoutAnimation.configureNext(LayoutAnimation.create(180, "easeInEaseOut", "opacity"));
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -143,6 +155,49 @@ function PersonRow({ person, actionLoading, colors, rightSlot }: {
   );
 }
 
+// ─── Collapsible section (accordion) ────────────────────────────────────────────
+
+function Section({
+  icon, title, subtitle, open, onToggle, colors, children, onLayout, badge,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  open: boolean;
+  onToggle: () => void;
+  colors: ReturnType<typeof useTheme>["colors"];
+  children: ReactNode;
+  onLayout?: (e: LayoutChangeEvent) => void;
+  badge?: number;
+}) {
+  return (
+    <View style={[st.section, { borderTopColor: colors.border }]} onLayout={onLayout}>
+      <Pressable style={st.sectionHead} onPress={onToggle} android_ripple={{ color: colors.accent + "11" }}>
+        <View style={[st.sectionIcon, { backgroundColor: colors.accent + "1a" }]}>
+          <Text style={{ fontSize: 16 }}>{icon}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={[st.sectionTitle, { color: colors.text }]}>{title}</Text>
+            {badge != null && badge > 0 ? (
+              <View style={[st.sectionBadge, { backgroundColor: colors.accent }]}>
+                <Text style={st.sectionBadgeText}>{badge > 99 ? "99+" : badge}</Text>
+              </View>
+            ) : null}
+          </View>
+          {subtitle ? <Text style={[st.sectionSub, { color: colors.muted }]} numberOfLines={1}>{subtitle}</Text> : null}
+        </View>
+        <View style={[st.sectionChevron, { borderColor: colors.border, backgroundColor: open ? colors.accent + "14" : "transparent" }]}>
+          <Text style={{ color: open ? colors.accent : colors.muted, fontSize: 13, fontWeight: "800" }}>
+            {open ? "▾" : "▸"}
+          </Text>
+        </View>
+      </Pressable>
+      {open ? <View style={st.sectionBody}>{children}</View> : null}
+    </View>
+  );
+}
+
 // ─── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
@@ -179,6 +234,29 @@ export default function ProfileScreen() {
   const [peopleTab, setPeopleTab] = useState<"friends" | "received" | "sent" | "suggestions">("friends");
   const [search, setSearch] = useState("");
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
+
+  // Accordion open/close state — everything collapsed by default for a clean,
+  // uncluttered first impression. Users expand what they want to see.
+  const [openContent, setOpenContent] = useState(false);
+  const [openPeople, setOpenPeople] = useState(false);
+  const [openLegal, setOpenLegal] = useState(false);
+  const [showAllInterests, setShowAllInterests] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const peopleY = useRef(0);
+
+  const toggleContent = () => { animateLayout(); setOpenContent((v) => !v); };
+  const toggleLegal = () => { animateLayout(); setOpenLegal((v) => !v); };
+  const togglePeople = () => { animateLayout(); setOpenPeople((v) => !v); };
+
+  // Friends stat / count → open People, focus the Friends tab, scroll it into view.
+  function jumpToFriends() {
+    setPeopleTab("friends");
+    animateLayout();
+    setOpenPeople(true);
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(peopleY.current - 12, 0), animated: true });
+    }, 160);
+  }
 
   const setLoading = (id: string, on: boolean) =>
     setActionLoadingIds((prev) => { const s = new Set(prev); if (on) s.add(id); else s.delete(id); return s; });
@@ -291,7 +369,6 @@ export default function ProfileScreen() {
 
   const comparesCount = posts.length;
   const votesCount = posts.reduce((s, p) => s + (p.totalVotes ?? (p.upvoteCount + p.downvoteCount)), 0);
-  const openCount = posts.filter((p) => p.isVotingOpen).length;
 
   const q = search.toLowerCase();
   const filteredFriends = friends.filter((f) => !q || (f.displayName || f.username).toLowerCase().includes(q));
@@ -343,6 +420,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={[st.scroll, { backgroundColor: colors.bg }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
       showsVerticalScrollIndicator={false}
@@ -380,15 +458,24 @@ export default function ProfileScreen() {
               {me?.email ? <Text style={[st.email, { color: colors.muted }]} numberOfLines={1}>{me.email}</Text> : null}
               {me?.bio ? <Text style={[st.bio, { color: colors.subtext }]} numberOfLines={2}>{me.bio}</Text> : null}
               {me?.interests && me.interests.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-                  <View style={{ flexDirection: "row", gap: 6 }}>
-                    {me.interests.map((tag) => (
-                      <View key={tag} style={[st.interestTag, { backgroundColor: colors.accent + "22", borderColor: colors.accent + "55" }]}>
-                        <Text style={[st.interestTagText, { color: colors.accent }]}>#{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
+                <View style={st.interestWrap}>
+                  {(showAllInterests ? me.interests : me.interests.slice(0, 3)).map((tag) => (
+                    <View key={tag} style={[st.interestTag, { backgroundColor: colors.accent + "22", borderColor: colors.accent + "55" }]}>
+                      <Text style={[st.interestTagText, { color: colors.accent }]}>#{tag}</Text>
+                    </View>
+                  ))}
+                  {me.interests.length > 3 ? (
+                    <Pressable
+                      style={[st.interestMore, { borderColor: colors.border }]}
+                      onPress={() => { animateLayout(); setShowAllInterests((v) => !v); }}
+                      hitSlop={6}
+                    >
+                      <Text style={[st.interestMoreText, { color: colors.subtext }]}>
+                        {showAllInterests ? "− less" : `+${me.interests.length - 3} more`}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : null}
             </View>
           </View>
@@ -419,19 +506,26 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* ── Stats row ── */}
+          {/* ── Stats row (Friends is tappable → jumps to People) ── */}
           <View style={[st.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {[
-              { label: "COMPARES", value: comparesCount },
-              { label: "VOTES", value: votesCount },
-              { label: "OPEN", value: openCount },
-              { label: "KEPT", value: savedPosts.length },
+              { label: "COMPARES", value: comparesCount, onPress: undefined as undefined | (() => void) },
+              { label: "VOTES", value: votesCount, onPress: undefined },
+              { label: "FRIENDS", value: friends.length, onPress: jumpToFriends },
+              { label: "KEPT", value: savedPosts.length, onPress: undefined },
             ].map((s, i, arr) => (
               <View key={s.label} style={{ flex: 1, flexDirection: "row" }}>
-                <View style={st.statBox}>
-                  <Text style={[st.statValue, { color: colors.text }]}>{s.value}</Text>
-                  <Text style={[st.statLabel, { color: colors.muted }]}>{s.label}</Text>
-                </View>
+                <Pressable
+                  style={st.statBox}
+                  onPress={s.onPress}
+                  disabled={!s.onPress}
+                  android_ripple={s.onPress ? { color: colors.accent + "18" } : undefined}
+                >
+                  <Text style={[st.statValue, { color: s.onPress ? colors.accent : colors.text }]}>{s.value}</Text>
+                  <Text style={[st.statLabel, { color: colors.muted }]}>
+                    {s.label}{s.onPress ? " ›" : ""}
+                  </Text>
+                </Pressable>
                 {i < arr.length - 1 && <View style={[st.statDivider, { backgroundColor: colors.border }]} />}
               </View>
             ))}
@@ -467,6 +561,19 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
+          {/* ── Your content (collapsible: drops / scheduled / kept / voted) ── */}
+          <Section
+            icon="📊"
+            title="Your content"
+            subtitle={
+              posts.length + savedPosts.length + scheduledPosts.length === 0
+                ? "Share your first compare"
+                : `${posts.length} drops · ${scheduledPosts.length} scheduled · ${savedPosts.length} kept`
+            }
+            open={openContent}
+            onToggle={toggleContent}
+            colors={colors}
+          >
           {/* ── Drops / Kept / Voted tab row ── */}
           <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
             <Pressable
@@ -690,11 +797,23 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+          </Section>
 
-          {/* ── People section ── */}
-          <View style={[st.peopleSectionHeader, { borderTopColor: colors.border }]}>
-            <Text style={[st.peopleSectionTitle, { color: colors.text }]}>People</Text>
-          </View>
+          {/* ── People (collapsible) ── */}
+          <Section
+            icon="👥"
+            title="People"
+            subtitle={
+              friends.length > 0
+                ? `${friends.length} friend${friends.length === 1 ? "" : "s"}${requestedMe.length > 0 ? ` · ${requestedMe.length} request${requestedMe.length === 1 ? "" : "s"}` : ""}`
+                : "Find people to connect with"
+            }
+            badge={requestedMe.length}
+            open={openPeople}
+            onToggle={togglePeople}
+            colors={colors}
+            onLayout={(e) => { peopleY.current = e.nativeEvent.layout.y; }}
+          >
 
           {/* Search */}
           <View style={[st.searchWrap, { backgroundColor: colors.section, borderColor: colors.border }]}>
@@ -740,9 +859,23 @@ export default function ProfileScreen() {
           >
             {peopleTab === "friends" && (
               filteredFriends.length === 0 ? (
-                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>
-                  {search ? "No friends match." : "No friends yet"}
-                </Text>
+                search ? (
+                  <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No friends match.</Text>
+                ) : (
+                  <View style={st.friendsEmpty}>
+                    <Text style={{ fontSize: 40 }}>👋</Text>
+                    <Text style={[st.friendsEmptyTitle, { color: colors.text }]}>No friends yet</Text>
+                    <Text style={[st.friendsEmptyText, { color: colors.muted }]}>
+                      Find people to compare with — add friends to see their drops and vote together.
+                    </Text>
+                    <Pressable
+                      style={[st.findFriendsBtn, { backgroundColor: colors.accent }]}
+                      onPress={() => { animateLayout(); setPeopleTab("suggestions"); }}
+                    >
+                      <Text style={st.findFriendsBtnText}>🔍  Find friends</Text>
+                    </Pressable>
+                  </View>
+                )
               ) : filteredFriends.map((f) => (
                 <PersonRow
                   key={f.id} person={f} colors={colors}
@@ -821,12 +954,18 @@ export default function ProfileScreen() {
               ))
             )}
           </ScrollView>
+          </Section>
 
-          {/* ── Footer: legal ── */}
-          <View style={st.profileFooter}>
-            <View style={[st.footerDivider, { backgroundColor: colors.border }]} />
-            <Text style={[st.footerLabel, { color: colors.muted }]}>LEGAL</Text>
-
+          {/* ── Legal & about (collapsible) ── */}
+          <Section
+            icon="📄"
+            title="Legal & about"
+            subtitle="Privacy, terms & credits"
+            open={openLegal}
+            onToggle={toggleLegal}
+            colors={colors}
+          >
+            <View style={st.legalWrap}>
             <View style={[st.footerLegalBlock, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Pressable style={st.footerLegalRow} onPress={() => void Linking.openURL(LEGAL_PAGE_URLS.privacy)}>
                 <View style={st.footerRowText}>
@@ -855,7 +994,8 @@ export default function ProfileScreen() {
                 <Text style={[st.footerRowArrow, { color: colors.accent }]}>→</Text>
               </Pressable>
             </View>
-          </View>
+            </View>
+          </Section>
         </>
       )}
     </ScrollView>
@@ -882,8 +1022,30 @@ const st = StyleSheet.create({
   username: { fontSize: 13, fontWeight: "600" },
   email: { fontSize: 12 },
   bio: { fontSize: 13, lineHeight: 18 },
+  interestWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6, alignItems: "center" },
   interestTag: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 2 },
   interestTagText: { fontSize: 12, fontWeight: "600" },
+  interestMore: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 2, borderStyle: "dashed" },
+  interestMoreText: { fontSize: 12, fontWeight: "700" },
+
+  // Collapsible sections (accordion)
+  section: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 2 },
+  sectionHead: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 15 },
+  sectionIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  sectionTitle: { fontSize: 15.5, fontWeight: "800" },
+  sectionSub: { fontSize: 11.5, marginTop: 2 },
+  sectionBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  sectionBadgeText: { color: "#fff", fontSize: 10.5, fontWeight: "800" },
+  sectionChevron: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  sectionBody: { paddingBottom: 8 },
+
+  // Friends empty state CTA
+  friendsEmpty: { alignItems: "center", paddingVertical: 22, paddingHorizontal: 12, gap: 6 },
+  friendsEmptyTitle: { fontSize: 16, fontWeight: "800", marginTop: 2 },
+  friendsEmptyText: { fontSize: 12.5, lineHeight: 18, textAlign: "center", marginBottom: 6 },
+  findFriendsBtn: { borderRadius: 24, paddingHorizontal: 24, paddingVertical: 11 },
+  findFriendsBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  legalWrap: { paddingHorizontal: 16, paddingTop: 4 },
 
   // Edit + logout
   editRow: { flexDirection: "row", paddingHorizontal: 16, gap: 10, marginBottom: 16 },

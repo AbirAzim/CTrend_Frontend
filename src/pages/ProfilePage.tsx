@@ -339,6 +339,27 @@ export function ProfilePage() {
     "friends" | "incoming" | "sent" | "suggestions"
   >("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
+  // Collapsible sections. On web there's room to show your content up front, so
+  // "Your content" starts expanded; People stays collapsed to keep things tidy.
+  const [openContent, setOpenContent] = useState(true);
+  const [openPeople, setOpenPeople] = useState(false);
+  const [showAllInterests, setShowAllInterests] = useState(false);
+  const peopleRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  // Friends count / stat → open People, focus Friends tab, scroll into view.
+  function jumpToFriends() {
+    setOpenPeople(true);
+    setConnectionsTab("friends");
+    setTimeout(() => peopleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }
+
+  // Compares / Votes / Kept stats → open "Your content" on the matching tab.
+  function openContentOn(tab: ProfileContentTab) {
+    setOpenContent(true);
+    selectProfileContentTab(tab);
+    setTimeout(() => contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }
   const [profileContentTab, setProfileContentTab] = useState<ProfileContentTab>(() => {
     if (initialTab === "scheduled") return "scheduled";
     if (initialTab === "kept") return "kept";
@@ -493,12 +514,10 @@ export function ProfilePage() {
     mapGqlPostToFeedView,
   );
 
-  const totalImages = gridPosts.reduce((a, p) => a + (p.imageUrls?.length ?? 0), 0);
   const totalVotes = gridPosts.reduce(
     (a, p) => a + (p.totalVotes ?? (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0)),
     0,
   );
-  const activeVoting = gridPosts.filter((p) => p.isVotingOpen !== false).length;
 
   const displayName =
     me?.displayName ?? user?.displayName ?? user?.email.split("@")[0] ?? "you";
@@ -653,9 +672,18 @@ export function ProfilePage() {
           {bio ? <p className="cx-profile-bio-preview">{bio}</p> : null}
           {interests.length > 0 && (
             <div className="cx-profile-interests">
-              {interests.map((tag) => (
+              {(showAllInterests ? interests : interests.slice(0, 3)).map((tag) => (
                 <span key={tag} className="cx-profile-interest-tag">#{tag}</span>
               ))}
+              {interests.length > 3 && (
+                <button
+                  type="button"
+                  className="cx-profile-interest-more"
+                  onClick={() => setShowAllInterests((v) => !v)}
+                >
+                  {showAllInterests ? "− less" : `+${interests.length - 3} more`}
+                </button>
+              )}
             </div>
           )}
           <button
@@ -672,26 +700,22 @@ export function ProfilePage() {
       </header>
 
       <div className="cx-profile-stats-row">
-        <div className="cx-profile-stat">
+        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => openContentOn("drops")}>
           <strong>{gridPosts.length}</strong>
-          <span>compares</span>
-        </div>
-        <div className="cx-profile-stat">
-          <strong>{totalImages}</strong>
-          <span>images</span>
-        </div>
-        <div className="cx-profile-stat">
+          <span>compares ›</span>
+        </button>
+        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => openContentOn("voted")}>
           <strong>{totalVotes.toLocaleString()}</strong>
-          <span>votes</span>
-        </div>
-        <div className="cx-profile-stat cx-profile-stat--ghost">
-          <strong>{activeVoting}</strong>
-          <span>open</span>
-        </div>
-        <div className="cx-profile-stat">
+          <span>votes ›</span>
+        </button>
+        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={jumpToFriends}>
+          <strong>{friends.length}</strong>
+          <span>friends ›</span>
+        </button>
+        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => openContentOn("kept")}>
           <strong>{savedPosts.length}</strong>
-          <span>kept</span>
-        </div>
+          <span>kept ›</span>
+        </button>
       </div>
 
       {editing && (
@@ -798,8 +822,27 @@ export function ProfilePage() {
         </div>
       )}
 
-      {/* ── Drops + Kept tabbed card ─────────────────────── */}
-      <div className="cx-profile-content-card">
+      {/* ── Your content (collapsible: drops / scheduled / kept / voted) ── */}
+      <div className="cx-profile-content-card" ref={contentRef}>
+        <button
+          type="button"
+          className={`cx-section-toggle${openContent ? " cx-section-toggle--open" : ""}`}
+          onClick={() => setOpenContent((v) => !v)}
+          aria-expanded={openContent}
+        >
+          <span className="cx-section-toggle-icon" aria-hidden>📊</span>
+          <span className="cx-section-toggle-text">
+            <strong>Your content</strong>
+            <span className="muted small">
+              {gridPosts.length + savedPosts.length + scheduledPosts.length === 0
+                ? "Share your first compare"
+                : `${gridPosts.length} drops · ${scheduledPosts.length} scheduled · ${savedPosts.length} kept`}
+            </span>
+          </span>
+          <span className="cx-section-toggle-chevron" aria-hidden>{openContent ? "▾" : "▸"}</span>
+        </button>
+        {openContent && (
+        <>
         <div className="cx-conn-tabs" role="tablist">
           <button
             type="button"
@@ -1063,15 +1106,36 @@ export function ProfilePage() {
             )}
           </div>
         )}
+        </>
+        )}
       </div>
 
-      {/* ── Connections Card (tabbed) ─────────────────────── */}
+      {/* ── People (collapsible) ─────────────────────── */}
       {!useMockFeed ? (
-        <section className="cx-connections-card" aria-label="People">
-          <div className="cx-connections-header">
-            <span className="cx-connections-title">People</span>
-          </div>
+        <section className="cx-connections-card" aria-label="People" ref={peopleRef}>
+          <button
+            type="button"
+            className={`cx-section-toggle${openPeople ? " cx-section-toggle--open" : ""}`}
+            onClick={() => setOpenPeople((v) => !v)}
+            aria-expanded={openPeople}
+          >
+            <span className="cx-section-toggle-icon" aria-hidden>👥</span>
+            <span className="cx-section-toggle-text">
+              <strong>People</strong>
+              <span className="muted small">
+                {friends.length > 0
+                  ? `${friends.length} friend${friends.length === 1 ? "" : "s"}${requestedMe.length > 0 ? ` · ${requestedMe.length} request${requestedMe.length === 1 ? "" : "s"}` : ""}`
+                  : "Find people to connect with"}
+              </span>
+            </span>
+            {requestedMe.length > 0 && (
+              <span className="cx-section-toggle-badge">{requestedMe.length}</span>
+            )}
+            <span className="cx-section-toggle-chevron" aria-hidden>{openPeople ? "▾" : "▸"}</span>
+          </button>
 
+          {openPeople && (
+          <>
           {/* Search input */}
           <div className="cx-conn-search-wrap">
             <svg className="cx-conn-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden>
@@ -1151,9 +1215,17 @@ export function ProfilePage() {
               {friendsLoading ? (
                 <p className="cx-conn-empty">Loading…</p>
               ) : friends.length === 0 ? (
-                <div className="cx-conn-empty">
-                  <span className="cx-conn-empty-icon">👥</span>
-                  <p>No friends yet. Add people from Suggestions!</p>
+                <div className="cx-conn-empty cx-conn-empty--cta">
+                  <span className="cx-conn-empty-icon">👋</span>
+                  <p className="cx-conn-empty-title">No friends yet</p>
+                  <p>Find people to compare with — add friends to see their drops and vote together.</p>
+                  <button
+                    type="button"
+                    className="cx-conn-btn cx-conn-btn--add cx-conn-find-btn"
+                    onClick={() => setConnectionsTab("suggestions")}
+                  >
+                    🔍  Find friends
+                  </button>
                 </div>
               ) : friends.filter(matchesSearch).length === 0 ? (
                 <div className="cx-conn-empty">
@@ -1406,6 +1478,8 @@ export function ProfilePage() {
                 );
               })()}
             </div>
+          )}
+          </>
           )}
         </section>
       ) : null}
