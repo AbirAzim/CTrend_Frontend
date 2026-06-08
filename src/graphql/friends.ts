@@ -76,6 +76,26 @@ export const FRIENDSHIP_STATUS = gql`
   }
 `;
 
+/** Another user's mutual-friend list — shown on their profile. */
+export const USER_FRIENDS = gql`
+  query UserFriends($userId: ID!) {
+    userFriends(userId: $userId) {
+      id
+      username
+      displayName
+      email
+      profileImageUrl
+    }
+  }
+`;
+
+/** Count of non-anonymous votes a user has cast — shown on their profile. */
+export const USER_VOTE_COUNT = gql`
+  query UserVoteCount($userId: ID!) {
+    userVoteCount(userId: $userId)
+  }
+`;
+
 export const GET_USER_PROFILE = gql`
   query GetUserProfile($userId: ID!) {
     getUserProfile(userId: $userId) {

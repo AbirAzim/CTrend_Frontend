@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useEffect, useState } from "react";
-import { NavLink, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -11,6 +11,10 @@ import {
   FRIEND_SOCIAL_REFETCH_QUERIES,
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
+  USER_FRIENDS,
+  USER_VOTE_COUNT,
+  MY_FRIENDS,
+  FRIEND_REQUESTS,
 } from "../graphql/friends";
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { USER_POSTS } from "../graphql/profile";
@@ -37,6 +41,14 @@ type PostRow = {
 };
 
 type FriendshipStatus = "FRIEND" | "PENDING_SENT" | "PENDING_RECEIVED" | "NONE";
+
+type FriendRow = {
+  id: string;
+  username?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+  profileImageUrl?: string | null;
+};
 
 function avatarInitial(profile: UserProfile): string {
   const name = profile.displayName?.trim() || profile.username?.trim() || "U";
@@ -234,6 +246,46 @@ export function UserProfilePage() {
     fetchPolicy: "network-only",
   });
 
+  const { data: userFriendsData, loading: userFriendsLoading } = useQuery(USER_FRIENDS, {
+    variables: { userId },
+    skip: !userId || isOwnProfile || !user,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const { data: voteCountData } = useQuery(USER_VOTE_COUNT, {
+    variables: { userId },
+    skip: !userId || isOwnProfile || !user,
+    fetchPolicy: "cache-and-network",
+  });
+
+  // My own friends + pending-sent, to label rows in their friend list correctly.
+  const { data: myFriendsData } = useQuery(MY_FRIENDS, { skip: !user, fetchPolicy: "cache-first" });
+  const { data: myRequestsData } = useQuery(FRIEND_REQUESTS, { skip: !user, fetchPolicy: "cache-and-network" });
+
+  const [addFriendMut] = useMutation(ADD_FRIEND);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
+
+  const comparesRef = useRef<HTMLDivElement | null>(null);
+  const friendsRef = useRef<HTMLDivElement | null>(null);
+  const [showAllInterests, setShowAllInterests] = useState(false);
+
+  function scrollToRef(ref: React.RefObject<HTMLDivElement | null>) {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function sendFriendRequest(targetId: string) {
+    setAddingIds((s) => new Set(s).add(targetId));
+    try {
+      await addFriendMut({ variables: { userId: targetId } });
+      setPendingIds((s) => new Set(s).add(targetId));
+    } catch {
+      /* ignore — UI keeps "Add" so the user can retry */
+    } finally {
+      setAddingIds((s) => { const n = new Set(s); n.delete(targetId); return n; });
+    }
+  }
+
   if (isOwnProfile) {
     return null;
   }
@@ -241,6 +293,12 @@ export function UserProfilePage() {
   const profile = profileData?.getUserProfile as UserProfile | undefined;
   const friendshipStatus = (statusData?.friendshipStatus ?? "NONE") as FriendshipStatus;
   const posts = (postsData?.getPostsByUser ?? []) as PostRow[];
+  const userFriends = (userFriendsData?.userFriends ?? []) as FriendRow[];
+  const voteCount = (voteCountData?.userVoteCount ?? 0) as number;
+  const myFriendIds = new Set(((myFriendsData?.myFriends ?? []) as FriendRow[]).map((f) => f.id));
+  const mySentIds = new Set(
+    ((myRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[]).map((f) => f.id),
+  );
   const isFriend = friendshipStatus === "FRIEND";
   const isLoggedIn = Boolean(user);
   // Show online status only for friends (mutual trust)
@@ -305,11 +363,20 @@ export function UserProfilePage() {
 
           {interests.length > 0 ? (
             <div className="cx-profile-interests up-interests">
-              {interests.map((interest) => (
+              {(showAllInterests ? interests : interests.slice(0, 3)).map((interest) => (
                 <span key={interest} className="cx-profile-interest-tag">
                   #{interest}
                 </span>
               ))}
+              {interests.length > 3 && (
+                <button
+                  type="button"
+                  className="cx-profile-interest-more"
+                  onClick={() => setShowAllInterests((v) => !v)}
+                >
+                  {showAllInterests ? "− less" : `+${interests.length - 3} more`}
+                </button>
+              )}
             </div>
           ) : null}
 
@@ -334,6 +401,23 @@ export function UserProfilePage() {
         </div>
       </header>
 
+      {isLoggedIn && (
+        <div className="cx-profile-stats-row">
+          <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => scrollToRef(comparesRef)}>
+            <strong>{posts.length.toLocaleString()}</strong>
+            <span>compares ›</span>
+          </button>
+          <div className="cx-profile-stat">
+            <strong>{voteCount.toLocaleString()}</strong>
+            <span>votes</span>
+          </div>
+          <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => scrollToRef(friendsRef)}>
+            <strong>{userFriends.length.toLocaleString()}</strong>
+            <span>friends ›</span>
+          </button>
+        </div>
+      )}
+
       {!isFriend && isLoggedIn && (
         <div className="up-locked-notice">
           <span className="up-locked-icon" aria-hidden>🔒</span>
@@ -344,7 +428,7 @@ export function UserProfilePage() {
         </div>
       )}
 
-      <section className="cx-profile-drops up-posts-section" aria-label={`${name}'s posts`}>
+      <section ref={comparesRef} className="cx-profile-drops up-posts-section" aria-label={`${name}'s posts`}>
         <h2 className="cx-profile-section-title">{name}'s compares</h2>
 
         {postsLoading && <p className="muted small">Loading posts…</p>}
@@ -403,6 +487,72 @@ export function UserProfilePage() {
           </ul>
         )}
       </section>
+
+      {isLoggedIn && (
+      <section ref={friendsRef} className="cx-profile-drops up-friends-section" aria-label={`${name}'s friends`}>
+        <h2 className="cx-profile-section-title">{name}'s friends</h2>
+
+        {userFriendsLoading && userFriends.length === 0 && (
+          <p className="muted small">Loading friends…</p>
+        )}
+
+        {!userFriendsLoading && userFriends.length === 0 && (
+          <p className="muted small">No friends to show yet.</p>
+        )}
+
+        {userFriends.length > 0 && (
+          <ul className="cx-conn-list">
+            {userFriends.map((f) => {
+              const fName = f.displayName?.trim() || f.username?.trim() || "User";
+              const fInitial = fName[0]!.toUpperCase();
+              const img = normalizeProfileImageUrl(f.profileImageUrl);
+              const isMe = Boolean(user && f.id === user.id);
+              const alreadyFriend = myFriendIds.has(f.id);
+              const requested = mySentIds.has(f.id) || pendingIds.has(f.id);
+              return (
+                <li key={f.id} className="cx-conn-row">
+                  <div className="cx-conn-avatar-wrap">
+                    <Link to={`/profile/${f.id}`} className="cx-conn-avatar">
+                      {img ? (
+                        <img src={img} alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span className="cx-conn-avatar-initial">{fInitial}</span>
+                      )}
+                    </Link>
+                    {onlineUserIds.has(f.id) && (
+                      <span className="cx-conn-online-dot" aria-label="Online" />
+                    )}
+                  </div>
+                  <div className="cx-conn-info">
+                    <Link to={`/profile/${f.id}`} className="cx-conn-name-link">
+                      <span className="cx-conn-name">{fName}</span>
+                    </Link>
+                  </div>
+                  {isLoggedIn && !isMe && (
+                    <div className="cx-conn-actions">
+                      {alreadyFriend ? (
+                        <span className="cx-conn-btn cx-conn-btn--ghost" aria-disabled>✓ Friend</span>
+                      ) : requested ? (
+                        <span className="cx-conn-btn cx-conn-btn--ghost" aria-disabled>Requested</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="cx-conn-btn"
+                          disabled={addingIds.has(f.id)}
+                          onClick={() => void sendFriendRequest(f.id)}
+                        >
+                          {addingIds.has(f.id) ? "…" : "+ Add"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+      )}
     </div>
   );
 }
