@@ -16,7 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ARCHIVE_NOTIFICATION,
   MARK_ALL_NOTIFICATIONS_READ,
@@ -40,6 +39,7 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { PLAY_STORE_CLOSED_TESTING_URL } from "@ctrend/shared/lib/appUpdate";
 import logoAsset from "../../assets/logo.png";
+import { BottomNav } from "../../components/BottomNav";
 import { useTheme } from "../../context/ThemeContext";
 import { useBackToFeed } from "../../hooks/useBackToFeed";
 import type { ColorPalette } from "../../context/ThemeContext";
@@ -160,6 +160,7 @@ function navigateFromNotif(notif: GqlNotification) {
 function makeStyles(c: ColorPalette, isDark: boolean) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: c.bg },
+    contentArea: { flex: 1 },
     headerBtn: { paddingHorizontal: 8 },
     headerBtnText: { fontSize: 13, color: c.accent, fontWeight: "700" },
 
@@ -452,7 +453,6 @@ function NotifRow({
 const PAGE_SIZE = 20;
 
 export default function NotificationsScreen() {
-  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const goBack = useBackToFeed(); // cold-start from a notification → back to feed
@@ -638,7 +638,7 @@ export default function NotificationsScreen() {
   const unreadCount = items.filter((n) => !n.read).length;
 
   return (
-    <View style={[st.flex, { paddingBottom: insets.bottom }]}>
+    <View style={st.flex}>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -663,6 +663,7 @@ export default function NotificationsScreen() {
         }}
       />
 
+      <View style={st.contentArea}>
       {loading && items.length === 0 ? (
         <View style={st.loadingWrap}>
           <ActivityIndicator color={colors.accent} />
@@ -699,6 +700,9 @@ export default function NotificationsScreen() {
           }
         />
       )}
+      </View>
+
+      <BottomNav />
     </View>
   );
 }
