@@ -30,7 +30,7 @@ import {
   RESPOND_FRIEND_REQUEST,
   CANCEL_FRIEND_REQUEST,
 } from "@ctrend/shared/graphql/friends";
-import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
+import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "@ctrend/shared/graphql/feed";
 import { START_DIRECT_CONVERSATION } from "@ctrend/shared/graphql/messages";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
@@ -84,6 +84,28 @@ type SavedPost = {
   upvoteCount: number;
   downvoteCount: number;
 };
+
+type ScheduledPost = {
+  id: string;
+  contentText?: string | null;
+  imageUrls?: string[] | null;
+  options?: Array<{ label: string; imageUrl?: string | null }> | null;
+  category?: { id: string; name?: string | null } | null;
+  status: string;
+  scheduledAt?: string | null;
+};
+
+function scheduledCountdown(scheduledAt?: string | null): string {
+  if (!scheduledAt) return "—";
+  const ms = new Date(scheduledAt).getTime() - Date.now();
+  if (ms <= 0) return "Going live…";
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 
 type Person = {
   id: string;
@@ -152,7 +174,7 @@ export default function ProfileScreen() {
     }
   }
 
-  const [contentTab, setContentTab] = useState<"drops" | "kept" | "voted">("drops");
+  const [contentTab, setContentTab] = useState<"drops" | "scheduled" | "kept" | "voted">("drops");
   const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
   const [peopleTab, setPeopleTab] = useState<"friends" | "received" | "sent" | "suggestions">("friends");
   const [search, setSearch] = useState("");
@@ -182,6 +204,16 @@ export default function ProfileScreen() {
     skip: !isAuthenticated,
   });
 
+  const { data: scheduledData, loading: scheduledLoading, refetch: refetchScheduled } = useQuery<{
+    myScheduledPosts: ScheduledPost[];
+  }>(MY_SCHEDULED_POSTS, {
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
+    skip: !isAuthenticated,
+    pollInterval: 30000,
+  });
+  const [cancelScheduledMut] = useMutation(CANCEL_SCHEDULED_POST);
+
   const { data: friendsData, refetch: refetchFriends } = useQuery<{ myFriends: Person[] }>(MY_FRIENDS, {
     fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated,
   });
@@ -194,8 +226,11 @@ export default function ProfileScreen() {
   // request received elsewhere shows up immediately (cache-first won't refetch).
   useFocusEffect(
     useCallback(() => {
-      if (isAuthenticated) void refetchRequests();
-    }, [isAuthenticated, refetchRequests]),
+      if (isAuthenticated) {
+        void refetchRequests();
+        void refetchScheduled();
+      }
+    }, [isAuthenticated, refetchRequests, refetchScheduled]),
   );
 
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery<{ friendSuggestions: Person[] }>(
@@ -230,6 +265,25 @@ export default function ProfileScreen() {
   const posts = postsData?.getPostsByUser ?? [];
   const savedPosts = savedData?.mySavedPosts ?? [];
   const votedPosts = votedData?.myVotedPosts ?? [];
+  const scheduledPosts = scheduledData?.myScheduledPosts ?? [];
+
+  async function handleCancelScheduled(postId: string) {
+    Alert.alert("Cancel post", "This scheduled post will be removed. Are you sure?", [
+      { text: "Keep it", style: "cancel" },
+      {
+        text: "Cancel post",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await cancelScheduledMut({ variables: { postId } });
+            void refetchScheduled();
+          } catch {
+            Alert.alert("Error", "Could not cancel the scheduled post.");
+          }
+        },
+      },
+    ]);
+  }
   const friends = friendsData?.myFriends ?? [];
   const requestedMe = requestsData?.friendRequests?.requestedMe ?? [];
   const requestedByMe = requestsData?.friendRequests?.requestedByMe ?? [];
@@ -390,9 +444,6 @@ export default function ProfileScreen() {
               <Pressable style={[st.adminTab, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/admin" as `/${string}`)}>
                 <Text style={[st.adminTabText, { color: colors.text }]}>Admin Panel →</Text>
               </Pressable>
-              <Pressable style={[st.adminTab, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/profile/scheduled" as `/${string}`)}>
-                <Text style={[st.adminTabText, { color: colors.text }]}>Scheduled →</Text>
-              </Pressable>
             </View>
           ) : null}
 
@@ -424,6 +475,14 @@ export default function ProfileScreen() {
             >
               <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
                 ✦ Drops{posts.length > 0 ? ` (${posts.length})` : ""}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[st.tabBtn, contentTab === "scheduled" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+              onPress={() => setContentTab("scheduled")}
+            >
+              <Text numberOfLines={1} style={[st.tabBtnText, { color: contentTab === "scheduled" ? colors.accent : colors.muted }]}>
+                ⏰ Sched{scheduledPosts.length > 0 ? ` (${scheduledPosts.length})` : ""}
               </Text>
             </Pressable>
             <Pressable
@@ -474,6 +533,84 @@ export default function ProfileScreen() {
                       </View>
                     ))}
                   </View>
+                </ScrollView>
+              )
+            )}
+
+            {/* ── Scheduled list ── */}
+            {contentTab === "scheduled" && (
+              scheduledLoading && scheduledPosts.length === 0 ? (
+                <View style={st.centerBox}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              ) : scheduledPosts.length === 0 ? (
+                <View style={[st.emptyBox, { borderColor: colors.border }]}>
+                  <Text style={[st.emptyText, { color: colors.muted }]}>
+                    No scheduled posts. Pick "Schedule for later" when creating a post.
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ padding: 14, gap: 12 }}
+                >
+                  {scheduledPosts.map((p) => {
+                    const img0 = p.imageUrls?.[0] ?? p.options?.[0]?.imageUrl ?? null;
+                    const img1 = p.imageUrls?.[1] ?? p.options?.[1]?.imageUrl ?? null;
+                    const live = scheduledCountdown(p.scheduledAt) === "Going live…";
+                    const goesAt = p.scheduledAt
+                      ? new Date(p.scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                      : null;
+                    return (
+                      <View key={p.id} style={[st.schedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <View style={[st.schedThumbStrip, { backgroundColor: colors.section }]}>
+                          {img0 ? (
+                            <Image source={{ uri: img0 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
+                          ) : (
+                            <View style={[st.schedThumb, { alignItems: "center", justifyContent: "center" }]}>
+                              <Text style={{ fontSize: 22 }}>🖼</Text>
+                            </View>
+                          )}
+                          {img1 ? (
+                            <Image source={{ uri: img1 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
+                          ) : null}
+                        </View>
+                        <View style={st.schedBody}>
+                          {p.contentText ? (
+                            <Text style={[st.schedCaption, { color: colors.text }]} numberOfLines={2}>{p.contentText}</Text>
+                          ) : null}
+                          <View style={st.schedMetaRow}>
+                            <View style={[st.schedPill, { backgroundColor: live ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
+                              <Text style={[st.schedPillText, { color: live ? "#22c55e" : "#f59e0b" }]}>
+                                {live ? "🟢 Going live" : `⏱ in ${scheduledCountdown(p.scheduledAt)}`}
+                              </Text>
+                            </View>
+                            {p.category?.name ? (
+                              <Text style={[st.schedCategory, { color: colors.muted }]}>{p.category.name}</Text>
+                            ) : null}
+                          </View>
+                          {goesAt && !live ? (
+                            <Text style={[st.schedDate, { color: colors.muted }]}>Goes live at {goesAt}</Text>
+                          ) : null}
+                          <View style={st.schedActions}>
+                            <Pressable
+                              style={[st.schedEditBtn, { borderColor: colors.accent }]}
+                              onPress={() => router.push(`/edit-post?postId=${p.id}` as `/${string}`)}
+                            >
+                              <Text style={[st.schedEditText, { color: colors.accent }]}>Edit</Text>
+                            </Pressable>
+                            <Pressable
+                              style={[st.schedCancelBtn, { borderColor: "#f87171" }]}
+                              onPress={() => void handleCancelScheduled(p.id)}
+                            >
+                              <Text style={st.schedCancelText}>Cancel</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </ScrollView>
               )
             )}
@@ -775,6 +912,21 @@ const st = StyleSheet.create({
   tabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabBtnActive: {},
   tabBtnText: { fontSize: 12, fontWeight: "700" },
+  schedCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
+  schedThumbStrip: { flexDirection: "row", height: 90 },
+  schedThumb: { flex: 1, height: 90 },
+  schedBody: { padding: 10, gap: 6 },
+  schedCaption: { fontSize: 13, fontWeight: "600", lineHeight: 18 },
+  schedMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  schedPill: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  schedPillText: { fontSize: 11, fontWeight: "700" },
+  schedCategory: { fontSize: 11 },
+  schedDate: { fontSize: 11 },
+  schedActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 2 },
+  schedEditBtn: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5 },
+  schedEditText: { fontSize: 12, fontWeight: "700" },
+  schedCancelBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5 },
+  schedCancelText: { color: "#f87171", fontSize: 12, fontWeight: "700" },
 
   // Grid layout
   gridContainer: { padding: 14, paddingBottom: 8 },

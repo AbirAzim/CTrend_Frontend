@@ -234,6 +234,9 @@ export const UPDATE_POST = gql`
       id
       imageUrls
       caption
+      isUserGlobalBroadcast
+      status
+      scheduledAt
       ${POST_OPTION_FIELDS}
       category {
         id
@@ -290,11 +293,15 @@ export const MY_SCHEDULED_POSTS = gql`
   query MyScheduledPosts {
     myScheduledPosts {
       id
+      format
       contentText
+      caption
       imageUrls
       options {
         label
         imageUrl
+        imageFocalX
+        imageFocalY
       }
       category {
         id
@@ -302,6 +309,15 @@ export const MY_SCHEDULED_POSTS = gql`
         slug
         color
       }
+      campaign {
+        id
+        name
+        slug
+      }
+      votingEndsAt
+      isVotingOpen
+      endingSoonLeadMinutes
+      isUserGlobalBroadcast
       status
       scheduledAt
       createdAt
