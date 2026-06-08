@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { useMutation, useQuery } from "@apollo/client";
-import { IconBookmark, IconHome, IconLogout, IconMessages, IconPlusSquare, IconShield, IconUser } from "../components/IgIcons";
+import { IconBookmark, IconHome, IconLogin, IconLogout, IconMessages, IconPlusSquare, IconShield, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
@@ -279,7 +279,15 @@ export function AppShell() {
               <IconLogout />
             </button>
           ) : (
-            <NavLink to="/login" className="ig-topbar-cta ig-topbar-cta--auth">
+            <NavLink
+              to="/login"
+              className="ig-topbar-cta ig-topbar-cta--auth"
+              aria-label="Log in"
+              title="Log in"
+            >
+              <span className="ig-topbar-cta-glyph" aria-hidden>
+                <IconLogin size={16} />
+              </span>
               <span className="ig-topbar-cta-label">Log in</span>
             </NavLink>
           )}
