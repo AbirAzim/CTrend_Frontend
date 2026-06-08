@@ -1676,6 +1676,9 @@ function FeedPostCardComponent({
               const label = compareOptionLabel(post, i);
               const thumb = opt?.imageUrl?.trim() || null;
               const pct = pollPercents[i] ?? 0;
+              const voteCount = Math.round(
+                activeOptionStats?.find((x) => x.index === i)?.count ?? 0,
+              );
               const picked = pollPick === i;
               const isWinner = isPollWinnerIndex(i);
               const thumbStyle =
@@ -1689,73 +1692,94 @@ function FeedPostCardComponent({
                     }
                   : undefined;
               return (
-                <button
+                <div
                   key={`${post.id}-poll-${i}`}
-                  type="button"
-                  className={`cx-poll-option cx-poll-option--c${i % 10}${
-                    picked ? " cx-poll-option--picked" : ""
-                  }${pollShowResults ? " cx-poll-option--result" : ""}${
-                    isVotingClosed && isWinner ? " cx-poll-option--winner" : ""
-                  }${
-                    isVotingClosed && !isWinner ? " cx-poll-option--loser" : ""
-                  }${
-                    justVotedIndex === i && !isVotingClosed
-                      ? " cx-poll-option--just-voted"
-                      : ""
+                  className={`cx-poll-option-wrap${
+                    pollShowResults ? " cx-poll-option-wrap--result" : ""
                   }`}
-                  disabled={voteControlsDisabled}
-                  aria-pressed={picked}
-                  aria-label={
-                    isVotingClosed
-                      ? `${label} — ${isWinner ? "winner" : "result"}: ${pct}%`
-                      : picked
-                        ? `Your choice: ${label} — tap to change`
-                        : `Vote for ${label}`
-                  }
-                  onClick={() => handlePollTap(i)}
                 >
-                  {pollShowResults ? (
-                    <span
-                      className="cx-poll-option-fill"
-                      style={{ width: `${clampPercent(pct)}%` }}
-                      aria-hidden
-                    />
-                  ) : null}
-                  <span className="cx-poll-option-content">
-                    {thumb ? (
-                      <img
-                        src={thumb}
-                        alt=""
-                        className="cx-poll-option-thumb"
-                        loading="lazy"
-                        decoding="async"
-                        style={thumbStyle}
-                      />
-                    ) : (
+                  <button
+                    type="button"
+                    className={`cx-poll-option cx-poll-option--c${i % 10}${
+                      picked ? " cx-poll-option--picked" : ""
+                    }${pollShowResults ? " cx-poll-option--result" : ""}${
+                      isVotingClosed && isWinner ? " cx-poll-option--winner" : ""
+                    }${
+                      isVotingClosed && !isWinner ? " cx-poll-option--loser" : ""
+                    }${
+                      justVotedIndex === i && !isVotingClosed
+                        ? " cx-poll-option--just-voted"
+                        : ""
+                    }`}
+                    disabled={voteControlsDisabled}
+                    aria-pressed={picked}
+                    aria-label={
+                      isVotingClosed
+                        ? `${label} — ${isWinner ? "winner" : "result"}: ${pct}%`
+                        : picked
+                          ? `Your choice: ${label} — tap to change`
+                          : `Vote for ${label}`
+                    }
+                    onClick={() => handlePollTap(i)}
+                  >
+                    {pollShowResults ? (
                       <span
-                        className={`cx-poll-option-radio${
-                          picked ? " cx-poll-option-radio--on" : ""
-                        }`}
+                        className="cx-poll-option-fill"
+                        style={{ width: `${clampPercent(pct)}%` }}
                         aria-hidden
                       />
-                    )}
-                    <span className="cx-poll-option-label">
-                      {isVotingClosed && isWinner ? (
-                        <span className="cx-poll-option-medal" aria-hidden>
-                          🥇{" "}
+                    ) : null}
+                    <span className="cx-poll-option-content">
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="cx-poll-option-thumb"
+                          loading="lazy"
+                          decoding="async"
+                          style={thumbStyle}
+                        />
+                      ) : (
+                        <span
+                          className={`cx-poll-option-radio${
+                            picked ? " cx-poll-option-radio--on" : ""
+                          }`}
+                          aria-hidden
+                        />
+                      )}
+                      <span className="cx-poll-option-label">
+                        {isVotingClosed && isWinner ? (
+                          <span className="cx-poll-option-medal" aria-hidden>
+                            🥇{" "}
+                          </span>
+                        ) : null}
+                        {label}
+                      </span>
+                      {pollShowResults ? (
+                        <span className="cx-poll-option-pct">{pct}%</span>
+                      ) : picked ? (
+                        <span className="cx-poll-option-check" aria-hidden>
+                          ✓
                         </span>
                       ) : null}
-                      {label}
                     </span>
-                    {pollShowResults ? (
-                      <span className="cx-poll-option-pct">{pct}%</span>
-                    ) : picked ? (
-                      <span className="cx-poll-option-check" aria-hidden>
-                        ✓
+                  </button>
+                  {pollShowResults ? (
+                    <button
+                      type="button"
+                      className="cx-poll-see-voters"
+                      onClick={() => void openVotersList(i)}
+                      aria-label={`See ${voteCount} ${
+                        voteCount === 1 ? "voter" : "voters"
+                      } for ${label}`}
+                    >
+                      <IconUsers size={15} />
+                      <span className="cx-poll-see-voters-count">
+                        {voteCount}
                       </span>
-                    ) : null}
-                  </span>
-                </button>
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -2156,58 +2180,6 @@ function FeedPostCardComponent({
                     >
                       <div className="cx-pulse-row-top">
                         <span className="cx-pulse-name">{label}</span>
-                        <div className="cx-pulse-row-actions">
-                          <span className="cx-pulse-count">{pctVal}%</span>
-                          <button
-                            type="button"
-                            className="cx-see-voters-btn"
-                            onClick={() => void openVotersList(idx)}
-                          >
-                            See voters
-                          </button>
-                        </div>
-                      </div>
-                      <div className="cx-pulse-track" aria-hidden>
-                        <div
-                          className={`cx-pulse-fill cx-pulse-fill--opt-${idx % 10}`}
-                          style={{ width: `${pctVal}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : isPoll ? (
-              <div
-                className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
-                aria-live="polite"
-              >
-                <div className="cx-pulse-card-head">
-                  <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
-                    {isVotingClosed ? "Final results" : "Live results"}
-                  </span>
-                  <span className="cx-pulse-card-metric">
-                    {pollTotalVotes.toLocaleString()} votes
-                  </span>
-                </div>
-                {Array.from({ length: pollOptionCount }, (_, idx) => {
-                  const pctVal = pollPercents[idx] ?? 0;
-                  const label = compareOptionLabel(post, idx);
-                  const isLeader =
-                    pollLeaderPct != null &&
-                    pollLeaderPct > 0 &&
-                    pctVal === pollLeaderPct;
-                  const isFinalWinner = isPollWinnerIndex(idx);
-                  return (
-                    <div
-                      key={`${post.id}-pollpulse-${idx}`}
-                      className={`cx-pulse-row${isLeader && !isVotingClosed ? " cx-pulse-row--leader" : ""}${isFinalWinner ? " cx-pulse-row--final-winner" : ""}${isVotingClosed && !isFinalWinner ? " cx-pulse-row--final-loser" : ""}`}
-                    >
-                      <div className="cx-pulse-row-top">
-                        <span className="cx-pulse-name">
-                          {isFinalWinner && <span className="cx-pulse-medal" aria-hidden>🥇 </span>}
-                          {label}
-                        </span>
                         <div className="cx-pulse-row-actions">
                           <span className="cx-pulse-count">{pctVal}%</span>
                           <button

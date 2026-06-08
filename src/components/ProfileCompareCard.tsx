@@ -4,6 +4,7 @@ import { IconEdit, IconLock } from "./IgIcons";
 export type ProfileCompareCardPost = {
   id: string;
   imageUrls: string[];
+  format?: string | null;
   caption?: string | null;
   category?: { name?: string | null } | null;
   options?: Array<{ label?: string | null }> | null;
@@ -71,6 +72,8 @@ export function ProfileCompareCard({
   onEdit?: () => void;
 }) {
   const images = post.imageUrls ?? [];
+  const isPoll = String(post.format ?? "").toLowerCase() === "poll";
+  const optionCount = (post.options ?? []).filter((o) => o.label?.trim()).length;
   const ended = votingEnded(post);
   const isOpen = !ended;
   const totalVotes = voteCount(post);
@@ -94,8 +97,22 @@ export function ProfileCompareCard({
         </button>
       ) : null}
       <NavLink to={`/post/${post.id}`} className="cx-profile-card-link">
-        <div className="cx-kept-card-media">
-          {images.length === 0 ? (
+        <div className={`cx-kept-card-media${isPoll ? " cx-kept-card-media--poll" : ""}`}>
+          {isPoll ? (
+            <div className="cx-poll-card-preview" aria-hidden>
+              <span className="cx-poll-card-preview-badge">📊 Poll</span>
+              <span className="cx-poll-card-preview-bars">
+                <span className="cx-poll-card-preview-bar" />
+                <span className="cx-poll-card-preview-bar" />
+                <span className="cx-poll-card-preview-bar" />
+              </span>
+              {optionCount > 0 ? (
+                <span className="cx-poll-card-preview-count">
+                  {optionCount} {optionCount === 1 ? "option" : "options"}
+                </span>
+              ) : null}
+            </div>
+          ) : images.length === 0 ? (
             <span className="cx-profile-card-media-empty" aria-hidden>
               📷
             </span>
@@ -108,7 +125,7 @@ export function ProfileCompareCard({
               />
             ))
           )}
-          {images.length > 4 ? (
+          {!isPoll && images.length > 4 ? (
             <span className="cx-kept-card-more">+{images.length - 4}</span>
           ) : null}
         </div>

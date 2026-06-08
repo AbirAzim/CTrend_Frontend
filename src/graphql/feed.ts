@@ -183,6 +183,7 @@ export const MY_SAVED_POSTS = gql`
       authorEmail
       authorProfileImageUrl
       imageUrls
+      format
       caption
       createdAt
       upvoteCount

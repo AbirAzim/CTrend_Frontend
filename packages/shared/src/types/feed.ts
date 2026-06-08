@@ -4,10 +4,15 @@ export type PostStatus = "published" | "scheduled";
 
 export type FeedPostType = "user" | "system" | "org";
 
+/** Post layout: `compare` = side-by-side images, `poll` = stacked option rows. */
+export type PostFormat = "compare" | "poll";
+
 export type FeedPostView = {
   id: string;
   /** API post type — `system` = platform-wide Ke Jitbe polls. */
   postType?: FeedPostType | null;
+  /** Post layout format (defaults to `compare` when absent). */
+  format?: PostFormat | null;
   authorId?: string | null;
   authorUsername: string;
   authorDisplayName: string | null;
@@ -60,6 +65,7 @@ export type FeedPostView = {
   /** Option titles + per-option image focal from API `options` (same order as voting indices / compare columns). */
   postOptions?: {
     label: string;
+    imageUrl?: string | null;
     imageFocalX?: number | null;
     imageFocalY?: number | null;
   }[] | null;

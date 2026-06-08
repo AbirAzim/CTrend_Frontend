@@ -10967,6 +10967,67 @@ a.cx-profile-btn-accent {
   font-weight: 700;
 }
 
+/* Poll posts have no hero image — give them a branded preview tile instead
+   of the empty camera placeholder. */
+.cx-kept-card-media--poll {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--cx-accent-rgb) / 0.18),
+    rgb(var(--cx-accent-rgb) / 0.06) 60%,
+    rgb(var(--cx-ink-rgb) / 0.08)
+  );
+}
+.cx-poll-card-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+}
+.cx-poll-card-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.16);
+  color: rgb(var(--cx-accent-rgb));
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cx-poll-card-preview-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  max-width: 130px;
+}
+.cx-poll-card-preview-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.5);
+}
+.cx-poll-card-preview-bar:nth-child(1) {
+  width: 90%;
+  background: rgb(var(--cx-accent-rgb) / 0.65);
+}
+.cx-poll-card-preview-bar:nth-child(2) {
+  width: 62%;
+}
+.cx-poll-card-preview-bar:nth-child(3) {
+  width: 40%;
+  background: rgb(var(--cx-accent-rgb) / 0.35);
+}
+.cx-poll-card-preview-count {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+}
+
 .cx-kept-card-info {
   padding: 8px 10px 10px;
 }
@@ -18907,6 +18968,18 @@ a.cx-profile-btn-accent {
   gap: 8px;
   padding: 10px 12px 4px;
 }
+/* Per-option accent — each poll row gets its own colour, like compare bars.
+   Falls back to the global accent if no --c{n} class is present. */
+.cx-poll-option--c0 { --cx-opt-rgb: 16 185 129; }
+.cx-poll-option--c1 { --cx-opt-rgb: 249 115 22; }
+.cx-poll-option--c2 { --cx-opt-rgb: 139 92 246; }
+.cx-poll-option--c3 { --cx-opt-rgb: 244 63 94; }
+.cx-poll-option--c4 { --cx-opt-rgb: 245 158 11; }
+.cx-poll-option--c5 { --cx-opt-rgb: 6 182 212; }
+.cx-poll-option--c6 { --cx-opt-rgb: 101 163 13; }
+.cx-poll-option--c7 { --cx-opt-rgb: 13 148 136; }
+.cx-poll-option--c8 { --cx-opt-rgb: 2 132 199; }
+.cx-poll-option--c9 { --cx-opt-rgb: 162 28 175; }
 .cx-poll-option {
   position: relative;
   display: block;
@@ -18925,24 +18998,24 @@ a.cx-profile-btn-accent {
   cursor: default;
 }
 .cx-poll-option:not(:disabled):hover {
-  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+  border-color: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.55);
 }
 .cx-poll-option:not(:disabled):active {
   transform: scale(0.99);
 }
 .cx-poll-option--picked {
-  border-color: rgb(var(--cx-accent-rgb));
-  box-shadow: 0 0 0 1px rgb(var(--cx-accent-rgb)) inset;
+  border-color: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)));
+  box-shadow: 0 0 0 1px rgb(var(--cx-opt-rgb, var(--cx-accent-rgb))) inset;
 }
 .cx-poll-option-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgb(var(--cx-accent-rgb) / 0.14);
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.16);
   transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
   z-index: 0;
 }
 .cx-poll-option--picked .cx-poll-option-fill {
-  background: rgb(var(--cx-accent-rgb) / 0.24);
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.3);
 }
 .cx-poll-option-content {
   position: relative;
@@ -18968,8 +19041,8 @@ a.cx-profile-btn-accent {
   flex: 0 0 auto;
 }
 .cx-poll-option-radio--on {
-  border-color: rgb(var(--cx-accent-rgb));
-  background: radial-gradient(circle at center, rgb(var(--cx-accent-rgb)) 0 5px, transparent 6px);
+  border-color: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)));
+  background: radial-gradient(circle at center, rgb(var(--cx-opt-rgb, var(--cx-accent-rgb))) 0 5px, transparent 6px);
 }
 .cx-poll-option-label {
   flex: 1 1 auto;
@@ -19010,6 +19083,47 @@ a.cx-profile-btn-accent {
   0% { transform: scale(1); }
   40% { transform: scale(1.02); }
   100% { transform: scale(1); }
+}
+.cx-poll-option-wrap {
+  position: relative;
+}
+/* Reserve room on the right of the row so the % and the voters chip have
+   clear separation and never collide once results are shown. */
+.cx-poll-option-wrap--result .cx-poll-option-content {
+  padding-right: 74px;
+}
+/* Voter chip — user icon + live voter count, sits separated from the % and
+   opens the full voters list on tap. */
+.cx-poll-see-voters {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.4);
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  color: rgb(var(--cx-accent-rgb));
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.cx-poll-see-voters-count {
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.cx-poll-see-voters:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.16);
+  border-color: rgb(var(--cx-accent-rgb) / 0.6);
+}
+.cx-poll-see-voters:active {
+  transform: translateY(-50%) scale(0.96);
 }
 
 /* ===== Create page — format switcher + poll editor ===== */

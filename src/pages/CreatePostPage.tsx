@@ -293,7 +293,7 @@ export function CreatePostPage() {
 
     const input: {
       categoryId: string;
-      format: "compare" | "poll";
+      format: "COMPARE" | "POLL";
       imageUrls: string[];
       options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
       votingEndsAt?: string;
@@ -304,7 +304,7 @@ export function CreatePostPage() {
       broadcastGlobally?: boolean;
     } = {
       categoryId: category,
-      format,
+      format: format.toUpperCase() as "COMPARE" | "POLL",
       imageUrls,
       options,
     };

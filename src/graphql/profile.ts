@@ -43,6 +43,7 @@ export const MY_VOTED_POSTS = gql`
       authorId
       authorProfileImageUrl
       imageUrls
+      format
       caption
       createdAt
       totalVotes
@@ -87,6 +88,7 @@ export const USER_POSTS = gql`
       authorId
       authorProfileImageUrl
       imageUrls
+      format
       caption
       createdAt
       totalVotes
