@@ -47,6 +47,7 @@ import { PostCampaignBadge } from "./PostCampaignBadge";
 import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
 import { ContentReportModal } from "./ContentReportModal";
 import { imageObjectPosition } from "../lib/imageFocal";
+import { linkifyText } from "../lib/linkify";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -842,6 +843,38 @@ function FeedPostCardComponent({
   // prevents duplicate submissions without the cursor: not-allowed flash.
   const voteControlsDisabled = isVotingClosed;
 
+  // Poll format — stacked option rows (optional left thumbnail), tap to vote,
+  // fill bar + % after voting. Reuses the same N-option vote path as multi
+  // compare; option labels/images come from `postOptions`, not `imageUrls`
+  // (those hold optional body/context images shown above the rows).
+  const isPoll = (post.format ?? "compare") === "poll";
+  const pollOptions = post.postOptions ?? [];
+  const pollOptionCount = isPoll
+    ? Math.max(pollOptions.length, activeOptionStats?.length ?? 0)
+    : 0;
+  const pollPercents = useMemo(() => {
+    if (!isPoll) return [];
+    return Array.from({ length: pollOptionCount }, (_, i) => {
+      const s = activeOptionStats?.find((x) => x.index === i);
+      return s ? Math.round(s.percentage) : 0;
+    });
+  }, [isPoll, pollOptionCount, activeOptionStats]);
+  const pollTotalVotes = useMemo(() => {
+    if (!isPoll || !activeOptionStats) return 0;
+    return activeOptionStats.reduce((a, s) => a + Math.round(s.count), 0);
+  }, [isPoll, activeOptionStats]);
+  const pollPick = isPoll ? activeMySelectedOptionIndex : null;
+  const pollHasVoted = pollPick !== null && pollPick !== undefined;
+  const pollShowResults = pollHasVoted || isVotingClosed;
+  const pollLeaderPct = pollPercents.length ? Math.max(...pollPercents) : null;
+  const isPollWinnerIndex = (i: number): boolean =>
+    isVotingClosed &&
+    isPoll &&
+    pollTotalVotes > 0 &&
+    pollLeaderPct != null &&
+    pollLeaderPct > 0 &&
+    (pollPercents[i] ?? -1) === pollLeaderPct;
+
   const meLabel =
     authUser?.displayName?.trim() ||
     authUser?.email?.split("@")[0] ||
@@ -1154,6 +1187,67 @@ function FeedPostCardComponent({
     void handleVote(side === 0 ? "UP" : "DOWN");
   }
 
+  // Cast (or switch) an N-option vote by index — shared by multi-compare cells
+  // and poll rows. API mode only: applies an optimistic stats update, then the
+  // server result reconciles via `processVoteIntent`.
+  async function castOptionVote(index: number) {
+    if (isVotingClosed) return;
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: location.pathname } });
+      return;
+    }
+    if (activeMySelectedOptionIndex === index) {
+      // Re-tapped the option they already chose → withdraw the vote.
+      void withdrawVote(index);
+      return;
+    }
+
+    // Compute instant optimistic counts — increment new pick, decrement old.
+    const curPick = activeMySelectedOptionIndex;
+    const curStats = optimisticVote?.optionStats ?? activeOptionStats ?? null;
+    const newStats = (() => {
+      if (!curStats) return null;
+      const updated = curStats.map((s) => {
+        let c = s.count;
+        if (s.index === index) c += 1;
+        if (curPick !== null && s.index === curPick) c = Math.max(0, c - 1);
+        return { ...s, count: c };
+      });
+      const total = updated.reduce((a, s) => a + s.count, 0);
+      return updated.map((s) => ({
+        ...s,
+        percentage: total > 0 ? (s.count / total) * 100 : 0,
+      }));
+    })();
+
+    // Instant feedback before server round-trip.
+    playVoteSound();
+    if (curPick !== null && curPick !== index) {
+      setJustUnvoted(curPick); // exit animation on the option being left
+    }
+    setOptimisticVote({
+      upvoteCount:           optimisticVote?.upvoteCount  ?? post.upvoteCount,
+      downvoteCount:         optimisticVote?.downvoteCount ?? post.downvoteCount,
+      viewerVote:            optimisticVote?.viewerVote   ?? post.viewerVote,
+      mySelectedOptionIndex: index,
+      optionStats:           newStats,
+      isVotingOpen:          optimisticVote?.isVotingOpen  ?? activeIsVotingOpen,
+      votingEndsAt:          optimisticVote?.votingEndsAt  ?? activeVotingEndsAt,
+    });
+    setJustVoted(index);
+    setDetailsOpen(true);
+
+    await processVoteIntent(index);
+  }
+
+  // Poll row tap → shared option-vote engine (API mode only; the mock/demo
+  // feed never produces poll-format posts).
+  function handlePollTap(index: number) {
+    if (voteMode === "api") {
+      void castOptionVote(index);
+    }
+  }
+
   async function handleMultiCompareTap(index: number) {
     if (isVotingClosed) {
       return;
@@ -1167,48 +1261,7 @@ function FeedPostCardComponent({
     }
 
     if (voteMode === "api") {
-      if (activeMySelectedOptionIndex === index) {
-        // Re-tapped the option they already chose → withdraw the vote.
-        void withdrawVote(index);
-        return;
-      }
-
-      // Compute instant optimistic counts — increment new pick, decrement old.
-      const curPickMulti  = activeMySelectedOptionIndex;
-      const curStatsMulti = optimisticVote?.optionStats ?? activeOptionStats ?? null;
-      const newStatsMulti = (() => {
-        if (!curStatsMulti) return null;
-        const updated = curStatsMulti.map((s) => {
-          let c = s.count;
-          if (s.index === index) c += 1;
-          if (curPickMulti !== null && s.index === curPickMulti) c = Math.max(0, c - 1);
-          return { ...s, count: c };
-        });
-        const total = updated.reduce((a, s) => a + s.count, 0);
-        return updated.map((s) => ({
-          ...s,
-          percentage: total > 0 ? (s.count / total) * 100 : 0,
-        }));
-      })();
-
-      // Instant feedback before server round-trip.
-      playVoteSound();
-      if (curPickMulti !== null && curPickMulti !== index) {
-        setJustUnvoted(curPickMulti); // exit animation on the cell being left
-      }
-      setOptimisticVote({
-        upvoteCount:           optimisticVote?.upvoteCount  ?? post.upvoteCount,
-        downvoteCount:         optimisticVote?.downvoteCount ?? post.downvoteCount,
-        viewerVote:            optimisticVote?.viewerVote   ?? post.viewerVote,
-        mySelectedOptionIndex: index,
-        optionStats:           newStatsMulti,
-        isVotingOpen:          optimisticVote?.isVotingOpen  ?? activeIsVotingOpen,
-        votingEndsAt:          optimisticVote?.votingEndsAt  ?? activeVotingEndsAt,
-      });
-      setJustVoted(index);
-      setDetailsOpen(true);
-
-      await processVoteIntent(index);
+      await castOptionVote(index);
       return;
     }
 
@@ -1250,8 +1303,12 @@ function FeedPostCardComponent({
   }
 
   const binaryTotal = up + down;
-  /** Total votes cast on this post (binary or multi) — shown on the Voters chip. */
-  const totalVoteCount = isMultiCompare ? multiTotalVotes : binaryTotal;
+  /** Total votes cast on this post (poll, binary or multi) — shown on the Voters chip. */
+  const totalVoteCount = isPoll
+    ? pollTotalVotes
+    : isMultiCompare
+      ? multiTotalVotes
+      : binaryTotal;
   const hypeCount = hypeCountLive;
   const commentCount = post.commentCount ?? 0;
   // Flat, chronologically-sorted list (newest first, as returned by the server).
@@ -1279,6 +1336,25 @@ function FeedPostCardComponent({
   const votingWinnerSummary = useMemo(() => {
     if (!isVotingClosed) {
       return "";
+    }
+
+    if (isPoll) {
+      if (pollTotalVotes <= 0 || pollPercents.length === 0) {
+        return "No votes were cast";
+      }
+      const topPct = Math.max(...pollPercents);
+      const leaders = pollPercents
+        .map((pct, idx) => ({ pct, idx }))
+        .filter((row) => row.pct === topPct);
+      if (leaders.length !== 1) {
+        return `Tie at ${topPct}%`;
+      }
+      const winnerIndex = leaders[0]!.idx;
+      const winnerLabel = compareOptionLabel(post, winnerIndex);
+      const winnerVotes = Math.round(
+        activeOptionStats?.find((s) => s.index === winnerIndex)?.count ?? 0,
+      );
+      return `${winnerLabel} won · ${topPct}% (${winnerVotes.toLocaleString()} votes)`;
     }
 
     if (isMultiCompare && compareUrls && compareUrls.length > 0) {
@@ -1316,6 +1392,10 @@ function FeedPostCardComponent({
     return `${winnerLabel} won · ${winnerPct}% (${winnerVotes.toLocaleString()} votes)`;
   }, [
     isVotingClosed,
+    isPoll,
+    pollTotalVotes,
+    pollPercents,
+    activeOptionStats,
     isMultiCompare,
     compareUrls,
     multiTotalVotes,
@@ -1370,7 +1450,7 @@ function FeedPostCardComponent({
       ? multiPickDisplayed !== null
       : viewer !== null; // classic UP/DOWN bar
 
-  const showClassicVoteBar = !compareUrls;
+  const showClassicVoteBar = !compareUrls && !isPoll;
   const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
     post.authorProfileImageUrl,
     post.authorEmail,
@@ -1566,11 +1646,157 @@ function FeedPostCardComponent({
       {/* Caption — always visible above the compare images */}
       {post.caption && (
         <div className="cx-post-caption-bar">
-          {post.caption}
+          {linkifyText(post.caption)}
         </div>
       )}
 
-      {compareUrls ? (
+      {isPoll ? (
+        <>
+          {post.imageUrls.length > 0 ? (
+            <div className="ig-post-media-wrap cx-poll-body-media">
+              {post.imageUrls.map((url, i) => (
+                <img
+                  key={`${post.id}-pbody-${i}`}
+                  src={url}
+                  alt=""
+                  className="cx-poll-body-image"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ))}
+            </div>
+          ) : null}
+          <div
+            className={`cx-poll-options${
+              isVotingClosed ? " cx-poll-options--closed" : ""
+            }`}
+          >
+            {Array.from({ length: pollOptionCount }, (_, i) => {
+              const opt = pollOptions[i];
+              const label = compareOptionLabel(post, i);
+              const thumb = opt?.imageUrl?.trim() || null;
+              const pct = pollPercents[i] ?? 0;
+              const picked = pollPick === i;
+              const isWinner = isPollWinnerIndex(i);
+              const thumbStyle =
+                thumb &&
+                (opt?.imageFocalX != null || opt?.imageFocalY != null)
+                  ? {
+                      objectPosition: imageObjectPosition(
+                        opt?.imageFocalX,
+                        opt?.imageFocalY,
+                      ),
+                    }
+                  : undefined;
+              return (
+                <button
+                  key={`${post.id}-poll-${i}`}
+                  type="button"
+                  className={`cx-poll-option cx-poll-option--c${i % 10}${
+                    picked ? " cx-poll-option--picked" : ""
+                  }${pollShowResults ? " cx-poll-option--result" : ""}${
+                    isVotingClosed && isWinner ? " cx-poll-option--winner" : ""
+                  }${
+                    isVotingClosed && !isWinner ? " cx-poll-option--loser" : ""
+                  }${
+                    justVotedIndex === i && !isVotingClosed
+                      ? " cx-poll-option--just-voted"
+                      : ""
+                  }`}
+                  disabled={voteControlsDisabled}
+                  aria-pressed={picked}
+                  aria-label={
+                    isVotingClosed
+                      ? `${label} — ${isWinner ? "winner" : "result"}: ${pct}%`
+                      : picked
+                        ? `Your choice: ${label} — tap to change`
+                        : `Vote for ${label}`
+                  }
+                  onClick={() => handlePollTap(i)}
+                >
+                  {pollShowResults ? (
+                    <span
+                      className="cx-poll-option-fill"
+                      style={{ width: `${clampPercent(pct)}%` }}
+                      aria-hidden
+                    />
+                  ) : null}
+                  <span className="cx-poll-option-content">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt=""
+                        className="cx-poll-option-thumb"
+                        loading="lazy"
+                        decoding="async"
+                        style={thumbStyle}
+                      />
+                    ) : (
+                      <span
+                        className={`cx-poll-option-radio${
+                          picked ? " cx-poll-option-radio--on" : ""
+                        }`}
+                        aria-hidden
+                      />
+                    )}
+                    <span className="cx-poll-option-label">
+                      {isVotingClosed && isWinner ? (
+                        <span className="cx-poll-option-medal" aria-hidden>
+                          🥇{" "}
+                        </span>
+                      ) : null}
+                      {label}
+                    </span>
+                    {pollShowResults ? (
+                      <span className="cx-poll-option-pct">{pct}%</span>
+                    ) : picked ? (
+                      <span className="cx-poll-option-check" aria-hidden>
+                        ✓
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {!isVotingClosed ? (
+            <div
+              className={`cx-tap-to-vote-hint${
+                pollHasVoted ? " cx-tap-to-vote-hint--voted" : ""
+              }`}
+              aria-live="polite"
+            >
+              {pollHasVoted ? (
+                <>
+                  <span className="cx-tap-to-vote-icon">✓</span>
+                  <span>Vote recorded — tap to change</span>
+                </>
+              ) : (
+                <>
+                  <span className="cx-tap-to-vote-icon">👆</span>
+                  <span>Tap an option to cast your vote</span>
+                </>
+              )}
+            </div>
+          ) : null}
+          {voteMode === "api" && !isVotingClosed ? (
+            <div className="cx-anon-toggle-row">
+              <label className="cx-anon-toggle">
+                <span className="cx-anon-toggle-icon" aria-hidden>
+                  👻
+                </span>
+                <span className="cx-anon-toggle-text">Vote anonymously</span>
+                <input
+                  type="checkbox"
+                  checked={anonymousVote}
+                  onChange={(e) => handleAnonymousToggle(e.target.checked)}
+                />
+                <span className="cx-anon-toggle-switch" aria-hidden />
+              </label>
+            </div>
+          ) : null}
+        </>
+      ) : compareUrls ? (
         <>
           <div
             className={`ig-post-media-wrap ig-post-media-wrap--compare${
@@ -1825,6 +2051,14 @@ function FeedPostCardComponent({
                   ? "Tap a side to vote — switch anytime with another tap"
                   : "Tap a side to vote — tap again to clear your pick"}
               </p>
+            ) : isPoll ? (
+              <p className="cx-vote-hint-chip">
+                {isVotingClosed
+                  ? votingWinnerSummary
+                    ? `Final: ${votingWinnerSummary}`
+                    : "Voting closed for this poll."
+                  : "Tap an option to vote — switch anytime with another tap"}
+              </p>
             ) : null}
 
             {votingHasEndDate ? (
@@ -1943,11 +2177,63 @@ function FeedPostCardComponent({
                   );
                 })}
               </div>
+            ) : isPoll ? (
+              <div
+                className={`cx-pulse-card${voteFx ? " cx-pulse-card--votefx" : ""}${isVotingClosed ? " cx-pulse-card--final" : ""}`}
+                aria-live="polite"
+              >
+                <div className="cx-pulse-card-head">
+                  <span className={`cx-pulse-card-title${isVotingClosed ? " cx-pulse-card-title--final" : ""}`}>
+                    {isVotingClosed ? "Final results" : "Live results"}
+                  </span>
+                  <span className="cx-pulse-card-metric">
+                    {pollTotalVotes.toLocaleString()} votes
+                  </span>
+                </div>
+                {Array.from({ length: pollOptionCount }, (_, idx) => {
+                  const pctVal = pollPercents[idx] ?? 0;
+                  const label = compareOptionLabel(post, idx);
+                  const isLeader =
+                    pollLeaderPct != null &&
+                    pollLeaderPct > 0 &&
+                    pctVal === pollLeaderPct;
+                  const isFinalWinner = isPollWinnerIndex(idx);
+                  return (
+                    <div
+                      key={`${post.id}-pollpulse-${idx}`}
+                      className={`cx-pulse-row${isLeader && !isVotingClosed ? " cx-pulse-row--leader" : ""}${isFinalWinner ? " cx-pulse-row--final-winner" : ""}${isVotingClosed && !isFinalWinner ? " cx-pulse-row--final-loser" : ""}`}
+                    >
+                      <div className="cx-pulse-row-top">
+                        <span className="cx-pulse-name">
+                          {isFinalWinner && <span className="cx-pulse-medal" aria-hidden>🥇 </span>}
+                          {label}
+                        </span>
+                        <div className="cx-pulse-row-actions">
+                          <span className="cx-pulse-count">{pctVal}%</span>
+                          <button
+                            type="button"
+                            className="cx-see-voters-btn"
+                            onClick={() => void openVotersList(idx)}
+                          >
+                            See voters
+                          </button>
+                        </div>
+                      </div>
+                      <div className="cx-pulse-track" aria-hidden>
+                        <div
+                          className={`cx-pulse-fill cx-pulse-fill--opt-${idx % 10}`}
+                          style={{ width: `${pctVal}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : null}
           </div>
         ) : null}
 
-        {!compareUrls ? (
+        {!compareUrls && !isPoll ? (
           <div
             className={`cx-pulse-card cx-pulse-card--compact${voteFx ? " cx-pulse-card--votefx" : ""}`}
             aria-live="polite"

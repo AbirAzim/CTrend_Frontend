@@ -38,6 +38,7 @@ export const FEED_POSTS = gql`
     feedPosts(campaignId: $campaignId, skip: $skip, take: $take) {
       id
       type
+      format
       authorId
       authorUsername
       authorDisplayName
@@ -83,6 +84,7 @@ export const GET_POST_BY_ID = gql`
     getPostById(id: $id) {
       id
       type
+      format
       authorId
       authorUsername
       authorDisplayName
@@ -349,6 +351,7 @@ export const POST_UPDATED = gql`
     postUpdated(postId: $postId) {
       id
       type
+      format
       isUserGlobalBroadcast
       imageUrls
       caption
