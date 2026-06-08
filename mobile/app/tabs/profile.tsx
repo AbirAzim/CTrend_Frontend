@@ -243,6 +243,7 @@ export default function ProfileScreen() {
   const [showAllInterests, setShowAllInterests] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const peopleY = useRef(0);
+  const contentY = useRef(0);
 
   const toggleContent = () => { animateLayout(); setOpenContent((v) => !v); };
   const toggleLegal = () => { animateLayout(); setOpenLegal((v) => !v); };
@@ -255,6 +256,16 @@ export default function ProfileScreen() {
     setOpenPeople(true);
     setTimeout(() => {
       scrollRef.current?.scrollTo({ y: Math.max(peopleY.current - 12, 0), animated: true });
+    }, 160);
+  }
+
+  // Compares / Votes / Kept stats → open "Your content" on the matching tab + scroll.
+  function openContentOn(tab: "drops" | "kept" | "voted") {
+    setContentTab(tab);
+    animateLayout();
+    setOpenContent(true);
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(contentY.current - 12, 0), animated: true });
     }, 160);
   }
 
@@ -509,10 +520,10 @@ export default function ProfileScreen() {
           {/* ── Stats row (Friends is tappable → jumps to People) ── */}
           <View style={[st.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {[
-              { label: "COMPARES", value: comparesCount, onPress: undefined as undefined | (() => void) },
-              { label: "VOTES", value: votesCount, onPress: undefined },
+              { label: "COMPARES", value: comparesCount, onPress: (() => openContentOn("drops")) as undefined | (() => void) },
+              { label: "VOTES", value: votesCount, onPress: () => openContentOn("voted") },
               { label: "FRIENDS", value: friends.length, onPress: jumpToFriends },
-              { label: "KEPT", value: savedPosts.length, onPress: undefined },
+              { label: "KEPT", value: savedPosts.length, onPress: () => openContentOn("kept") },
             ].map((s, i, arr) => (
               <View key={s.label} style={{ flex: 1, flexDirection: "row" }}>
                 <Pressable
@@ -573,6 +584,7 @@ export default function ProfileScreen() {
             open={openContent}
             onToggle={toggleContent}
             colors={colors}
+            onLayout={(e) => { contentY.current = e.nativeEvent.layout.y; }}
           >
           {/* ── Drops / Kept / Voted tab row ── */}
           <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
