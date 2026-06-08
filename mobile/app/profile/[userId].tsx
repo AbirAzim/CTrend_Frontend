@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,9 +15,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ADD_FRIEND,
   FRIENDSHIP_STATUS,
+  FRIEND_REQUESTS,
   GET_USER_PROFILE,
+  MY_FRIENDS,
   RESPOND_FRIEND_REQUEST,
   UNFRIEND,
+  USER_FRIENDS,
+  USER_VOTE_COUNT,
 } from "@ctrend/shared/graphql/friends";
 import { USER_POSTS } from "@ctrend/shared/graphql/profile";
 import { ONLINE_USER_IDS, START_DIRECT_CONVERSATION } from "@ctrend/shared/graphql/messages";
@@ -50,11 +54,23 @@ type PostThumb = {
 
 type FriendshipStatus = "FRIEND" | "PENDING_SENT" | "PENDING_RECEIVED" | "NONE";
 
+type FriendRow = {
+  id: string;
+  username?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+  profileImageUrl?: string | null;
+};
+
 type ProfileData = { getUserProfile: UserProfile };
 type StatusData = { friendshipStatus: string };
 type PostsData = { getPostsByUser: PostThumb[] };
 type OnlineData = { onlineUserIds: string[] };
 type StartDmData = { startDirectConversation: { id: string } };
+type UserFriendsData = { userFriends: FriendRow[] };
+type VoteCountData = { userVoteCount: number };
+type MyFriendsData = { myFriends: FriendRow[] };
+type RequestsData = { friendRequests: { requestedByMe: FriendRow[]; requestedMe: FriendRow[] } };
 
 const GRID_COLS = 3;
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -216,6 +232,46 @@ export default function UserProfileScreen() {
     pollInterval: 30000,
   });
 
+  const { data: userFriendsData, loading: userFriendsLoading } = useQuery<UserFriendsData>(
+    USER_FRIENDS,
+    { variables: { userId }, skip: !userId || isOwnProfile || !isAuthenticated, fetchPolicy: "cache-and-network" },
+  );
+
+  const { data: voteCountData } = useQuery<VoteCountData>(
+    USER_VOTE_COUNT,
+    { variables: { userId }, skip: !userId || isOwnProfile || !isAuthenticated, fetchPolicy: "cache-and-network" },
+  );
+
+  // My own friends + pending-sent, to label rows in their friend list correctly.
+  const { data: myFriendsData } = useQuery<MyFriendsData>(MY_FRIENDS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-first",
+  });
+  const { data: myRequestsData } = useQuery<RequestsData>(FRIEND_REQUESTS, {
+    skip: !isAuthenticated,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const [addFriendRow] = useMutation(ADD_FRIEND);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
+
+  const scrollRef = useRef<ScrollView>(null);
+  const friendsY = useRef(0);
+
+  async function sendFriendRequest(targetId: string) {
+    setAddingIds((s) => new Set(s).add(targetId));
+    try {
+      await addFriendRow({ variables: { userId: targetId } });
+      setPendingIds((s) => new Set(s).add(targetId));
+      showToast("Friend request sent ✓", "success");
+    } catch {
+      showToast("Failed to send request", "error");
+    } finally {
+      setAddingIds((s) => { const n = new Set(s); n.delete(targetId); return n; });
+    }
+  }
+
   if (isOwnProfile) {
     return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   }
@@ -226,6 +282,10 @@ export default function UserProfileScreen() {
   const posts = postsData?.getPostsByUser ?? [];
   const onlineSet = new Set(onlineData?.onlineUserIds ?? []);
   const isOnline = isFriend && Boolean(userId) && onlineSet.has(userId ?? "");
+  const userFriends = userFriendsData?.userFriends ?? [];
+  const voteCount = voteCountData?.userVoteCount ?? 0;
+  const myFriendIds = new Set((myFriendsData?.myFriends ?? []).map((f) => f.id));
+  const mySentIds = new Set((myRequestsData?.friendRequests?.requestedByMe ?? []).map((f) => f.id));
 
   const name = profile?.displayName?.trim() || profile?.username || "User";
   const initial = name.slice(0, 1).toUpperCase();
@@ -280,6 +340,7 @@ export default function UserProfileScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: insets.bottom + 32 },
@@ -360,6 +421,29 @@ export default function UserProfileScreen() {
             </View>
           )}
 
+          {/* Stats */}
+          {isAuthenticated && (
+            <View style={[styles.statsRow, { borderColor: colors.border }]}>
+              <View style={styles.stat}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{posts.length}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>compares</Text>
+              </View>
+              <View style={[styles.statSep, { backgroundColor: colors.border }]} />
+              <View style={styles.stat}>
+                <Text style={[styles.statValue, { color: colors.text }]}>{voteCount}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>votes</Text>
+              </View>
+              <View style={[styles.statSep, { backgroundColor: colors.border }]} />
+              <Pressable
+                style={styles.stat}
+                onPress={() => scrollRef.current?.scrollTo({ y: friendsY.current, animated: true })}
+              >
+                <Text style={[styles.statValue, { color: colors.text }]}>{userFriends.length}</Text>
+                <Text style={[styles.statLabel, { color: colors.accent }]}>friends ›</Text>
+              </Pressable>
+            </View>
+          )}
+
           {/* Divider */}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -408,6 +492,82 @@ export default function UserProfileScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+          )}
+
+          {/* Friends */}
+          {isAuthenticated && (
+            <View
+              style={styles.friendsSection}
+              onLayout={(e) => { friendsY.current = e.nativeEvent.layout.y; }}
+            >
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {name}'s friends
+              </Text>
+
+              {userFriendsLoading && userFriends.length === 0 ? (
+                <View style={styles.center}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              ) : userFriends.length === 0 ? (
+                <View style={[styles.center, { paddingVertical: 24 }]}>
+                  <Text style={{ fontSize: 28, marginBottom: 6 }}>👥</Text>
+                  <Text style={[styles.emptyText, { color: colors.muted }]}>No friends to show yet</Text>
+                </View>
+              ) : (
+                <View style={{ alignSelf: "stretch" }}>
+                  {userFriends.map((f) => {
+                    const fName = f.displayName?.trim() || f.username?.trim() || "User";
+                    const fInitial = fName.slice(0, 1).toUpperCase();
+                    const fAvatar = normalizeProfileImageUrl(f.profileImageUrl);
+                    const isMe = Boolean(user && f.id === user.id);
+                    const alreadyFriend = myFriendIds.has(f.id);
+                    const requested = mySentIds.has(f.id) || pendingIds.has(f.id);
+                    return (
+                      <View key={f.id} style={[styles.friendRow, { borderBottomColor: colors.border }]}>
+                        <Pressable
+                          style={styles.friendRowMain}
+                          onPress={() => router.push(`/profile/${f.id}` as `/${string}`)}
+                        >
+                          <View style={styles.friendAvatarWrap}>
+                            {fAvatar ? (
+                              <Image source={{ uri: fAvatar }} style={styles.friendAvatar} contentFit="cover" cachePolicy="memory-disk" />
+                            ) : (
+                              <View style={[styles.friendAvatar, styles.avatarFallback]}>
+                                <Text style={styles.friendAvatarInitial}>{fInitial}</Text>
+                              </View>
+                            )}
+                            {onlineSet.has(f.id) && <View style={styles.friendOnlineDot} />}
+                          </View>
+                          <Text style={[styles.friendName, { color: colors.text }]} numberOfLines={1}>{fName}</Text>
+                        </Pressable>
+                        {!isMe && (
+                          alreadyFriend ? (
+                            <View style={[styles.friendAddBtn, { borderColor: colors.border, backgroundColor: colors.section }]}>
+                              <Text style={[styles.friendAddText, { color: colors.muted }]}>✓ Friend</Text>
+                            </View>
+                          ) : requested ? (
+                            <View style={[styles.friendAddBtn, { borderColor: colors.border, backgroundColor: colors.section }]}>
+                              <Text style={[styles.friendAddText, { color: colors.muted }]}>Requested</Text>
+                            </View>
+                          ) : (
+                            <Pressable
+                              style={[styles.friendAddBtn, { backgroundColor: colors.accent }]}
+                              onPress={() => void sendFriendRequest(f.id)}
+                              disabled={addingIds.has(f.id)}
+                            >
+                              {addingIds.has(f.id)
+                                ? <ActivityIndicator size="small" color="#fff" />
+                                : <Text style={[styles.friendAddText, { color: "#fff" }]}>+ Add</Text>}
+                            </Pressable>
+                          )
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -507,6 +667,53 @@ const styles = StyleSheet.create({
   },
   friendBtnText: { fontSize: 14, fontWeight: "700" },
   divider: { width: "100%", height: StyleSheet.hairlineWidth, marginBottom: 16 },
+  statsRow: {
+    flexDirection: "row",
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "space-around",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  stat: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "800" },
+  statLabel: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+  statSep: { width: StyleSheet.hairlineWidth, height: 28 },
+  friendsSection: { alignSelf: "stretch", marginTop: 20 },
+  friendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  friendRowMain: { flex: 1, flexDirection: "row", alignItems: "center" },
+  friendAvatarWrap: { position: "relative", marginRight: 12 },
+  friendAvatar: { width: 44, height: 44, borderRadius: 22 },
+  friendAvatarInitial: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  friendOnlineDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: "#22c55e",
+    borderWidth: 2,
+    borderColor: "#0a0a0a",
+  },
+  friendName: { flex: 1, fontSize: 15, fontWeight: "700" },
+  friendAddBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    minWidth: 76,
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  friendAddText: { fontSize: 13, fontWeight: "700" },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "800",
