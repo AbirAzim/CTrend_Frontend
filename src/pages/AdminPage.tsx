@@ -2101,7 +2101,7 @@ type PostVotingFilter = "all" | "live" | "closed";
 type PostSortBy = "createdAt" | "votes" | "caption" | "updatedAt";
 type PostSortOrder = "asc" | "desc";
 
-type PostScope = "admin" | "user";
+type PostScope = "admin" | "user" | "user-all";
 
 function PostsTab() {
   const navigate = useNavigate();
@@ -2208,7 +2208,9 @@ function PostsTab() {
         subtitle={
           scope === "admin"
             ? "Admin platform-wide polls — search, filter, open a post, or edit as any admin."
-            : "Normal-user posts broadcast platform-wide — search, filter, open, or remove."
+            : scope === "user"
+              ? "Normal-user posts broadcast platform-wide — search, filter, open, or remove."
+              : "Normal (friend-only) user posts — not shown in the public feed. Search, filter, open, or remove."
         }
         action={
           scope === "admin" ? (
@@ -2238,6 +2240,15 @@ function PostsTab() {
           onClick={() => setScope("user")}
         >
           User Post Management
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "user-all"}
+          className={`admin-subtab${scope === "user-all" ? " is-active" : ""}`}
+          onClick={() => setScope("user-all")}
+        >
+          User Normal Posts
         </button>
       </div>
 
