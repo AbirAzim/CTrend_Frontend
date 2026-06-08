@@ -47,6 +47,7 @@ import { PostCampaignBadge } from "./PostCampaignBadge";
 import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
 import { ContentReportModal } from "./ContentReportModal";
 import { imageObjectPosition } from "../lib/imageFocal";
+import { categoryColorRgb } from "../lib/categoryColor";
 import { linkifyText } from "../lib/linkify";
 
 function storyInitial(name: string): string {
@@ -810,6 +811,23 @@ function FeedPostCardComponent({
   const postTimeIso = post.scheduledAt ?? post.createdAt;
   const timeLabel =
     formatRelativeTime(postTimeIso) || (voteMode === "local" ? "demo" : "");
+  // Dim category tag shown after the post-type badge; hover (web) reveals a
+  // "Category" tooltip via the `data-tip` attribute.
+  const categoryName = post.category?.name?.trim();
+  const categoryRgb = categoryColorRgb(post.category);
+  const categoryChip = categoryName ? (
+    <span
+      className="cx-post-category"
+      data-tip="Category"
+      style={
+        categoryRgb
+          ? ({ "--cat-rgb": categoryRgb } as CSSProperties)
+          : undefined
+      }
+    >
+      {categoryName}
+    </span>
+  ) : null;
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
@@ -1507,6 +1525,7 @@ function FeedPostCardComponent({
               <span className="ig-post-username-row">
                 <span className="ig-post-username">{MODERATOR_PLATFORM_NAME}</span>
                 <span className="cx-platform-post-badge">Platform</span>
+                {categoryChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>
@@ -1543,6 +1562,7 @@ function FeedPostCardComponent({
                 {isUserGlobalPost ? (
                   <span className="cx-user-global-post-badge">Global</span>
                 ) : null}
+                {categoryChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>
@@ -1569,8 +1589,11 @@ function FeedPostCardComponent({
               )}
             </span>
             <div>
-              <span className="ig-post-username">
-                {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
+              <span className="ig-post-username-row">
+                <span className="ig-post-username">
+                  {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
+                </span>
+                {categoryChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>

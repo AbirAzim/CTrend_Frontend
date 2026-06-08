@@ -25,6 +25,7 @@ import {
 import { CATEGORIES, DELETE_POST } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { categoryColorHex } from "../lib/categoryColor";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import {
@@ -1797,7 +1798,12 @@ function InvitationsTab() {
 
 // ─── Categories Tab ──────────────────────────────────────────────────────────
 
-type CategoryRow = { id: string; name: string; slug: string };
+type CategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  color?: string | null;
+};
 
 function CategoriesTab() {
   const { data, loading, error, refetch } = useQuery(CATEGORIES, {
@@ -1808,6 +1814,8 @@ function CategoriesTab() {
   const [editName, setEditName] = useState("");
   const [pageError, setPageError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [savingColorId, setSavingColorId] = useState<string | null>(null);
+  const [colorDrafts, setColorDrafts] = useState<Record<string, string>>({});
 
   const [createMut, { loading: creating }] = useMutation(CREATE_CATEGORY, {
     refetchQueries: [{ query: CATEGORIES }],
@@ -1848,6 +1856,19 @@ function CategoriesTab() {
     } catch (err) {
       setPageError(getApolloErrorMessage(err));
     }
+  }
+
+  async function handleColorChange(cat: CategoryRow, color: string) {
+    // color = "" clears the admin color (back to the derived default).
+    setPageError(null);
+    setSavingColorId(cat.id);
+    try {
+      await updateMut({ variables: { id: cat.id, name: cat.name, color } });
+      void refetch();
+    } catch (err) {
+      setPageError(getApolloErrorMessage(err));
+    }
+    setSavingColorId(null);
   }
 
   async function handleDelete(cat: CategoryRow) {
@@ -1903,6 +1924,7 @@ function CategoriesTab() {
               <tr>
                 <th>Name</th>
                 <th>Slug</th>
+                <th>Color</th>
                 <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
@@ -1926,6 +1948,50 @@ function CategoriesTab() {
                       )}
                     </td>
                     <td className="admin-table-email" data-label="Slug">{cat.slug}</td>
+                    <td data-label="Color">
+                      <div className="admin-cat-color">
+                        <input
+                          type="color"
+                          className="admin-cat-color-input"
+                          aria-label={`Accent color for ${cat.name}`}
+                          title="Pick category color"
+                          value={
+                            colorDrafts[cat.id] ??
+                            categoryColorHex(cat) ??
+                            "#888888"
+                          }
+                          disabled={savingColorId === cat.id}
+                          onChange={(e) =>
+                            setColorDrafts((d) => ({ ...d, [cat.id]: e.target.value }))
+                          }
+                          onBlur={(e) => {
+                            const next = e.target.value.toLowerCase();
+                            if (next !== (cat.color ?? "").toLowerCase()) {
+                              void handleColorChange(cat, next);
+                            }
+                          }}
+                        />
+                        {cat.color ? (
+                          <button
+                            type="button"
+                            className="admin-action-link"
+                            disabled={savingColorId === cat.id}
+                            onClick={() => {
+                              setColorDrafts((d) => {
+                                const rest = { ...d };
+                                delete rest[cat.id];
+                                return rest;
+                              });
+                              void handleColorChange(cat, "");
+                            }}
+                          >
+                            Reset
+                          </button>
+                        ) : (
+                          <span className="muted small">auto</span>
+                        )}
+                      </div>
+                    </td>
                     <AdminActionsCell>
                       {isEditing ? (
                         <>

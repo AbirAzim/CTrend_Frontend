@@ -57,6 +57,7 @@ import {
 } from '@ctrend/shared/lib/contentReport';
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
+import { categoryChipColors } from '../lib/categoryColor';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Card has marginHorizontal:12 on each side, so its inner content is narrower
@@ -274,6 +275,17 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: c.text,
 			letterSpacing: 0.1,
 		},
+		// Dim per-category chip after the post-type badge; tap reveals tooltip.
+		catChip: {
+			position: 'relative' as const,
+			borderRadius: 999,
+			paddingHorizontal: 8,
+			paddingVertical: 1,
+		},
+		catChipText: {
+			fontSize: 10,
+			fontWeight: '800' as const,
+		},
 		platformBadge: {
 			fontSize: 9,
 			fontWeight: '700' as const,
@@ -287,10 +299,12 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: c.accentLight,
 			overflow: 'hidden' as const,
 		},
+		// Platform (official "Ke Jitbe") posts: clean left accent stripe instead
+		// of a full purple border + flat tint, which framed the whole card oddly
+		// in light mode. The PLATFORM badge + brand avatar already mark these.
 		platformCard: {
-			borderColor: c.accentLight,
-			borderWidth: 1.5,
-			backgroundColor: c.accent + '14',
+			borderLeftWidth: 3,
+			borderLeftColor: c.accent,
 		},
 		globalBadge: {
 			fontSize: 9,
@@ -306,14 +320,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			backgroundColor: isDark ? 'rgba(16,185,129,0.14)' : 'rgba(22,163,74,0.1)',
 			overflow: 'hidden' as const,
 		},
+		// User-global posts: a subtle left accent stripe only (matches web
+		// `.ig-post--user-global`). A full green border + tint looked like a
+		// weird extra frame, especially in light mode.
 		userGlobalCard: {
-			borderColor: isDark ? 'rgba(52,211,153,0.5)' : 'rgba(22,163,74,0.45)',
-			borderWidth: 1.5,
-			backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(22,163,74,0.06)',
+			borderLeftWidth: 3,
+			borderLeftColor: isDark ? 'rgba(52,211,153,0.55)' : 'rgba(22,163,74,0.5)',
 		},
 		campaignCard: {
-			borderColor: isDark ? 'rgba(245,158,11,0.5)' : 'rgba(217,160,23,0.55)',
-			borderWidth: 1.5,
+			borderLeftWidth: 3,
+			borderLeftColor: isDark ? 'rgba(245,158,11,0.6)' : 'rgba(217,160,23,0.7)',
 		},
 		endingSoonBanner: {
 			flexDirection: 'row' as const,
@@ -1074,6 +1090,14 @@ function FeedPostCardComponent({
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
+	// Category chip: tap to reveal a small "Category" tooltip (auto-hides).
+	const [showCatTip, setShowCatTip] = useState(false);
+	const catTipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	function revealCategoryTip() {
+		setShowCatTip(true);
+		if (catTipTimer.current) clearTimeout(catTipTimer.current);
+		catTipTimer.current = setTimeout(() => setShowCatTip(false), 1800);
+	}
 
 	function openComments(focusComposer: boolean) {
 		if (!isAuthenticated) {
@@ -1846,6 +1870,8 @@ function FeedPostCardComponent({
 		: (post.authorProfileImageUrl ?? null);
 	const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 	const campaign = post.campaign ?? null;
+	const categoryName = post.category?.name?.trim();
+	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
 		<View
@@ -1908,6 +1934,19 @@ function FeedPostCardComponent({
 								<Text style={st.platformBadge}>Platform</Text>
 							) : isUserGlobal ? (
 								<Text style={st.globalBadge}>🌍 Global</Text>
+							) : null}
+							{categoryName && catColors ? (
+								<Pressable
+									onPress={revealCategoryTip}
+									hitSlop={6}
+									accessibilityLabel={`Category: ${categoryName}`}
+									style={[st.catChip, { backgroundColor: catColors.bg }]}>
+									<Text
+										style={[st.catChipText, { color: catColors.text }]}
+										numberOfLines={1}>
+										{showCatTip ? '🏷 Category' : categoryName}
+									</Text>
+								</Pressable>
 							) : null}
 						</View>
 						{timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
@@ -2288,7 +2327,7 @@ function FeedPostCardComponent({
 			) : null}
 
 			{/* Multi-compare Live Split — only shown when expanded */}
-			{detailsExpanded && !isBinary && multiTotal > 0 ? (
+			{detailsExpanded && !isBinary && !isPoll && multiTotal > 0 ? (
 				<View style={st.liveSplit}>
 					<View style={st.liveSplitHeader}>
 						<Text style={st.liveSplitTitle}>LIVE SPLIT</Text>

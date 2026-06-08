@@ -71,6 +71,14 @@ export type FeedPostView = {
   }[] | null;
   /** Demo-only labels when API `options` / `optionStats` are absent. */
   compareOptionLabels?: string[] | null;
+  /** Post category shown as a chip on the card. */
+  category?: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    /** Admin-assigned accent color (hex); falls back to a derived color. */
+    color?: string | null;
+  } | null;
   /** Campaign this compare is linked to (Phase 22). */
   campaign?: FeedPostCampaignView | null;
   /** Random prize-draw winner after voting closes (Phase 24). */
