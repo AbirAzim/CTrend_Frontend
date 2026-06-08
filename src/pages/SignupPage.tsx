@@ -5,6 +5,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GOOGLE_LOGIN, SIGNUP } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { PasswordField } from "../components/PasswordField";
 import {
   getNativeGoogleIdToken,
   isNativeGoogleAuthAvailable,
@@ -109,8 +110,7 @@ export function SignupPage() {
           </label>
           <label className="field">
             <span>Password</span>
-            <input
-              type="password"
+            <PasswordField
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -120,8 +120,7 @@ export function SignupPage() {
           </label>
           <label className="field">
             <span>Confirm password</span>
-            <input
-              type="password"
+            <PasswordField
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}

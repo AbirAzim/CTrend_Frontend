@@ -75,6 +75,15 @@ export function CreatePostPage() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState("");
   const [broadcastGlobally, setBroadcastGlobally] = useState(false);
+  /** Post layout: `compare` (image grid) or `poll` (stacked option rows). */
+  const [format, setFormat] = useState<"compare" | "poll">("compare");
+  const isPoll = format === "poll";
+  /** Poll-only body/context images (post-level `imageUrls`). Optional, 0+. */
+  const [bodyImages, setBodyImages] = useState<
+    Array<{ id: string; imageUrl: string; localPreview?: string }>
+  >([]);
+  const [bodyUploadingId, setBodyUploadingId] = useState<string | null>(null);
+  const bodyFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data: platformSettingsData } = useQuery(PLATFORM_SETTINGS);
   const allowUserGlobalPosts = Boolean(
@@ -115,6 +124,49 @@ export function CreatePostPage() {
       setError(err instanceof Error ? err.message : "Upload failed — please try again.");
     } finally {
       setUploadingId(null);
+    }
+  }
+
+  /** Poll quick-fill: two text options "Yes"/"No", no images. */
+  function fillYesNo() {
+    setItems([
+      { id: "yes", imageUrl: "", title: "Yes", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
+      { id: "no", imageUrl: "", title: "No", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
+    ]);
+  }
+
+  function addBodyImage() {
+    setBodyImages((prev) => [...prev, { id: String(Date.now()), imageUrl: "" }]);
+  }
+
+  function removeBodyImage(id: string) {
+    setBodyImages((prev) => prev.filter((b) => b.id !== id));
+  }
+
+  async function handleBodyFileChange(id: string, file: File | undefined) {
+    if (!file) return;
+    const localPreview = URL.createObjectURL(file);
+    setBodyImages((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, localPreview } : b)),
+    );
+    setBodyUploadingId(id);
+    setError(null);
+    try {
+      const publicUrl = await uploadImage(file);
+      setBodyImages((prev) =>
+        prev.map((b) =>
+          b.id === id ? { ...b, imageUrl: publicUrl, localPreview: undefined } : b,
+        ),
+      );
+      URL.revokeObjectURL(localPreview);
+    } catch (err: unknown) {
+      setBodyImages((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, localPreview: undefined } : b)),
+      );
+      URL.revokeObjectURL(localPreview);
+      setError(err instanceof Error ? err.message : "Upload failed — please try again.");
+    } finally {
+      setBodyUploadingId(null);
     }
   }
 
@@ -176,27 +228,55 @@ export function CreatePostPage() {
       }
     }
 
-    const normalized = items
-      .map((it) => ({
-        imageUrl: it.imageUrl.trim(),
-        title: it.title.trim(),
-      }))
-      .filter((it) => it.imageUrl.length > 0);
+    let imageUrls: string[];
+    let options: Array<{
+      label: string;
+      imageUrl?: string;
+      imageFocalX?: number;
+      imageFocalY?: number;
+    }>;
 
-    if (normalized.length < 2) {
-      setError("Please upload images for at least two options.");
-      return;
+    if (isPoll) {
+      const labeledCount = items.filter((it) => it.title.trim().length > 0).length;
+      if (labeledCount < 2) {
+        setError("Please add at least two poll options with labels.");
+        return;
+      }
+      // Poll options: label required, image optional (text-only rows allowed).
+      options = items.map((it, idx) => {
+        const label = it.title.trim() || `Option ${idx + 1}`;
+        const img = it.imageUrl.trim();
+        return img
+          ? { label, imageUrl: img, imageFocalX: it.imageFocalX, imageFocalY: it.imageFocalY }
+          : { label };
+      });
+      // Body/context images live in post-level imageUrls (optional for polls).
+      imageUrls = bodyImages
+        .map((b) => b.imageUrl.trim())
+        .filter((u) => u.length > 0);
+    } else {
+      const normalized = items
+        .map((it) => ({
+          imageUrl: it.imageUrl.trim(),
+          title: it.title.trim(),
+        }))
+        .filter((it) => it.imageUrl.length > 0);
+
+      if (normalized.length < 2) {
+        setError("Please upload images for at least two options.");
+        return;
+      }
+
+      imageUrls = normalized.map((it) => it.imageUrl);
+      options = items
+        .filter((it) => it.imageUrl.trim().length > 0)
+        .map((it, idx) => ({
+          label: it.title.trim() || `Option ${idx + 1}`,
+          imageUrl: it.imageUrl.trim(),
+          imageFocalX: it.imageFocalX,
+          imageFocalY: it.imageFocalY,
+        }));
     }
-
-    const imageUrls = normalized.map((it) => it.imageUrl);
-    const options = items
-      .filter((it) => it.imageUrl.trim().length > 0)
-      .map((it, idx) => ({
-        label: it.title.trim() || `Option ${idx + 1}`,
-        imageUrl: it.imageUrl.trim(),
-        imageFocalX: it.imageFocalX,
-        imageFocalY: it.imageFocalY,
-      }));
 
     // Validate schedule time if enabled
     const scheduledAtIso = scheduleEnabled ? localInputToUtcIso(scheduledAt) : null;
@@ -213,8 +293,9 @@ export function CreatePostPage() {
 
     const input: {
       categoryId: string;
+      format: "compare" | "poll";
       imageUrls: string[];
-      options: Array<{ label: string; imageUrl: string; imageFocalX: number; imageFocalY: number }>;
+      options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
       votingEndsAt?: string;
       scheduledAt?: string;
       contentText?: string;
@@ -223,6 +304,7 @@ export function CreatePostPage() {
       broadcastGlobally?: boolean;
     } = {
       categoryId: category,
+      format,
       imageUrls,
       options,
     };
@@ -268,6 +350,7 @@ export function CreatePostPage() {
           { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
           { id: "2", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
         ]);
+        setBodyImages([]);
         setTimeout(() => setSuccessToast(null), 5000);
         return;
       }
@@ -341,30 +424,67 @@ export function CreatePostPage() {
   return (
     <div className="ig-create-page">
       <div className="ig-create-hero">
-        <span className="ig-create-hero-chip">New Compare</span>
+        <span className="ig-create-hero-chip">{isPoll ? "New Poll" : "New Compare"}</span>
         <h1 className="ig-create-title">What's your take?</h1>
-        <p className="ig-create-lead">Drop your picks. Let the crowd decide.</p>
+        <p className="ig-create-lead">
+          {isPoll
+            ? "Ask a question. Let the crowd pick a side."
+            : "Drop your picks. Let the crowd decide."}
+        </p>
       </div>
 
       <form className="ig-create-form" onSubmit={(ev) => void onSubmit(ev)}>
 
-        {/* ── Admin post type toggle ── */}
+        {/* ── Format switcher ── */}
+        <div className="ig-format-switch" role="tablist" aria-label="Post format">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!isPoll}
+            className={`ig-format-switch-btn${!isPoll ? " ig-format-switch-btn--active" : ""}`}
+            onClick={() => setFormat("compare")}
+          >
+            🖼 Compare
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isPoll}
+            className={`ig-format-switch-btn${isPoll ? " ig-format-switch-btn--active" : ""}`}
+            onClick={() => setFormat("poll")}
+          >
+            📊 Poll
+          </button>
+        </div>
+
+        {/* ── Audience: Friends vs Global (only when admin allows global) ── */}
         {showGlobalPostOption && (
-          <div className="ig-create-settings-card ig-user-global-post-option">
-            <label className="ig-user-global-post-label">
-              <input
-                type="checkbox"
-                checked={broadcastGlobally}
-                onChange={(e) => setBroadcastGlobally(e.target.checked)}
-              />
-              <span>
-                <strong>Post globally</strong>
-                <span className="muted small block">
-                  Everyone on Ke Jitbe will see your name and photo on this compare and get a
-                  notification. This is not an official Ke Jitbe platform post.
-                </span>
-              </span>
-            </label>
+          <div className="ig-create-settings-card ig-audience-card">
+            <p className="ig-settings-label">
+              <span className="ig-settings-icon">👁</span> Who can see &amp; vote?
+            </p>
+            <div className="ig-audience-switch" role="radiogroup" aria-label="Post audience">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!broadcastGlobally}
+                className={`ig-audience-option${!broadcastGlobally ? " ig-audience-option--active" : ""}`}
+                onClick={() => setBroadcastGlobally(false)}
+              >
+                <span className="ig-audience-option-title">👥 Friends</span>
+                <span className="ig-audience-option-sub">Only your friends can view and vote</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={broadcastGlobally}
+                className={`ig-audience-option${broadcastGlobally ? " ig-audience-option--active" : ""}`}
+                onClick={() => setBroadcastGlobally(true)}
+              >
+                <span className="ig-audience-option-title">🌐 Global</span>
+                <span className="ig-audience-option-sub">Everyone on Ke Jitbe sees it &amp; can vote</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -400,6 +520,8 @@ export function CreatePostPage() {
           </div>
         )}
 
+        {!isPoll ? (
+        <>
         {/* ── Compare slots ── */}
         <div className="ig-create-vs-wrap">
           <div className="ig-compare-grid">
@@ -511,6 +633,139 @@ export function CreatePostPage() {
         <button type="button" className="ig-create-add-btn" onClick={addItem}>
           + Add option
         </button>
+        </>
+        ) : (
+        <>
+          {/* ── Poll option rows ── */}
+          <div className="ig-poll-edit">
+            <div className="ig-poll-edit-head">
+              <span className="ig-settings-label">
+                <span className="ig-settings-icon">📊</span> Poll options
+                <span className="ig-settings-required">required</span>
+              </span>
+              <button
+                type="button"
+                className="ig-poll-yesno-btn"
+                onClick={fillYesNo}
+              >
+                Yes / No
+              </button>
+            </div>
+            <div className="ig-poll-edit-list">
+              {items.map((item, idx) => (
+                <div className="ig-poll-edit-row" key={item.id}>
+                  <input
+                    ref={(el) => { fileInputRefs.current[item.id] = el; }}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                    style={{ display: "none" }}
+                    onChange={(ev) =>
+                      void handleFileChange(item.id, ev.target.files?.[0])
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={`ig-poll-edit-thumb${item.imageUrl || item.localPreview ? " ig-poll-edit-thumb--filled" : ""}`}
+                    style={
+                      item.imageUrl || item.localPreview
+                        ? { backgroundImage: `url(${item.imageUrl || item.localPreview})` }
+                        : undefined
+                    }
+                    onClick={() => fileInputRefs.current[item.id]?.click()}
+                    disabled={uploadingId === item.id}
+                    aria-label={`Optional image for option ${idx + 1}`}
+                  >
+                    {uploadingId === item.id ? (
+                      <span className="ig-compare-spinner" />
+                    ) : item.imageUrl || item.localPreview ? null : (
+                      <span className="ig-poll-edit-thumb-plus" aria-hidden>＋</span>
+                    )}
+                  </button>
+                  <input
+                    type="text"
+                    className="ig-poll-edit-label-input"
+                    value={item.title}
+                    onChange={(ev) => updateItem(item.id, "title", ev.target.value)}
+                    placeholder={`Option ${idx + 1}`}
+                    autoComplete="off"
+                  />
+                  {items.length > 2 && (
+                    <button
+                      type="button"
+                      className="ig-poll-edit-remove"
+                      onClick={() => removeItem(item.id)}
+                      aria-label="Remove option"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" className="ig-create-add-btn" onClick={addItem}>
+              + Add option
+            </button>
+          </div>
+
+          {/* ── Poll body / context images (optional) ── */}
+          <div className="ig-poll-body-edit">
+            <span className="ig-settings-label">
+              <span className="ig-settings-icon">🖼</span> Context images
+              <span className="ig-settings-optional">optional</span>
+            </span>
+            <p className="muted small">Shown above your poll options.</p>
+            <div className="ig-poll-body-grid">
+              {bodyImages.map((b) => (
+                <div className="ig-poll-body-cell" key={b.id}>
+                  <input
+                    ref={(el) => { bodyFileRefs.current[b.id] = el; }}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                    style={{ display: "none" }}
+                    onChange={(ev) =>
+                      void handleBodyFileChange(b.id, ev.target.files?.[0])
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={`ig-poll-body-thumb${b.imageUrl || b.localPreview ? " ig-poll-body-thumb--filled" : ""}`}
+                    style={
+                      b.imageUrl || b.localPreview
+                        ? { backgroundImage: `url(${b.imageUrl || b.localPreview})` }
+                        : undefined
+                    }
+                    onClick={() => bodyFileRefs.current[b.id]?.click()}
+                    disabled={bodyUploadingId === b.id}
+                    aria-label="Upload context image"
+                  >
+                    {bodyUploadingId === b.id ? (
+                      <span className="ig-compare-spinner" />
+                    ) : b.imageUrl || b.localPreview ? null : (
+                      <span className="ig-poll-edit-thumb-plus" aria-hidden>＋</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="ig-poll-body-remove"
+                    onClick={() => removeBodyImage(b.id)}
+                    aria-label="Remove context image"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="ig-poll-body-add"
+                onClick={addBodyImage}
+              >
+                <span aria-hidden>＋</span>
+                <span>Add image</span>
+              </button>
+            </div>
+          </div>
+        </>
+        )}
 
         {/* ── Settings card ── */}
         <div className="ig-create-settings-card">
@@ -589,7 +844,7 @@ export function CreatePostPage() {
               className="ig-settings-textarea"
               value={caption}
               onChange={(ev) => setCaption(ev.target.value)}
-              placeholder="What are you comparing?"
+              placeholder={isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
               autoComplete="off"
             />
           </div>
@@ -663,7 +918,7 @@ export function CreatePostPage() {
           <button
             type="submit"
             className="ig-create-submit"
-            disabled={loading || !!uploadingId || !scheduledAt}
+            disabled={loading || !!uploadingId || !!bodyUploadingId || !scheduledAt}
           >
             {loading ? "Scheduling…" : "Confirm schedule →"}
           </button>
@@ -672,14 +927,14 @@ export function CreatePostPage() {
             <button
               type="submit"
               className="ig-create-submit ig-create-submit--main"
-              disabled={loading || !!uploadingId}
+              disabled={loading || !!uploadingId || !!bodyUploadingId}
             >
               {loading ? "Posting…" : "Launch it →"}
             </button>
             <button
               type="button"
               className="ig-create-submit ig-create-submit--schedule"
-              disabled={loading || !!uploadingId}
+              disabled={loading || !!uploadingId || !!bodyUploadingId}
               onClick={() => setScheduleEnabled(true)}
             >
               ⏰ Schedule
