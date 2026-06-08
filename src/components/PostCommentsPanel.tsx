@@ -26,6 +26,8 @@ export type CommentRow = {
   createdAt: string;
   postId: string;
   parentId?: string | null;
+  replyToName?: string | null;
+  replyToUserId?: string | null;
   reactions: Array<{ emoji: string; count: number }>;
   viewerReaction?: string | null;
   author: CommentAuthor;
@@ -263,6 +265,16 @@ function CommentItem({
             <Link to={`/profile/${row.author.id}`} className="cx-fb-bubble-author">
               {name}
             </Link>
+            {row.replyToName ? (
+              <span className="cx-fb-bubble-replying-to">
+                Replying to{" "}
+                {row.replyToUserId ? (
+                  <Link to={`/profile/${row.replyToUserId}`}>{row.replyToName}</Link>
+                ) : (
+                  row.replyToName
+                )}
+              </span>
+            ) : null}
             <p className="cx-comment-body cx-fb-bubble-text">{row.content}</p>
           </div>
           {reactionTotal > 0 ? (
@@ -328,7 +340,7 @@ function CommentItem({
           ) : (
             <span className="cx-discuss-signin-hint muted small">Sign in to react</span>
           )}
-          {!isReply && isAuthenticated ? (
+          {isAuthenticated ? (
             <button
               type="button"
               className={`cx-fb-meta-btn${replyOpen ? " cx-fb-meta-btn--active" : ""}`}
@@ -531,7 +543,14 @@ export function PostCommentsPanel({
   }, [showAllComments, displayedThreads.length, displayedLocalComments.length]);
 
   const buildOptimisticComment = useCallback(
-    (content: string, parentId?: string): CommentRow | null => {
+    (
+      content: string,
+      opts?: {
+        parentId?: string | null;
+        replyToName?: string | null;
+        replyToUserId?: string | null;
+      },
+    ): CommentRow | null => {
       const author = buildAuthor();
       if (!author) return null;
       return {
@@ -539,7 +558,9 @@ export function PostCommentsPanel({
         content,
         createdAt: new Date().toISOString(),
         postId,
-        parentId: parentId ?? null,
+        parentId: opts?.parentId ?? null,
+        replyToName: opts?.replyToName ?? null,
+        replyToUserId: opts?.replyToUserId ?? null,
         reactions: [],
         viewerReaction: null,
         author,
@@ -552,6 +573,11 @@ export function PostCommentsPanel({
     (optimistic: CommentRow, server: Partial<CommentRow> & { id: string }): CommentRow => ({
       ...optimistic,
       ...server,
+      // Backend flattens nested replies under the top-level ancestor and resolves
+      // who was replied to — trust those values, falling back to the optimistic ones.
+      parentId: server.parentId ?? optimistic.parentId,
+      replyToName: server.replyToName ?? optimistic.replyToName,
+      replyToUserId: server.replyToUserId ?? optimistic.replyToUserId,
       author: server.author ?? optimistic.author,
       reactions: server.reactions ?? optimistic.reactions,
       viewerReaction: server.viewerReaction ?? optimistic.viewerReaction,
@@ -617,7 +643,7 @@ export function PostCommentsPanel({
       });
   }
 
-  function onSubmitReply(parentId: string) {
+  function onSubmitReply(targetId: string) {
     setCommentError(null);
     const text = replyDraft.trim();
     if (!text) return;
@@ -627,7 +653,20 @@ export function PostCommentsPanel({
       return;
     }
 
-    const optimistic = buildOptimisticComment(text, parentId);
+    // Replies are a flat, two-level thread (Facebook-style): replying to a reply
+    // nests the new comment under the same top-level ancestor and tags who was
+    // replied to. The backend normalizes this; mirror it for the optimistic row.
+    const target = commentsLiveRef.current.find((c) => c.id === targetId);
+    const groupingParentId = target?.parentId ?? targetId;
+    const isReplyToReply = Boolean(target?.parentId);
+    const replyToName = isReplyToReply && target ? commentDisplayName(target.author) : null;
+    const replyToUserId = isReplyToReply && target ? target.author.id : null;
+
+    const optimistic = buildOptimisticComment(text, {
+      parentId: groupingParentId,
+      replyToName,
+      replyToUserId,
+    });
     if (!optimistic) return;
 
     const snapshot = commentsLiveRef.current;
@@ -639,7 +678,7 @@ export function PostCommentsPanel({
     void replyMut({
       variables: {
         postId,
-        input: { content: text, parentId },
+        input: { content: text, parentId: targetId },
       },
     })
       .then(({ data }) => {
@@ -654,7 +693,7 @@ export function PostCommentsPanel({
       .catch((err: unknown) => {
         setCommentsLive(snapshot);
         setReplyDraft(text);
-        setReplyTargetId(parentId);
+        setReplyTargetId(targetId);
         setCommentError(getApolloErrorMessage(err));
       });
   }

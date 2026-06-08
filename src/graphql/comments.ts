@@ -37,6 +37,8 @@ export const COMMENT_POST = gql`
       content
       postId
       parentId
+      replyToName
+      replyToUserId
       createdAt
       reactions {
         emoji
