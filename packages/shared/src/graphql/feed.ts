@@ -38,6 +38,7 @@ export const FEED_POSTS = gql`
       authorEmail
       authorProfileImageUrl
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       createdAt
@@ -64,6 +65,7 @@ export const FEED_POSTS = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -91,6 +93,7 @@ export const GET_POST_BY_ID = gql`
       authorEmail
       authorProfileImageUrl
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       createdAt
@@ -117,6 +120,7 @@ export const GET_POST_BY_ID = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -174,6 +178,7 @@ export const MY_SAVED_POSTS = gql`
       authorEmail
       authorProfileImageUrl
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       createdAt
@@ -200,6 +205,7 @@ export const MY_SAVED_POSTS = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }
@@ -334,6 +340,7 @@ export const POST_UPDATED = gql`
       id
       type
       isUserGlobalBroadcast
+      format
       imageUrls
       caption
       scheduledAt
@@ -354,6 +361,7 @@ export const POST_UPDATED = gql`
       }
       options {
         label
+        imageUrl
         imageFocalX
         imageFocalY
       }

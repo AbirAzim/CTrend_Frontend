@@ -1,4 +1,4 @@
-import type { FeedPostView, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
+import type { FeedPostView, PostFormat, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
 
 function mapViewerVote(
   viewerVote: string | null | undefined,
@@ -30,6 +30,7 @@ export function mapGqlPostToFeedView(p: {
   authorEmail?: string | null;
   authorProfileImageUrl?: string | null;
   isUserGlobalBroadcast?: boolean | null;
+  format?: string | null;
   imageUrls?: string[] | null;
   caption?: string | null;
   createdAt?: string | null;
@@ -66,6 +67,7 @@ export function mapGqlPostToFeedView(p: {
   }> | null;
   options?: Array<{
     label: string;
+    imageUrl?: string | null;
     imageFocalX?: number | null;
     imageFocalY?: number | null;
   }> | null;
@@ -104,6 +106,7 @@ export function mapGqlPostToFeedView(p: {
   const postOptions =
     p.options?.map((o) => ({
       label: o.label,
+      imageUrl: o.imageUrl ?? null,
       imageFocalX: o.imageFocalX ?? null,
       imageFocalY: o.imageFocalY ?? null,
     })) ?? null;
@@ -112,9 +115,12 @@ export function mapGqlPostToFeedView(p: {
     rawType === "system" || rawType === "org" || rawType === "user"
       ? rawType
       : null;
+  const format: PostFormat =
+    p.format?.toLowerCase() === "poll" ? "poll" : "compare";
   return {
     id: p.id,
     postType,
+    format,
     authorId: p.authorId ?? null,
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,

@@ -21,6 +21,7 @@ import { useTheme } from "../../context/ThemeContext";
 import type { StoredUser } from "../../lib/authStorage";
 import { AuthDivider, GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { LegalLinksFooter } from "../../components/LegalLinksFooter";
+import { PasswordInput } from "../../components/PasswordInput";
 
 type LoginData = { login: { accessToken: string; user: StoredUser } };
 
@@ -78,13 +79,12 @@ export default function LoginScreen() {
           />
 
           <Text style={[styles.label, { color: colors.subtext }]}>Password</Text>
-          <TextInput
+          <PasswordInput
             style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={password}
             onChangeText={setPassword}
             placeholder="Your password"
             placeholderTextColor={colors.muted}
-            secureTextEntry
             returnKeyType="done"
             onSubmitEditing={() => void handleLogin()}
           />

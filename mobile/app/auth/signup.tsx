@@ -18,6 +18,7 @@ import { SIGNUP } from "@ctrend/shared/graphql/auth";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { AuthDivider, GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { LegalLinksFooter } from "../../components/LegalLinksFooter";
+import { PasswordInput } from "../../components/PasswordInput";
 import { useTheme } from "../../context/ThemeContext";
 
 type SignupData = { signup: boolean };
@@ -90,13 +91,12 @@ export default function SignupScreen() {
           />
 
           <Text style={[styles.label, { color: colors.subtext }]}>Password</Text>
-          <TextInput
+          <PasswordInput
             style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={password}
             onChangeText={setPassword}
             placeholder="At least 8 characters"
             placeholderTextColor={colors.muted}
-            secureTextEntry
             returnKeyType="done"
             onSubmitEditing={() => void handleSignup()}
           />
