@@ -189,17 +189,25 @@ export default function ScheduledPostsScreen() {
                   ) : null}
                 </View>
 
-                {/* Cancel */}
-                <Pressable
-                  style={[st.cancelBtn, { borderColor: "#f87171" }]}
-                  onPress={() => void handleCancel(p.id)}
-                  disabled={isCancelling}
-                >
-                  {isCancelling
-                    ? <ActivityIndicator size="small" color="#f87171" />
-                    : <Text style={st.cancelText}>✕</Text>
-                  }
-                </Pressable>
+                {/* Edit + Cancel */}
+                <View style={st.actionRow}>
+                  <Pressable
+                    style={[st.editBtn, { borderColor: colors.accent }]}
+                    onPress={() => router.push(`/edit-post?postId=${p.id}` as `/${string}`)}
+                  >
+                    <Text style={[st.editText, { color: colors.accent }]}>Edit</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[st.cancelBtn, { borderColor: "#f87171" }]}
+                    onPress={() => void handleCancel(p.id)}
+                    disabled={isCancelling}
+                  >
+                    {isCancelling
+                      ? <ActivityIndicator size="small" color="#f87171" />
+                      : <Text style={st.cancelText}>Cancel</Text>
+                    }
+                  </Pressable>
+                </View>
               </View>
             );
           }}
@@ -235,16 +243,30 @@ function styles(c: ReturnType<typeof useTheme>["colors"]) {
     statusText: { fontSize: 11, fontWeight: "700" },
     category: { fontSize: 11 },
     date: { fontSize: 11 },
-    cancelBtn: {
-      alignSelf: "flex-end",
+    actionRow: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      gap: 8,
       margin: 10,
       marginTop: 0,
-      paddingHorizontal: 12,
+    },
+    editBtn: {
+      paddingHorizontal: 16,
       paddingVertical: 6,
       borderRadius: 20,
       borderWidth: 1.5,
       alignItems: "center",
       justifyContent: "center",
+    },
+    editText: { fontSize: 12, fontWeight: "700" },
+    cancelBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 64,
     },
     cancelText: { color: "#f87171", fontSize: 12, fontWeight: "700" },
   });

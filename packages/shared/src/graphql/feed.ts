@@ -42,6 +42,7 @@ export const FEED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      status
       scheduledAt
       upvoteCount
       downvoteCount
@@ -98,6 +99,7 @@ export const GET_POST_BY_ID = gql`
       imageUrls
       caption
       createdAt
+      status
       scheduledAt
       upvoteCount
       downvoteCount
@@ -183,6 +185,7 @@ export const MY_SAVED_POSTS = gql`
       imageUrls
       caption
       createdAt
+      status
       scheduledAt
       upvoteCount
       downvoteCount
@@ -422,6 +425,9 @@ export const UPDATE_POST = gql`
       imageUrls
       options { label imageUrl }
       category { id name slug color }
+      isUserGlobalBroadcast
+      status
+      scheduledAt
     }
   }
 `;

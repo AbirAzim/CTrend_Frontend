@@ -18,7 +18,7 @@ import {
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { ME, UPDATE_PROFILE, USER_POSTS, MY_VOTED_POSTS } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
-import { MY_SAVED_POSTS } from "../graphql/feed";
+import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
 import { ProfileCompareCard } from "../components/ProfileCompareCard";
@@ -92,7 +92,31 @@ function MessageButton({ userId }: { userId: string }) {
   );
 }
 
-function profileTabSearch(tab: "drops" | "kept" | "voted"): string {
+type ProfileContentTab = "drops" | "scheduled" | "kept" | "voted";
+
+function formatScheduledCountdown(isoDate: string): string {
+  const diff = new Date(isoDate).getTime() - Date.now();
+  if (diff <= 0) return "Publishing soon…";
+  const mins = Math.floor(diff / 60_000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `Goes live in ${days}d ${hours % 24}h`;
+  if (hours > 0) return `Goes live in ${hours}h ${mins % 60}m`;
+  return `Goes live in ${Math.max(mins, 1)}m`;
+}
+
+function formatGoLiveDate(isoDate: string): string {
+  return new Date(isoDate).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function profileTabSearch(tab: ProfileContentTab): string {
+  if (tab === "scheduled") return "?tab=scheduled";
   if (tab === "kept") return "?tab=kept";
   if (tab === "voted") return "?tab=voted";
   return "";
@@ -187,12 +211,25 @@ export function ProfilePage() {
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
+  const {
+    data: scheduledPostsData,
+    loading: scheduledPostsLoading,
+    refetch: refetchScheduled,
+  } = useQuery(MY_SCHEDULED_POSTS, {
+    skip: useMockFeed || !user,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
+    pollInterval: 30_000,
+  });
+  const [cancelScheduledMut] = useMutation(CANCEL_SCHEDULED_POST);
 
   const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
     id: string;
+    format?: string | null;
     imageUrls: string[];
     caption?: string | null;
     createdAt?: string | null;
+    isUserGlobalBroadcast?: boolean | null;
     totalVotes?: number | null;
     upvoteCount?: number | null;
     downvoteCount?: number | null;
@@ -214,7 +251,12 @@ export function ProfilePage() {
       selectedOptionIndex?: number | null;
       pickedAt?: string | null;
     } | null;
-    options?: Array<{ label?: string | null }> | null;
+    options?: Array<{
+      label?: string | null;
+      imageUrl?: string | null;
+      imageFocalX?: number | null;
+      imageFocalY?: number | null;
+    }> | null;
     category?: { id: string; name?: string | null; slug?: string | null } | null;
     campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   }>;
@@ -228,9 +270,11 @@ export function ProfilePage() {
 
   const gridPosts: Array<{
     id: string;
+    format?: string | null;
     imageUrls: string[];
     caption?: string | null;
     createdAt?: string | null;
+    isUserGlobalBroadcast?: boolean | null;
     totalVotes?: number | null;
     upvoteCount?: number | null;
     downvoteCount?: number | null;
@@ -252,13 +296,40 @@ export function ProfilePage() {
       selectedOptionIndex?: number | null;
       pickedAt?: string | null;
     } | null;
-    options?: Array<{ label?: string | null }> | null;
+    options?: Array<{
+      label?: string | null;
+      imageUrl?: string | null;
+      imageFocalX?: number | null;
+      imageFocalY?: number | null;
+    }> | null;
     category?: { id: string; name?: string | null; slug?: string | null } | null;
     campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   }> = useMockFeed
     ? playgroundPosts
     : apiPosts;
   const votedPosts = (votedPostsData?.myVotedPosts ?? []) as typeof gridPosts;
+  const scheduledPosts = (scheduledPostsData?.myScheduledPosts ?? []) as Array<{
+    id: string;
+    format?: string | null;
+    contentText?: string | null;
+    caption?: string | null;
+    imageUrls?: string[] | null;
+    options?: Array<{
+      label?: string | null;
+      imageUrl?: string | null;
+      imageFocalX?: number | null;
+      imageFocalY?: number | null;
+    }> | null;
+    category?: { id: string; name?: string | null; slug?: string | null } | null;
+    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
+    votingEndsAt?: string | null;
+    isVotingOpen?: boolean | null;
+    endingSoonLeadMinutes?: number | null;
+    isUserGlobalBroadcast?: boolean | null;
+    status: string;
+    scheduledAt: string;
+    createdAt?: string | null;
+  }>;
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const requestedMe = (friendRequestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
@@ -268,13 +339,24 @@ export function ProfilePage() {
     "friends" | "incoming" | "sent" | "suggestions"
   >("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
-  const [profileContentTab, setProfileContentTab] = useState<"drops" | "kept" | "voted">(() => {
+  const [profileContentTab, setProfileContentTab] = useState<ProfileContentTab>(() => {
+    if (initialTab === "scheduled") return "scheduled";
     if (initialTab === "kept") return "kept";
     if (initialTab === "voted") return "voted";
     return "drops";
   });
 
-  function selectProfileContentTab(tab: "drops" | "kept" | "voted") {
+  async function handleCancelScheduled(postId: string) {
+    if (!window.confirm("Cancel this scheduled post? This can't be undone.")) return;
+    try {
+      await cancelScheduledMut({ variables: { postId } });
+      void refetchScheduled();
+    } catch (err) {
+      alert(getApolloErrorMessage(err));
+    }
+  }
+
+  function selectProfileContentTab(tab: ProfileContentTab) {
     setProfileContentTab(tab);
     const nextSearch = profileTabSearch(tab);
     if (location.pathname === "/profile" && location.search !== nextSearch) {
@@ -284,7 +366,9 @@ export function ProfilePage() {
 
   // React to URL changes (e.g. clicking the Keep bottom-nav button while already on profile)
   useEffect(() => {
-    if (initialTab === "kept") {
+    if (initialTab === "scheduled") {
+      setProfileContentTab("scheduled");
+    } else if (initialTab === "kept") {
       setProfileContentTab("kept");
     } else if (initialTab === "voted") {
       setProfileContentTab("voted");
@@ -294,14 +378,23 @@ export function ProfilePage() {
   }, [initialTab]);
   const [editingPost, setEditingPost] = useState<{
     id: string;
+    format?: string | null;
     caption?: string | null;
     imageUrls: string[];
-    options?: Array<{ label?: string | null }> | null;
+    options?: Array<{
+      label?: string | null;
+      imageUrl?: string | null;
+      imageFocalX?: number | null;
+      imageFocalY?: number | null;
+    }> | null;
     category?: { id: string; name?: string | null } | null;
     campaign?: { id: string; name?: string | null; slug?: string | null } | null;
     votingEndsAt?: string | null;
     isVotingOpen?: boolean | null;
     isUserGlobalBroadcast?: boolean | null;
+    endingSoonLeadMinutes?: number | null;
+    status?: string | null;
+    scheduledAt?: string | null;
   } | null>(null);
   const [friendsPage, setFriendsPage] = useState(0);
   const [incomingPage, setIncomingPage] = useState(0);
@@ -718,6 +811,20 @@ export function ProfilePage() {
             ✨ Your drops
             {gridPosts.length > 0 && <span className="cx-conn-tab-badge">{gridPosts.length}</span>}
           </button>
+          {!useMockFeed && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={profileContentTab === "scheduled"}
+              className={`cx-conn-tab${profileContentTab === "scheduled" ? " cx-conn-tab--active" : ""}`}
+              onClick={() => selectProfileContentTab("scheduled")}
+            >
+              ⏰ Scheduled
+              {scheduledPosts.length > 0 && (
+                <span className="cx-conn-tab-badge">{scheduledPosts.length}</span>
+              )}
+            </button>
+          )}
           <button
             type="button"
             role="tab"
@@ -789,6 +896,111 @@ export function ProfilePage() {
           </div>
         )}
       </section>
+          </div>
+        )}
+
+        {profileContentTab === "scheduled" && (
+          <div className="cx-profile-content-panel" role="tabpanel">
+            <section className="cx-profile-drops" aria-label="Your scheduled posts">
+              {scheduledPostsLoading && scheduledPosts.length === 0 ? (
+                <p className="cx-conn-empty">Loading scheduled posts…</p>
+              ) : scheduledPosts.length === 0 ? (
+                <div className="cx-conn-empty">
+                  <span className="cx-conn-empty-icon">⏰</span>
+                  <p>No scheduled posts. Schedule a post for later from Create.</p>
+                  <NavLink
+                    to="/create"
+                    className="cx-conn-btn cx-conn-btn--add"
+                    style={{ marginTop: "8px", textDecoration: "none" }}
+                  >
+                    Create a post
+                  </NavLink>
+                </div>
+              ) : (
+                <ul className="cx-scheduled-list">
+                  {scheduledPosts.map((post) => {
+                    const images = (post.imageUrls ?? [])
+                      .filter((u): u is string => Boolean(u && u.trim()))
+                      .slice(0, 2);
+                    const optionLabels = (post.options ?? [])
+                      .map((o) => o.label?.trim())
+                      .filter((l): l is string => Boolean(l))
+                      .slice(0, 4);
+                    return (
+                      <li key={post.id} className="cx-scheduled-card">
+                        <div className="cx-scheduled-card-media">
+                          {images.length > 0 ? (
+                            images.map((url, i) => (
+                              <div
+                                key={i}
+                                className="cx-scheduled-card-img"
+                                style={{ backgroundImage: `url(${url})` }}
+                                role="img"
+                                aria-label={`Option ${i + 1}`}
+                              />
+                            ))
+                          ) : (
+                            <div className="cx-scheduled-card-placeholder" aria-hidden>🖼</div>
+                          )}
+                        </div>
+                        <div className="cx-scheduled-card-body">
+                          {(post.caption ?? post.contentText) && (
+                            <p className="cx-scheduled-card-caption">
+                              {post.caption ?? post.contentText}
+                            </p>
+                          )}
+                          {optionLabels.length > 0 && (
+                            <div className="cx-scheduled-option-chips">
+                              {optionLabels.map((label) => (
+                                <span key={label} className="cx-scheduled-option-chip">{label}</span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="cx-scheduled-countdown">
+                            {formatScheduledCountdown(post.scheduledAt)}
+                          </p>
+                          <p className="cx-scheduled-date">
+                            Goes live {formatGoLiveDate(post.scheduledAt)}
+                          </p>
+                          <div className="cx-scheduled-actions">
+                            <button
+                              type="button"
+                              className="cx-scheduled-edit-btn"
+                              onClick={() =>
+                                setEditingPost({
+                                  id: post.id,
+                                  format: post.format,
+                                  caption: post.caption ?? post.contentText,
+                                  imageUrls: post.imageUrls ?? [],
+                                  options: post.options,
+                                  category: post.category,
+                                  campaign: post.campaign,
+                                  votingEndsAt: post.votingEndsAt,
+                                  isVotingOpen: post.isVotingOpen,
+                                  endingSoonLeadMinutes: post.endingSoonLeadMinutes,
+                                  isUserGlobalBroadcast: post.isUserGlobalBroadcast,
+                                  status: post.status,
+                                  scheduledAt: post.scheduledAt,
+                                })
+                              }
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="cx-scheduled-cancel-btn"
+                              onClick={() => void handleCancelScheduled(post.id)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
           </div>
         )}
 
@@ -1219,7 +1431,7 @@ export function ProfilePage() {
         <EditPostModal
           post={editingPost}
           onClose={() => setEditingPost(null)}
-          onSaved={() => { void refetchPosts(); }}
+          onSaved={() => { void refetchPosts(); void refetchScheduled(); }}
         />
       )}
     </div>

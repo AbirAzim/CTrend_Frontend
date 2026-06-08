@@ -2049,6 +2049,7 @@ type PlatformPostEditor = AdminPerson;
 type PlatformPostRow = {
   id: string;
   type?: string | null;
+  format?: string | null;
   caption?: string | null;
   imageUrls?: string[] | null;
   createdAt?: string | null;
@@ -2081,7 +2082,12 @@ type PlatformPostRow = {
   } | null;
   category?: { id: string; name: string; slug?: string | null } | null;
   campaign?: { id: string; name: string; slug?: string | null } | null;
-  options?: Array<{ label: string; imageUrl?: string | null }> | null;
+  options?: Array<{
+    label: string;
+    imageUrl?: string | null;
+    imageFocalX?: number | null;
+    imageFocalY?: number | null;
+  }> | null;
   voteWinner?: {
     selectedOptionIndex?: number | null;
     pickedAt?: string | null;
@@ -2672,6 +2678,7 @@ function PostsTab() {
         <EditPostModal
           post={{
             id: editingPost.id,
+            format: editingPost.format,
             caption: editingPost.caption,
             imageUrls: editingPost.imageUrls ?? [],
             options: editingPost.options,
@@ -2680,6 +2687,8 @@ function PostsTab() {
             votingEndsAt: editingPost.votingEndsAt,
             endingSoonLeadMinutes: editingPost.endingSoonLeadMinutes,
             isVotingOpen: editingPost.isVotingOpen,
+            status: editingPost.status,
+            scheduledAt: editingPost.scheduledAt,
           }}
           onClose={() => setEditingPost(null)}
           onSaved={() => {

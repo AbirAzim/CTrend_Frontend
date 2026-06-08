@@ -200,6 +200,7 @@ export const ADMIN_PLATFORM_POSTS = gql`
     adminPlatformPosts(query: $query, skip: $skip, take: $take) {
       id
       type
+      format
       caption
       imageUrls
       createdAt
@@ -243,6 +244,8 @@ export const ADMIN_PLATFORM_POSTS = gql`
       options {
         label
         imageUrl
+        imageFocalX
+        imageFocalY
       }
       optionStats {
         index

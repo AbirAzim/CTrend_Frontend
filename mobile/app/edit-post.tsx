@@ -10,6 +10,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -25,6 +26,24 @@ import { useAuth } from "../context/AuthContext";
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
 type PostData = { getPostById: unknown };
+
+const SCHEDULE_PRESETS: { label: string; hours: number }[] = [
+  { label: "+1h", hours: 1 },
+  { label: "+6h", hours: 6 },
+  { label: "+1d", hours: 24 },
+  { label: "+3d", hours: 72 },
+  { label: "+1w", hours: 168 },
+];
+
+function fmtScheduleSummary(d: Date): string {
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function EditPostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
@@ -44,24 +63,63 @@ export default function EditPostScreen() {
 
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [options, setOptions] = useState<Array<{ label: string; imageUrl: string }>>([]);
+  const [options, setOptions] = useState<
+    Array<{ label: string; imageUrl: string; imageFocalX?: number | null; imageFocalY?: number | null }>
+  >([]);
+  const [isPoll, setIsPoll] = useState(false);
+  // Poll-only: post-level body/context photos, shown locked (votes depend on them).
+  const [bodyImages, setBodyImages] = useState<string[]>([]);
+  // Friends-only ↔ platform-wide (global) audience toggle (post owners only).
+  const [broadcastGlobally, setBroadcastGlobally] = useState(false);
+  const [initialBroadcast, setInitialBroadcast] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
   const [endingSoonLead, setEndingSoonLead] = useState("5");
   const [initialized, setInitialized] = useState(false);
+  // Scheduled (not-yet-published) posts can change their go-live time. Once
+  // published this section never shows, so the schedule time is locked.
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(d.getHours() + 1, 0, 0, 0);
+    return d;
+  });
 
   // Pre-fill form when post loads
   useEffect(() => {
     if (!postData?.getPostById || initialized) return;
     const post = mapGqlPostToFeedView(postData.getPostById as Parameters<typeof mapGqlPostToFeedView>[0]);
+    const poll = post.format === "poll";
+    setIsPoll(poll);
     setCaption(post.caption ?? "");
     setEndingSoonLead(String(post.endingSoonLeadMinutes ?? 5));
-    setOptions(
-      post.imageUrls.map((url, i) => ({
-        imageUrl: url,
-        label: post.postOptions?.[i]?.label ?? "",
-      })),
-    );
+    setBroadcastGlobally(Boolean(post.isUserGlobalBroadcast));
+    setInitialBroadcast(Boolean(post.isUserGlobalBroadcast));
+    const scheduled = (post.status ?? "").toLowerCase() === "scheduled";
+    setIsScheduled(scheduled);
+    if (scheduled && post.scheduledAt) {
+      const d = new Date(post.scheduledAt);
+      if (!Number.isNaN(d.getTime())) setScheduleDate(d);
+    }
+    if (poll) {
+      // Poll options carry their own (optional) thumbnail; body photos are separate.
+      setOptions(
+        (post.postOptions ?? []).map((o) => ({
+          label: o.label ?? "",
+          imageUrl: o.imageUrl ?? "",
+          imageFocalX: o.imageFocalX ?? null,
+          imageFocalY: o.imageFocalY ?? null,
+        })),
+      );
+      setBodyImages(post.imageUrls ?? []);
+    } else {
+      setOptions(
+        post.imageUrls.map((url, i) => ({
+          imageUrl: url,
+          label: post.postOptions?.[i]?.label ?? "",
+        })),
+      );
+    }
     // Try to match category by checking the raw data
     const raw = postData.getPostById as Record<string, unknown>;
     const cat = raw.category as { id: string } | null | undefined;
@@ -74,6 +132,67 @@ export default function EditPostScreen() {
   async function handleSave() {
     setSubmitError(null);
     if (!categoryId) { setSubmitError("Please select a category."); return; }
+
+    const adminInput = isAdmin
+      ? {
+          endingSoonLeadMinutes: Math.max(
+            1,
+            Math.min(1440, Math.round(Number(endingSoonLead) || 5)),
+          ),
+        }
+      : {};
+    // Only owners (non-admins) toggle audience, and only send it when changed.
+    const audienceInput =
+      !isAdmin && broadcastGlobally !== initialBroadcast ? { broadcastGlobally } : {};
+
+    // Reschedule only for not-yet-published posts; published posts never send it.
+    let scheduleInput: { scheduledAt: string } | Record<string, never> = {};
+    if (isScheduled) {
+      if (scheduleDate.getTime() <= Date.now()) {
+        setSubmitError("Schedule time must be in the future.");
+        return;
+      }
+      scheduleInput = { scheduledAt: scheduleDate.toISOString() };
+    }
+
+    if (isPoll) {
+      const labeled = options.filter((o) => o.label.trim().length > 0);
+      if (labeled.length < 2) {
+        setSubmitError("A poll needs at least 2 options with labels.");
+        return;
+      }
+      try {
+        await updatePost({
+          variables: {
+            postId,
+            input: {
+              caption: caption.trim() || undefined,
+              categoryId,
+              // Preserve each option's image/focal — only labels change, so votes
+              // stay intact. imageUrls (body photos) is omitted to leave it untouched.
+              options: labeled.map((o) => ({
+                label: o.label.trim(),
+                ...(o.imageUrl
+                  ? {
+                      imageUrl: o.imageUrl,
+                      imageFocalX: o.imageFocalX ?? undefined,
+                      imageFocalY: o.imageFocalY ?? undefined,
+                    }
+                  : {}),
+              })),
+              ...adminInput,
+              ...audienceInput,
+              ...scheduleInput,
+            },
+          },
+        });
+        router.back();
+      } catch (err: unknown) {
+        setSubmitError(getApolloErrorMessage(err));
+      }
+      return;
+    }
+
     try {
       await updatePost({
         variables: {
@@ -83,14 +202,9 @@ export default function EditPostScreen() {
             categoryId,
             options: options.map((o) => ({ label: o.label, imageUrl: o.imageUrl })),
             imageUrls: options.map((o) => o.imageUrl),
-            ...(isAdmin
-              ? {
-                  endingSoonLeadMinutes: Math.max(
-                    1,
-                    Math.min(1440, Math.round(Number(endingSoonLead) || 5)),
-                  ),
-                }
-              : {}),
+            ...adminInput,
+            ...audienceInput,
+            ...scheduleInput,
           },
         },
       });
@@ -126,29 +240,50 @@ export default function EditPostScreen() {
           <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
             <Text style={[st.cancelText, { color: colors.muted }]}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[st.screenTitle, { color: colors.text }]}>Edit Post</Text>
+          <Text style={[st.screenTitle, { color: colors.text }]}>
+            {isScheduled ? "Edit Scheduled" : isPoll ? "Edit Poll" : "Edit Compare"}
+          </Text>
           <View style={{ width: 60 }} />
         </View>
 
-        {/* Options (images + labels) */}
+        {/* Poll body photos — locked (votes depend on them) */}
+        {isPoll && bodyImages.length > 0 ? (
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[st.cardLabel, { color: colors.subtext }]}>🔒 PHOTOS · LOCKED</Text>
+            <View style={st.bodyPhotoRow}>
+              {bodyImages.map((url, i) => (
+                <View key={i} style={[st.bodyPhoto, { backgroundColor: colors.section }]}>
+                  <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                </View>
+              ))}
+            </View>
+            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 8 }}>
+              Photos can't be changed after posting — they're tied to existing votes.
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Options (labels editable; photos locked) */}
         <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[st.cardLabel, { color: colors.subtext }]}>COMPARE OPTIONS</Text>
+          <Text style={[st.cardLabel, { color: colors.subtext }]}>
+            {isPoll ? "POLL OPTIONS" : "COMPARE OPTIONS"}
+          </Text>
           {options.map((opt, i) => (
             <View key={i} style={[st.optionRow, { borderTopColor: colors.border }]}>
               <View style={[st.optionThumb, { backgroundColor: colors.section, overflow: "hidden" }]}>
                 {opt.imageUrl ? (
                   <Image source={{ uri: opt.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
                 ) : (
-                  <Text style={{ fontSize: 20, color: colors.muted }}>🖼</Text>
+                  <Text style={{ fontSize: 20, color: colors.muted }}>{isPoll ? "📊" : "🖼"}</Text>
                 )}
               </View>
               <TextInput
                 style={[st.optionLabel, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
                 value={opt.label}
                 onChangeText={(v) => setOptions((prev) => prev.map((o, j) => j === i ? { ...o, label: v } : o))}
-                placeholder={`Label ${String.fromCharCode(65 + i)}`}
+                placeholder={isPoll ? `Option ${i + 1} label` : `Label ${String.fromCharCode(65 + i)}`}
                 placeholderTextColor={colors.muted}
-                maxLength={60}
+                maxLength={isPoll ? 200 : 60}
               />
             </View>
           ))}
@@ -181,13 +316,32 @@ export default function EditPostScreen() {
               style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
               value={caption}
               onChangeText={setCaption}
-              placeholder="What are you comparing?"
+              placeholder={isPoll ? "What's this poll about?" : "What are you comparing?"}
               placeholderTextColor={colors.muted}
               multiline
               numberOfLines={2}
               maxLength={300}
             />
           </View>
+
+          {/* Audience: friends-only ↔ platform-wide (owners only) */}
+          {!isAdmin ? (
+            <View style={[st.audienceRow, { borderTopColor: colors.border }]}>
+              <View style={{ flex: 1, paddingRight: 12, gap: 2 }}>
+                <Text style={[st.rowKey, { color: colors.text }]}>Post platform-wide (global)</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>
+                  {broadcastGlobally
+                    ? "Everyone can see and vote — not just your friends."
+                    : "Only your friends can see and vote on this post."}
+                </Text>
+              </View>
+              <Switch
+                value={broadcastGlobally}
+                onValueChange={setBroadcastGlobally}
+                trackColor={{ true: colors.accent }}
+              />
+            </View>
+          ) : null}
 
           {/* Ending-soon threshold (admin only) */}
           {isAdmin ? (
@@ -210,6 +364,117 @@ export default function EditPostScreen() {
             </View>
           ) : null}
         </View>
+
+        {/* Go-live time — only for not-yet-published (scheduled) posts */}
+        {isScheduled ? (
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[st.cardLabel, { color: colors.subtext }]}>⏰ GO-LIVE TIME</Text>
+            <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10 }}>
+              Not published yet — change when this post goes live.
+            </Text>
+
+            {/* Quick presets (relative to now) */}
+            <View style={st.presetRow}>
+              {SCHEDULE_PRESETS.map((p) => (
+                <Pressable
+                  key={p.label}
+                  style={[st.presetChip, { borderColor: colors.border, backgroundColor: colors.section }]}
+                  onPress={() => {
+                    const d = new Date(Date.now() + p.hours * 3_600_000);
+                    d.setSeconds(0, 0);
+                    setScheduleDate(d);
+                    setSubmitError(null);
+                  }}
+                >
+                  <Text style={[st.presetChipText, { color: colors.text }]}>{p.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Custom date + time steppers */}
+            <View style={[st.dtCard, { backgroundColor: colors.section, borderColor: colors.border }]}>
+              <View style={st.dtRow}>
+                <Text style={[st.dtLabel, { color: colors.muted }]}>DATE</Text>
+                <View style={st.dtStepper}>
+                  <Pressable
+                    style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setScheduleDate((d) => { const n = new Date(d); n.setDate(n.getDate() - 1); return n.getTime() > Date.now() ? n : d; })}
+                    hitSlop={8}
+                  >
+                    <Text style={[st.dtArrow, { color: colors.text }]}>‹</Text>
+                  </Pressable>
+                  <Text style={[st.dtValue, { color: colors.text }]}>
+                    {scheduleDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </Text>
+                  <Pressable
+                    style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setScheduleDate((d) => { const n = new Date(d); n.setDate(n.getDate() + 1); return n; })}
+                    hitSlop={8}
+                  >
+                    <Text style={[st.dtArrow, { color: colors.text }]}>›</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={[st.dtDivider, { backgroundColor: colors.border }]} />
+
+              <View style={st.dtRow}>
+                <Text style={[st.dtLabel, { color: colors.muted }]}>TIME</Text>
+                <View style={st.dtTimeGroup}>
+                  <View style={st.dtStepper}>
+                    <Pressable
+                      style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => setScheduleDate((d) => { const n = new Date(d); n.setHours((n.getHours() + 1) % 24); return n; })}
+                      hitSlop={6}
+                    >
+                      <Text style={[st.dtArrow, { color: colors.text }]}>+</Text>
+                    </Pressable>
+                    <Text style={[st.dtValue, { color: colors.text }]}>{String(scheduleDate.getHours() % 12 || 12).padStart(2, "0")}</Text>
+                    <Pressable
+                      style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => setScheduleDate((d) => { const n = new Date(d); n.setHours((n.getHours() + 23) % 24); return n; })}
+                      hitSlop={6}
+                    >
+                      <Text style={[st.dtArrow, { color: colors.text }]}>−</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={[st.dtColon, { color: colors.accent }]}>:</Text>
+                  <View style={st.dtStepper}>
+                    <Pressable
+                      style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => setScheduleDate((d) => { const n = new Date(d); n.setMinutes((Math.floor(n.getMinutes() / 5) + 1) * 5 % 60); return n; })}
+                      hitSlop={6}
+                    >
+                      <Text style={[st.dtArrow, { color: colors.text }]}>+</Text>
+                    </Pressable>
+                    <Text style={[st.dtValue, { color: colors.text }]}>{String(scheduleDate.getMinutes()).padStart(2, "0")}</Text>
+                    <Pressable
+                      style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => setScheduleDate((d) => { const n = new Date(d); const cur = Math.floor(n.getMinutes() / 5); n.setMinutes(((cur - 1 + 12) % 12) * 5); return n; })}
+                      hitSlop={6}
+                    >
+                      <Text style={[st.dtArrow, { color: colors.text }]}>−</Text>
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    style={[st.dtAmPm, { backgroundColor: colors.accent }]}
+                    onPress={() => setScheduleDate((d) => { const n = new Date(d); n.setHours((n.getHours() + 12) % 24); return n; })}
+                  >
+                    <Text style={st.dtAmPmText}>{scheduleDate.getHours() >= 12 ? "PM" : "AM"}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            <View style={[st.scheduleSummary, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "44" }]}>
+              <Text style={{ fontSize: 18 }}>📅</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.scheduleSummaryTitle, { color: colors.accent }]}>Goes live</Text>
+                <Text style={[st.scheduleSummaryDate, { color: colors.text }]}>{fmtScheduleSummary(scheduleDate)}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
 
         {/* Error */}
         {submitError ? (
@@ -268,12 +533,33 @@ const st = StyleSheet.create({
   cardLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 },
   optionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   optionThumb: { width: 56, height: 56, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  bodyPhotoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  bodyPhoto: { width: 72, height: 72, borderRadius: 8, overflow: "hidden" },
   optionLabel: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1 },
+  audienceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1 },
   rowKey: { fontSize: 14, fontWeight: "600" },
   rowVal: { fontSize: 14 },
   captionInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 60, textAlignVertical: "top" },
   errorBanner: { borderRadius: 10, padding: 12 },
+  presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  presetChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
+  presetChipText: { fontSize: 13, fontWeight: "700" },
+  dtCard: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 10 },
+  dtRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  dtLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8 },
+  dtStepper: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dtTimeGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dtBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  dtArrow: { fontSize: 18, fontWeight: "700" },
+  dtValue: { fontSize: 16, fontWeight: "700", minWidth: 44, textAlign: "center" },
+  dtColon: { fontSize: 18, fontWeight: "800" },
+  dtDivider: { height: StyleSheet.hairlineWidth },
+  dtAmPm: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  dtAmPmText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  scheduleSummary: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
+  scheduleSummaryTitle: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
+  scheduleSummaryDate: { fontSize: 14, fontWeight: "700", marginTop: 2 },
   saveBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center" },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },

@@ -91,6 +91,7 @@ export const USER_POSTS = gql`
       format
       caption
       createdAt
+      isUserGlobalBroadcast
       totalVotes
       upvoteCount
       downvoteCount
@@ -116,6 +117,9 @@ export const USER_POSTS = gql`
       }
       options {
         label
+        imageUrl
+        imageFocalX
+        imageFocalY
       }
       category {
         id
