@@ -28,6 +28,7 @@ import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/ad
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { ImagePositionEditor } from "../../components/ImagePositionEditor";
+import { CompareImageCropper } from "../../components/CompareImageCropper";
 import { AppActionSheet } from "../../components/AppDialog";
 import { hasCustomFocal, DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
@@ -257,6 +258,8 @@ export default function CreateScreen() {
   const [campaignModal, setCampaignModal] = useState(false);
   const [positionSlotId, setPositionSlotId] = useState<string | null>(null);
   const [imageSheetSlotId, setImageSheetSlotId] = useState<string | null>(null);
+  // Pending crop: compare images pass through the crop+zoom editor before upload.
+  const [cropper, setCropper] = useState<{ slotId: string; uri: string } | null>(null);
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
@@ -414,6 +417,31 @@ export default function CreateScreen() {
   }
 
   // ── Image pick + upload ───────────────────────────────────────────────────
+  // Upload a local image uri (already picked/cropped) into a slot.
+  async function uploadToSlot(slotId: string, uri: string, mimeType = "image/jpeg", fileName?: string) {
+    const ext = mimeType.split("/")[1] ?? "jpg";
+    const filename = fileName ?? `photo_${Date.now()}.${ext}`;
+    patchSlot(slotId, { localUri: uri, uploading: true, error: null, publicUrl: null });
+    try {
+      const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
+      if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
+      const { uploadUrl, publicUrl } = data.getImageUploadUrl;
+      let uploadUri = uri;
+      if (Platform.OS === "android" && !uri.startsWith("file://")) {
+        uploadUri = `${FileSystem.cacheDirectory}upload_${Date.now()}.${ext}`;
+        await FileSystem.copyAsync({ from: uri, to: uploadUri });
+      }
+      const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
+        httpMethod: "PUT", uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { "Content-Type": mimeType },
+      });
+      if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
+      patchSlot(slotId, { uploading: false, publicUrl });
+    } catch (err: unknown) {
+      patchSlot(slotId, { uploading: false, error: err instanceof Error ? err.message : "Upload failed" });
+    }
+  }
+
   async function pickAndUpload(slotId: string, useCamera: boolean) {
     try {
       if (useCamera) {
@@ -423,29 +451,18 @@ export default function CreateScreen() {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") { Alert.alert("Permission needed", "Gallery access required."); return; }
       }
+      // Compare images go through our crop+zoom editor for a uniform shape;
+      // poll thumbnails use the OS square crop (small + square-ish).
       const result = useCamera
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.85, allowsEditing: true })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85, allowsEditing: true });
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.92, allowsEditing: isPoll })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.92, allowsEditing: isPoll });
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
-      const mimeType = asset.mimeType ?? "image/jpeg";
-      const ext = mimeType.split("/")[1] ?? "jpg";
-      const filename = asset.fileName ?? `photo_${Date.now()}.${ext}`;
-      patchSlot(slotId, { localUri: asset.uri, uploading: true, error: null, publicUrl: null });
-      const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
-      if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
-      const { uploadUrl, publicUrl } = data.getImageUploadUrl;
-      let uploadUri = asset.uri;
-      if (Platform.OS === "android" && !asset.uri.startsWith("file://")) {
-        uploadUri = `${FileSystem.cacheDirectory}upload_${Date.now()}.${ext}`;
-        await FileSystem.copyAsync({ from: asset.uri, to: uploadUri });
+      if (!isPoll) {
+        setCropper({ slotId, uri: asset.uri });
+        return;
       }
-      const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
-        httpMethod: "PUT", uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: { "Content-Type": mimeType },
-      });
-      if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
-      patchSlot(slotId, { uploading: false, publicUrl });
+      await uploadToSlot(slotId, asset.uri, asset.mimeType ?? "image/jpeg", asset.fileName ?? undefined);
     } catch (err: unknown) {
       patchSlot(slotId, { uploading: false, error: err instanceof Error ? err.message : "Upload failed" });
     }
@@ -1121,6 +1138,20 @@ export default function CreateScreen() {
         );
       })()}
 
+      {/* Crop + zoom editor (compare images) */}
+      <CompareImageCropper
+        visible={cropper !== null}
+        uri={cropper?.uri ?? null}
+        /* Match the post cell shape: 3+ options render as squares, 2 as portrait. */
+        aspect={slots.length >= 3 ? 1 : 1.55}
+        onCancel={() => setCropper(null)}
+        onDone={(croppedUri) => {
+          const target = cropper;
+          setCropper(null);
+          if (target) void uploadToSlot(target.slotId, croppedUri, "image/jpeg");
+        }}
+      />
+
       <AppActionSheet
         visible={imageSheetSlotId !== null}
         title={imageSheetSlot?.localUri || imageSheetSlot?.publicUrl ? "Image options" : "Add image"}
@@ -1128,6 +1159,16 @@ export default function CreateScreen() {
         actions={
           imageSheetSlot?.localUri || imageSheetSlot?.publicUrl
             ? [
+                ...(!isPoll && (imageSheetSlot?.localUri || imageSheetSlot?.publicUrl)
+                  ? [{
+                      label: "Crop & reposition",
+                      onPress: () => {
+                        const s = imageSheetSlot;
+                        const src = s?.localUri ?? s?.publicUrl;
+                        if (s && src) setCropper({ slotId: s.id, uri: src });
+                      },
+                    }]
+                  : []),
                 {
                   label: "Replace from gallery",
                   onPress: () => void pickAndUpload(imageSheetSlotId!, false),
