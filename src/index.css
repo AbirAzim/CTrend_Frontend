@@ -18237,6 +18237,113 @@ a.cx-profile-btn-accent {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Copy / forward actions in the quick-react bar */
+.cw-bubble-act-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--ig-border, rgba(0, 0, 0, 0.12));
+}
+.cw-bubble-act-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ig-text, #1f2937);
+}
+[data-theme="dark"] .cw-bubble-act-btn { color: #e2e8f0; }
+
+/* Forward popover */
+.cw-fwd-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  max-width: 80vw;
+  background: var(--ig-surface, #fff);
+  border: 1px solid var(--ig-border, rgba(0, 0, 0, 0.1));
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  z-index: 6;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cw-msg--mine .cw-fwd-pop { left: auto; right: 0; transform: none; }
+[data-theme="dark"] .cw-fwd-pop { background: #1e293b; border-color: rgba(255, 255, 255, 0.12); }
+.cw-fwd-pop-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; font-weight: 800; color: var(--ig-text, #1f2937); padding: 2px 4px; }
+[data-theme="dark"] .cw-fwd-pop-head { color: #e2e8f0; }
+.cw-fwd-pop-close { background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--ig-text-muted, #64748b); }
+.cw-fwd-pop-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.cw-fwd-pop-empty { font-size: 0.8rem; color: var(--ig-text-muted, #64748b); text-align: center; padding: 14px 0; margin: 0; }
+.cw-fwd-pop-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: 8px 8px; border-radius: 8px; font-size: 0.85rem; color: var(--ig-text, #1f2937);
+}
+.cw-fwd-pop-item:hover { background: var(--ig-surface-2, rgba(0, 0, 0, 0.04)); }
+[data-theme="dark"] .cw-fwd-pop-item { color: #e2e8f0; }
+[data-theme="dark"] .cw-fwd-pop-item:hover { background: rgba(255, 255, 255, 0.06); }
+.cw-fwd-pop-item--sel { background: rgba(99, 102, 241, 0.12); }
+.cw-fwd-pop-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-fwd-pop-check { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--ig-border, rgba(0,0,0,0.2)); display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff; flex-shrink: 0; }
+.cw-fwd-pop-check--on { background: var(--cx-accent, #6366f1); border-color: var(--cx-accent, #6366f1); }
+.cw-fwd-pop-send {
+  margin-top: 2px; padding: 9px; border-radius: 10px; border: none; cursor: pointer;
+  background: var(--cx-accent, #6366f1); color: #fff; font-weight: 800; font-size: 0.85rem;
+}
+.cw-fwd-pop-send:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Compare image cropper (web) ───────────────────────────────────── */
+.ig-cropper {
+  background: #0b0f1a;
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 92vw;
+}
+.ig-cropper-title { color: #fff; font-size: 1.05rem; font-weight: 800; margin: 0; }
+.ig-cropper-hint { color: #94a3b8; font-size: 0.75rem; margin: -6px 0 0; text-align: center; }
+.ig-cropper-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  touch-action: none;
+  cursor: grab;
+}
+.ig-cropper-frame:active { cursor: grabbing; }
+.ig-cropper-bgblur { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(26px); transform: scale(1.1); }
+.ig-cropper-bgtint { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.25); }
+.ig-cropper-bgsolid { position: absolute; inset: 0; }
+.ig-cropper-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
+.ig-cropper-guide { position: absolute; background: rgba(255, 255, 255, 0.3); pointer-events: none; }
+.ig-cropper-guide--v { top: 0; bottom: 0; width: 1px; }
+.ig-cropper-guide--h { left: 0; right: 0; height: 1px; }
+.ig-cropper-zoom { display: flex; align-items: center; gap: 14px; }
+.ig-cropper-zoom-btn {
+  width: 40px; height: 40px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.4);
+  background: transparent; color: #fff; font-size: 1.4rem; font-weight: 800; cursor: pointer; line-height: 1;
+}
+.ig-cropper-zoom-val { color: #fff; font-size: 0.85rem; font-weight: 700; min-width: 52px; text-align: center; }
+.ig-cropper-fill { display: flex; align-items: center; gap: 8px; }
+.ig-cropper-fill-label { color: #94a3b8; font-size: 0.78rem; font-weight: 700; }
+.ig-cropper-fill-chip {
+  border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 999px; padding: 5px 14px;
+  background: transparent; color: #cbd5e1; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
+.ig-cropper-fill-chip--active { border-color: var(--cx-accent, #6366f1); background: rgba(99, 102, 241, 0.25); color: #fff; }
+.ig-cropper-actions { display: flex; gap: 12px; margin-top: 4px; }
+.ig-cropper-btn { border-radius: 12px; padding: 11px 26px; font-size: 0.95rem; font-weight: 800; cursor: pointer; min-width: 120px; }
+.ig-cropper-btn--ghost { background: transparent; border: 1px solid rgba(255, 255, 255, 0.4); color: #fff; }
+.ig-cropper-btn--primary { background: var(--cx-accent, #6366f1); border: none; color: #fff; }
+.ig-cropper-btn:disabled { opacity: 0.6; cursor: default; }
+
 .cw-bubble-quick-react-btn {
   background: none;
   border: none;

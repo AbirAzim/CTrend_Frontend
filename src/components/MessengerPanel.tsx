@@ -112,11 +112,52 @@ function MessageBubble({
   onJumpToQuoted?: (messageId: string) => void;
   children: ReactNode;
 }) {
-  const { reactMessage } = useMessenger();
+  const { reactMessage, conversations, sendMessage } = useMessenger();
+  const { user } = useAuth();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hoverQuick, setHoverQuick] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardSel, setForwardSel] = useState<Set<string>>(new Set());
+  const [forwarding, setForwarding] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleCopy() {
+    const text = (msg.text ?? "").trim();
+    if (!text) return;
+    void navigator.clipboard?.writeText(text);
+    setCopied(true);
+    setPickerOpen(false);
+    setHoverQuick(false);
+    setTimeout(() => setCopied(false), 1400);
+  }
+
+  function toggleForwardTarget(id: string) {
+    setForwardSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function doForward() {
+    if (forwardSel.size === 0) return;
+    const targets = Array.from(forwardSel);
+    setForwarding(true);
+    try {
+      await Promise.all(
+        targets.map((cid) => sendMessage(cid, msg.text && msg.text.trim() ? msg.text : " ", msg.imageUrl ?? undefined)),
+      );
+      setForwardOpen(false);
+      setForwardSel(new Set());
+      setPickerOpen(false);
+      setHoverQuick(false);
+    } finally {
+      setForwarding(false);
+    }
+  }
 
   const showQuickBar = pickerOpen || hoverQuick;
 
@@ -172,6 +213,74 @@ function MessageBubble({
               {emoji}
             </button>
           ))}
+          <span className="cw-bubble-act-sep" aria-hidden />
+          {msg.text?.trim() ? (
+            <button
+              type="button"
+              className="cw-bubble-quick-react-btn cw-bubble-act-btn"
+              aria-label="Copy message"
+              title={copied ? "Copied" : "Copy"}
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden><polyline points="20 6 9 17 4 12" /></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              )}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="cw-bubble-quick-react-btn cw-bubble-act-btn"
+            aria-label="Forward message"
+            title="Forward"
+            onClick={() => { setForwardSel(new Set()); setForwardOpen(true); }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden><polyline points="15 17 20 12 15 7" /><path d="M4 18v-2a4 4 0 0 1 4-4h12" /></svg>
+          </button>
+        </div>
+      ) : null}
+
+      {forwardOpen ? (
+        <div className="cw-fwd-pop" role="dialog" aria-label="Forward to" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="cw-fwd-pop-head">
+            <span>Forward to…</span>
+            <button type="button" className="cw-fwd-pop-close" aria-label="Close" onClick={() => setForwardOpen(false)}>✕</button>
+          </div>
+          <div className="cw-fwd-pop-list">
+            {conversations.filter((c) => c.id !== conversationId).length === 0 ? (
+              <p className="cw-fwd-pop-empty">No other chats.</p>
+            ) : (
+              conversations
+                .filter((c) => c.id !== conversationId)
+                .map((c) => {
+                  const others = c.participants.filter((p) => p.id !== user?.id);
+                  const title = c.name?.trim() || others.map((p) => p.displayName).join(", ") || "Chat";
+                  const selected = forwardSel.has(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`cw-fwd-pop-item${selected ? " cw-fwd-pop-item--sel" : ""}`}
+                      onClick={() => toggleForwardTarget(c.id)}
+                    >
+                      <span className="cw-fwd-pop-name">{title}</span>
+                      <span className={`cw-fwd-pop-check${selected ? " cw-fwd-pop-check--on" : ""}`} aria-hidden>
+                        {selected ? "✓" : ""}
+                      </span>
+                    </button>
+                  );
+                })
+            )}
+          </div>
+          <button
+            type="button"
+            className="cw-fwd-pop-send"
+            disabled={forwarding || forwardSel.size === 0}
+            onClick={() => void doForward()}
+          >
+            {forwarding ? "Forwarding…" : `Forward${forwardSel.size > 0 ? ` (${forwardSel.size})` : ""}`}
+          </button>
         </div>
       ) : null}
 

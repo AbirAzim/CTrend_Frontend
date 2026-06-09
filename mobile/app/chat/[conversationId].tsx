@@ -40,7 +40,10 @@ import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { MODERATOR_BRAND_NAME } from "@ctrend/shared/lib/moderatorBrand";
+import * as Clipboard from "expo-clipboard";
+import { Ionicons } from "@expo/vector-icons";
 import { LinkText } from "../../components/LinkText";
+import { useToast } from "../../components/useToast";
 import logoAsset from "../../assets/logo.png";
 
 // Official platform sender id used for moderator/admin broadcast messages.
@@ -142,6 +145,8 @@ function MessageBubble({
   onImagePress,
   onJumpToOriginal,
   onDelete,
+  onCopy,
+  onForward,
 }: {
   msg: Message;
   isOwn: boolean;
@@ -157,6 +162,8 @@ function MessageBubble({
   onImagePress: (uri: string) => void;
   onJumpToOriginal: (messageId: string) => void;
   onDelete: () => void;
+  onCopy: () => void;
+  onForward: () => void;
 }) {
   const isModerator = msg.senderId === MODERATOR_SENDER_ID;
   const avatar = isModerator ? null : normalizeProfileImageUrl(msg.senderAvatar);
@@ -201,13 +208,21 @@ function MessageBubble({
               <Text style={styles.quickReactEmoji}>{emoji}</Text>
             </Pressable>
           ))}
+          {msg.text && msg.text.trim() ? (
+            <Pressable style={styles.quickReactClose} onPress={onCopy} hitSlop={4}>
+              <Ionicons name="copy-outline" size={15} color="rgba(255,255,255,0.9)" />
+            </Pressable>
+          ) : null}
+          <Pressable style={styles.quickReactClose} onPress={onForward} hitSlop={4}>
+            <Ionicons name="arrow-redo-outline" size={16} color="rgba(255,255,255,0.9)" />
+          </Pressable>
           {isOwn && (
-            <Pressable style={styles.quickReactClose} onPress={onDelete}>
-              <Text style={styles.quickReactCloseText}>🗑</Text>
+            <Pressable style={styles.quickReactClose} onPress={onDelete} hitSlop={4}>
+              <Ionicons name="trash-outline" size={15} color="rgba(248,113,113,0.95)" />
             </Pressable>
           )}
-          <Pressable style={styles.quickReactClose} onPress={onLongPress}>
-            <Text style={styles.quickReactCloseText}>✕</Text>
+          <Pressable style={styles.quickReactClose} onPress={onLongPress} hitSlop={4}>
+            <Ionicons name="close" size={17} color="rgba(255,255,255,0.9)" />
           </Pressable>
         </View>
       )}
@@ -373,6 +388,7 @@ export default function ChatScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { showToast, ToastView } = useToast();
   const { playNotification } = useSounds();
   const insets = useSafeAreaInsets();
   const goBack = useBackToFeed(); // cold-start from a notification → back to feed
@@ -393,6 +409,10 @@ export default function ChatScreen() {
   const [activeReplyMsgId, setActiveReplyMsgId] = useState<string | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<ReplyPreview | null>(null);
+  // Forward: the message being forwarded + selected target conversations.
+  const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
+  const [forwardTargets, setForwardTargets] = useState<Set<string>>(new Set());
+  const [forwarding, setForwarding] = useState(false);
   const [flashMsgId, setFlashMsgId] = useState<string | null>(null);
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -450,6 +470,10 @@ export default function ChatScreen() {
   // ── Mutations ───────────────────────────────────────────────────────────────
   const [sendMessage] = useMutation(SEND_MESSAGE);
   const [setTypingMut] = useMutation(SET_TYPING);
+  // Conversations list for the forward picker.
+  const { data: convListData } = useQuery<ConversationsData>(MY_CONVERSATIONS, {
+    fetchPolicy: "cache-and-network",
+  });
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [reactMessage] = useMutation(REACT_MESSAGE);
   const [deleteMessageMut] = useMutation(DELETE_MESSAGE);
@@ -523,6 +547,57 @@ export default function ChatScreen() {
   }
 
   // ── Reply to a message ──────────────────────────────────────────────────────
+  function handleCopy(msg: Message) {
+    const text = (msg.text ?? "").trim();
+    if (!text) return;
+    void Clipboard.setStringAsync(text);
+    setActiveReactMsgId(null);
+    showToast("Copied to clipboard", "success");
+  }
+
+  function handleForward(msg: Message) {
+    setForwardMsg(msg);
+    setForwardTargets(new Set());
+    setActiveReactMsgId(null);
+  }
+
+  function toggleForwardTarget(id: string) {
+    setForwardTargets((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function doForward() {
+    if (!forwardMsg || forwardTargets.size === 0) return;
+    const m = forwardMsg;
+    const targets = Array.from(forwardTargets);
+    setForwarding(true);
+    try {
+      await Promise.all(
+        targets.map((cid) =>
+          sendMessage({
+            variables: {
+              conversationId: cid,
+              text: m.text && m.text.trim() ? m.text : " ",
+              ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
+            },
+            refetchQueries: [MY_CONVERSATIONS],
+          }),
+        ),
+      );
+      setForwardMsg(null);
+      setForwardTargets(new Set());
+      showToast(`Forwarded to ${targets.length} chat${targets.length > 1 ? "s" : ""}`, "success");
+    } catch {
+      showToast("Failed to forward", "error");
+    } finally {
+      setForwarding(false);
+    }
+  }
+
   function handleReply(msg: Message) {
     setReplyTarget({
       messageId: msg.id,
@@ -885,6 +960,8 @@ export default function ChatScreen() {
                   onImagePress={(uri) => setViewerUri(uri)}
                   onJumpToOriginal={handleJumpToOriginal}
                   onDelete={() => handleDeleteMessage(msg)}
+                  onCopy={() => handleCopy(msg)}
+                  onForward={() => handleForward(msg)}
                 />
               );
             }}
@@ -1040,6 +1117,73 @@ export default function ChatScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Forward picker */}
+      <Modal visible={forwardMsg !== null} transparent animationType="slide" onRequestClose={() => setForwardMsg(null)}>
+        <Pressable style={styles.fwdOverlay} onPress={() => setForwardMsg(null)}>
+          <View
+            style={[styles.fwdSheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={[styles.fwdHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.fwdTitle, { color: colors.text }]}>Forward to…</Text>
+
+            {forwardMsg ? (
+              <View style={[styles.fwdPreview, { backgroundColor: colors.section, borderColor: colors.border }]}>
+                {forwardMsg.imageUrl ? (
+                  <Image source={{ uri: forwardMsg.imageUrl }} style={styles.fwdPreviewThumb} contentFit="cover" />
+                ) : null}
+                <Text style={[styles.fwdPreviewText, { color: colors.muted }]} numberOfLines={2}>
+                  {forwardMsg.text?.trim() || (forwardMsg.imageUrl ? "📷 Photo" : "")}
+                </Text>
+              </View>
+            ) : null}
+
+            <FlatList
+              data={(convListData?.myConversations ?? []).filter((c) => c.id !== conversationId)}
+              keyExtractor={(c) => c.id}
+              style={{ maxHeight: 320 }}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={<Text style={[styles.fwdEmpty, { color: colors.muted }]}>No other chats to forward to.</Text>}
+              renderItem={({ item: c }) => {
+                const other = c.participants.find((p) => p.id !== user?.id) ?? c.participants[0];
+                const title = c.type === "group" || c.name ? c.name ?? "Group" : other?.displayName ?? "Unknown";
+                const avatar = normalizeProfileImageUrl(other?.avatarUrl);
+                const selected = forwardTargets.has(c.id);
+                return (
+                  <Pressable style={styles.fwdRow} onPress={() => toggleForwardTarget(c.id)}>
+                    <View style={[styles.fwdAvatar, { backgroundColor: colors.section }]}>
+                      {avatar ? (
+                        <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                      ) : (
+                        <Text style={styles.fwdAvatarText}>{title.slice(0, 1).toUpperCase()}</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.fwdRowName, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+                    <View style={[styles.fwdCheck, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accent : "transparent" }]}>
+                      {selected ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+
+            <Pressable
+              style={[styles.fwdSend, { backgroundColor: colors.accent }, (forwarding || forwardTargets.size === 0) && { opacity: 0.5 }]}
+              onPress={() => void doForward()}
+              disabled={forwarding || forwardTargets.size === 0}
+            >
+              {forwarding ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.fwdSendText}>Forward{forwardTargets.size > 0 ? ` (${forwardTargets.size})` : ""}</Text>
+              )}
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <ToastView />
     </View>
   );
 }
@@ -1147,6 +1291,23 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   quickReactCloseText: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700" },
+
+  // Forward picker
+  fwdOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  fwdSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 12, paddingHorizontal: 16, gap: 10 },
+  fwdHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 6 },
+  fwdTitle: { fontSize: 17, fontWeight: "800" },
+  fwdPreview: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 10, borderWidth: 1, padding: 10 },
+  fwdPreviewThumb: { width: 36, height: 36, borderRadius: 6 },
+  fwdPreviewText: { flex: 1, fontSize: 13 },
+  fwdEmpty: { textAlign: "center", paddingVertical: 24, fontSize: 14 },
+  fwdRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
+  fwdAvatar: { width: 40, height: 40, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  fwdAvatarText: { color: "#94a3b8", fontSize: 16, fontWeight: "800" },
+  fwdRowName: { flex: 1, fontSize: 15, fontWeight: "600" },
+  fwdCheck: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  fwdSend: { borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 4 },
+  fwdSendText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 
   // Standalone Messenger-style reply arrow beside the bubble
   sideReply: {

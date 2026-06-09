@@ -9,6 +9,7 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
 import { useAuth } from "../context/AuthContext";
 import { ImagePositionEditor } from "../components/ImagePositionEditor";
+import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
 
 type DraftCompareItem = {
@@ -69,6 +70,8 @@ export function CreatePostPage() {
   ]);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [positionEditId, setPositionEditId] = useState<string | null>(null);
+  // Pending crop: compare images pass through the crop+zoom editor before upload.
+  const [cropper, setCropper] = useState<{ id: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -91,8 +94,18 @@ export function CreatePostPage() {
   );
   const showGlobalPostOption = !isAdmin && allowUserGlobalPosts;
 
-  async function handleFileChange(id: string, file: File | undefined) {
+  function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
+    if (!isPoll) {
+      // Compare images go through the crop+zoom editor for a uniform shape.
+      setCropper({ id, url: URL.createObjectURL(file) });
+      return;
+    }
+    // Poll option thumbnails upload directly.
+    void uploadFileToItem(id, file);
+  }
+
+  async function uploadFileToItem(id: string, file: File) {
     // Show local preview immediately so user sees feedback before upload finishes
     const localPreview = URL.createObjectURL(file);
     setItems((prev) =>
@@ -961,6 +974,23 @@ export function CreatePostPage() {
             );
           }}
           onClose={() => setPositionEditId(null)}
+        />
+      ) : null}
+
+      {cropper ? (
+        <CompareImageCropper
+          src={cropper.url}
+          aspect={1}
+          onCancel={() => {
+            URL.revokeObjectURL(cropper.url);
+            setCropper(null);
+          }}
+          onDone={(file) => {
+            const id = cropper.id;
+            URL.revokeObjectURL(cropper.url);
+            setCropper(null);
+            void uploadFileToItem(id, file);
+          }}
         />
       ) : null}
     </div>
