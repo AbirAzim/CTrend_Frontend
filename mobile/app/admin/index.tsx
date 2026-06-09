@@ -119,6 +119,9 @@ export default function AdminUsersScreen() {
   const [setMinAndroidVersion, { loading: disablingUpdate }] = useMutation(SET_MIN_ANDROID_VERSION_CODE);
   const [publishUpdate, { loading: publishingUpdate }] = useMutation(PUBLISH_ANDROID_UPDATE_NOTICE);
   const [globalDetails, setGlobalDetails] = useState(false);
+  // Android update notice is a rarely-used admin tool — collapsed by default so
+  // the user list stays prominent.
+  const [updateNoticeOpen, setUpdateNoticeOpen] = useState(false);
   const [minVersionInput, setMinVersionInput] = useState(String(BUNDLED_ANDROID_VERSION_CODE));
   const [updateTitleInput, setUpdateTitleInput] = useState("Update required");
   const [updateBodyInput, setUpdateBodyInput] = useState(
@@ -240,9 +243,18 @@ export default function AdminUsersScreen() {
       {/* Header */}
       <View style={[st.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={st.headerTop}>
-          <View>
-            <Text style={[st.sectionTitle, { color: colors.text }]}>All Users</Text>
-            <Text style={[st.sectionSub, { color: colors.muted }]}>Regular users on the platform</Text>
+          <View style={{ flex: 1 }}>
+            <View style={st.titleRow}>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>All Users</Text>
+              <View style={[st.countPill, { backgroundColor: colors.accent + "1a", borderColor: colors.accent + "55" }]}>
+                <Text style={[st.countPillText, { color: colors.accent }]}>
+                  {total.toLocaleString()} total
+                </Text>
+              </View>
+            </View>
+            <Text style={[st.sectionSub, { color: colors.muted }]}>
+              {debouncedSearch ? `Matching "${debouncedSearch}"` : "Regular users on the platform"}
+            </Text>
           </View>
           <Pressable style={[st.inviteBtn, { backgroundColor: colors.accent }]} onPress={() => setInviteModal(true)}>
             <Text style={st.inviteBtnText}>+ Invite User</Text>
@@ -306,16 +318,21 @@ export default function AdminUsersScreen() {
         </View>
 
         <View style={[st.globalCard, { borderColor: colors.border, backgroundColor: colors.inputBg }]}>
-          <Text style={[st.globalTitle, { color: colors.text }]}>⬆️ Android update notice</Text>
-          <Text style={[st.globalStatus, { color: colors.muted }]}>
+          <Pressable style={st.collapseHead} onPress={() => setUpdateNoticeOpen((v) => !v)} hitSlop={6}>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.globalTitle, { color: colors.text }]}>⬆️ Android update notice</Text>
+              <Text style={[st.globalStatus, { color: minAndroidVersion > 0 ? colors.accent : colors.muted }]}>
+                {minAndroidVersion > 0 ? `Active · min version ${minAndroidVersion}+` : "Off · tap to configure"}
+              </Text>
+            </View>
+            <Text style={[st.collapseChevron, { color: colors.muted }]}>{updateNoticeOpen ? "▴" : "▾"}</Text>
+          </Pressable>
+          {!updateNoticeOpen ? null : (
+          <>
+          <Text style={[st.globalStatus, { color: colors.muted, marginTop: 4 }]}>
             Outdated Android users see a blocking modal until they update. Push + in-app alert sent only
             to users below the min version (not up-to-date users).
           </Text>
-          {minAndroidVersion > 0 && (
-            <Text style={[st.globalStatus, { color: colors.accent, marginTop: 4 }]}>
-              Active: min version {minAndroidVersion}+
-            </Text>
-          )}
           <TextInput
             style={[st.modalInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, marginTop: 8 }]}
             placeholder="Modal title"
@@ -363,6 +380,8 @@ export default function AdminUsersScreen() {
               </Text>
             </Pressable>
           )}
+          </>
+          )}
         </View>
       </View>
 
@@ -401,33 +420,32 @@ export default function AdminUsersScreen() {
           }
           renderItem={({ item: u }) => (
             <View style={[st.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <UserAvatar user={u} colors={colors} />
-              <View style={st.rowInfo}>
-                <Text style={[st.rowName, { color: colors.text }]} numberOfLines={1}>
-                  {u.displayName ?? u.username ?? "—"}
-                </Text>
-                <Text style={[st.rowEmail, { color: colors.muted }]} numberOfLines={1}>{u.email}</Text>
-                <View style={st.rowMeta}>
-                  <View style={[st.statusPill, { backgroundColor: u.emailVerified ? "rgba(34,197,94,0.1)" : "rgba(100,116,139,0.1)" }]}>
-                    <Text style={[st.statusText, { color: u.emailVerified ? "#22c55e" : "#64748b" }]}>
-                      {u.emailVerified ? "VERIFIED" : "UNVERIFIED"}
-                    </Text>
+              <Pressable
+                style={st.rowTap}
+                onPress={() => router.push(`/profile/${u.id}` as never)}
+                hitSlop={4}
+              >
+                <UserAvatar user={u} colors={colors} />
+                <View style={st.rowInfo}>
+                  <Text style={[st.rowName, { color: colors.text }]} numberOfLines={1}>
+                    {u.displayName ?? u.username ?? "—"}
+                  </Text>
+                  <Text style={[st.rowEmail, { color: colors.muted }]} numberOfLines={1}>{u.email}</Text>
+                  <View style={st.rowMeta}>
+                    <View style={[st.statusPill, { backgroundColor: u.emailVerified ? "rgba(34,197,94,0.1)" : "rgba(100,116,139,0.1)" }]}>
+                      <Text style={[st.statusText, { color: u.emailVerified ? "#22c55e" : "#64748b" }]}>
+                        {u.emailVerified ? "VERIFIED" : "UNVERIFIED"}
+                      </Text>
+                    </View>
+                    {u.createdAt && (
+                      <Text style={[st.joinedText, { color: colors.muted }]}>
+                        {new Date(u.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                      </Text>
+                    )}
                   </View>
-                  {u.createdAt && (
-                    <Text style={[st.joinedText, { color: colors.muted }]}>
-                      {new Date(u.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                    </Text>
-                  )}
                 </View>
-              </View>
+              </Pressable>
               <View style={st.rowActions}>
-                <Pressable
-                  style={[st.actionBtn, { borderColor: colors.accent }]}
-                  onPress={() => router.push(`/user/${u.id}` as never)}
-                  hitSlop={4}
-                >
-                  <Text style={[st.actionBtnText, { color: colors.accent }]}>👤</Text>
-                </Pressable>
                 <Pressable
                   style={[st.actionBtn, { borderColor: "#f87171" }]}
                   onPress={() => void handleRemove(u)}
@@ -520,6 +538,11 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     headerTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
     sectionTitle: { fontSize: 16, fontWeight: "800" },
     sectionSub: { fontSize: 12, marginTop: 2 },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+    countPill: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2 },
+    countPillText: { fontSize: 11, fontWeight: "800" },
+    collapseHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+    collapseChevron: { fontSize: 16, fontWeight: "800" },
     inviteBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
     inviteBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
     searchWrap: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, gap: 6 },
@@ -556,6 +579,7 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     pageBtnDisabled: { opacity: 0.4 },
     pageBtnText: { fontSize: 13, fontWeight: "700" },
     row: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 10, gap: 10 },
+    rowTap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
     rowInfo: { flex: 1, gap: 3 },
     rowName: { fontSize: 14, fontWeight: "700" },
     rowEmail: { fontSize: 12 },
