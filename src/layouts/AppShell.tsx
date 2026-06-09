@@ -11,6 +11,7 @@ import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
 import { NotificationBell } from "../components/NotificationBell";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { MessengerPanel } from "../components/MessengerPanel";
+import { WorldCupFloating } from "../components/WorldCupFloating";
 import {
   isBottomNavAdmin,
   isBottomNavCreate,
@@ -298,6 +299,7 @@ export function AppShell() {
         <Outlet key={location.pathname} />
       </main>
 
+      <WorldCupFloating />
       <MessengerPanel />
 
       <nav

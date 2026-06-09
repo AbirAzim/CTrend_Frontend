@@ -15,6 +15,7 @@ import { SoundProvider, useSounds } from "../context/SoundContext";
 import { NotificationProvider, useNotification, type NotifToast } from "../context/NotificationContext";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { ForceUpdateModal } from "../components/ForceUpdateModal";
+import { WorldCupFloating } from "../components/WorldCupFloating";
 import { useForceUpdateRequired } from "../hooks/useForceUpdateRequired";
 import { InAppNotificationBanner } from "../components/InAppNotificationBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
@@ -501,6 +502,7 @@ export default function RootLayout() {
                       <Stack screenOptions={{ headerShown: false }} />
                       <OfflineBanner />
                       <InAppNotificationBanner />
+                      <WorldCupFloating />
                       <ForceUpdateGate />
                     </ThemedRoot>
                   </KeyboardProvider>

@@ -1,59 +1,29 @@
 import { useQuery } from "@apollo/client";
 import { useNavigate } from "react-router-dom";
 import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
+import {
+  type WcFixture,
+  WC_STAGE_LABELS,
+  WC_STAGE_ORDER,
+  countdownToKickoff,
+  fixtureTeams,
+  formatTime,
+  groupByDay,
+  involvesTeam,
+  isFinished,
+  isLive,
+  isUpcoming,
+  liveFixtures,
+  liveMinute,
+  upcomingFixtures,
+} from "../lib/worldCupFixtures";
+import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
 
-type FixtureTeam = { name: string; shortName: string; crest: string };
-type FixtureScore = { home: number | null; away: number | null; winner: string | null };
-
-type Fixture = {
-  id: string;
-  externalId: number;
-  homeTeam: FixtureTeam;
-  awayTeam: FixtureTeam;
-  kickoff: string;
-  status: string;
-  stage: string;
-  group: string | null;
-  matchday: number | null;
-  score: FixtureScore;
-  campaignPostId: string | null;
-};
-
-const STAGE_ORDER: Record<string, number> = {
-  GROUP_STAGE: 0,
-  LAST_16: 1,
-  QUARTER_FINALS: 2,
-  SEMI_FINALS: 3,
-  THIRD_PLACE: 4,
-  FINAL: 5,
-};
-
-const STAGE_LABELS: Record<string, string> = {
-  GROUP_STAGE: "Group Stage",
-  LAST_16: "Round of 16",
-  QUARTER_FINALS: "Quarter Finals",
-  SEMI_FINALS: "Semi Finals",
-  THIRD_PLACE: "Third Place",
-  FINAL: "Final",
-};
-
-function formatKickoff(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === "IN_PLAY" || status === "PAUSED") {
-    return <span className="wc-badge wc-badge--live">LIVE</span>;
+function StatusBadge({ fixture }: { fixture: WcFixture }) {
+  if (isLive(fixture)) {
+    return <span className="wc-badge wc-badge--live">LIVE {liveMinute(fixture.kickoff)}&apos;</span>;
   }
-  if (status === "FINISHED") {
+  if (isFinished(fixture)) {
     return <span className="wc-badge wc-badge--finished">FT</span>;
   }
   return null;
@@ -79,28 +49,28 @@ function TeamCrest({ crest, name }: { crest: string; name: string }) {
   );
 }
 
-function FixtureRow({ fixture }: { fixture: Fixture }) {
+function FixtureRow({ fixture }: { fixture: WcFixture }) {
   const navigate = useNavigate();
-  const now = new Date();
-  const kickoff = new Date(fixture.kickoff);
-  const isUpcoming = kickoff > now;
-  const isLive = fixture.status === "IN_PLAY" || fixture.status === "PAUSED";
-  const isFinished = fixture.status === "FINISHED";
-  const hasScore = isFinished || isLive;
-  const canVote = !!fixture.campaignPostId && isUpcoming;
+  const live = isLive(fixture);
+  const finished = isFinished(fixture);
+  const upcoming = isUpcoming(fixture);
+  const hasScore = finished || live;
+  const canVote = !!fixture.campaignPostId && upcoming;
 
   const homeWon = fixture.score.winner === "HOME_TEAM";
   const awayWon = fixture.score.winner === "AWAY_TEAM";
 
   return (
-    <div className={`wc-fixture${isLive ? " wc-fixture--live" : ""}${isFinished ? " wc-fixture--finished" : ""}`}>
+    <div
+      className={`wc-fixture${live ? " wc-fixture--live" : ""}${finished ? " wc-fixture--finished" : ""}`}
+    >
       <div className={`wc-team wc-team--home${homeWon ? " wc-team--winner" : ""}`}>
         <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} />
         <span className="wc-team-name">{fixture.homeTeam.shortName}</span>
       </div>
 
       <div className="wc-center">
-        <StatusBadge status={fixture.status} />
+        <StatusBadge fixture={fixture} />
         {hasScore ? (
           <div className="wc-score">
             <span className={homeWon ? "wc-score-num wc-score-num--winner" : "wc-score-num"}>
@@ -112,9 +82,11 @@ function FixtureRow({ fixture }: { fixture: Fixture }) {
             </span>
           </div>
         ) : (
-          <div className="wc-kickoff-time">{formatKickoff(fixture.kickoff)}</div>
+          <>
+            <div className="wc-kickoff-time">{formatTime(fixture.kickoff)}</div>
+            <div className="wc-kickoff-date">{countdownToKickoff(fixture.kickoff)}</div>
+          </>
         )}
-        {!hasScore && <div className="wc-kickoff-date">{new Date(fixture.kickoff).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>}
         {canVote && (
           <button
             type="button"
@@ -134,7 +106,7 @@ function FixtureRow({ fixture }: { fixture: Fixture }) {
   );
 }
 
-function GroupSection({ group, fixtures }: { group: string; fixtures: Fixture[] }) {
+function GroupSection({ group, fixtures }: { group: string; fixtures: WcFixture[] }) {
   const label = group.replace("GROUP_", "Group ");
   const sorted = [...fixtures].sort(
     (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
@@ -151,16 +123,14 @@ function GroupSection({ group, fixtures }: { group: string; fixtures: Fixture[] 
   );
 }
 
-function StageSection({ stage, fixtures }: { stage: string; fixtures: Fixture[] }) {
-  const label = STAGE_LABELS[stage] ?? stage;
-  const isGroupStage = stage === "GROUP_STAGE";
+function StageSection({ stage, fixtures }: { stage: string; fixtures: WcFixture[] }) {
+  const label = WC_STAGE_LABELS[stage] ?? stage;
 
-  if (isGroupStage) {
-    const byGroup: Record<string, Fixture[]> = {};
+  if (stage === "GROUP_STAGE") {
+    const byGroup: Record<string, WcFixture[]> = {};
     for (const f of fixtures) {
       const g = f.group ?? "UNKNOWN";
-      if (!byGroup[g]) byGroup[g] = [];
-      byGroup[g].push(f);
+      (byGroup[g] ??= []).push(f);
     }
     const sortedGroups = Object.keys(byGroup).sort();
     return (
@@ -191,21 +161,23 @@ function StageSection({ stage, fixtures }: { stage: string; fixtures: Fixture[] 
 }
 
 export function WorldCupPage() {
-  const { data, loading, error } = useQuery<{ worldCupFixtures: Fixture[] }>(
+  const { data, loading, error } = useQuery<{ worldCupFixtures: WcFixture[] }>(
     WORLD_CUP_FIXTURES,
-    { fetchPolicy: "cache-and-network" },
+    { fetchPolicy: "cache-and-network", pollInterval: 60_000 },
   );
+  const followed = useFollowedTeam();
 
   const fixtures = data?.worldCupFixtures ?? [];
+  const teams = fixtureTeams(fixtures);
+  const filtered = fixtures.filter((f) => involvesTeam(f, followed));
 
-  const byStage: Record<string, Fixture[]> = {};
-  for (const f of fixtures) {
-    if (!byStage[f.stage]) byStage[f.stage] = [];
-    byStage[f.stage].push(f);
-  }
+  const live = liveFixtures(filtered);
+  const upcomingDays = groupByDay(upcomingFixtures(filtered));
 
+  const byStage: Record<string, WcFixture[]> = {};
+  for (const f of filtered) (byStage[f.stage] ??= []).push(f);
   const sortedStages = Object.keys(byStage).sort(
-    (a, b) => (STAGE_ORDER[a] ?? 99) - (STAGE_ORDER[b] ?? 99),
+    (a, b) => (WC_STAGE_ORDER[a] ?? 99) - (WC_STAGE_ORDER[b] ?? 99),
   );
 
   return (
@@ -219,6 +191,41 @@ export function WorldCupPage() {
           </div>
         </div>
       </div>
+
+      {fixtures.length > 0 && (
+        <div className="wc-filter-bar">
+          <label className="wc-filter-label" htmlFor="wc-team-filter">
+            Filter by team
+          </label>
+          <select
+            id="wc-team-filter"
+            className="wc-filter-select"
+            value={followed ?? ""}
+            onChange={(e) => setFollowedTeam(e.target.value || null)}
+          >
+            <option value="">All teams</option>
+            {teams.map((t) => (
+              <option key={t.name} value={t.name}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {followed && (
+            <button
+              type="button"
+              className="wc-filter-clear"
+              onClick={() => setFollowedTeam(null)}
+            >
+              Clear
+            </button>
+          )}
+          <span className="wc-filter-hint muted small">
+            {followed
+              ? "Saved — your team also shows in the feed widget."
+              : "Pick a team to see only its matches."}
+          </span>
+        </div>
+      )}
 
       {loading && fixtures.length === 0 && (
         <p className="wc-status-msg">Loading fixtures…</p>
@@ -234,9 +241,47 @@ export function WorldCupPage() {
         </p>
       )}
 
-      {sortedStages.map((stage) => (
-        <StageSection key={stage} stage={stage} fixtures={byStage[stage]!} />
-      ))}
+      {live.length > 0 && (
+        <section className="wc-stage wc-stage--live">
+          <h2 className="wc-stage-title">
+            <span className="wc-live-dot" /> Live now
+          </h2>
+          <div className="wc-fixture-list wc-fixture-list--knockout">
+            {live.map((f) => (
+              <FixtureRow key={f.id} fixture={f} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {upcomingDays.length > 0 && (
+        <section className="wc-stage wc-stage--upnext">
+          <h2 className="wc-stage-title">⏱ Up next</h2>
+          {upcomingDays.map((g) => (
+            <div className="wc-day" key={g.key}>
+              <h3 className="wc-day-title">{g.label}</h3>
+              <div className="wc-fixture-list wc-fixture-list--knockout">
+                {g.fixtures.map((f) => (
+                  <FixtureRow key={f.id} fixture={f} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {fixtures.length > 0 && (
+        <>
+          <h2 className="wc-section-divider">Full schedule</h2>
+          {sortedStages.map((stage) => (
+            <StageSection key={stage} stage={stage} fixtures={byStage[stage]!} />
+          ))}
+        </>
+      )}
+
+      {followed && filtered.length === 0 && (
+        <p className="wc-status-msg">No matches found for {followed}.</p>
+      )}
     </div>
   );
 }
