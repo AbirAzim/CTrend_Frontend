@@ -11969,6 +11969,33 @@ a.cx-profile-btn-accent {
   flex: 1;
 }
 
+.cx-edit-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cx-edit-item-action {
+  border: 1px solid var(--ig-border);
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+  color: var(--cx-ink);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cx-edit-item-action:hover:not(:disabled) {
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.cx-edit-item-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .cx-edit-upload-btn {
   width: 34px;
   height: 34px;

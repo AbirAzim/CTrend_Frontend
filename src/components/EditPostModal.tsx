@@ -3,11 +3,21 @@ import { useMutation, useQuery } from "@apollo/client";
 import { CATEGORIES, EXTEND_POST_VOTING, UPDATE_POST } from "../graphql/feed";
 import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "./DateTimePicker";
+import { ImagePositionEditor } from "./ImagePositionEditor";
+import { CompareImageCropper } from "./CompareImageCropper";
+import { DEFAULT_IMAGE_FOCAL } from "../lib/imageFocal";
 import { useImageUpload } from "../lib/useImageUpload";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useAuth } from "../context/AuthContext";
 
-type CompareItem = { imageUrl: string; label: string };
+type CompareItem = {
+  imageUrl: string;
+  label: string;
+  imageFocalX: number;
+  imageFocalY: number;
+  /** True for options that existed before this edit (carry votes). */
+  existing: boolean;
+};
 
 type PollOption = {
   label: string;
@@ -33,6 +43,10 @@ type EditablePost = {
   isVotingOpen?: boolean | null;
   endingSoonLeadMinutes?: number | null;
   isUserGlobalBroadcast?: boolean | null;
+  /** Vote tallies — used to decide whether swapping an image needs a warning. */
+  upvoteCount?: number | null;
+  downvoteCount?: number | null;
+  optionStats?: Array<{ index: number; count?: number | null }> | null;
   /** "scheduled" while queued for a future go-live; "published" once live. */
   status?: string | null;
   /** ISO go-live time — only meaningful while status === "scheduled". */
@@ -82,10 +96,19 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const initialItems: CompareItem[] = post.imageUrls.map((url, i) => ({
     imageUrl: url,
     label: post.options?.[i]?.label ?? `Option ${i + 1}`,
+    imageFocalX: post.options?.[i]?.imageFocalX ?? DEFAULT_IMAGE_FOCAL,
+    imageFocalY: post.options?.[i]?.imageFocalY ?? DEFAULT_IMAGE_FOCAL,
+    existing: true,
   }));
-  // Items already on the post are locked (editing/removing them would invalidate
-  // existing votes). Only newly added items (index >= lockedCount) are editable.
-  const lockedCount = initialItems.length;
+  // Items already on the post carry existing votes (tracked per-item via
+  // `existing`). Their label and position stay editable, but swapping the actual
+  // image is what resets votes — so it's gated behind a warning when votes exist.
+
+  // Whether any vote has been cast yet. Before the first vote, swapping an image
+  // is harmless (nothing to lose), so we skip the warning.
+  const hasVotes =
+    (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0) > 0 ||
+    (post.optionStats ?? []).some((s) => (s.count ?? 0) > 0);
 
   // Poll options carry their own (optional) thumbnail. Labels stay editable;
   // images are locked because changing them would invalidate existing votes.
@@ -119,7 +142,15 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     post.endingSoonLeadMinutes ?? 5,
   );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  // Open image-position (focal) editor for this compare item index.
+  const [positionIdx, setPositionIdx] = useState<number | null>(null);
+  // Same, for a poll option index.
+  const [pollPositionIdx, setPollPositionIdx] = useState<number | null>(null);
+  // Pending crop for a freshly chosen file before it's uploaded.
+  const [cropper, setCropper] = useState<{ idx: number; url: string } | null>(null);
+  const [pollUploadingIdx, setPollUploadingIdx] = useState<number | null>(null);
   const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const pollFileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { uploadImage } = useImageUpload();
 
   const votingOpen = post.isVotingOpen !== false && votingEndsAt
@@ -155,24 +186,100 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const [updatePostMut, { loading }] = useMutation(UPDATE_POST);
   const [extendVotingMut, { loading: extending }] = useMutation(EXTEND_POST_VOTING);
 
-  function setItemField(idx: number, field: keyof CompareItem, value: string) {
-    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
+  function setItemLabel(idx: number, value: string) {
+    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, label: value } : item)));
+  }
+
+  function setItemFocal(idx: number, imageFocalX: number, imageFocalY: number) {
+    setItems((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, imageFocalX, imageFocalY } : item)),
+    );
   }
 
   function addItem() {
     if (items.length >= 10) return;
-    setItems((prev) => [...prev, { imageUrl: "", label: `Option ${prev.length + 1}` }]);
+    setItems((prev) => [
+      ...prev,
+      {
+        imageUrl: "",
+        label: `Option ${prev.length + 1}`,
+        imageFocalX: DEFAULT_IMAGE_FOCAL,
+        imageFocalY: DEFAULT_IMAGE_FOCAL,
+        existing: false,
+      },
+    ]);
   }
 
   function removeItem(idx: number) {
-    if (items.length <= 2) return;
+    // Existing options can't be removed (it would shift vote indices); only
+    // newly added rows can. Keep at least 2 items.
+    if (items[idx]?.existing || items.length <= 2) return;
     setItems((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  /**
+   * Picking a new file for an item. For an existing option that already has
+   * votes, swapping the image wipes those votes — so confirm first.
+   */
+  function requestReplace(idx: number) {
+    if (items[idx]?.existing && hasVotes) {
+      const ok = window.confirm(
+        "Replacing this image will remove all current votes on this post. " +
+          "Repositioning the existing image (Adjust position) keeps the votes. " +
+          "Replace the image anyway?",
+      );
+      if (!ok) return;
+    }
+    fileRefs.current[idx]?.click();
   }
 
   function setPollLabel(idx: number, value: string) {
     setPollOptions((prev) =>
       prev.map((opt, i) => (i === idx ? { ...opt, label: value } : opt)),
     );
+  }
+
+  function setPollFocal(idx: number, imageFocalX: number, imageFocalY: number) {
+    setPollOptions((prev) =>
+      prev.map((opt, i) => (i === idx ? { ...opt, imageFocalX, imageFocalY } : opt)),
+    );
+  }
+
+  // Poll thumbnails upload directly (no crop step — matches poll create); a new
+  // image resets that option's focal point.
+  async function handlePollFileUpload(idx: number, file: File) {
+    setPollUploadingIdx(idx);
+    try {
+      const url = await uploadImage(file);
+      setPollOptions((prev) =>
+        prev.map((opt, i) =>
+          i === idx
+            ? {
+                ...opt,
+                imageUrl: url,
+                imageFocalX: DEFAULT_IMAGE_FOCAL,
+                imageFocalY: DEFAULT_IMAGE_FOCAL,
+              }
+            : opt,
+        ),
+      );
+    } catch {
+      setError("Image upload failed. Try again.");
+    }
+    setPollUploadingIdx(null);
+  }
+
+  // Swapping an existing option's photo resets votes — confirm when votes exist.
+  function requestPollReplace(idx: number) {
+    if (idx < pollLockedCount && pollOptions[idx]?.imageUrl && hasVotes) {
+      const ok = window.confirm(
+        "Replacing this option's photo will remove all current votes on this poll. " +
+          "Repositioning the existing photo (Adjust position) keeps the votes. " +
+          "Replace the photo anyway?",
+      );
+      if (!ok) return;
+    }
+    pollFileRefs.current[idx]?.click();
   }
 
   function addPollOption() {
@@ -187,13 +294,31 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     setPollOptions((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  async function handleFileUpload(idx: number, file: File) {
+  // A freshly chosen file goes through the crop+zoom editor first (same as the
+  // create flow) so every compare image gets a uniform shape.
+  function handleFilePicked(idx: number, file: File) {
+    setCropper({ idx, url: URL.createObjectURL(file) });
+  }
+
+  async function uploadCroppedFile(idx: number, file: File) {
     setUploadingIdx(idx);
     try {
       const url = await uploadImage(file);
-      setItemField(idx, "imageUrl", url);
+      // A new image resets the focal point — the crop already framed it.
+      setItems((prev) =>
+        prev.map((item, i) =>
+          i === idx
+            ? {
+                ...item,
+                imageUrl: url,
+                imageFocalX: DEFAULT_IMAGE_FOCAL,
+                imageFocalY: DEFAULT_IMAGE_FOCAL,
+              }
+            : item,
+        ),
+      );
     } catch {
-      setError("Image upload failed. Try pasting a URL instead.");
+      setError("Image upload failed. Try again.");
     }
     setUploadingIdx(null);
   }
@@ -321,8 +446,15 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
           postId: post.id,
           input: {
             ...sharedInput,
+            // imageUrls drive the backend's vote-reset check: an unchanged URL
+            // (label/position edit) keeps votes; a swapped URL resets them.
             imageUrls: items.map((it) => it.imageUrl.trim()),
-            options: items.map((it) => ({ label: it.label.trim() || "Option" })),
+            options: items.map((it) => ({
+              label: it.label.trim() || "Option",
+              imageUrl: it.imageUrl.trim(),
+              imageFocalX: it.imageFocalX,
+              imageFocalY: it.imageFocalY,
+            })),
           },
         },
       });
@@ -547,23 +679,29 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                 <span className="cx-edit-item-count">{pollOptions.length} / 10</span>
               </p>
               <p className="muted small cx-edit-locked-note">
-                Edit option labels freely — votes stay intact. Option photos are
-                locked and can't be changed.
+                Edit labels and reposition photos anytime — votes stay intact.
+                {hasVotes
+                  ? " Replacing an option's photo resets all votes (you'll be asked to confirm)."
+                  : " You can also swap photos freely until the first vote is cast."}
               </p>
 
               <div className="cx-edit-items">
                 {pollOptions.map((opt, idx) => {
                   const locked = idx < pollLockedCount;
+                  const hasImage = Boolean(opt.imageUrl);
                   return (
                     <div key={idx} className="cx-edit-item cx-edit-item--poll">
                       <div className="cx-edit-item-thumb">
                         {opt.imageUrl ? (
-                          <img src={opt.imageUrl} alt="" />
+                          <img
+                            src={opt.imageUrl}
+                            alt=""
+                            style={{
+                              objectPosition: `${opt.imageFocalX ?? DEFAULT_IMAGE_FOCAL}% ${opt.imageFocalY ?? DEFAULT_IMAGE_FOCAL}%`,
+                            }}
+                          />
                         ) : (
                           <span className="cx-edit-item-placeholder">📊</span>
-                        )}
-                        {opt.imageUrl && (
-                          <span className="cx-edit-item-lock" title="Photo locked" aria-hidden>🔒</span>
                         )}
                       </div>
                       <div className="cx-edit-item-fields">
@@ -575,6 +713,40 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                           placeholder={`Option ${idx + 1} label`}
                           maxLength={200}
                         />
+                        <div className="cx-edit-item-actions">
+                          {hasImage && (
+                            <button
+                              type="button"
+                              className="cx-edit-item-action"
+                              onClick={() => setPollPositionIdx(idx)}
+                            >
+                              ↔ Adjust position
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="cx-edit-item-action"
+                            disabled={pollUploadingIdx !== null}
+                            onClick={() => requestPollReplace(idx)}
+                          >
+                            {pollUploadingIdx === idx
+                              ? "Uploading…"
+                              : hasImage
+                                ? "🔁 Replace photo"
+                                : "📁 Add photo"}
+                          </button>
+                          <input
+                            ref={(el) => { pollFileRefs.current[idx] = el; }}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) void handlePollFileUpload(idx, f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </div>
                       </div>
                       {!locked && (
                         <button
@@ -604,74 +776,75 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             <span className="cx-edit-item-count">{items.length} / 10</span>
           </p>
           <p className="muted small cx-edit-locked-note">
-            🔒 Existing options are locked to protect votes. You can add new
-            options below — changing an existing image would reset all votes.
+            Edit labels and reposition images anytime — votes stay intact.
+            {hasVotes
+              ? " Replacing an image resets all votes (you'll be asked to confirm)."
+              : " You can also swap images freely until the first vote is cast."}
           </p>
 
           <div className="cx-edit-items">
             {items.map((item, idx) => {
-              const locked = idx < lockedCount;
+              const hasImage = Boolean(item.imageUrl);
               return (
-                <div
-                  key={idx}
-                  className={`cx-edit-item${locked ? " cx-edit-item--locked" : ""}`}
-                >
+                <div key={idx} className="cx-edit-item">
                   <div className="cx-edit-item-thumb">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt="" />
+                    {hasImage ? (
+                      <img
+                        src={item.imageUrl}
+                        alt=""
+                        style={{
+                          objectPosition: `${item.imageFocalX}% ${item.imageFocalY}%`,
+                        }}
+                      />
                     ) : (
                       <span className="cx-edit-item-placeholder">📷</span>
                     )}
-                    {locked && (
-                      <span className="cx-edit-item-lock" title="Locked — has votes" aria-hidden>🔒</span>
-                    )}
                   </div>
                   <div className="cx-edit-item-fields">
-                    <div className="cx-edit-item-url-row">
-                      <input
-                        type="url"
-                        className="cx-edit-input"
-                        value={item.imageUrl}
-                        onChange={(e) => setItemField(idx, "imageUrl", e.target.value)}
-                        placeholder="Image URL"
-                        disabled={locked}
-                      />
-                      {!locked && (
-                        <>
-                          <button
-                            type="button"
-                            className="cx-edit-upload-btn"
-                            title="Upload image"
-                            disabled={uploadingIdx !== null}
-                            onClick={() => fileRefs.current[idx]?.click()}
-                          >
-                            {uploadingIdx === idx ? "…" : "📁"}
-                          </button>
-                          <input
-                            ref={(el) => { fileRefs.current[idx] = el; }}
-                            type="file"
-                            accept="image/*"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) void handleFileUpload(idx, f);
-                              e.target.value = "";
-                            }}
-                          />
-                        </>
-                      )}
-                    </div>
                     <input
                       type="text"
                       className="cx-edit-input"
                       value={item.label}
-                      onChange={(e) => setItemField(idx, "label", e.target.value)}
+                      onChange={(e) => setItemLabel(idx, e.target.value)}
                       placeholder={`Label for option ${idx + 1}`}
                       maxLength={200}
-                      disabled={locked}
                     />
+                    <div className="cx-edit-item-actions">
+                      {hasImage && (
+                        <button
+                          type="button"
+                          className="cx-edit-item-action"
+                          onClick={() => setPositionIdx(idx)}
+                        >
+                          ↔ Adjust position
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="cx-edit-item-action"
+                        disabled={uploadingIdx !== null}
+                        onClick={() => requestReplace(idx)}
+                      >
+                        {uploadingIdx === idx
+                          ? "Uploading…"
+                          : hasImage
+                            ? "🔁 Replace image"
+                            : "📁 Upload image"}
+                      </button>
+                      <input
+                        ref={(el) => { fileRefs.current[idx] = el; }}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleFilePicked(idx, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </div>
                   </div>
-                  {!locked && (
+                  {!item.existing && (
                     <button
                       type="button"
                       className="cx-edit-remove-btn"
@@ -706,13 +879,52 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
           <button
             type="button"
             className="cx-conn-btn cx-conn-btn--add"
-            disabled={loading || uploadingIdx !== null}
+            disabled={loading || uploadingIdx !== null || pollUploadingIdx !== null}
             onClick={() => void handleSave()}
           >
             {loading ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
+
+      {positionIdx !== null && items[positionIdx]?.imageUrl ? (
+        <ImagePositionEditor
+          src={items[positionIdx].imageUrl}
+          label={items[positionIdx].label || `Option ${positionIdx + 1}`}
+          focalX={items[positionIdx].imageFocalX}
+          focalY={items[positionIdx].imageFocalY}
+          onChange={(fx, fy) => setItemFocal(positionIdx, fx, fy)}
+          onClose={() => setPositionIdx(null)}
+        />
+      ) : null}
+
+      {pollPositionIdx !== null && pollOptions[pollPositionIdx]?.imageUrl ? (
+        <ImagePositionEditor
+          src={pollOptions[pollPositionIdx].imageUrl as string}
+          label={pollOptions[pollPositionIdx].label || `Option ${pollPositionIdx + 1}`}
+          focalX={pollOptions[pollPositionIdx].imageFocalX ?? DEFAULT_IMAGE_FOCAL}
+          focalY={pollOptions[pollPositionIdx].imageFocalY ?? DEFAULT_IMAGE_FOCAL}
+          onChange={(fx, fy) => setPollFocal(pollPositionIdx, fx, fy)}
+          onClose={() => setPollPositionIdx(null)}
+        />
+      ) : null}
+
+      {cropper ? (
+        <CompareImageCropper
+          src={cropper.url}
+          aspect={1}
+          onCancel={() => {
+            URL.revokeObjectURL(cropper.url);
+            setCropper(null);
+          }}
+          onDone={(file) => {
+            const idx = cropper.idx;
+            URL.revokeObjectURL(cropper.url);
+            setCropper(null);
+            void uploadCroppedFile(idx, file);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

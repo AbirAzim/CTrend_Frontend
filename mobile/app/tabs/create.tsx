@@ -55,6 +55,9 @@ type EditPostData = {
   campaign?: { id: string } | null;
   votingEndsAt?: string | null;
   isUserGlobalBroadcast?: boolean | null;
+  upvoteCount?: number | null;
+  downvoteCount?: number | null;
+  optionStats?: { index: number; count?: number | null }[] | null;
 };
 
 /** Poll-only context/body image (post-level `imageUrls`). Optional, 0+. */
@@ -421,7 +424,15 @@ export default function CreateScreen() {
   async function uploadToSlot(slotId: string, uri: string, mimeType = "image/jpeg", fileName?: string) {
     const ext = mimeType.split("/")[1] ?? "jpg";
     const filename = fileName ?? `photo_${Date.now()}.${ext}`;
-    patchSlot(slotId, { localUri: uri, uploading: true, error: null, publicUrl: null });
+    // A fresh image resets the focal point — the cropper already framed it.
+    patchSlot(slotId, {
+      localUri: uri,
+      uploading: true,
+      error: null,
+      publicUrl: null,
+      imageFocalX: DEFAULT_IMAGE_FOCAL,
+      imageFocalY: DEFAULT_IMAGE_FOCAL,
+    });
     try {
       const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
       if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
@@ -475,6 +486,40 @@ export default function CreateScreen() {
 
   function openImageOptions(slotId: string) {
     setImageSheetSlotId(slotId);
+  }
+
+  // Whether the post being edited already has at least one vote. Before the
+  // first vote, swapping an image is harmless, so no warning is shown.
+  const editPostHasVotes = (() => {
+    const p = editData?.getPostById;
+    if (!p) return false;
+    if ((p.upvoteCount ?? 0) + (p.downvoteCount ?? 0) > 0) return true;
+    return (p.optionStats ?? []).some((s) => (s.count ?? 0) > 0);
+  })();
+
+  /**
+   * Open the image picker for a slot. Labels and position stay freely editable;
+   * only swapping the actual image resets votes — so for an existing option that
+   * already has votes, confirm first.
+   */
+  function requestReplace(slot: Slot) {
+    if (slot.locked && editPostHasVotes) {
+      Alert.alert(
+        "Replace image?",
+        "Replacing this image will remove all current votes on this post. " +
+          "Repositioning the existing image keeps the votes.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Replace anyway",
+            style: "destructive",
+            onPress: () => openImageOptions(slot.id),
+          },
+        ],
+      );
+      return;
+    }
+    openImageOptions(slot.id);
   }
 
   // ── Poll helpers ────────────────────────────────────────────────────────────
@@ -675,8 +720,10 @@ export default function CreateScreen() {
         <View style={{ gap: 12 }}>
           {isEdit && (
             <Text style={[st.lockedNote, { color: colors.muted, backgroundColor: colors.section, borderColor: colors.border }]}>
-              🔒 Existing options are locked to protect their votes. You can add new
-              options below — changing an existing image would reset all votes.
+              Edit labels and reposition images anytime — votes stay intact.
+              {editPostHasVotes
+                ? " Replacing an image resets all votes (you'll be asked to confirm)."
+                : " You can also swap images freely until the first vote is cast."}
             </Text>
           )}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
@@ -689,8 +736,7 @@ export default function CreateScreen() {
                   {/* Image tile */}
                   <Pressable
                     style={[st.slotTile, { borderColor: slot.error ? "#ef4444" : hasImage ? colors.accent + "66" : colors.border }]}
-                    onPress={locked ? undefined : () => openImageOptions(slot.id)}
-                    disabled={locked}
+                    onPress={() => requestReplace(slot)}
                   >
                     {hasImage ? (
                       <Image source={{ uri: imgSrc ?? slot.publicUrl ?? "" }} style={st.slotImg} contentFit="cover" />
@@ -709,14 +755,14 @@ export default function CreateScreen() {
                         <Text style={st.slotOverlayText}>Uploading…</Text>
                       </View>
                     )}
-                    {slot.publicUrl && !slot.uploading && !locked && (
+                    {slot.publicUrl && !slot.uploading && (
                       <View style={st.slotDone}>
                         <Text style={st.slotDoneText}>✓</Text>
                       </View>
                     )}
-                    {locked && (
-                      <View style={st.slotLock}>
-                        <Text style={st.slotLockText}>🔒</Text>
+                    {hasImage && (
+                      <View style={st.slotReplaceHint}>
+                        <Text style={st.slotReplaceHintText}>Tap to replace</Text>
                       </View>
                     )}
                     {slots.length > 2 && !locked && (
@@ -726,8 +772,9 @@ export default function CreateScreen() {
                     )}
                   </Pressable>
                   {slot.error ? <Text style={st.slotError}>{slot.error}</Text> : null}
-                  {/* Position editor trigger */}
-                  {!locked && hasImage && (slot.localUri || slot.publicUrl) ? (
+                  {/* Position editor trigger — available for any image (focal-only,
+                      never resets votes). */}
+                  {hasImage && (slot.localUri || slot.publicUrl) ? (
                     <Pressable
                       style={[st.positionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
                       onPress={() => setPositionSlotId(slot.id)}
@@ -752,15 +799,14 @@ export default function CreateScreen() {
                       keyboardType="url"
                     />
                   )}
-                  {/* Label */}
+                  {/* Label — always editable, even for existing options. */}
                   <TextInput
-                    style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: locked ? colors.muted : colors.text }]}
+                    style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
                     value={slot.label}
                     onChangeText={(v) => patchSlot(slot.id, { label: v })}
                     placeholder="Label…"
                     placeholderTextColor={colors.muted}
                     maxLength={40}
-                    editable={!locked}
                   />
                 </View>
               );
@@ -1231,8 +1277,8 @@ const st = StyleSheet.create({
   slotDoneText: { color: "#fff", fontSize: 12, fontWeight: "800" },
   slotRemove: { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
   slotRemoveText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  slotLock: { position: "absolute", bottom: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
-  slotLockText: { fontSize: 11 },
+  slotReplaceHint: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.45)", paddingVertical: 3, alignItems: "center" },
+  slotReplaceHintText: { color: "#fff", fontSize: 10, fontWeight: "600" },
   lockedNote: { fontSize: 12, lineHeight: 17, borderWidth: 1, borderRadius: 10, padding: 10 },
   slotError: { color: "#f87171", fontSize: 10, textAlign: "center" },
   slotInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12 },

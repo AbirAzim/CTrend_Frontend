@@ -416,6 +416,9 @@ export function ProfilePage() {
     endingSoonLeadMinutes?: number | null;
     status?: string | null;
     scheduledAt?: string | null;
+    upvoteCount?: number | null;
+    downvoteCount?: number | null;
+    optionStats?: Array<{ index: number; count?: number | null }> | null;
   } | null>(null);
   const [friendsPage, setFriendsPage] = useState(0);
   const [incomingPage, setIncomingPage] = useState(0);

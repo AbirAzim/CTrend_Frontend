@@ -1,9 +1,12 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,10 +21,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GET_POST_BY_ID, UPDATE_POST, CATEGORIES } from "@ctrend/shared/graphql/feed";
+import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { ImagePositionEditor } from "../components/ImagePositionEditor";
+import { DEFAULT_IMAGE_FOCAL, hasCustomFocal } from "../lib/imageFocal";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+
+type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
@@ -67,6 +75,10 @@ export default function EditPostScreen() {
     Array<{ label: string; imageUrl: string; imageFocalX?: number | null; imageFocalY?: number | null }>
   >([]);
   const [isPoll, setIsPoll] = useState(false);
+  // Whether the post already has votes — gates the replace-photo warning.
+  const [hasVotes, setHasVotes] = useState(false);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [positionIdx, setPositionIdx] = useState<number | null>(null);
   // Poll-only: post-level body/context photos, shown locked (votes depend on them).
   const [bodyImages, setBodyImages] = useState<string[]>([]);
   // Friends-only ↔ platform-wide (global) audience toggle (post owners only).
@@ -91,6 +103,13 @@ export default function EditPostScreen() {
     const post = mapGqlPostToFeedView(postData.getPostById as Parameters<typeof mapGqlPostToFeedView>[0]);
     const poll = post.format === "poll";
     setIsPoll(poll);
+    const optionVotes = (post.optionStats ?? []).reduce(
+      (sum, s) => sum + (s.count ?? 0),
+      0,
+    );
+    setHasVotes(
+      (post.upvoteCount ?? 0) + (post.downvoteCount ?? 0) > 0 || optionVotes > 0,
+    );
     setCaption(post.caption ?? "");
     setEndingSoonLead(String(post.endingSoonLeadMinutes ?? 5));
     setBroadcastGlobally(Boolean(post.isUserGlobalBroadcast));
@@ -117,6 +136,8 @@ export default function EditPostScreen() {
         post.imageUrls.map((url, i) => ({
           imageUrl: url,
           label: post.postOptions?.[i]?.label ?? "",
+          imageFocalX: post.postOptions?.[i]?.imageFocalX ?? null,
+          imageFocalY: post.postOptions?.[i]?.imageFocalY ?? null,
         })),
       );
     }
@@ -128,6 +149,86 @@ export default function EditPostScreen() {
   }, [postData, initialized]);
 
   const [updatePost, { loading: saving }] = useMutation(UPDATE_POST);
+  const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
+
+  // Upload a freshly picked image into an option slot; a new image resets that
+  // option's focal point (it was framed at pick time).
+  async function uploadOptionImage(
+    idx: number,
+    uri: string,
+    mimeType = "image/jpeg",
+    fileName?: string,
+  ) {
+    setUploadingIdx(idx);
+    setSubmitError(null);
+    try {
+      const ext = mimeType.split("/")[1] ?? "jpg";
+      const filename = fileName ?? `photo_${Date.now()}.${ext}`;
+      const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
+      if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
+      const { uploadUrl, publicUrl } = data.getImageUploadUrl;
+      let uploadUri = uri;
+      if (Platform.OS === "android" && !uri.startsWith("file://")) {
+        uploadUri = `${FileSystem.cacheDirectory}upload_${Date.now()}.${ext}`;
+        await FileSystem.copyAsync({ from: uri, to: uploadUri });
+      }
+      const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
+        httpMethod: "PUT",
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { "Content-Type": mimeType },
+      });
+      if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
+      setOptions((prev) =>
+        prev.map((o, j) =>
+          j === idx
+            ? { ...o, imageUrl: publicUrl, imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL }
+            : o,
+        ),
+      );
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Upload failed");
+    }
+    setUploadingIdx(null);
+  }
+
+  async function pickOptionImage(idx: number) {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Gallery access is required.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.92,
+        // Compare images frame portrait; poll thumbnails are square-ish.
+        allowsEditing: true,
+        aspect: isPoll ? [1, 1] : [4, 5],
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      await uploadOptionImage(idx, asset.uri, asset.mimeType ?? "image/jpeg", asset.fileName ?? undefined);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Upload failed");
+    }
+  }
+
+  // Swapping an existing option's image resets votes — confirm first when votes
+  // exist. Repositioning (focal) never resets, so it's not gated.
+  function requestReplaceImage(idx: number) {
+    if (hasVotes && options[idx]?.imageUrl) {
+      Alert.alert(
+        isPoll ? "Replace photo?" : "Replace image?",
+        `Replacing this ${isPoll ? "option's photo" : "image"} will remove all current votes on this post. Repositioning the existing ${isPoll ? "photo" : "image"} keeps the votes.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Replace anyway", style: "destructive", onPress: () => void pickOptionImage(idx) },
+        ],
+      );
+      return;
+    }
+    void pickOptionImage(idx);
+  }
 
   async function handleSave() {
     setSubmitError(null);
@@ -200,7 +301,12 @@ export default function EditPostScreen() {
           input: {
             caption: caption.trim() || undefined,
             categoryId,
-            options: options.map((o) => ({ label: o.label, imageUrl: o.imageUrl })),
+            options: options.map((o) => ({
+              label: o.label,
+              imageUrl: o.imageUrl,
+              imageFocalX: o.imageFocalX ?? undefined,
+              imageFocalY: o.imageFocalY ?? undefined,
+            })),
             imageUrls: options.map((o) => o.imageUrl),
             ...adminInput,
             ...audienceInput,
@@ -263,30 +369,79 @@ export default function EditPostScreen() {
           </View>
         ) : null}
 
-        {/* Options (labels editable; photos locked) */}
+        {/* Options — labels + positions editable; replacing a photo resets votes */}
         <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[st.cardLabel, { color: colors.subtext }]}>
             {isPoll ? "POLL OPTIONS" : "COMPARE OPTIONS"}
           </Text>
-          {options.map((opt, i) => (
-            <View key={i} style={[st.optionRow, { borderTopColor: colors.border }]}>
-              <View style={[st.optionThumb, { backgroundColor: colors.section, overflow: "hidden" }]}>
-                {opt.imageUrl ? (
-                  <Image source={{ uri: opt.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
-                ) : (
-                  <Text style={{ fontSize: 20, color: colors.muted }}>{isPoll ? "📊" : "🖼"}</Text>
-                )}
+          <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>
+            Edit labels and reposition {isPoll ? "photos" : "images"} anytime — votes stay intact.
+            {hasVotes
+              ? ` Replacing ${isPoll ? "an option's photo" : "an image"} resets all votes (you'll be asked to confirm).`
+              : " You can also swap them freely until the first vote is cast."}
+          </Text>
+          {options.map((opt, i) => {
+            const hasImage = Boolean(opt.imageUrl);
+            return (
+              <View key={i} style={[st.optionRow, { borderTopColor: colors.border }]}>
+                <Pressable
+                  style={[st.optionThumb, { backgroundColor: colors.section, overflow: "hidden" }]}
+                  onPress={() => requestReplaceImage(i)}
+                >
+                  {hasImage ? (
+                    <Image
+                      source={{ uri: opt.imageUrl }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      contentPosition={{
+                        left: `${opt.imageFocalX ?? DEFAULT_IMAGE_FOCAL}%`,
+                        top: `${opt.imageFocalY ?? DEFAULT_IMAGE_FOCAL}%`,
+                      }}
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 20, color: colors.muted }}>{isPoll ? "📊" : "🖼"}</Text>
+                  )}
+                  {uploadingIdx === i ? (
+                    <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
+                      <ActivityIndicator color="#fff" size="small" />
+                    </View>
+                  ) : null}
+                </Pressable>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <TextInput
+                    style={[st.optionLabel, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                    value={opt.label}
+                    onChangeText={(v) => setOptions((prev) => prev.map((o, j) => j === i ? { ...o, label: v } : o))}
+                    placeholder={isPoll ? `Option ${i + 1} label` : `Label ${String.fromCharCode(65 + i)}`}
+                    placeholderTextColor={colors.muted}
+                    maxLength={isPoll ? 200 : 60}
+                  />
+                  <View style={st.optionActions}>
+                    {hasImage ? (
+                      <Pressable
+                        style={[st.optionActionBtn, { borderColor: colors.border, backgroundColor: colors.section }]}
+                        onPress={() => setPositionIdx(i)}
+                      >
+                        <Text style={[st.optionActionText, { color: colors.subtext }]}>
+                          ↔ Position{hasCustomFocal(opt.imageFocalX ?? DEFAULT_IMAGE_FOCAL, opt.imageFocalY ?? DEFAULT_IMAGE_FOCAL) ? " ·" : ""}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      style={[st.optionActionBtn, { borderColor: colors.border, backgroundColor: colors.section }]}
+                      onPress={() => requestReplaceImage(i)}
+                      disabled={uploadingIdx !== null}
+                    >
+                      <Text style={[st.optionActionText, { color: colors.subtext }]}>
+                        {hasImage ? (isPoll ? "🔁 Replace photo" : "🔁 Replace image") : (isPoll ? "📁 Add photo" : "📁 Add image")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
-              <TextInput
-                style={[st.optionLabel, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
-                value={opt.label}
-                onChangeText={(v) => setOptions((prev) => prev.map((o, j) => j === i ? { ...o, label: v } : o))}
-                placeholder={isPoll ? `Option ${i + 1} label` : `Label ${String.fromCharCode(65 + i)}`}
-                placeholderTextColor={colors.muted}
-                maxLength={isPoll ? 200 : 60}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Settings */}
@@ -519,6 +674,23 @@ export default function EditPostScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Image position (focal) editor — focal-only, never resets votes */}
+      {positionIdx !== null && options[positionIdx]?.imageUrl ? (
+        <ImagePositionEditor
+          visible
+          src={options[positionIdx].imageUrl}
+          label={options[positionIdx].label?.trim() || `Option ${positionIdx + 1}`}
+          focalX={options[positionIdx].imageFocalX ?? DEFAULT_IMAGE_FOCAL}
+          focalY={options[positionIdx].imageFocalY ?? DEFAULT_IMAGE_FOCAL}
+          onChange={(x, y) =>
+            setOptions((prev) =>
+              prev.map((o, j) => (j === positionIdx ? { ...o, imageFocalX: x, imageFocalY: y } : o)),
+            )
+          }
+          onClose={() => setPositionIdx(null)}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -531,8 +703,12 @@ const st = StyleSheet.create({
   screenTitle: { fontSize: 17, fontWeight: "800" },
   card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 0 },
   cardLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 },
-  optionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  optionRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   optionThumb: { width: 56, height: 56, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  thumbOverlay: { backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  optionActions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  optionActionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  optionActionText: { fontSize: 12, fontWeight: "600" },
   bodyPhotoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   bodyPhoto: { width: 72, height: 72, borderRadius: 8, overflow: "hidden" },
   optionLabel: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 },
