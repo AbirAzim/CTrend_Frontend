@@ -35,6 +35,7 @@ export const GET_MESSAGES = gql`
       text
       imageUrl
       deleted
+      forwarded
       readBy {
         userId
         readAt
@@ -105,8 +106,8 @@ export const CREATE_GROUP_CONVERSATION = gql`
 `;
 
 export const SEND_MESSAGE = gql`
-  mutation SendMessage($conversationId: ID!, $text: String!, $imageUrl: String, $replyToId: ID) {
-    sendMessage(conversationId: $conversationId, text: $text, imageUrl: $imageUrl, replyToId: $replyToId) {
+  mutation SendMessage($conversationId: ID!, $text: String!, $imageUrl: String, $replyToId: ID, $forwarded: Boolean) {
+    sendMessage(conversationId: $conversationId, text: $text, imageUrl: $imageUrl, replyToId: $replyToId, forwarded: $forwarded) {
       id
       conversationId
       senderId
@@ -115,6 +116,7 @@ export const SEND_MESSAGE = gql`
       text
       imageUrl
       deleted
+      forwarded
       readBy {
         userId
         readAt
@@ -198,6 +200,7 @@ export const MESSAGE_RECEIVED = gql`
       text
       imageUrl
       deleted
+      forwarded
       readBy {
         userId
         readAt

@@ -90,6 +90,7 @@ export type Message = {
   senderAvatar?: string | null;
   text: string;
   imageUrl?: string | null;
+  forwarded?: boolean | null;
   readBy: { userId: string; readAt: string }[];
   reactions: MessageReactionCount[];
   viewerReaction?: string | null;
@@ -112,6 +113,7 @@ type MessengerContextValue = {
     text: string,
     imageUrl?: string,
     replyToId?: string | null,
+    forwarded?: boolean,
   ) => Promise<void>;
   reactMessage: (messageId: string, conversationId: string, emoji: string | null) => Promise<void>;
   markRead: (conversationId: string) => void;
@@ -377,9 +379,10 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
       text: string,
       imageUrl?: string,
       replyToId?: string | null,
+      forwarded?: boolean,
     ) => {
       const { data } = await sendMessageMut({
-        variables: { conversationId, text, imageUrl, replyToId: replyToId ?? null },
+        variables: { conversationId, text, imageUrl, replyToId: replyToId ?? null, forwarded: forwarded ?? false },
       });
       const raw = data?.sendMessage as Message | undefined;
       if (!raw) return;

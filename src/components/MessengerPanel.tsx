@@ -148,7 +148,7 @@ function MessageBubble({
     setForwarding(true);
     try {
       await Promise.all(
-        targets.map((cid) => sendMessage(cid, msg.text && msg.text.trim() ? msg.text : " ", msg.imageUrl ?? undefined)),
+        targets.map((cid) => sendMessage(cid, msg.text && msg.text.trim() ? msg.text : " ", msg.imageUrl ?? undefined, null, true)),
       );
       setForwardOpen(false);
       setForwardSel(new Set());
@@ -308,6 +308,12 @@ function MessageBubble({
                   : undefined
               }
             />
+          ) : null}
+          {msg.forwarded ? (
+            <span className="cw-bubble-forwarded">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12" aria-hidden><polyline points="15 17 20 12 15 7" /><path d="M4 18v-2a4 4 0 0 1 4-4h12" /></svg>
+              Forwarded
+            </span>
           ) : null}
           {children}
         </div>

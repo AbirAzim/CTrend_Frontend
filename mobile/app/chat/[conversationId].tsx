@@ -75,6 +75,7 @@ type Message = {
   text: string;
   imageUrl?: string | null;
   deleted?: boolean | null;
+  forwarded?: boolean | null;
   readBy: Array<{ userId: string; readAt: string }>;
   reactions?: MessageReaction[] | null;
   viewerReaction?: string | null;
@@ -295,6 +296,14 @@ function MessageBubble({
               </View>
             </Pressable>
           )}
+
+          {/* Forwarded label (WhatsApp/Messenger style) */}
+          {msg.forwarded ? (
+            <View style={styles.fwdLabel}>
+              <Ionicons name="arrow-redo-outline" size={11} color={isOwn ? "rgba(255,255,255,0.75)" : colors.muted} />
+              <Text style={[styles.fwdLabelText, { color: isOwn ? "rgba(255,255,255,0.75)" : colors.muted }]}>Forwarded</Text>
+            </View>
+          ) : null}
 
           {/* Image bubble */}
           {msg.imageUrl ? (
@@ -583,6 +592,7 @@ export default function ChatScreen() {
               conversationId: cid,
               text: m.text && m.text.trim() ? m.text : " ",
               ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
+              forwarded: true,
             },
             refetchQueries: [MY_CONVERSATIONS],
           }),
@@ -1308,6 +1318,8 @@ const styles = StyleSheet.create({
   fwdCheck: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   fwdSend: { borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 4 },
   fwdSendText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  fwdLabel: { flexDirection: "row", alignItems: "center", gap: 3, marginBottom: 2, paddingHorizontal: 2 },
+  fwdLabelText: { fontSize: 11, fontStyle: "italic", fontWeight: "600" },
 
   // Standalone Messenger-style reply arrow beside the bubble
   sideReply: {

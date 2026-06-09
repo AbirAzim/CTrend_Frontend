@@ -18237,6 +18237,17 @@ a.cx-profile-btn-accent {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* "Forwarded" label (WhatsApp/Messenger style) */
+.cw-bubble-forwarded {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-style: italic;
+  opacity: 0.65;
+  margin-bottom: 3px;
+}
+
 /* Copy / forward actions in the quick-react bar */
 .cw-bubble-act-sep {
   width: 1px;
