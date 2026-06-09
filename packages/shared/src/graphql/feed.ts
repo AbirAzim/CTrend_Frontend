@@ -32,6 +32,12 @@ export const FEED_POSTS = gql`
     feedPosts(campaignId: $campaignId, skip: $skip, take: $take) {
       id
       type
+      category {
+        id
+        name
+        slug
+        color
+      }
       authorId
       authorUsername
       authorDisplayName
@@ -175,6 +181,12 @@ export const MY_SAVED_POSTS = gql`
   query MySavedPosts {
     mySavedPosts {
       id
+      category {
+        id
+        name
+        slug
+        color
+      }
       authorId
       authorUsername
       authorDisplayName

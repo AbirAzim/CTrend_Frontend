@@ -3,7 +3,7 @@ import notifee, { EventType } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AppState, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -89,6 +89,14 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 function AppStatusBar() {
   const { isDark } = useTheme();
   return <StatusBar style={isDark ? "light" : "dark"} />;
+}
+
+// Root container painted with the active theme background. Without this the
+// edge-to-edge window default (white) shows through behind the Android system
+// nav bar — the "white box" at the bottom of dark-themed screens.
+function ThemedRoot({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return <View style={{ flex: 1, backgroundColor: colors.bg }}>{children}</View>;
 }
 
 // Syncs unread notification count to the app icon badge.
@@ -482,7 +490,7 @@ export default function RootLayout() {
               <SoundProvider>
                 <NotificationProvider>
                   <KeyboardProvider>
-                    <View style={{ flex: 1 }}>
+                    <ThemedRoot>
                       <AppServices />
                       <AppStatusBar />
                       <NotificationResponseHandler />
@@ -494,7 +502,7 @@ export default function RootLayout() {
                       <OfflineBanner />
                       <InAppNotificationBanner />
                       <ForceUpdateGate />
-                    </View>
+                    </ThemedRoot>
                   </KeyboardProvider>
                 </NotificationProvider>
               </SoundProvider>

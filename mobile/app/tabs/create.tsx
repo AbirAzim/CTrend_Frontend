@@ -46,6 +46,7 @@ type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string
 
 type EditPostData = {
   id: string;
+  format?: string | null;
   caption?: string | null;
   imageUrls?: (string | null)[] | null;
   options?: { label?: string | null; imageFocalX?: number | null; imageFocalY?: number | null }[] | null;
@@ -53,6 +54,15 @@ type EditPostData = {
   campaign?: { id: string } | null;
   votingEndsAt?: string | null;
   isUserGlobalBroadcast?: boolean | null;
+};
+
+/** Poll-only context/body image (post-level `imageUrls`). Optional, 0+. */
+type BodyImg = {
+  id: string;
+  localUri: string | null;
+  publicUrl: string | null;
+  uploading: boolean;
+  error: string | null;
 };
 
 type Slot = {
@@ -229,7 +239,13 @@ export default function CreateScreen() {
   const { platform: platformParam, editId } = useLocalSearchParams<{ platform?: string; editId?: string }>();
   const isEdit = Boolean(editId);
 
+  // Post layout: `compare` (image grid) or `poll` (stacked option rows).
+  const [format, setFormat] = useState<"compare" | "poll">("compare");
+  const isPoll = format === "poll";
+
   const [slots, setSlots] = useState<Slot[]>([makeSlot("1"), makeSlot("2")]);
+  // Poll-only body/context images (post-level imageUrls). Optional, 0+.
+  const [bodyImages, setBodyImages] = useState<BodyImg[]>([]);
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
   // Pre-select platform-wide when admin arrives from "+ New platform post"
@@ -315,6 +331,12 @@ export default function CreateScreen() {
     const post = editData?.getPostById;
     if (!isEdit || !post || editLoadedRef.current) return;
     editLoadedRef.current = true;
+    // Polls have a different edit model (locked photos, label-only) handled by
+    // the dedicated poll-aware editor. Hand off so feed/keeps edits work too.
+    if ((post.format ?? "").toLowerCase() === "poll") {
+      router.replace(`/edit-post?postId=${post.id}` as never);
+      return;
+    }
     setCaption(post.caption ?? "");
     setCategoryId(post.category?.id ?? "");
     setCampaignId(post.campaign?.id ?? "");
@@ -359,7 +381,8 @@ export default function CreateScreen() {
     setSlots((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
   function addSlot() {
-    if (slots.length >= 4) return;
+    const max = isPoll ? 8 : 4;
+    if (slots.length >= max) return;
     setSlots((prev) => [...prev, makeSlot(String(Date.now()))]);
   }
   function removeSlot(id: string) {
@@ -371,7 +394,9 @@ export default function CreateScreen() {
   // tab-mounted screen returns to create mode from edit mode).
   function resetForm() {
     editLoadedRef.current = false;
+    setFormat("compare");
     setSlots([makeSlot("1"), makeSlot("2")]);
+    setBodyImages([]);
     setCaption("");
     setCategoryId("");
     setCampaignId("");
@@ -435,6 +460,53 @@ export default function CreateScreen() {
     setImageSheetSlotId(slotId);
   }
 
+  // ── Poll helpers ────────────────────────────────────────────────────────────
+  /** Quick-fill two text options "Yes" / "No". */
+  function fillYesNo() {
+    setSlots([
+      { ...makeSlot("yes"), label: "Yes" },
+      { ...makeSlot("no"), label: "No" },
+    ]);
+  }
+
+  /** Pick + upload a poll context/body image, appending it to the grid. */
+  async function pickAndUploadBody() {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") { Alert.alert("Permission needed", "Gallery access required."); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const id = String(Date.now());
+      setBodyImages((prev) => [...prev, { id, localUri: asset.uri, publicUrl: null, uploading: true, error: null }]);
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      const ext = mimeType.split("/")[1] ?? "jpg";
+      const filename = asset.fileName ?? `photo_${Date.now()}.${ext}`;
+      const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
+      if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
+      const { uploadUrl, publicUrl } = data.getImageUploadUrl;
+      let uploadUri = asset.uri;
+      if (Platform.OS === "android" && !asset.uri.startsWith("file://")) {
+        uploadUri = `${FileSystem.cacheDirectory}upload_${Date.now()}.${ext}`;
+        await FileSystem.copyAsync({ from: asset.uri, to: uploadUri });
+      }
+      const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
+        httpMethod: "PUT", uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { "Content-Type": mimeType },
+      });
+      if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
+      setBodyImages((prev) => prev.map((b) => (b.id === id ? { ...b, uploading: false, publicUrl } : b)));
+    } catch (err: unknown) {
+      setBodyImages((prev) =>
+        prev.map((b) => (b.uploading ? { ...b, uploading: false, error: err instanceof Error ? err.message : "Upload failed" } : b)),
+      );
+    }
+  }
+
+  function removeBodyImage(id: string) {
+    setBodyImages((prev) => prev.filter((b) => b.id !== id));
+  }
+
   const imageSheetSlot = imageSheetSlotId
     ? slots.find((s) => s.id === imageSheetSlotId)
     : null;
@@ -443,17 +515,39 @@ export default function CreateScreen() {
   async function handleSubmit(isSchedule: boolean) {
     setSubmitError(null);
     if (!categoryId) { setSubmitError("Please select a category."); return; }
-    const readySlots = slots.filter((s) => s.publicUrl);
-    if (readySlots.length < 2) { setSubmitError("Upload or paste at least 2 images."); return; }
-    if (slots.some((s) => s.uploading)) { setSubmitError("Please wait for uploads to finish."); return; }
 
-    const imageUrls = readySlots.map((s) => s.publicUrl as string);
-    const options = readySlots.map((s, i) => ({
-      label: s.label.trim() || `Option ${SLOT_LABELS[i] ?? i + 1}`,
-      imageUrl: s.publicUrl as string,
-      imageFocalX: s.imageFocalX,
-      imageFocalY: s.imageFocalY,
-    }));
+    let imageUrls: string[];
+    let options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
+
+    if (isPoll) {
+      if (slots.some((s) => s.uploading) || bodyImages.some((b) => b.uploading)) {
+        setSubmitError("Please wait for uploads to finish."); return;
+      }
+      const labeled = slots.filter((s) => s.label.trim().length > 0);
+      if (labeled.length < 2) { setSubmitError("Add at least two poll options with labels."); return; }
+      // Poll options: label required, image optional (text-only rows allowed).
+      options = slots
+        .filter((s) => s.label.trim().length > 0 || s.publicUrl)
+        .map((s, i) => {
+          const label = s.label.trim() || `Option ${SLOT_LABELS[i] ?? i + 1}`;
+          return s.publicUrl
+            ? { label, imageUrl: s.publicUrl, imageFocalX: s.imageFocalX, imageFocalY: s.imageFocalY }
+            : { label };
+        });
+      // Body/context images live in post-level imageUrls (optional for polls).
+      imageUrls = bodyImages.map((b) => b.publicUrl).filter((u): u is string => Boolean(u));
+    } else {
+      const readySlots = slots.filter((s) => s.publicUrl);
+      if (readySlots.length < 2) { setSubmitError("Upload or paste at least 2 images."); return; }
+      if (slots.some((s) => s.uploading)) { setSubmitError("Please wait for uploads to finish."); return; }
+      imageUrls = readySlots.map((s) => s.publicUrl as string);
+      options = readySlots.map((s, i) => ({
+        label: s.label.trim() || `Option ${SLOT_LABELS[i] ?? i + 1}`,
+        imageUrl: s.publicUrl as string,
+        imageFocalX: s.imageFocalX,
+        imageFocalY: s.imageFocalY,
+      }));
+    }
 
     // ── Edit mode: update the existing post instead of creating a new one ──
     if (isEdit && editId) {
@@ -481,7 +575,7 @@ export default function CreateScreen() {
       return;
     }
 
-    const input: Record<string, unknown> = { categoryId, imageUrls, options };
+    const input: Record<string, unknown> = { categoryId, format: format.toUpperCase(), imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
     if (campaignId) input.campaignId = campaignId;
     // Non-admin global broadcast (admins use createSystemPost instead) — Phase 36
@@ -508,7 +602,10 @@ export default function CreateScreen() {
   }
 
   function confirmCancel() {
-    const dirty = slots.some((s) => s.localUri || s.pasteUrl) || caption.trim();
+    const dirty =
+      slots.some((s) => s.localUri || s.pasteUrl || s.label.trim()) ||
+      bodyImages.length > 0 ||
+      caption.trim();
     if (!dirty) { router.back(); return; }
     Alert.alert("Discard post?", "Your draft will be lost.", [
       { text: "Keep editing", style: "cancel" },
@@ -530,11 +627,34 @@ export default function CreateScreen() {
         {/* ── Header ── */}
         <View style={st.topRow}>
           <View style={{ width: 40 }} />
-          <Text style={[st.screenTitle, { color: colors.text }]}>{isEdit ? "Edit Compare" : "New Compare"}</Text>
+          <Text style={[st.screenTitle, { color: colors.text }]}>
+            {isEdit ? "Edit Compare" : isPoll ? "New Poll" : "New Compare"}
+          </Text>
           <View style={{ width: 40 }} />
         </View>
 
-        {/* ── Image slots (2-col grid) ── */}
+        {/* ── Format switcher (create only) ── */}
+        {!isEdit && (
+          <View style={[st.formatSwitch, { backgroundColor: colors.section, borderColor: colors.border }]}>
+            {(["compare", "poll"] as const).map((f) => {
+              const active = format === f;
+              return (
+                <Pressable
+                  key={f}
+                  style={[st.formatBtn, active && { backgroundColor: colors.accent }]}
+                  onPress={() => setFormat(f)}
+                >
+                  <Text style={[st.formatBtnText, { color: active ? "#fff" : colors.subtext }]}>
+                    {f === "compare" ? "🖼  Compare" : "📊  Poll"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ── Compare slots (2-col grid) ── */}
+        {!isPoll ? (
         <View style={{ gap: 12 }}>
           {isEdit && (
             <Text style={[st.lockedNote, { color: colors.muted, backgroundColor: colors.section, borderColor: colors.border }]}>
@@ -637,6 +757,96 @@ export default function CreateScreen() {
             </Pressable>
           )}
         </View>
+        ) : (
+        /* ── Poll option rows + context images ── */
+        <View style={{ gap: 12 }}>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, gap: 10 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ fontSize: 14 }}>📊</Text>
+                <Text style={[st.settingKey, { color: colors.text }]}>Poll options</Text>
+                <View style={st.requiredBadge}><Text style={st.requiredText}>REQUIRED</Text></View>
+              </View>
+              <Pressable
+                style={[st.yesNoBtn, { borderColor: colors.accent + "66", backgroundColor: colors.accent + "14" }]}
+                onPress={fillYesNo}
+              >
+                <Text style={[st.yesNoText, { color: colors.accent }]}>Yes / No</Text>
+              </Pressable>
+            </View>
+
+            {slots.map((slot, idx) => {
+              const imgSrc = slot.localUri ?? slot.publicUrl;
+              return (
+                <View key={slot.id} style={st.pollRow}>
+                  <Pressable
+                    style={[st.pollThumb, { borderColor: colors.border, backgroundColor: colors.section }]}
+                    onPress={() => openImageOptions(slot.id)}
+                  >
+                    {slot.uploading ? (
+                      <ActivityIndicator size="small" color={colors.accent} />
+                    ) : imgSrc ? (
+                      <Image source={{ uri: imgSrc }} style={st.pollThumbImg} contentFit="cover" />
+                    ) : (
+                      <Text style={[st.pollThumbPlus, { color: colors.muted }]}>＋</Text>
+                    )}
+                  </Pressable>
+                  <TextInput
+                    style={[st.pollLabelInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                    value={slot.label}
+                    onChangeText={(v) => patchSlot(slot.id, { label: v })}
+                    placeholder={`Option ${idx + 1}`}
+                    placeholderTextColor={colors.muted}
+                    maxLength={200}
+                  />
+                  {slots.length > 2 && (
+                    <Pressable style={st.pollRemove} onPress={() => removeSlot(slot.id)} hitSlop={6}>
+                      <Text style={[st.pollRemoveText, { color: colors.muted }]}>✕</Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+
+            {slots.length < 8 && (
+              <Pressable style={[st.addSlotBtn, { borderColor: colors.accent + "88", paddingVertical: 11 }]} onPress={addSlot}>
+                <Text style={[st.addSlotText, { color: colors.accent }]}>+ Add option</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* Context images (optional) */}
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, gap: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 14 }}>🖼</Text>
+              <Text style={[st.settingKey, { color: colors.text }]}>Context images</Text>
+              <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
+            </View>
+            <Text style={[st.optional, { color: colors.muted }]}>Shown above your poll options.</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+              {bodyImages.map((b) => (
+                <View key={b.id} style={[st.bodyCell, { borderColor: colors.border, backgroundColor: colors.section }]}>
+                  {b.uploading ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : b.publicUrl || b.localUri ? (
+                    <Image source={{ uri: (b.publicUrl ?? b.localUri) as string }} style={st.bodyCellImg} contentFit="cover" />
+                  ) : null}
+                  <Pressable style={st.bodyRemove} onPress={() => removeBodyImage(b.id)} hitSlop={6}>
+                    <Text style={st.bodyRemoveText}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+              <Pressable
+                style={[st.bodyAdd, { borderColor: colors.accent + "88" }]}
+                onPress={() => void pickAndUploadBody()}
+              >
+                <Text style={[st.pollThumbPlus, { color: colors.accent }]}>＋</Text>
+                <Text style={[st.optional, { color: colors.accent }]}>Add</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+        )}
 
         {/* ── Settings card ── */}
         <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -727,7 +937,7 @@ export default function CreateScreen() {
               style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
               value={caption}
               onChangeText={setCaption}
-              placeholder="What are you comparing?"
+              placeholder={isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
               placeholderTextColor={colors.muted}
               multiline
               numberOfLines={3}
@@ -990,6 +1200,29 @@ const st = StyleSheet.create({
 
   addSlotBtn: { borderWidth: 1.5, borderStyle: "dashed", borderRadius: 12, paddingVertical: 13, alignItems: "center" },
   addSlotText: { fontSize: 14, fontWeight: "700" },
+
+  // Format switcher (Compare / Poll)
+  formatSwitch: { flexDirection: "row", borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
+  formatBtn: { flex: 1, borderRadius: 9, paddingVertical: 9, alignItems: "center" },
+  formatBtnText: { fontSize: 14, fontWeight: "800" },
+
+  // Poll option rows
+  yesNoBtn: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5 },
+  yesNoText: { fontSize: 12, fontWeight: "800" },
+  pollRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pollThumb: { width: 46, height: 46, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  pollThumbImg: { width: "100%", height: "100%" },
+  pollThumbPlus: { fontSize: 20, fontWeight: "400" },
+  pollLabelInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  pollRemove: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  pollRemoveText: { fontSize: 15, fontWeight: "700" },
+
+  // Poll context/body images
+  bodyCell: { width: 64, height: 64, borderRadius: 10, borderWidth: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  bodyCellImg: { width: "100%", height: "100%" },
+  bodyRemove: { position: "absolute", top: 2, right: 2, width: 20, height: 20, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+  bodyRemoveText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  bodyAdd: { width: 64, height: 64, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center", gap: 1 },
 
   // Settings card
   card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
