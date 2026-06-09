@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
+import { Image } from "expo-image";
 import { useTheme } from "../context/ThemeContext";
 import {
   type WcFixture,
@@ -221,7 +222,11 @@ export function WorldCupFloating() {
         {...panRef.current.panHandlers}
         style={[st.bubble, { left: pos.x, top: pos.y, transform: [{ scale }] }]}
       >
-        <Text style={st.bubbleText}>⚽</Text>
+        <Image
+          source={require("../assets/worldcup-trophy.png")}
+          style={st.bubbleImg}
+          contentFit="contain"
+        />
         {live.length > 0 ? <View style={st.bubbleLiveDot} /> : null}
       </Animated.View>
     </View>
@@ -256,19 +261,12 @@ function makeStyles(c: {
       position: "absolute",
       width: BUBBLE,
       height: BUBBLE,
-      borderRadius: HALF,
       backgroundColor: "transparent",
       alignItems: "center",
       justifyContent: "center",
       zIndex: 1000,
     },
-    // Soft drop shadow on the emoji glyph itself so it reads on any background.
-    bubbleText: {
-      fontSize: 40,
-      textShadowColor: "rgba(0,0,0,0.35)",
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 4,
-    },
+    bubbleImg: { width: BUBBLE, height: BUBBLE },
     bubbleLiveDot: {
       position: "absolute",
       top: 4,

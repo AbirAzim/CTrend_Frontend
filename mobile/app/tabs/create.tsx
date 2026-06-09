@@ -332,11 +332,18 @@ export default function CreateScreen() {
     fetchPolicy: "cache-and-network",
     skip: !isEdit || !isAuthenticated,
   });
-  const editLoadedRef = useRef(false);
+  // Tracks WHICH post id has been hydrated — not just a boolean — so opening a
+  // different post (the tab stays mounted) always re-hydrates, and stale data
+  // for the previous post is never applied.
+  const editLoadedRef = useRef<string | null>(null);
   useEffect(() => {
     const post = editData?.getPostById;
-    if (!isEdit || !post || editLoadedRef.current) return;
-    editLoadedRef.current = true;
+    if (!isEdit || !post) return;
+    // Ignore data that isn't (yet) the post we're editing — guards against
+    // Apollo briefly returning the previous post's cached result.
+    if (post.id !== editId) return;
+    if (editLoadedRef.current === editId) return;
+    editLoadedRef.current = editId ?? null;
     // Polls have a different edit model (locked photos, label-only) handled by
     // the dedicated poll-aware editor. Hand off so feed/keeps edits work too.
     if ((post.format ?? "").toLowerCase() === "poll") {
@@ -365,19 +372,24 @@ export default function CreateScreen() {
         setDeadlinePreset(null);
         setDeadlineCustom(d);
       }
+    } else {
+      // Don't carry a deadline over from a previously-edited post.
+      setDeadlineEnabled(false);
     }
-  }, [editData, isEdit]);
+  }, [editData, isEdit, editId]);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.replace("/auth/login" as never);
   }, [hydrated, isAuthenticated]);
 
   // This screen lives in the tab navigator, so it stays mounted between visits.
-  // Re-sync when the editId param changes: clear the form when returning to
-  // "create" mode, or allow the edit form to re-hydrate for a different post.
+  // When it returns to "create" mode (no editId), clear the form. (Re-hydration
+  // for a different editId is handled by the id-keyed effect above.)
   useEffect(() => {
-    if (editId) editLoadedRef.current = false;
-    else resetForm();
+    if (!editId) {
+      editLoadedRef.current = null;
+      resetForm();
+    }
   }, [editId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hydrated || !isAuthenticated) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
@@ -399,7 +411,7 @@ export default function CreateScreen() {
   // Clear the form back to a blank draft (after a successful launch, or when the
   // tab-mounted screen returns to create mode from edit mode).
   function resetForm() {
-    editLoadedRef.current = false;
+    editLoadedRef.current = null;
     setFormat("compare");
     setSlots([makeSlot("1"), makeSlot("2")]);
     setBodyImages([]);

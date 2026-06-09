@@ -197,6 +197,8 @@ export default function EditPostScreen() {
   useEffect(() => {
     if (!postData?.getPostById || initialized) return;
     const post = mapGqlPostToFeedView(postData.getPostById as Parameters<typeof mapGqlPostToFeedView>[0]);
+    // Guard against hydrating with another post's (stale) data.
+    if (post.id !== postId) return;
     const poll = post.format === "poll";
     setIsPoll(poll);
     const optionVotes = (post.optionStats ?? []).reduce(
@@ -252,7 +254,7 @@ export default function EditPostScreen() {
     const cat = raw.category as { id: string } | null | undefined;
     if (cat?.id) setCategoryId(cat.id);
     setInitialized(true);
-  }, [postData, initialized]);
+  }, [postData, initialized, postId]);
 
   const [updatePost, { loading: saving }] = useMutation(UPDATE_POST);
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);

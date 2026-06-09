@@ -219,7 +219,7 @@ export function WorldCupFloating() {
         onPointerUp={onPointerUp}
         aria-label="World Cup matches — drag to move, tap to open"
       >
-        ⚽
+        <img src="/worldcup-trophy.png" className="wc-bubble-img" alt="" draggable={false} />
         {live.length > 0 && <span className="wc-bubble-live-dot" />}
       </button>
     </>

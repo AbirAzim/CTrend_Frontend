@@ -19966,23 +19966,28 @@ a.cx-profile-btn-accent {
 /* ── World Cup floating bubble (draggable, app-wide) ────────────────────── */
 .wc-bubble {
   position: fixed;
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
   z-index: 1000;
   background: transparent;
-  color: #fff;
-  font-size: 2.2rem;
-  line-height: 1;
+  padding: 0;
   cursor: grab;
   touch-action: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.4));
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.45));
   user-select: none;
   transition: transform 0.12s ease;
+}
+.wc-bubble-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 .wc-bubble:active,
 .wc-bubble--grabbing {
