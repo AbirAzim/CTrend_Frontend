@@ -313,6 +313,8 @@ export const CATEGORIES = gql`
     categories: getAllCategories {
       id
       name
+      slug
+      color
     }
   }
 `;

@@ -19,11 +19,13 @@ import {
 import { CATEGORIES } from "@ctrend/shared/graphql/feed";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
+import { categoryColorHex, CATEGORY_PALETTE_HEX } from "../../lib/categoryColor";
 
 type Category = {
   id: string;
   name: string;
   slug?: string | null;
+  color?: string | null;
 };
 
 type CategoriesData = { categories: Category[] };
@@ -36,6 +38,8 @@ export default function CategoriesScreen() {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  // "" = auto (no admin color); a hex string = explicit admin color.
+  const [editingColor, setEditingColor] = useState("");
 
   const { data, loading, refetch } = useQuery<CategoriesData>(CATEGORIES, {
     fetchPolicy: "cache-and-network",
@@ -64,20 +68,24 @@ export default function CategoriesScreen() {
   function startEdit(cat: Category) {
     setEditingId(cat.id);
     setEditingName(cat.name);
+    setEditingColor(cat.color ?? "");
   }
 
   function cancelEdit() {
     setEditingId(null);
     setEditingName("");
+    setEditingColor("");
   }
 
   async function handleUpdate(id: string) {
     const name = editingName.trim();
     if (!name) return;
     try {
-      await updateMut({ variables: { id, name } });
+      // color "" clears the admin color (back to the auto-derived palette hue).
+      await updateMut({ variables: { id, name, color: editingColor || "" } });
       setEditingId(null);
       setEditingName("");
+      setEditingColor("");
       void refetch();
       showToast("Category updated", "success");
     } catch (err: unknown) {
@@ -169,16 +177,44 @@ export default function CategoriesScreen() {
             return (
               <View style={[st.row, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 {isEditing ? (
-                  <>
+                  <View style={{ flex: 1, gap: 10 }}>
                     <TextInput
-                      style={[st.editInput, { flex: 2, color: colors.text, borderColor: colors.accent, backgroundColor: colors.inputBg }]}
+                      style={[st.editInput, { color: colors.text, borderColor: colors.accent, backgroundColor: colors.inputBg }]}
                       value={editingName}
                       onChangeText={setEditingName}
                       autoFocus
                       onSubmitEditing={() => void handleUpdate(cat.id)}
                       returnKeyType="done"
                     />
-                    <View style={[st.rowActions, { flex: 1.5 }]}>
+                    {/* Color swatch picker — Auto resets to the derived palette hue. */}
+                    <View style={st.swatchRow}>
+                      <Pressable
+                        style={[
+                          st.autoChip,
+                          { borderColor: !editingColor ? colors.accent : colors.border },
+                          !editingColor && { backgroundColor: colors.accent + "1a" },
+                        ]}
+                        onPress={() => setEditingColor("")}
+                      >
+                        <Text style={[st.autoChipText, { color: !editingColor ? colors.accent : colors.muted }]}>Auto</Text>
+                      </Pressable>
+                      {CATEGORY_PALETTE_HEX.map((hex) => {
+                        const selected = editingColor.toLowerCase() === hex.toLowerCase();
+                        return (
+                          <Pressable
+                            key={hex}
+                            onPress={() => setEditingColor(hex)}
+                            style={[
+                              st.swatch,
+                              { backgroundColor: hex, borderColor: selected ? colors.text : "transparent" },
+                            ]}
+                          >
+                            {selected ? <Text style={st.swatchCheck}>✓</Text> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <View style={[st.rowActions, { justifyContent: "flex-start" }]}>
                       <Pressable
                         style={[st.actionBtn, { borderColor: colors.accent }, updating && { opacity: 0.5 }]}
                         onPress={() => void handleUpdate(cat.id)}
@@ -195,11 +231,17 @@ export default function CategoriesScreen() {
                         <Text style={[st.actionBtnText, { color: colors.muted }]}>Cancel</Text>
                       </Pressable>
                     </View>
-                  </>
+                  </View>
                 ) : (
                   <>
-                    <Text style={[st.cellName, { flex: 2, color: colors.text }]}>{cat.name}</Text>
-                    <Text style={[st.cellSlug, { flex: 2, color: colors.muted }]}>{cat.slug ?? "—"}</Text>
+                    <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={[st.swatchDot, { backgroundColor: categoryColorHex(cat) ?? colors.muted }]} />
+                      <Text style={[st.cellName, { color: colors.text }]} numberOfLines={1}>{cat.name}</Text>
+                    </View>
+                    <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={[st.cellSlug, { color: colors.muted }]} numberOfLines={1}>{cat.slug ?? "—"}</Text>
+                      {!cat.color ? <Text style={[st.autoTag, { color: colors.muted, borderColor: colors.border }]}>auto</Text> : null}
+                    </View>
                     <View style={[st.rowActions, { flex: 1.5 }]}>
                       <Pressable
                         style={[st.actionBtn, { borderColor: colors.accent }]}
@@ -270,5 +312,12 @@ function makeStyles(c: ReturnType<typeof useTheme>["colors"]) {
     rowActions: { flexDirection: "row", gap: 6, justifyContent: "flex-end" },
     actionBtn: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
     actionBtnText: { fontSize: 12, fontWeight: "700" },
+    swatchDot: { width: 14, height: 14, borderRadius: 4 },
+    autoTag: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", borderWidth: 1, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+    swatchRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7 },
+    autoChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, height: 28, alignItems: "center", justifyContent: "center" },
+    autoChipText: { fontSize: 12, fontWeight: "700" },
+    swatch: { width: 28, height: 28, borderRadius: 7, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+    swatchCheck: { color: "#fff", fontSize: 14, fontWeight: "900" },
   });
 }

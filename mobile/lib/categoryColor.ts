@@ -88,3 +88,17 @@ export function categoryChipColors(
   const text = `rgb(${t[0]}, ${t[1]}, ${t[2]})`;
   return { bg, text };
 }
+
+function rgbToHex([r, g, b]: [number, number, number]): string {
+  const h = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/** The palette as hex strings — used by the admin category color picker. */
+export const CATEGORY_PALETTE_HEX: string[] = CATEGORY_PALETTE.map(rgbToHex);
+
+/** Solid accent hex for a category: admin `color` wins, else the hashed palette hue. */
+export function categoryColorHex(cat: CategoryLike): string | null {
+  const rgb = categoryRgb(cat);
+  return rgb ? rgbToHex(rgb) : null;
+}
