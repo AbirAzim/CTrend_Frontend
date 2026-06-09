@@ -3394,6 +3394,7 @@ a.cx-friend-avatar:hover {
   letter-spacing: 0;
   color: var(--cx-ink);
   word-break: break-word;
+  white-space: pre-wrap; /* preserve the author's line breaks */
 }
 
 :root[data-theme="dark"] .cx-post-caption-bar {
@@ -11927,6 +11928,73 @@ a.cx-profile-btn-accent {
   object-fit: cover;
 }
 
+.cx-edit-poll-photo .cx-edit-item-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.4rem;
+  opacity: 0.6;
+}
+
+.cx-edit-poll-photo-uploading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  font-size: 1.2rem;
+}
+
+.cx-edit-poll-photo-actions {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  gap: 3px;
+}
+
+.cx-edit-poll-photo-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cx-edit-poll-photo-btn:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.75);
+}
+
+.cx-edit-poll-photo-btn--remove {
+  background: rgb(var(--cx-rose-rgb) / 0.85);
+}
+
+.cx-edit-poll-photo--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--ig-border);
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+  color: var(--cx-ink);
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+.cx-edit-poll-photo--add:hover:not(:disabled) {
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
 .cx-edit-toggle-row {
   flex-direction: row;
   align-items: center;
@@ -19487,11 +19555,21 @@ a.cx-profile-btn-accent {
   flex-direction: column;
   gap: 6px;
 }
+/* Poll context photos show in FULL — never cropped. Override the media wrap's
+   fixed 4/3 aspect and let each image keep its natural shape, capped at a max
+   height so very tall photos scale down (entire image still visible). */
+.cx-poll-body-media.ig-post-media-wrap {
+  aspect-ratio: auto;
+  background: transparent;
+}
 .cx-poll-body-image {
   width: 100%;
   display: block;
   border-radius: 10px;
-  object-fit: cover;
+  object-fit: contain;
+  height: auto;
+  max-height: 55vh;
+  background: #000;
 }
 .cx-poll-options {
   display: flex;

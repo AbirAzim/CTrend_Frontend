@@ -20,9 +20,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	COMMENTS_BY_POST,
 	COMMENT_POST,
+	COMMENT_REACTION_EMOJIS,
 	DELETE_COMMENT,
 	EDIT_COMMENT,
-	SET_COMMENT_LIKE,
+	SET_COMMENT_REACTION,
 } from '@ctrend/shared/graphql/comments';
 import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
@@ -37,6 +38,8 @@ type GqlComment = {
 	editedAt?: string | null;
 	likeCount: number;
 	viewerHasLiked: boolean;
+	viewerReaction?: string | null;
+	reactions?: { emoji: string; count: number }[] | null;
 	postId: string;
 	parentId?: string | null;
 	replyToName?: string | null;
@@ -118,6 +121,8 @@ export function FeedInlineComments({
 	const [editText, setEditText] = useState('');
 	const [replyTarget, setReplyTarget] = useState<{ id: string; name: string } | null>(null);
 	const [deleteTarget, setDeleteTarget] = useState<GqlComment | null>(null);
+	// Which comment's reaction tray is open (long-press to reveal all reactions).
+	const [reactionPickerId, setReactionPickerId] = useState<string | null>(null);
 	const inputRef = useRef<TextInput>(null);
 	const listRef = useRef<KeyboardAwareScrollViewRef>(null);
 	const commentOffsets = useRef<Record<string, number>>({});
@@ -131,7 +136,7 @@ export function FeedInlineComments({
 	});
 
 	const [commentPost] = useMutation(COMMENT_POST);
-	const [setLike] = useMutation(SET_COMMENT_LIKE);
+	const [setReaction] = useMutation(SET_COMMENT_REACTION);
 	const [editComment] = useMutation(EDIT_COMMENT);
 	const [deleteComment] = useMutation(DELETE_COMMENT);
 
@@ -212,14 +217,57 @@ export function FeedInlineComments({
 		setTimeout(() => inputRef.current?.focus(), 50);
 	}
 
-	function handleLike(c: GqlComment) {
+	// A comment's current reaction (new model first, falling back to the old like).
+	function currentReaction(c: GqlComment): string | null {
+		return c.viewerReaction ?? (c.viewerHasLiked ? '👍' : null);
+	}
+
+	// Set or clear a reaction. Passing the same emoji again clears it. Apollo
+	// merges the mutation result (id + viewerReaction + reactions) into the cache.
+	function applyReaction(c: GqlComment, emoji: string | null) {
 		if (!isAuthenticated) {
 			router.push('/auth/login');
 			return;
 		}
-		void setLike({
-			variables: { commentId: c.id, liked: !c.viewerHasLiked },
+		const next = currentReaction(c) === emoji ? null : emoji;
+		const prev = currentReaction(c);
+		const reactions = c.reactions ?? [];
+		// Optimistic counts so the pill updates instantly.
+		const map = new Map(reactions.map((r) => [r.emoji, r.count]));
+		if (prev) {
+			const n = (map.get(prev) ?? 1) - 1;
+			if (n <= 0) map.delete(prev);
+			else map.set(prev, n);
+		}
+		if (next) map.set(next, (map.get(next) ?? 0) + 1);
+		const order = new Map<string, number>(COMMENT_REACTION_EMOJIS.map((e, i) => [e, i]));
+		const nextReactions = [...map.entries()]
+			.map(([emoji, count]) => ({ emoji, count, __typename: 'CommentReactionCountGql' as const }))
+			.sort((a, b) => (order.get(a.emoji) ?? 99) - (order.get(b.emoji) ?? 99));
+		void setReaction({
+			variables: { commentId: c.id, emoji: next },
+			optimisticResponse: {
+				setCommentReaction: {
+					__typename: 'CommentGql',
+					id: c.id,
+					viewerReaction: next,
+					reactions: nextReactions,
+				},
+			},
 		}).catch(() => {});
+		setReactionPickerId(null);
+	}
+
+	function quickReact(c: GqlComment) {
+		applyReaction(c, currentReaction(c) ? null : COMMENT_REACTION_EMOJIS[0]);
+	}
+
+	function openReactionTray(c: GqlComment) {
+		if (!isAuthenticated) {
+			router.push('/auth/login');
+			return;
+		}
+		setReactionPickerId((cur) => (cur === c.id ? null : c.id));
 	}
 
 	function startEdit(c: GqlComment) {
@@ -268,6 +316,17 @@ export function FeedInlineComments({
 		const isEditing = editingId === c.id;
 		const isHighlighted = highlightCommentId === c.id;
 		const timeLabel = formatRelativeTime(c.createdAt);
+
+		const reactions = c.reactions ?? [];
+		const reactionTotal =
+			reactions.reduce((s, r) => s + r.count, 0) || (c.likeCount ?? 0);
+		const topEmojis = reactions.length
+			? [...reactions].sort((a, b) => b.count - a.count).slice(0, 3).map((r) => r.emoji)
+			: (c.likeCount ?? 0) > 0
+				? ['👍']
+				: [];
+		const mine = currentReaction(c);
+		const trayOpen = reactionPickerId === c.id;
 
 		return (
 			<View
@@ -332,12 +391,32 @@ export function FeedInlineComments({
 						)}
 					</View>
 
+					{trayOpen ? (
+						<View style={st.reactionTray}>
+							{COMMENT_REACTION_EMOJIS.map((e) => (
+								<Pressable
+									key={e}
+									onPress={() => applyReaction(c, e)}
+									style={[st.reactionTrayBtn, mine === e && st.reactionTrayBtnActive]}
+									hitSlop={4}
+								>
+									<Text style={st.reactionTrayEmoji}>{e}</Text>
+								</Pressable>
+							))}
+						</View>
+					) : null}
+
 					{!isEditing && (
 						<View style={st.metaRow}>
 							<Text style={st.time}>{timeLabel}</Text>
-							<Pressable onPress={() => handleLike(c)} hitSlop={8}>
-								<Text style={[st.metaBtn, c.viewerHasLiked && st.metaBtnLiked]}>
-									Like
+							<Pressable
+								onPress={() => quickReact(c)}
+								onLongPress={() => openReactionTray(c)}
+								delayLongPress={200}
+								hitSlop={8}
+							>
+								<Text style={[st.metaBtn, mine && st.metaBtnLiked]}>
+									{mine ? `${mine} Reacted` : 'Like'}
 								</Text>
 							</Pressable>
 							<Pressable onPress={() => startReply(c)} hitSlop={8}>
@@ -357,18 +436,30 @@ export function FeedInlineComments({
 					)}
 				</View>
 
-				{!isEditing && c.likeCount > 0 ? (
-					<View style={st.likePill}>
-						<Text style={st.likePillIcon}>👍</Text>
-						<Text style={st.likePillCount}>{c.likeCount}</Text>
-					</View>
-				) : (
-					<Pressable style={st.likeBtn} onPress={() => handleLike(c)} hitSlop={8}>
-						<Text style={[st.likeBtnIcon, c.viewerHasLiked && st.likeBtnIconActive]}>
-							{c.viewerHasLiked ? '👍' : '👍🏻'}
+				{!isEditing && reactionTotal > 0 ? (
+					<Pressable
+						style={st.likePill}
+						onPress={() => quickReact(c)}
+						onLongPress={() => openReactionTray(c)}
+						delayLongPress={200}
+						hitSlop={6}
+					>
+						<Text style={st.likePillIcon}>{topEmojis.join('')}</Text>
+						<Text style={st.likePillCount}>{reactionTotal}</Text>
+					</Pressable>
+				) : !isEditing ? (
+					<Pressable
+						style={st.likeBtn}
+						onPress={() => quickReact(c)}
+						onLongPress={() => openReactionTray(c)}
+						delayLongPress={200}
+						hitSlop={8}
+					>
+						<Text style={[st.likeBtnIcon, mine && st.likeBtnIconActive]}>
+							{mine ?? '👍🏻'}
 						</Text>
 					</Pressable>
-				)}
+				) : null}
 			</View>
 		);
 	}
@@ -595,7 +686,29 @@ function makeStyles(fb: FbPalette) {
 		},
 		avatarSm: { width: 32, height: 32, borderRadius: 16 },
 		avatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-		bodyCol: { flex: 1, gap: 4, paddingRight: 4 },
+		bodyCol: { flex: 1, gap: 4, paddingRight: 4, position: 'relative' },
+		reactionTray: {
+			position: 'absolute',
+			bottom: 22,
+			left: 6,
+			flexDirection: 'row',
+			gap: 2,
+			backgroundColor: fb.composerBar,
+			borderRadius: 24,
+			paddingHorizontal: 6,
+			paddingVertical: 4,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: fb.border,
+			zIndex: 30,
+			elevation: 6,
+			shadowColor: '#000',
+			shadowOpacity: 0.2,
+			shadowRadius: 8,
+			shadowOffset: { width: 0, height: 2 },
+		},
+		reactionTrayBtn: { paddingHorizontal: 4, paddingVertical: 2, borderRadius: 18 },
+		reactionTrayBtnActive: { backgroundColor: fb.link + '22' },
+		reactionTrayEmoji: { fontSize: 26 },
 		bubble: {
 			backgroundColor: fb.bubble,
 			borderRadius: 18,

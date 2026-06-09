@@ -1,5 +1,8 @@
 import { gql } from "@apollo/client";
 
+/** The common comment reactions, in display order (first is the quick/default). */
+export const COMMENT_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+
 export const COMMENTS_BY_POST = gql`
   query CommentsByPost($postId: ID!) {
     commentsByPost(postId: $postId) {

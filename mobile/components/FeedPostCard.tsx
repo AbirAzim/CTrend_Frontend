@@ -173,6 +173,35 @@ function compareLabel(post: FeedPostView, idx: number): string {
 	return post.postOptions?.[idx]?.label?.trim() ?? `Side ${idx + 1}`;
 }
 
+/**
+ * A poll context/body photo shown in FULL — never cropped. Keeps the image's
+ * natural aspect ratio (measured on load) and only caps very tall photos at a
+ * max height so they scale down (the whole image stays visible).
+ */
+function PollBodyImage({ uri, radius }: { uri: string; radius: number }) {
+	const [ar, setAr] = useState<number | null>(null);
+	const maxHeight = Math.round(Dimensions.get('window').height * 0.55);
+	return (
+		<Image
+			source={{ uri }}
+			style={{
+				width: '100%',
+				aspectRatio: ar ?? 1.4,
+				maxHeight,
+				borderRadius: radius,
+				backgroundColor: '#000',
+			}}
+			contentFit='contain'
+			cachePolicy='memory-disk'
+			onLoad={(e) => {
+				const w = e?.source?.width;
+				const h = e?.source?.height;
+				if (w && h) setAr(w / h);
+			}}
+		/>
+	);
+}
+
 function calcCountdown(endsAt: string | null | undefined): string | null {
 	if (!endsAt) return null;
 	const ms = new Date(endsAt).getTime() - Date.now();
@@ -1973,13 +2002,7 @@ function FeedPostCardComponent({
 					{post.imageUrls.length > 0 ? (
 						<View style={st.pollBodyMedia}>
 							{post.imageUrls.map((url, bi) => (
-								<Image
-									key={`${post.id}-pbody-${bi}`}
-									source={{ uri: url }}
-									style={st.pollBodyImage}
-									contentFit='cover'
-									cachePolicy='memory-disk'
-								/>
+								<PollBodyImage key={`${post.id}-pbody-${bi}`} uri={url} radius={10} />
 							))}
 						</View>
 					) : null}

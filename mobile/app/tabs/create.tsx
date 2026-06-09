@@ -663,15 +663,25 @@ export default function CreateScreen() {
     }
   }
 
+  // Robust back: fall back to the feed tab when there's no screen to pop (e.g.
+  // this tab was reached without a stack entry behind it).
+  function goBack() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/tabs" as never);
+  }
+
   function confirmCancel() {
+    // In edit mode there's no "draft" to lose — just leave (unsaved edits are
+    // simply not applied).
+    if (isEdit) { goBack(); return; }
     const dirty =
       slots.some((s) => s.localUri || s.pasteUrl || s.label.trim()) ||
       bodyImages.length > 0 ||
       caption.trim();
-    if (!dirty) { router.back(); return; }
+    if (!dirty) { goBack(); return; }
     Alert.alert("Discard post?", "Your draft will be lost.", [
       { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: () => router.back() },
+      { text: "Discard", style: "destructive", onPress: () => goBack() },
     ]);
   }
 
@@ -688,11 +698,17 @@ export default function CreateScreen() {
       >
         {/* ── Header ── */}
         <View style={st.topRow}>
-          <View style={{ width: 40 }} />
+          {isEdit ? (
+            <Pressable onPress={goBack} hitSlop={10} style={{ width: 60 }}>
+              <Text style={[st.backText, { color: colors.muted }]}>← Back</Text>
+            </Pressable>
+          ) : (
+            <View style={{ width: 60 }} />
+          )}
           <Text style={[st.screenTitle, { color: colors.text }]}>
             {isEdit ? "Edit Compare" : isPoll ? "New Poll" : "New Compare"}
           </Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 60 }} />
         </View>
 
         {/* ── Format switcher (create only) ── */}
@@ -918,7 +934,7 @@ export default function CreateScreen() {
             <View style={[st.settingRow, { borderBottomColor: colors.border }]}>
               <Text style={[st.settingKey, { color: colors.text }]}>Post type</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
-                {(["Regular", "Platform-wide"] as const).map((opt) => {
+                {(["Friends Only", "Platform-wide"] as const).map((opt) => {
                   const active = opt === "Platform-wide" ? platformWide : !platformWide;
                   return (
                     <Pressable
@@ -1258,6 +1274,7 @@ export default function CreateScreen() {
 const st = StyleSheet.create({
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
   screenTitle: { fontSize: 17, fontWeight: "800" },
+  backText: { fontSize: 15, fontWeight: "600" },
 
   // Slot tile
   slotTile: {

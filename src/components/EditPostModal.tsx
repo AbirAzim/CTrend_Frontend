@@ -26,6 +26,13 @@ type PollOption = {
   imageFocalY?: number | null;
 };
 
+type BodyImage = {
+  id: string;
+  url: string;
+  /** True for photos already on the post (carry votes). */
+  existing: boolean;
+};
+
 type EditablePost = {
   id: string;
   format?: string | null;
@@ -120,9 +127,20 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   }));
   const pollLockedCount = initialPollOptions.length;
 
+  // Poll context/body photos. Existing ones carry votes — replacing/removing one
+  // resets votes; adding new ones is safe.
+  const initialBodyImages: BodyImage[] = (post.imageUrls ?? []).map((url, i) => ({
+    id: `body-${i}`,
+    url,
+    existing: true,
+  }));
+
   const [caption, setCaption] = useState(post.caption ?? "");
   const [items, setItems] = useState<CompareItem[]>(initialItems);
   const [pollOptions, setPollOptions] = useState<PollOption[]>(initialPollOptions);
+  const [bodyImages, setBodyImages] = useState<BodyImage[]>(initialBodyImages);
+  const [bodyUploadingId, setBodyUploadingId] = useState<string | null>(null);
+  const bodyFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [broadcastGlobally, setBroadcastGlobally] = useState(
     Boolean(post.isUserGlobalBroadcast),
   );
@@ -282,6 +300,48 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     pollFileRefs.current[idx]?.click();
   }
 
+  // ── Poll context/body photos ──────────────────────────────────────────────
+  async function handleBodyFileUpload(id: string, file: File) {
+    setBodyUploadingId(id);
+    try {
+      const url = await uploadImage(file);
+      setBodyImages((prev) => prev.map((b) => (b.id === id ? { ...b, url } : b)));
+    } catch {
+      setError("Image upload failed. Try again.");
+    }
+    setBodyUploadingId(null);
+  }
+
+  function addBodyImage() {
+    if (bodyImages.length >= 6) return;
+    const id = `body-new-${Date.now()}`;
+    setBodyImages((prev) => [...prev, { id, url: "", existing: false }]);
+    // Open the file picker on the next tick once the input is mounted.
+    setTimeout(() => bodyFileRefs.current[id]?.click(), 0);
+  }
+
+  function removeBodyImage(id: string) {
+    const img = bodyImages.find((b) => b.id === id);
+    if (img?.existing && img.url && hasVotes) {
+      const ok = window.confirm(
+        "Removing this photo will remove all current votes on this poll. Remove it anyway?",
+      );
+      if (!ok) return;
+    }
+    setBodyImages((prev) => prev.filter((b) => b.id !== id));
+  }
+
+  function requestBodyReplace(id: string) {
+    const img = bodyImages.find((b) => b.id === id);
+    if (img?.existing && img.url && hasVotes) {
+      const ok = window.confirm(
+        "Replacing this photo will remove all current votes on this poll. Replace it anyway?",
+      );
+      if (!ok) return;
+    }
+    bodyFileRefs.current[id]?.click();
+  }
+
   function addPollOption() {
     if (pollOptions.length >= 10) return;
     setPollOptions((prev) => [...prev, { label: "" }]);
@@ -414,9 +474,11 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             postId: post.id,
             input: {
               ...sharedInput,
-              // Preserve each option's existing image/focal point — only labels
-              // change here, so votes are never reset. Body images (imageUrls)
-              // are intentionally omitted so they stay untouched.
+              // Context/body photos. The backend resets votes if an existing one
+              // changed/was removed (existingImageUrlsChanged); adding is safe.
+              imageUrls: bodyImages
+                .map((b) => b.url.trim())
+                .filter((u) => u.length > 0),
               options: labeled.map((o) => ({
                 label: o.label.trim() || "Option",
                 ...(o.imageUrl
@@ -656,23 +718,70 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
 
           {isPoll ? (
             <>
-              {post.imageUrls.length > 0 && (
-                <>
-                  <p className="cx-edit-section-label">Poll photos</p>
-                  <p className="muted small cx-edit-locked-note">
-                    🔒 Photos can't be changed after posting — they're tied to
-                    existing votes.
-                  </p>
-                  <div className="cx-edit-poll-photos">
-                    {post.imageUrls.map((url, i) => (
-                      <div className="cx-edit-poll-photo" key={i}>
-                        <img src={url} alt="" />
-                        <span className="cx-edit-item-lock" title="Locked" aria-hidden>🔒</span>
-                      </div>
-                    ))}
+              <p className="cx-edit-section-label">
+                Poll photos
+                <span className="cx-edit-item-count">{bodyImages.length} / 6</span>
+              </p>
+              <p className="muted small cx-edit-locked-note">
+                Context photos shown above the options.
+                {hasVotes
+                  ? " Replacing or removing an existing photo resets all votes (you'll be asked to confirm); adding new ones is safe."
+                  : " Add, replace or remove freely until the first vote is cast."}
+              </p>
+              <div className="cx-edit-poll-photos">
+                {bodyImages.map((b) => (
+                  <div className="cx-edit-poll-photo" key={b.id}>
+                    {b.url ? (
+                      <img src={b.url} alt="" />
+                    ) : (
+                      <span className="cx-edit-item-placeholder">🖼</span>
+                    )}
+                    {bodyUploadingId === b.id && (
+                      <span className="cx-edit-poll-photo-uploading">…</span>
+                    )}
+                    <div className="cx-edit-poll-photo-actions">
+                      <button
+                        type="button"
+                        className="cx-edit-poll-photo-btn"
+                        title={b.url ? "Replace photo" : "Upload photo"}
+                        disabled={bodyUploadingId !== null}
+                        onClick={() => requestBodyReplace(b.id)}
+                      >
+                        {b.url ? "🔁" : "📁"}
+                      </button>
+                      <button
+                        type="button"
+                        className="cx-edit-poll-photo-btn cx-edit-poll-photo-btn--remove"
+                        title="Remove photo"
+                        onClick={() => removeBodyImage(b.id)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <input
+                      ref={(el) => { bodyFileRefs.current[b.id] = el; }}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void handleBodyFileUpload(b.id, f);
+                        e.target.value = "";
+                      }}
+                    />
                   </div>
-                </>
-              )}
+                ))}
+                {bodyImages.length < 6 && (
+                  <button
+                    type="button"
+                    className="cx-edit-poll-photo cx-edit-poll-photo--add"
+                    onClick={addBodyImage}
+                    disabled={bodyUploadingId !== null}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
 
               <p className="cx-edit-section-label">
                 Poll Options

@@ -53,6 +53,89 @@ function fmtScheduleSummary(d: Date): string {
   });
 }
 
+const DEADLINE_PRESETS: { label: string; hours: number }[] = [
+  { label: "+12h", hours: 12 },
+  { label: "+1d", hours: 24 },
+  { label: "+3d", hours: 72 },
+  { label: "+1w", hours: 168 },
+];
+
+type StepperPalette = {
+  card: string;
+  section: string;
+  border: string;
+  text: string;
+  accent: string;
+};
+
+/** Date + time stepper (shared by go-live and voting-deadline editors). */
+function DateTimeStepper({
+  date,
+  onChange,
+  colors,
+}: {
+  date: Date;
+  onChange: (d: Date) => void;
+  colors: StepperPalette;
+}) {
+  return (
+    <View style={[st.dtCard, { backgroundColor: colors.section, borderColor: colors.border }]}>
+      <View style={st.dtRow}>
+        <Text style={[st.dtLabel, { color: colors.text }]}>DATE</Text>
+        <View style={st.dtStepper}>
+          <Pressable
+            style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => { const n = new Date(date); n.setDate(n.getDate() - 1); if (n.getTime() > Date.now()) onChange(n); }}
+            hitSlop={8}
+          >
+            <Text style={[st.dtArrow, { color: colors.text }]}>‹</Text>
+          </Pressable>
+          <Text style={[st.dtValue, { color: colors.text }]}>
+            {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </Text>
+          <Pressable
+            style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => { const n = new Date(date); n.setDate(n.getDate() + 1); onChange(n); }}
+            hitSlop={8}
+          >
+            <Text style={[st.dtArrow, { color: colors.text }]}>›</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={[st.dtDivider, { backgroundColor: colors.border }]} />
+
+      <View style={st.dtRow}>
+        <Text style={[st.dtLabel, { color: colors.text }]}>TIME</Text>
+        <View style={st.dtTimeGroup}>
+          <View style={st.dtStepper}>
+            <Pressable style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { const n = new Date(date); n.setHours((n.getHours() + 1) % 24); onChange(n); }} hitSlop={6}>
+              <Text style={[st.dtArrow, { color: colors.text }]}>+</Text>
+            </Pressable>
+            <Text style={[st.dtValue, { color: colors.text }]}>{String(date.getHours() % 12 || 12).padStart(2, "0")}</Text>
+            <Pressable style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { const n = new Date(date); n.setHours((n.getHours() + 23) % 24); onChange(n); }} hitSlop={6}>
+              <Text style={[st.dtArrow, { color: colors.text }]}>−</Text>
+            </Pressable>
+          </View>
+          <Text style={[st.dtColon, { color: colors.accent }]}>:</Text>
+          <View style={st.dtStepper}>
+            <Pressable style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { const n = new Date(date); n.setMinutes((Math.floor(n.getMinutes() / 5) + 1) * 5 % 60); onChange(n); }} hitSlop={6}>
+              <Text style={[st.dtArrow, { color: colors.text }]}>+</Text>
+            </Pressable>
+            <Text style={[st.dtValue, { color: colors.text }]}>{String(date.getMinutes()).padStart(2, "0")}</Text>
+            <Pressable style={[st.dtBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { const n = new Date(date); const cur = Math.floor(n.getMinutes() / 5); n.setMinutes(((cur - 1 + 12) % 12) * 5); onChange(n); }} hitSlop={6}>
+              <Text style={[st.dtArrow, { color: colors.text }]}>−</Text>
+            </Pressable>
+          </View>
+          <Pressable style={[st.dtAmPm, { backgroundColor: colors.accent }]} onPress={() => { const n = new Date(date); n.setHours((n.getHours() + 12) % 24); onChange(n); }}>
+            <Text style={st.dtAmPmText}>{date.getHours() >= 12 ? "PM" : "AM"}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function EditPostScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { colors } = useTheme();
@@ -79,8 +162,12 @@ export default function EditPostScreen() {
   const [hasVotes, setHasVotes] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [positionIdx, setPositionIdx] = useState<number | null>(null);
-  // Poll-only: post-level body/context photos, shown locked (votes depend on them).
-  const [bodyImages, setBodyImages] = useState<string[]>([]);
+  // Poll-only: post-level body/context photos. Existing ones carry votes —
+  // replacing/removing one resets votes; adding new ones is safe.
+  const [bodyImages, setBodyImages] = useState<
+    Array<{ id: string; url: string; existing: boolean }>
+  >([]);
+  const [bodyUploadingId, setBodyUploadingId] = useState<string | null>(null);
   // Friends-only ↔ platform-wide (global) audience toggle (post owners only).
   const [broadcastGlobally, setBroadcastGlobally] = useState(false);
   const [initialBroadcast, setInitialBroadcast] = useState(false);
@@ -88,6 +175,15 @@ export default function EditPostScreen() {
   const [categoryModal, setCategoryModal] = useState(false);
   const [endingSoonLead, setEndingSoonLead] = useState("5");
   const [initialized, setInitialized] = useState(false);
+  // Published posts can change/extend their voting deadline (votingEndsAt).
+  const [deadlineEnabled, setDeadlineEnabled] = useState(false);
+  const [votingEnd, setVotingEnd] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(d.getHours() + 24, 0, 0, 0);
+    return d;
+  });
+  const [initialVotingEnd, setInitialVotingEnd] = useState<string | null>(null);
+  const [votingOpen, setVotingOpen] = useState(true);
   // Scheduled (not-yet-published) posts can change their go-live time. Once
   // published this section never shows, so the schedule time is locked.
   const [isScheduled, setIsScheduled] = useState(false);
@@ -120,6 +216,14 @@ export default function EditPostScreen() {
       const d = new Date(post.scheduledAt);
       if (!Number.isNaN(d.getTime())) setScheduleDate(d);
     }
+    setVotingOpen(post.isVotingOpen !== false);
+    if (post.votingEndsAt) {
+      const d = new Date(post.votingEndsAt);
+      if (!Number.isNaN(d.getTime())) {
+        setVotingEnd(d);
+        setInitialVotingEnd(post.votingEndsAt);
+      }
+    }
     if (poll) {
       // Poll options carry their own (optional) thumbnail; body photos are separate.
       setOptions(
@@ -130,7 +234,9 @@ export default function EditPostScreen() {
           imageFocalY: o.imageFocalY ?? null,
         })),
       );
-      setBodyImages(post.imageUrls ?? []);
+      setBodyImages(
+        (post.imageUrls ?? []).map((url, i) => ({ id: `body-${i}`, url, existing: true })),
+      );
     } else {
       setOptions(
         post.imageUrls.map((url, i) => ({
@@ -150,6 +256,13 @@ export default function EditPostScreen() {
 
   const [updatePost, { loading: saving }] = useMutation(UPDATE_POST);
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
+
+  // Robust back: this screen can be reached via router.replace (e.g. redirected
+  // from the create tab for polls), leaving nothing to pop — fall back to feed.
+  function goBack() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/tabs" as never);
+  }
 
   // Upload a freshly picked image into an option slot; a new image resets that
   // option's focal point (it was framed at pick time).
@@ -230,6 +343,95 @@ export default function EditPostScreen() {
     void pickOptionImage(idx);
   }
 
+  // ── Poll context/body photos ──────────────────────────────────────────────
+  async function uploadBodyImage(id: string, uri: string, mimeType = "image/jpeg", fileName?: string) {
+    setBodyUploadingId(id);
+    setSubmitError(null);
+    try {
+      const ext = mimeType.split("/")[1] ?? "jpg";
+      const filename = fileName ?? `photo_${Date.now()}.${ext}`;
+      const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
+      if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
+      const { uploadUrl, publicUrl } = data.getImageUploadUrl;
+      let uploadUri = uri;
+      if (Platform.OS === "android" && !uri.startsWith("file://")) {
+        uploadUri = `${FileSystem.cacheDirectory}upload_${Date.now()}.${ext}`;
+        await FileSystem.copyAsync({ from: uri, to: uploadUri });
+      }
+      const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
+        httpMethod: "PUT",
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { "Content-Type": mimeType },
+      });
+      if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
+      setBodyImages((prev) => prev.map((b) => (b.id === id ? { ...b, url: publicUrl } : b)));
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Upload failed");
+      // Drop an empty just-added slot that failed to upload.
+      setBodyImages((prev) => prev.filter((b) => b.id !== id || b.url));
+    }
+    setBodyUploadingId(null);
+  }
+
+  async function pickBodyImage(id: string) {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Gallery access is required.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
+      if (result.canceled || !result.assets[0]) {
+        setBodyImages((prev) => prev.filter((b) => b.id !== id || b.url));
+        return;
+      }
+      const asset = result.assets[0];
+      await uploadBodyImage(id, asset.uri, asset.mimeType ?? "image/jpeg", asset.fileName ?? undefined);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Upload failed");
+    }
+  }
+
+  function addBodyImage() {
+    if (bodyImages.length >= 6) return;
+    const id = `body-new-${Date.now()}`;
+    setBodyImages((prev) => [...prev, { id, url: "", existing: false }]);
+    void pickBodyImage(id);
+  }
+
+  function requestReplaceBody(id: string) {
+    const img = bodyImages.find((b) => b.id === id);
+    if (img?.existing && img.url && hasVotes) {
+      Alert.alert(
+        "Replace photo?",
+        "Replacing this context photo will remove all current votes on this poll.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Replace anyway", style: "destructive", onPress: () => void pickBodyImage(id) },
+        ],
+      );
+      return;
+    }
+    void pickBodyImage(id);
+  }
+
+  function removeBodyImage(id: string) {
+    const img = bodyImages.find((b) => b.id === id);
+    const doRemove = () => setBodyImages((prev) => prev.filter((b) => b.id !== id));
+    if (img?.existing && img.url && hasVotes) {
+      Alert.alert(
+        "Remove photo?",
+        "Removing this context photo will remove all current votes on this poll.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Remove anyway", style: "destructive", onPress: doRemove },
+        ],
+      );
+      return;
+    }
+    doRemove();
+  }
+
   async function handleSave() {
     setSubmitError(null);
     if (!categoryId) { setSubmitError("Please select a category."); return; }
@@ -256,6 +458,16 @@ export default function EditPostScreen() {
       scheduleInput = { scheduledAt: scheduleDate.toISOString() };
     }
 
+    // Change/extend the voting deadline (published posts only).
+    let deadlineInput: { votingEndsAt: string } | Record<string, never> = {};
+    if (!isScheduled && deadlineEnabled) {
+      if (votingEnd.getTime() <= Date.now()) {
+        setSubmitError("Voting deadline must be in the future.");
+        return;
+      }
+      deadlineInput = { votingEndsAt: votingEnd.toISOString() };
+    }
+
     if (isPoll) {
       const labeled = options.filter((o) => o.label.trim().length > 0);
       if (labeled.length < 2) {
@@ -269,8 +481,9 @@ export default function EditPostScreen() {
             input: {
               caption: caption.trim() || undefined,
               categoryId,
-              // Preserve each option's image/focal — only labels change, so votes
-              // stay intact. imageUrls (body photos) is omitted to leave it untouched.
+              // Context/body photos. Backend resets votes if an existing one
+              // changed/was removed; adding is safe.
+              imageUrls: bodyImages.map((b) => b.url.trim()).filter((u) => u.length > 0),
               options: labeled.map((o) => ({
                 label: o.label.trim(),
                 ...(o.imageUrl
@@ -284,10 +497,11 @@ export default function EditPostScreen() {
               ...adminInput,
               ...audienceInput,
               ...scheduleInput,
+              ...deadlineInput,
             },
           },
         });
-        router.back();
+        goBack();
       } catch (err: unknown) {
         setSubmitError(getApolloErrorMessage(err));
       }
@@ -311,10 +525,11 @@ export default function EditPostScreen() {
             ...adminInput,
             ...audienceInput,
             ...scheduleInput,
+            ...deadlineInput,
           },
         },
       });
-      router.back();
+      goBack();
     } catch (err: unknown) {
       setSubmitError(getApolloErrorMessage(err));
     }
@@ -343,7 +558,7 @@ export default function EditPostScreen() {
       >
         {/* Header */}
         <View style={st.topRow}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+          <TouchableOpacity onPress={goBack} hitSlop={10}>
             <Text style={[st.cancelText, { color: colors.muted }]}>← Back</Text>
           </TouchableOpacity>
           <Text style={[st.screenTitle, { color: colors.text }]}>
@@ -352,20 +567,49 @@ export default function EditPostScreen() {
           <View style={{ width: 60 }} />
         </View>
 
-        {/* Poll body photos — locked (votes depend on them) */}
-        {isPoll && bodyImages.length > 0 ? (
+        {/* Poll context/body photos — editable (replace/remove resets votes) */}
+        {isPoll ? (
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[st.cardLabel, { color: colors.subtext }]}>🔒 PHOTOS · LOCKED</Text>
+            <Text style={[st.cardLabel, { color: colors.subtext }]}>CONTEXT PHOTOS</Text>
+            <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10 }}>
+              Shown above the options.
+              {hasVotes
+                ? " Replacing or removing an existing photo resets all votes (you'll be asked to confirm); adding is safe."
+                : " Add, replace or remove freely until the first vote is cast."}
+            </Text>
             <View style={st.bodyPhotoRow}>
-              {bodyImages.map((url, i) => (
-                <View key={i} style={[st.bodyPhoto, { backgroundColor: colors.section }]}>
-                  <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+              {bodyImages.map((b) => (
+                <View key={b.id} style={[st.bodyPhoto, { backgroundColor: colors.section }]}>
+                  {b.url ? (
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => requestReplaceBody(b.id)}>
+                      <Image source={{ uri: b.url }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                    </Pressable>
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
+                      <Text style={{ fontSize: 18, color: "#fff" }}>🖼</Text>
+                    </View>
+                  )}
+                  {bodyUploadingId === b.id ? (
+                    <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
+                      <ActivityIndicator color="#fff" size="small" />
+                    </View>
+                  ) : (
+                    <Pressable style={st.bodyPhotoRemove} onPress={() => removeBodyImage(b.id)} hitSlop={6}>
+                      <Text style={st.bodyPhotoRemoveText}>✕</Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
+              {bodyImages.length < 6 ? (
+                <Pressable
+                  style={[st.bodyPhoto, st.bodyPhotoAdd, { borderColor: colors.border }]}
+                  onPress={addBodyImage}
+                  disabled={bodyUploadingId !== null}
+                >
+                  <Text style={{ fontSize: 26, color: colors.muted }}>+</Text>
+                </Pressable>
+              ) : null}
             </View>
-            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 8 }}>
-              Photos can't be changed after posting — they're tied to existing votes.
-            </Text>
           </View>
         ) : null}
 
@@ -519,6 +763,57 @@ export default function EditPostScreen() {
             </View>
           ) : null}
         </View>
+
+        {/* Voting deadline — for published posts (change / extend the end time) */}
+        {!isScheduled ? (
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flex: 1, paddingRight: 12, gap: 2 }}>
+                <Text style={[st.rowKey, { color: colors.text }]}>⏰ Change voting deadline</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>
+                  {initialVotingEnd
+                    ? `Current: ${fmtScheduleSummary(new Date(initialVotingEnd))}${votingOpen ? "" : " · Closed"}`
+                    : "No deadline set — voting stays open."}
+                </Text>
+              </View>
+              <Switch
+                value={deadlineEnabled}
+                onValueChange={setDeadlineEnabled}
+                trackColor={{ true: colors.accent }}
+              />
+            </View>
+
+            {deadlineEnabled ? (
+              <View style={{ marginTop: 12, gap: 12 }}>
+                <View style={st.presetRow}>
+                  {DEADLINE_PRESETS.map((p) => (
+                    <Pressable
+                      key={p.label}
+                      style={[st.presetChip, { borderColor: colors.border, backgroundColor: colors.section }]}
+                      onPress={() => {
+                        const base = votingEnd.getTime() > Date.now() ? votingEnd : new Date();
+                        const d = new Date(base.getTime() + p.hours * 3_600_000);
+                        d.setSeconds(0, 0);
+                        setVotingEnd(d);
+                        setSubmitError(null);
+                      }}
+                    >
+                      <Text style={[st.presetChipText, { color: colors.text }]}>{p.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <DateTimeStepper date={votingEnd} onChange={setVotingEnd} colors={colors} />
+                <View style={[st.scheduleSummary, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "44" }]}>
+                  <Text style={{ fontSize: 18 }}>🗳️</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[st.scheduleSummaryTitle, { color: colors.accent }]}>Voting ends</Text>
+                    <Text style={[st.scheduleSummaryDate, { color: colors.text }]}>{fmtScheduleSummary(votingEnd)}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* Go-live time — only for not-yet-published (scheduled) posts */}
         {isScheduled ? (
@@ -711,6 +1006,9 @@ const st = StyleSheet.create({
   optionActionText: { fontSize: 12, fontWeight: "600" },
   bodyPhotoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   bodyPhoto: { width: 72, height: 72, borderRadius: 8, overflow: "hidden" },
+  bodyPhotoRemove: { position: "absolute", top: 3, right: 3, width: 20, height: 20, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+  bodyPhotoRemoveText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  bodyPhotoAdd: { alignItems: "center", justifyContent: "center", borderWidth: 1, borderStyle: "dashed" },
   optionLabel: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1 },
   audienceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1 },

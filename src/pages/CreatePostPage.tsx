@@ -515,7 +515,7 @@ export function CreatePostPage() {
                   checked={postType === "regular"}
                   onChange={() => setPostType("regular")}
                 />
-                <strong>Regular Post</strong>
+                <strong>Friends Only</strong>
                 <span className="muted small">Visible to your followers only</span>
               </label>
               <label className={`ig-admin-post-type-option${postType === "system" ? " ig-admin-post-type-option--active" : ""}`}>
