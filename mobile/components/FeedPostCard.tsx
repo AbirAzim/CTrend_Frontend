@@ -255,18 +255,19 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 	return {
 		card: {
 			backgroundColor: c.card,
-			marginBottom: 12,
+			marginBottom: 14,
 			marginHorizontal: 12,
-			borderRadius: 20,
+			borderRadius: 22,
 			borderWidth: 1,
 			borderColor: c.border,
 			overflow: 'hidden' as const,
-			// depth shadow
-			elevation: 4,
+			// Soft, diffuse depth — the card floats cleanly over the feed rather
+			// than sitting in a hard-edged box.
+			elevation: 3,
 			shadowColor: '#000',
-			shadowOffset: { width: 0, height: 2 },
-			shadowOpacity: 0.12,
-			shadowRadius: 8,
+			shadowOffset: { width: 0, height: 6 },
+			shadowOpacity: isDark ? 0.22 : 0.07,
+			shadowRadius: 16,
 		},
 		header: {
 			flexDirection: 'row' as const,
@@ -330,13 +331,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: c.accentLight,
 			overflow: 'hidden' as const,
 		},
-		// Platform (official "Ke Jitbe") posts: clean left accent stripe instead
-		// of a full purple border + flat tint, which framed the whole card oddly
-		// in light mode. The PLATFORM badge + brand avatar already mark these.
-		platformCard: {
-			borderLeftWidth: 3,
-			borderLeftColor: c.accent,
-		},
 		globalBadge: {
 			fontSize: 9,
 			fontWeight: '700' as const,
@@ -350,17 +344,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: isDark ? 'rgba(52,211,153,0.5)' : 'rgba(22,163,74,0.45)',
 			backgroundColor: isDark ? 'rgba(16,185,129,0.14)' : 'rgba(22,163,74,0.1)',
 			overflow: 'hidden' as const,
-		},
-		// User-global posts: a subtle left accent stripe only (matches web
-		// `.ig-post--user-global`). A full green border + tint looked like a
-		// weird extra frame, especially in light mode.
-		userGlobalCard: {
-			borderLeftWidth: 3,
-			borderLeftColor: isDark ? 'rgba(52,211,153,0.55)' : 'rgba(22,163,74,0.5)',
-		},
-		campaignCard: {
-			borderLeftWidth: 3,
-			borderLeftColor: isDark ? 'rgba(245,158,11,0.6)' : 'rgba(217,160,23,0.7)',
 		},
 		endingSoonBanner: {
 			flexDirection: 'row' as const,
@@ -621,9 +604,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
 			paddingHorizontal: 14,
-			paddingVertical: 8,
+			paddingVertical: 6,
 			gap: 8,
-			backgroundColor: c.section,
 		},
 		anonIcon: { fontSize: 13 },
 		anonLabel: {
@@ -633,24 +615,21 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontWeight: '500' as const,
 		},
 		// ── Two-zone action rail ──
+		// Flush, full-width row separated from the media/vote area by a single
+		// hairline — no inset box-in-box border, tint, or margin. Reads as part
+		// of the card instead of a floating panel.
 		actionRail: {
-			marginHorizontal: 12,
-			marginBottom: 12,
-			borderRadius: 16,
-			borderWidth: 1,
-			borderColor: isDark ? 'rgba(148,163,184,0.24)' : 'rgba(67,56,202,0.14)',
-			backgroundColor: isDark
-				? 'rgba(15,23,42,0.64)'
-				: 'rgba(255,255,255,0.72)',
-			overflow: 'hidden' as const,
+			marginTop: 2,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: c.border,
 		},
 		actionRailIcons: {
 			flexDirection: 'row' as const,
 			justifyContent: 'space-evenly' as const,
 			alignItems: 'center' as const,
 			flexWrap: 'wrap' as const,
-			paddingVertical: 7,
-			paddingHorizontal: 8,
+			paddingVertical: 6,
+			paddingHorizontal: 6,
 			gap: 2,
 		},
 		actionChipFlat: {
@@ -879,15 +858,10 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			alignItems: 'center' as const,
 			justifyContent: 'space-between' as const,
 			gap: 10,
-			paddingVertical: 8,
+			paddingVertical: 9,
 			paddingHorizontal: 14,
-			borderTopWidth: 1 as const,
-			borderTopColor: isDark
-				? 'rgba(148,163,184,0.18)'
-				: 'rgba(67,56,202,0.12)',
-			backgroundColor: isDark
-				? 'rgba(255,255,255,0.03)'
-				: 'rgba(21,20,27,0.025)',
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: c.border,
 		},
 		actionStatusText: {
 			flex: 1,
@@ -1906,13 +1880,7 @@ function FeedPostCardComponent({
 	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
-		<View
-			style={[
-				st.card,
-				isPlatformPost && st.platformCard,
-				isUserGlobal && st.userGlobalCard,
-				campaign && st.campaignCard,
-			]}>
+		<View style={st.card}>
 			{/* Ending-soon urgency banner */}
 			{isEndingSoon ? (
 				<View style={st.endingSoonBanner}>
@@ -2287,7 +2255,7 @@ function FeedPostCardComponent({
 					<Switch
 						value={anon}
 						onValueChange={(val) => void handleAnonymousToggle(val)}
-						trackColor={{ false: colors.border, true: '#8b5cf6' }}
+						trackColor={{ false: colors.border, true: colors.accent }}
 						thumbColor='#ffffff'
 					/>
 				</View>
