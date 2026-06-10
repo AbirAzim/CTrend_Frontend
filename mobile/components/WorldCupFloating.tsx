@@ -74,7 +74,6 @@ export function WorldCupFloating() {
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {open ? (
         <>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={[st.card, { right: 12, bottom: insets.bottom + 88 }]}>
             <View style={st.head}>
               <Pressable

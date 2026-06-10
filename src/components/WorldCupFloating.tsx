@@ -74,7 +74,6 @@ export function WorldCupFloating() {
 
   return (
     <>
-      <div className="wc-float-backdrop" onClick={() => setOpen(false)} />
       <div className="wc-float-card wc-float-card--right wc-float-card--bottom" role="dialog" aria-label="World Cup matches">
         <div className="wc-float-head">
           <button type="button" className="wc-float-title" onClick={() => { setOpen(false); navigate("/world-cup"); }}>
