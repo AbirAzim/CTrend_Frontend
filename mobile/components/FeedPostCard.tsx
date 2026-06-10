@@ -2412,7 +2412,8 @@ function FeedPostCardComponent({
 				const hasCompare = Boolean(compareUrls);
 
 				const statusText = (() => {
-					if (!hasCompare) return null;
+					// Compare and poll posts both have voting deadlines/winners.
+					if (!hasCompare && !isPoll) return null;
 					if (isVotingClosed) {
 						return (
 							'🏆 ' +
@@ -2554,7 +2555,7 @@ function FeedPostCardComponent({
 							)}
 						</View>
 
-						{/* Zone 2 — status + see details (compare posts only) */}
+						{/* Zone 2 — status + see details (compare & poll posts) */}
 						{statusText ? (
 							<View style={st.actionRailContext}>
 								<Text
