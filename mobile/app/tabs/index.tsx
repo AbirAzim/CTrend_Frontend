@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { PressableScale } from "../../components/PressableScale";
@@ -35,6 +36,14 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
 type FeedData = { feedPosts: unknown[] };
+
+// Tap-to-vote coach mark persistence (industry-standard "show until first use"):
+// • DONE  — set once the user actually votes → never show again.
+// • SHOWN — how many sessions it has appeared in; capped so a user who never
+//   votes isn't nagged forever.
+const VOTE_COACH_DONE_KEY = "ctrend_vote_coach_done";
+const VOTE_COACH_SHOWN_KEY = "ctrend_vote_coach_shown";
+const VOTE_COACH_MAX_SHOWS = 3;
 
 function FeedTopBar() {
   const { logout, isAuthenticated } = useAuth();
@@ -137,6 +146,34 @@ export default function FeedScreen() {
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(true);
   const serverCountRef = useRef(0);
+
+  // Tap-to-vote coach mark gating. Eligible until the user has voted (DONE) or
+  // it has already appeared in VOTE_COACH_MAX_SHOWS sessions. `suppressed`
+  // hides it for the rest of the current session after a timeout/vote.
+  const [coachStore, setCoachStore] = useState<{ done: boolean; shown: number } | null>(null);
+  const [coachSuppressed, setCoachSuppressed] = useState(false);
+  const coachCounted = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      AsyncStorage.getItem(VOTE_COACH_DONE_KEY),
+      AsyncStorage.getItem(VOTE_COACH_SHOWN_KEY),
+    ]).then(([done, shown]) => {
+      if (alive) setCoachStore({ done: done === "1", shown: Number(shown) || 0 });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const coachEligible =
+    !!coachStore && !coachStore.done && coachStore.shown < VOTE_COACH_MAX_SHOWS && !coachSuppressed;
+  const dismissVoteCoach = useCallback((reason: "voted" | "timeout") => {
+    setCoachSuppressed(true); // stop showing for the rest of this session
+    if (reason === "voted") {
+      setCoachStore((s) => (s ? { ...s, done: true } : s));
+      void AsyncStorage.setItem(VOTE_COACH_DONE_KEY, "1");
+    }
+  }, []);
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const y = e.nativeEvent.contentOffset.y;
@@ -289,7 +326,35 @@ export default function FeedScreen() {
     },
   });
 
-  const renderItem: ListRenderItem<FeedPostView> = ({ item }) => <FeedPostCard post={item} />;
+  // The single card that gets the coach mark: the first still-votable compare
+  // post the signed-in viewer hasn't acted on yet.
+  const coachPostId = useMemo(() => {
+    if (!coachEligible || !isAuthenticated) return null;
+    const target = posts.find(
+      (p) =>
+        (p.imageUrls?.length ?? 0) >= 2 &&
+        p.isVotingOpen !== false &&
+        p.viewerVote == null &&
+        p.mySelectedOptionIndex == null,
+    );
+    return target?.id ?? null;
+  }, [coachEligible, isAuthenticated, posts]);
+
+  // Burn one of the capped appearances the first time it actually surfaces
+  // this session (persisted, so the cap holds across launches).
+  useEffect(() => {
+    if (!coachPostId || !coachStore || coachCounted.current) return;
+    coachCounted.current = true;
+    void AsyncStorage.setItem(VOTE_COACH_SHOWN_KEY, String(coachStore.shown + 1));
+  }, [coachPostId, coachStore]);
+
+  const renderItem: ListRenderItem<FeedPostView> = ({ item }) => (
+    <FeedPostCard
+      post={item}
+      showVoteCoachmark={item.id === coachPostId}
+      onCoachmarkDismiss={dismissVoteCoach}
+    />
+  );
   const isRefreshing = networkStatus === 4;
 
   return (
@@ -307,6 +372,7 @@ export default function FeedScreen() {
       ) : (
         <FlatList
           data={posts}
+          extraData={coachPostId}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           style={[styles.list, { backgroundColor: colors.bg }]}

@@ -52,6 +52,7 @@ import { MODERATOR_PLATFORM_NAME } from '@ctrend/shared/lib/moderatorBrand';
 import logoAsset from '../assets/logo.png';
 import { PostCampaignBadge } from './PostCampaignBadge';
 import { PostVoteWinnerBanner } from './PostVoteWinnerBanner';
+import { VoteCoachmark } from './VoteCoachmark';
 import { imageContentPosition } from '../lib/imageFocal';
 import {
 	CONTENT_REPORT_REASONS,
@@ -126,6 +127,11 @@ type Props = {
 	initialCommentsOpen?: boolean;
 	/** Scroll to / highlight this comment when the sheet opens. */
 	highlightCommentId?: string | null;
+	/** Show the first-run tap-to-vote coach mark over the compare images. */
+	showVoteCoachmark?: boolean;
+	/** Called when the coach mark is dismissed. 'voted' retires it permanently;
+	 *  'timeout' only hides it for this session (may reappear, capped by feed). */
+	onCoachmarkDismiss?: (reason: 'voted' | 'timeout') => void;
 };
 
 type VoteLiveState = {
@@ -1023,6 +1029,8 @@ function FeedPostCardComponent({
 	variant = 'feed',
 	initialCommentsOpen = false,
 	highlightCommentId = null,
+	showVoteCoachmark = false,
+	onCoachmarkDismiss,
 }: Props) {
 	const isDetail = variant === 'detail';
 	const { user, isAuthenticated } = useAuth();
@@ -1193,6 +1201,15 @@ function FeedPostCardComponent({
 		return side === 0 ? up > down : down > up;
 	};
 	const hasVoted = viewer !== null || activeMyIdx !== null;
+
+	// First-run tap-to-vote coach mark — only over a still-votable compare post
+	// the viewer hasn't acted on yet. The feed decides which single card gets it.
+	const coachActive =
+		showVoteCoachmark && !!compareUrls && !isVotingClosed && !hasVoted;
+	// Retire the coach for good the moment the user actually votes.
+	useEffect(() => {
+		if (showVoteCoachmark && hasVoted) onCoachmarkDismiss?.('voted');
+	}, [showVoteCoachmark, hasVoted]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Multi-compare layout — fixed per-count rows (see getCompareRows), all cells
 	// the same square size (sized to the widest row so images stay identical),
@@ -2066,6 +2083,7 @@ function FeedPostCardComponent({
 				</View>
 			) : compareUrls && !isBinary ? (
 				/* ── Multi-option grid (3+ options) ── */
+				<View style={styles.coachAnchor}>
 				<View style={styles.multiGrid}>
 					{compareRowsWithStart.map(({ size, start }, rowIdx) => (
 						<View
@@ -2150,8 +2168,13 @@ function FeedPostCardComponent({
 						</View>
 					))}
 				</View>
+				{coachActive ? (
+					<VoteCoachmark onDone={() => onCoachmarkDismiss?.('timeout')} />
+				) : null}
+				</View>
 			) : compareUrls ? (
 				<>
+					<View style={styles.coachAnchor}>
 					<View style={st.compareWrap}>
 						{compareUrls.slice(0, 2).map((url, i) => {
 							const picked =
@@ -2228,6 +2251,10 @@ function FeedPostCardComponent({
 								</Animated.View>
 							);
 						})}
+					</View>
+					{coachActive ? (
+						<VoteCoachmark onDone={() => onCoachmarkDismiss?.('timeout')} />
+					) : null}
 					</View>
 
 					{/* Split bar — animated flex */}
@@ -3110,6 +3137,8 @@ export const FeedPostCard = memo(FeedPostCardComponent);
 const styles = StyleSheet.create({
 	fill: { flex: 1 },
 	absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+	// Relative wrapper so the tap-to-vote coach mark can absolute-fill the media.
+	coachAnchor: { position: 'relative' },
 	// Multi-option grid (3–4 options)
 	multiGrid: {
 		flexDirection: 'column',
