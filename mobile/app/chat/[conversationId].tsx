@@ -7,8 +7,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -171,6 +173,42 @@ function MessageBubble({
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
   const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
 
+  // Swipe left→right to reply (WhatsApp-style), with a haptic at the threshold.
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const swipeFired = useRef(false);
+  const onReplyRef = useRef(onReply);
+  onReplyRef.current = onReply;
+  const SWIPE_TRIGGER = 56;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+      onPanResponderGrant: () => {
+        swipeFired.current = false;
+      },
+      onPanResponderMove: (_e, g) => {
+        const x = Math.max(0, Math.min(g.dx, 72));
+        swipeX.setValue(x);
+        if (!swipeFired.current && x >= SWIPE_TRIGGER) {
+          swipeFired.current = true;
+          Vibration.vibrate(12);
+        }
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx >= SWIPE_TRIGGER) onReplyRef.current();
+        Animated.spring(swipeX, { toValue: 0, useNativeDriver: false, friction: 7 }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(swipeX, { toValue: 0, useNativeDriver: false, friction: 7 }).start();
+      },
+    }),
+  ).current;
+  const replyIconOpacity = swipeX.interpolate({
+    inputRange: [0, SWIPE_TRIGGER],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+
   // Deleted ("unsent") message → muted placeholder, no reactions/reply/tray.
   if (msg.deleted) {
     return (
@@ -228,7 +266,18 @@ function MessageBubble({
         </View>
       )}
 
-      <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
+      {/* Swipe-to-reply arrow revealed underneath as the bubble slides right */}
+      <Animated.View style={[styles.swipeReplyIcon, { opacity: replyIconOpacity }]} pointerEvents="none">
+        <Ionicons name="arrow-undo" size={20} color={colors.accent} />
+      </Animated.View>
+      <Animated.View
+        {...pan.panHandlers}
+        style={[
+          styles.bubbleRow,
+          isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther,
+          { transform: [{ translateX: swipeX }] },
+        ]}
+      >
         {/* Standalone reply arrow — inner side of own bubbles (Messenger-style).
             Single-tap shows it on text; for images (tap opens the photo) it rides
             along with the long-press tray so images stay replyable. */}
@@ -386,7 +435,7 @@ function MessageBubble({
             <Text style={[styles.sideReplyText, { color: colors.text }]}>↩</Text>
           </Pressable>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -521,6 +570,7 @@ export default function ChatScreen() {
   function handleReact(msg: Message, emoji: string) {
     const isRemove = msg.viewerReaction === emoji;
     const emojiToSend = isRemove ? null : emoji;
+    if (!isRemove) Vibration.vibrate(8);
 
     setMessages((prev) =>
       prev.map((m) => {
@@ -963,6 +1013,7 @@ export default function ChatScreen() {
                   onLongPress={() => {
                     // Long press → toggle the emoji tray; close the reply arrow.
                     setActiveReplyMsgId(null);
+                    if (!isReacting) Vibration.vibrate(12);
                     setActiveReactMsgId(isReacting ? null : msg.id);
                   }}
                   onReact={(emoji) => handleReact(msg, emoji)}
@@ -1233,6 +1284,7 @@ const styles = StyleSheet.create({
 
   // Bubbles
   bubbleRow: { flexDirection: "row", marginBottom: 4, alignItems: "flex-end" },
+  swipeReplyIcon: { position: "absolute", left: 16, top: 0, bottom: 0, justifyContent: "center", zIndex: 0 },
   bubbleRowOwn: { justifyContent: "flex-end" },
   bubbleRowOther: { justifyContent: "flex-start" },
   bubbleAvatarSlot: { width: 32, marginRight: 6 },

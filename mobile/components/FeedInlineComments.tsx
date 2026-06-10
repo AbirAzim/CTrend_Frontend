@@ -9,6 +9,7 @@ import {
 	StyleSheet,
 	Text,
 	TextInput,
+	Vibration,
 	View,
 } from 'react-native';
 import {
@@ -231,6 +232,7 @@ export function FeedInlineComments({
 		}
 		const next = currentReaction(c) === emoji ? null : emoji;
 		const prev = currentReaction(c);
+		if (next) Vibration.vibrate(8);
 		const reactions = c.reactions ?? [];
 		// Optimistic counts so the pill updates instantly.
 		const map = new Map(reactions.map((r) => [r.emoji, r.count]));
@@ -267,7 +269,10 @@ export function FeedInlineComments({
 			router.push('/auth/login');
 			return;
 		}
-		setReactionPickerId((cur) => (cur === c.id ? null : c.id));
+		setReactionPickerId((cur) => {
+			if (cur !== c.id) Vibration.vibrate(12);
+			return cur === c.id ? null : c.id;
+		});
 	}
 
 	function startEdit(c: GqlComment) {

@@ -3,6 +3,7 @@ import {
 	useMutation,
 	useSubscription,
 } from '@apollo/client/react';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -22,6 +23,7 @@ import {
 	Text,
 	TextInput,
 	ToastAndroid,
+	Vibration,
 	View,
 } from 'react-native';
 import {
@@ -1743,6 +1745,7 @@ function FeedPostCardComponent({
 	}
 
 	function handleCellTap(idx: number) {
+		Vibration.vibrate(8);
 		// Ternary (not ??) so withdraw null state is not masked by stale server value
 		const curVote =
 			optimisticVote !== null ? optimisticVote.viewerVote : post.viewerVote;
@@ -2441,7 +2444,7 @@ function FeedPostCardComponent({
 				const chips: ChipDef[] = [
 					{
 						i: 0,
-						icon: '💬',
+						icon: 'chatbubble-outline',
 						accessLabel: 'View comments',
 						onPress: () => openComments(false),
 						count: commentCount,
@@ -2450,7 +2453,7 @@ function FeedPostCardComponent({
 					},
 					{
 						i: 1,
-						icon: '🔗',
+						icon: 'link-outline',
 						accessLabel: 'Copy link',
 						onPress: () => void copyLink(),
 					},
@@ -2460,14 +2463,14 @@ function FeedPostCardComponent({
 						: [
 								{
 									i: 2,
-									icon: '↗️',
+									icon: 'open-outline',
 									accessLabel: 'Full page',
 									onPress: goToPost,
 								} as ChipDef,
 							]),
 					{
 						i: 3,
-						icon: '❤️',
+						icon: 'heart-outline',
 						accessLabel: 'Hype',
 						onPress: () => void handleHype(),
 						count: hypeCount,
@@ -2476,7 +2479,7 @@ function FeedPostCardComponent({
 					},
 					{
 						i: 4,
-						icon: '🔖',
+						icon: 'bookmark-outline',
 						accessLabel: 'Keep',
 						onPress: () => void handleSave(),
 						count: saveCount,
@@ -2485,7 +2488,7 @@ function FeedPostCardComponent({
 					},
 					{
 						i: 5,
-						icon: '👥',
+						icon: 'people-outline',
 						accessLabel: 'Voters',
 						onPress: () => openVoters(null),
 						count: votersTotal,
@@ -2526,15 +2529,21 @@ function FeedPostCardComponent({
 											accessibilityLabel={accessLabel}
 											hitSlop={4}>
 											<View style={st.chipIconWrap}>
-												<Text
-													style={[
-														st.actionChipFlatIcon,
-														isHype && active && st.actionChipFlatIconHype,
-														isSave && active && st.actionChipFlatIconSave,
-														isHype && !active && st.actionChipFlatIconDim,
-													]}>
-													{icon}
-												</Text>
+												<Ionicons
+													name={
+														(active && (isHype || isSave)
+															? icon.replace('-outline', '')
+															: icon) as keyof typeof Ionicons.glyphMap
+													}
+													size={22}
+													color={
+														isHype && active
+															? '#f43f5e'
+															: isSave && active
+																? '#f59e0b'
+																: colors.subtext
+													}
+												/>
 												{count != null && count > 0 ? (
 													<View
 														style={[

@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -513,7 +514,7 @@ function FriendsTab({
         return (
           <Pressable
             style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onLongPress={() => confirmUnfriend(u)}
+            onLongPress={() => { Vibration.vibrate(12); confirmUnfriend(u); }}
           >
             <Pressable
               onPress={() => router.push(`/profile/${u.id}` as `/${string}`)}
