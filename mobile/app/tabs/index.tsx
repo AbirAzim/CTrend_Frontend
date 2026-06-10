@@ -34,6 +34,8 @@ import { CampaignBanner } from "../../components/CampaignBanner";
 import { FeedCampaignFilter } from "../../components/FeedCampaignFilter";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useForceUpdateRequired } from "../../hooks/useForceUpdateRequired";
+import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 
 type FeedData = { feedPosts: unknown[] };
 
@@ -135,6 +137,7 @@ export default function FeedScreen() {
   const client = useApolloClient();
   const { colors } = useTheme();
   const { isAuthenticated } = useAuth();
+  const { needsUpdate } = useForceUpdateRequired();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const { campaign } = useLocalSearchParams<{ campaign?: string }>();
@@ -364,10 +367,12 @@ export default function FeedScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
-      ) : error && posts.length === 0 ? (
+      ) : error && posts.length === 0 && !needsUpdate ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>Could not load feed.</Text>
-          <Text style={[styles.errorSub, { color: colors.subtext }]}>{error.message}</Text>
+          <Text style={[styles.errorSub, { color: colors.subtext }]}>
+            {getApolloErrorMessage(error)}
+          </Text>
         </View>
       ) : (
         <FlatList

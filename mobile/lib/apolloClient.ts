@@ -6,7 +6,10 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { createClient } from "graphql-ws";
 import { getAndroidClientHeaders } from "./androidVersion";
-import { setForceUpdateFromGraphqlError } from "./forceUpdateState";
+import {
+  applyForceUpdateFromApolloNetworkError,
+  applyForceUpdateFromGraphqlErrors,
+} from "./forceUpdateState";
 import { readStoredToken } from "./authStorage";
 
 const HTTP_URL = process.env.EXPO_PUBLIC_GRAPHQL_HTTP;
@@ -17,26 +20,10 @@ if (!HTTP_URL) {
 }
 const WS_URL = process.env.EXPO_PUBLIC_GRAPHQL_WS;
 
-const forceUpdateErrorLink = onError(({ graphQLErrors }) => {
-  for (const err of graphQLErrors ?? []) {
-    const ext = err.extensions as Record<string, unknown> | undefined;
-    if (ext?.code === "ANDROID_UPDATE_REQUIRED") {
-      setForceUpdateFromGraphqlError({
-        minRequiredVersionCode: parseVersionExt(ext.minAndroidVersionCode),
-        title: String(ext.title ?? "Update required"),
-        body: String(
-          ext.body ??
-            "A newer version of Ke Jitbe is available. Please update from Google Play.",
-        ),
-      });
-    }
-  }
+const forceUpdateErrorLink = onError(({ graphQLErrors, networkError }) => {
+  applyForceUpdateFromGraphqlErrors(graphQLErrors);
+  applyForceUpdateFromApolloNetworkError(networkError);
 });
-
-function parseVersionExt(value: unknown): number {
-  const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
 
 const authLink = setContext(async (_, { headers }) => {
   const token = await readStoredToken();
