@@ -178,9 +178,9 @@ export function VoteCoachmark({
 }
 
 const styles = StyleSheet.create({
-	root: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
+	root: { ...StyleSheet.absoluteFill, zIndex: 20 },
 	scrim: {
-		...StyleSheet.absoluteFillObject,
+		...StyleSheet.absoluteFill,
 		backgroundColor: 'rgba(0,0,0,0.16)',
 	},
 	tipWrap: {

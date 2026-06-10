@@ -18,8 +18,7 @@ import {
   nextUpcoming,
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
-
-const TROPHY = require("../assets/worldcup-trophy.png");
+import trophyAsset from "../assets/worldcup-trophy.png";
 
 type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: boolean };
 type FixturesData = { worldCupFixtures: WcFixture[] };
@@ -83,7 +82,7 @@ export function WorldCupFloating() {
                   router.push("/world-cup" as `/${string}`);
                 }}
               >
-                <Image source={TROPHY} style={st.headTrophy} contentFit="contain" />
+                <Image source={trophyAsset} style={st.headTrophy} contentFit="contain" />
                 <Text style={st.titleText} numberOfLines={1}>
                   {wcCampaign?.name || "World Cup"}
                   {followed ? ` · ${followed}` : ""}
@@ -137,7 +136,7 @@ export function WorldCupFloating() {
           accessibilityRole="button"
           accessibilityLabel="Open World Cup matches"
         >
-          <Image source={TROPHY} style={st.tabImg} contentFit="contain" />
+          <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
           {live.length > 0 ? <View style={st.tabLiveDot} /> : null}
         </Pressable>
       )}

@@ -33,11 +33,12 @@ function TeamCrest({ crest, name, size = 26 }: { crest: string; name: string; si
       style={{ width: size, height: size }}
       contentFit="contain"
       cachePolicy="memory-disk"
+      accessibilityLabel={name}
     />
   );
 }
 
-function FixtureRow({ fixture, st, colors }: { fixture: WcFixture; st: ReturnType<typeof makeStyles>; colors: Palette }) {
+function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof makeStyles> }) {
   const live = isLive(fixture);
   const finished = isFinished(fixture);
   const hasScore = live || finished;
@@ -177,7 +178,7 @@ export default function WorldCupScreen() {
           <View>
             <Text style={st.sectionTitle}>🔴 Live now</Text>
             {live.map((f) => (
-              <FixtureRow key={f.id} fixture={f} st={st} colors={colors} />
+              <FixtureRow key={f.id} fixture={f} st={st} />
             ))}
           </View>
         )}
@@ -189,7 +190,7 @@ export default function WorldCupScreen() {
               <View key={g.key}>
                 <Text style={st.dayTitle}>{g.label}</Text>
                 {g.fixtures.map((f) => (
-                  <FixtureRow key={f.id} fixture={f} st={st} colors={colors} />
+                  <FixtureRow key={f.id} fixture={f} st={st} />
                 ))}
               </View>
             ))}
@@ -207,7 +208,7 @@ export default function WorldCupScreen() {
                 <View key={stage} style={{ marginBottom: 10 }}>
                   <Text style={st.stageTitle}>{WC_STAGE_LABELS[stage] ?? stage}</Text>
                   {stageFixtures.map((f) => (
-                    <FixtureRow key={f.id} fixture={f} st={st} colors={colors} />
+                    <FixtureRow key={f.id} fixture={f} st={st} />
                   ))}
                 </View>
               );
