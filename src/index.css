@@ -16986,6 +16986,25 @@ a.cx-profile-btn-accent {
   background: rgb(var(--cx-rose-rgb) / 0.04);
 }
 
+/* Brief highlight when a match is opened from the feed widget (?focus=) */
+.wc-fixture--focus {
+  animation: wc-fixture-focus 2.4s ease;
+  border-radius: 10px;
+  position: relative;
+  z-index: 1;
+}
+@keyframes wc-fixture-focus {
+  0%,
+  70% {
+    box-shadow: 0 0 0 2px rgb(var(--cx-accent-rgb) / 0.9);
+    background: rgb(var(--cx-accent-rgb) / 0.12);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgb(var(--cx-accent-rgb) / 0);
+    background: transparent;
+  }
+}
+
 .wc-fixture-list--knockout .wc-fixture {
   background: var(--cx-canvas, #f2f1f4);
   border: 1px solid var(--ig-border);
@@ -16998,12 +17017,14 @@ a.cx-profile-btn-accent {
   gap: 8px;
 }
 
+/* Home hugs the left edge, away the right edge — fills the row instead of
+   clustering both teams in the middle with empty outer gaps. */
 .wc-team--home {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .wc-team--away {
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .wc-team--winner .wc-team-name {
@@ -17012,13 +17033,13 @@ a.cx-profile-btn-accent {
 }
 
 .wc-team-name {
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--ig-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 80px;
+  max-width: 150px;
 }
 
 .wc-crest {
@@ -17161,8 +17182,8 @@ a.cx-profile-btn-accent {
 
 @media (max-width: 620px) {
   .wc-team-name {
-    max-width: 60px;
-    font-size: 0.78rem;
+    max-width: 96px;
+    font-size: 0.8rem;
   }
   .wc-groups-grid {
     grid-template-columns: 1fr;
@@ -20166,15 +20187,39 @@ a.cx-profile-btn-accent {
 }
 .wc-filter-label { font-weight: 700; font-size: 0.85rem; color: var(--cx-ink); }
 .wc-filter-select {
-  padding: 7px 10px;
-  border-radius: 9px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 8px 34px 8px 12px;
+  border-radius: 10px;
   border: 1px solid var(--ig-border);
-  background: var(--ig-surface, #fff);
+  background-color: var(--ig-surface, #fff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
   color: var(--cx-ink);
   font-size: 0.85rem;
-  min-width: 160px;
+  font-weight: 600;
+  min-width: 180px;
+  cursor: pointer;
 }
-:root[data-theme="dark"] .wc-filter-select { background: #1b1d22; }
+.wc-filter-select:focus-visible {
+  outline: none;
+  border-color: rgb(var(--cx-accent-rgb) / 0.7);
+}
+:root[data-theme="dark"] .wc-filter-select {
+  background-color: rgb(255 255 255 / 0.05);
+  border-color: rgb(255 255 255 / 0.12);
+}
+/* The opened option list is rendered by the browser — give it solid theme
+   colours so it isn't a white popup on the dark theme. */
+.wc-filter-select option {
+  background-color: var(--ig-surface, #fff);
+  color: var(--cx-ink);
+}
+:root[data-theme="dark"] .wc-filter-select option {
+  background-color: #1b1d22;
+  color: #e5e7eb;
+}
 .wc-filter-clear {
   border: none;
   background: rgb(var(--cx-rose-rgb) / 0.12);

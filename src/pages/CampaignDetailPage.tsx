@@ -110,7 +110,7 @@ function computeGroupTables(fixtures: Fixture[]): GroupTable[] {
   // Pass 2 — tally finished matches only
   for (const f of fixtures) {
     if (f.stage !== "GROUP_STAGE" || !f.group || f.status !== "FINISHED") continue;
-    if (f.score.home === null || f.score.away === null) continue;
+    if (f.score?.home == null || f.score?.away == null) continue;
     const gMap = tables.get(f.group);
     if (!gMap) continue;
     const home = gMap.get(f.homeTeam.name ?? "");
@@ -257,8 +257,8 @@ function FixtureCard({ fixture }: { fixture: Fixture }) {
   const isLive = fixture.status === "IN_PLAY" || fixture.status === "PAUSED";
   const isFinished = fixture.status === "FINISHED";
   const hasScore = isFinished || isLive;
-  const homeWon = fixture.score.winner === "HOME_TEAM";
-  const awayWon = fixture.score.winner === "AWAY_TEAM";
+  const homeWon = fixture.score?.winner === "HOME_TEAM";
+  const awayWon = fixture.score?.winner === "AWAY_TEAM";
 
   const groupLabel = fixture.group ? fixture.group.replace("GROUP_", "Group ") : null;
   const matchLabel = groupLabel
@@ -298,9 +298,9 @@ function FixtureCard({ fixture }: { fixture: Fixture }) {
           {hasScore ? (
             <>
               <div className="cd-fc-score">
-                <span className={`cd-fc-sn${homeWon ? " cd-fc-sn--w" : ""}`}>{fixture.score.home ?? "–"}</span>
+                <span className={`cd-fc-sn${homeWon ? " cd-fc-sn--w" : ""}`}>{fixture.score?.home ?? "–"}</span>
                 <span className="cd-fc-ssep">–</span>
-                <span className={`cd-fc-sn${awayWon ? " cd-fc-sn--w" : ""}`}>{fixture.score.away ?? "–"}</span>
+                <span className={`cd-fc-sn${awayWon ? " cd-fc-sn--w" : ""}`}>{fixture.score?.away ?? "–"}</span>
               </div>
               {isFinished && <span className="cd-fc-ft">Full Time</span>}
             </>

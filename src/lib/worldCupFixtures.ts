@@ -1,7 +1,9 @@
 // Shared World Cup fixture helpers — pure functions over the `worldCupFixtures`
 // API shape. Used by the World Cup page and the floating feed widget.
 
-export type WcTeam = { name: string; shortName: string; crest: string };
+// Knockout placeholders (teams not yet decided) come back with null name/shortName
+// and an empty crest — every consumer must treat these as optional.
+export type WcTeam = { name: string | null; shortName: string | null; crest: string | null };
 export type WcScore = { home: number | null; away: number | null; winner: string | null };
 
 export type WcFixture = {
@@ -14,7 +16,8 @@ export type WcFixture = {
   stage: string;
   group: string | null;
   matchday: number | null;
-  score: WcScore;
+  // API returns null for matches that haven't produced a score yet (upcoming).
+  score: WcScore | null;
   campaignPostId: string | null;
 };
 
@@ -62,7 +65,7 @@ export function fixtureTeams(fixtures: WcFixture[]): WcTeam[] {
       if (t?.name && !map.has(t.name)) map.set(t.name, t);
     }
   }
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...map.values()].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 }
 
 export function byKickoffAsc(a: WcFixture, b: WcFixture): number {

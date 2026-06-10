@@ -55,7 +55,9 @@ export function WorldCupFloating() {
 
   function openMatch(f: WcFixture) {
     setOpen(false);
-    navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : "/world-cup");
+    // With a vote post → open it. Otherwise jump to the schedule page and focus
+    // this exact match (so the click always lands somewhere visible).
+    navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : `/world-cup?focus=${f.id}`);
   }
 
   if (!open) {
@@ -95,7 +97,7 @@ export function WorldCupFloating() {
                 <button key={f.id} type="button" className="wc-float-row wc-float-row--live" onClick={() => openMatch(f)}>
                   <span className="wc-float-live-badge">LIVE {liveMinute(f.kickoff)}&apos;</span>
                   <span className="wc-float-teams">
-                    {f.homeTeam.shortName} {f.score.home ?? 0}–{f.score.away ?? 0} {f.awayTeam.shortName}
+                    {f.homeTeam.shortName ?? "TBD"} {f.score?.home ?? 0}–{f.score?.away ?? 0} {f.awayTeam.shortName ?? "TBD"}
                   </span>
                 </button>
               ))}
@@ -107,7 +109,7 @@ export function WorldCupFloating() {
               {g.fixtures.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row" onClick={() => openMatch(f)}>
                   <span className="wc-float-teams">
-                    {f.homeTeam.shortName} <span className="wc-float-v">v</span> {f.awayTeam.shortName}
+                    {f.homeTeam.shortName ?? "TBD"} <span className="wc-float-v">v</span> {f.awayTeam.shortName ?? "TBD"}
                   </span>
                   <span className="wc-float-time">
                     {formatTime(f.kickoff)}

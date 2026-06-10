@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { useQuery } from "@apollo/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
 import {
   type WcFixture,
@@ -29,18 +30,19 @@ function StatusBadge({ fixture }: { fixture: WcFixture }) {
   return null;
 }
 
-function TeamCrest({ crest, name }: { crest: string; name: string }) {
+function TeamCrest({ crest, name }: { crest: string | null; name: string | null }) {
+  const label = name?.trim() || "TBD";
   if (!crest) {
     return (
-      <span className="wc-crest wc-crest--placeholder" aria-label={name}>
-        {name.slice(0, 2).toUpperCase()}
+      <span className="wc-crest wc-crest--placeholder" aria-label={label}>
+        {label.slice(0, 2).toUpperCase()}
       </span>
     );
   }
   return (
     <img
       src={crest}
-      alt={name}
+      alt={label}
       className="wc-crest"
       onError={(e) => {
         (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -57,16 +59,17 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
   const hasScore = finished || live;
   const canVote = !!fixture.campaignPostId && upcoming;
 
-  const homeWon = fixture.score.winner === "HOME_TEAM";
-  const awayWon = fixture.score.winner === "AWAY_TEAM";
+  const homeWon = fixture.score?.winner === "HOME_TEAM";
+  const awayWon = fixture.score?.winner === "AWAY_TEAM";
 
   return (
     <div
+      id={`wc-fixture-${fixture.id}`}
       className={`wc-fixture${live ? " wc-fixture--live" : ""}${finished ? " wc-fixture--finished" : ""}`}
     >
       <div className={`wc-team wc-team--home${homeWon ? " wc-team--winner" : ""}`}>
         <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} />
-        <span className="wc-team-name">{fixture.homeTeam.shortName}</span>
+        <span className="wc-team-name">{fixture.homeTeam.shortName ?? "TBD"}</span>
       </div>
 
       <div className="wc-center">
@@ -74,11 +77,11 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
         {hasScore ? (
           <div className="wc-score">
             <span className={homeWon ? "wc-score-num wc-score-num--winner" : "wc-score-num"}>
-              {fixture.score.home ?? "–"}
+              {fixture.score?.home ?? "–"}
             </span>
             <span className="wc-score-sep">:</span>
             <span className={awayWon ? "wc-score-num wc-score-num--winner" : "wc-score-num"}>
-              {fixture.score.away ?? "–"}
+              {fixture.score?.away ?? "–"}
             </span>
           </div>
         ) : (
@@ -99,7 +102,7 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
       </div>
 
       <div className={`wc-team wc-team--away${awayWon ? " wc-team--winner" : ""}`}>
-        <span className="wc-team-name">{fixture.awayTeam.shortName}</span>
+        <span className="wc-team-name">{fixture.awayTeam.shortName ?? "TBD"}</span>
         <TeamCrest crest={fixture.awayTeam.crest} name={fixture.awayTeam.name} />
       </div>
     </div>
@@ -166,6 +169,8 @@ export function WorldCupPage() {
     { fetchPolicy: "cache-and-network", pollInterval: 60_000 },
   );
   const followed = useFollowedTeam();
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get("focus");
 
   const fixtures = data?.worldCupFixtures ?? [];
   const teams = fixtureTeams(fixtures);
@@ -179,6 +184,18 @@ export function WorldCupPage() {
   const sortedStages = Object.keys(byStage).sort(
     (a, b) => (WC_STAGE_ORDER[a] ?? 99) - (WC_STAGE_ORDER[b] ?? 99),
   );
+
+  // When arriving from the feed widget with ?focus=<fixtureId>, scroll to that
+  // match and briefly highlight it so the click visibly lands on the match.
+  useEffect(() => {
+    if (!focusId || fixtures.length === 0) return;
+    const el = document.getElementById(`wc-fixture-${focusId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("wc-fixture--focus");
+    const t = setTimeout(() => el.classList.remove("wc-fixture--focus"), 2400);
+    return () => clearTimeout(t);
+  }, [focusId, fixtures.length]);
 
   return (
     <div className="wc-page">
@@ -205,8 +222,8 @@ export function WorldCupPage() {
           >
             <option value="">All teams</option>
             {teams.map((t) => (
-              <option key={t.name} value={t.name}>
-                {t.name}
+              <option key={t.name ?? ""} value={t.name ?? ""}>
+                {t.name ?? "TBD"}
               </option>
             ))}
           </select>
