@@ -1,0 +1,14 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ctrend.app",
+      "sha256_cert_fingerprints": [
+        "2B:F7:EA:13:80:E0:C8:83:04:22:FC:23:81:D5:8A:81:8C:66:9D:F4:A5:BF:A6:D3:3D:54:02:88:F5:56:EB:2D",
+        "82:30:B8:77:95:CB:07:45:FF:89:F9:36:40:52:F8:86:46:D4:5A:0C:A9:97:33:65:4F:F2:0C:BA:47:50:A6:C2",
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
+      ]
+    }
+  }
+]
