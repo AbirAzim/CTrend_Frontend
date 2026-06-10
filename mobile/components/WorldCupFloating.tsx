@@ -1,8 +1,9 @@
 import { useQuery } from "@apollo/client/react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
@@ -40,6 +41,88 @@ export function WorldCupFloating() {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
   }, []);
+
+  // ── Draggable, semi-transparent edge tab ──────────────────────────────────
+  // The tab can be dragged up/down so it never permanently blocks content, and
+  // it sits at reduced opacity while idle (full opacity while touched). The drop
+  // position is remembered across sessions.
+  const TAB_H = 56;
+  const IDLE_OPACITY = 0.55;
+  const baseTop = Math.round(H * 0.46);
+  const minRel = insets.top + 8 - baseTop;
+  const maxRel = H - insets.bottom - TAB_H - 92 - baseTop;
+  const minRelRef = useRef(minRel);
+  const maxRelRef = useRef(maxRel);
+  minRelRef.current = minRel;
+  maxRelRef.current = maxRel;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const tabOpacity = useRef(new Animated.Value(IDLE_OPACITY)).current;
+  const lastOffset = useRef(0);
+  // Tracks whether the tab is currently pinned to a clamp edge, so the edge
+  // "bump" haptic fires once on arrival rather than every move frame.
+  const atEdge = useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("ctrend_wc_tab_y").then((v) => {
+      if (v == null) return;
+      const rel = Number(v);
+      if (Number.isNaN(rel)) return;
+      const clamped = Math.max(minRelRef.current, Math.min(maxRelRef.current, rel));
+      lastOffset.current = clamped;
+      dragY.setValue(clamped);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fadeTab = (to: number) =>
+    Animated.timing(tabOpacity, { toValue: to, duration: 160, useNativeDriver: false }).start();
+
+  const pan = useRef(
+    PanResponder.create({
+      // Tap falls through to the inner Pressable; only a real vertical drag grabs it.
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderGrant: () => {
+        dragY.setOffset(lastOffset.current);
+        dragY.setValue(0);
+        atEdge.current = false;
+        fadeTab(1);
+        Vibration.vibrate(10); // light "pick up" tick
+      },
+      onPanResponderMove: Animated.event([null, { dy: dragY }], {
+        useNativeDriver: false,
+        // Edge-bump haptic: buzz once when the drag reaches the top/bottom limit.
+        listener: (_e, g: { dy: number }) => {
+          const raw = lastOffset.current + g.dy;
+          const beyond = raw <= minRelRef.current || raw >= maxRelRef.current;
+          if (beyond && !atEdge.current) {
+            atEdge.current = true;
+            Vibration.vibrate(20);
+          } else if (!beyond && atEdge.current) {
+            atEdge.current = false;
+          }
+        },
+      }),
+      onPanResponderRelease: (_, g) => {
+        dragY.flattenOffset();
+        const next = Math.max(
+          minRelRef.current,
+          Math.min(maxRelRef.current, lastOffset.current + g.dy),
+        );
+        lastOffset.current = next;
+        Animated.spring(dragY, {
+          toValue: next,
+          useNativeDriver: false,
+          tension: 90,
+          friction: 11,
+        }).start();
+        void AsyncStorage.setItem("ctrend_wc_tab_y", String(next));
+        fadeTab(IDLE_OPACITY);
+        Vibration.vibrate(8); // soft "drop" tick
+      },
+      onPanResponderTerminate: () => fadeTab(IDLE_OPACITY),
+    }),
+  ).current;
 
   const { data: campData } = useQuery<CampaignsData>(ACTIVE_CAMPAIGNS, {
     fetchPolicy: "cache-and-network",
@@ -129,16 +212,24 @@ export function WorldCupFloating() {
           </View>
         </>
       ) : (
-        // Half-peeking tab pinned to the right edge.
-        <Pressable
-          style={[st.tab, { top: Math.round(H * 0.46) }]}
-          onPress={() => setOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Open World Cup matches"
+        // Half-peeking tab pinned to the right edge — drag up/down to reposition.
+        <Animated.View
+          style={[
+            st.tab,
+            { top: baseTop, opacity: tabOpacity, transform: [{ translateY: dragY }] },
+          ]}
+          {...pan.panHandlers}
         >
-          <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
-          {live.length > 0 ? <View style={st.tabLiveDot} /> : null}
-        </Pressable>
+          <Pressable
+            style={st.tabPressable}
+            onPress={() => setOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open World Cup matches. Drag up or down to move."
+          >
+            <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
+            {live.length > 0 ? <View style={st.tabLiveDot} /> : null}
+          </Pressable>
+        </Animated.View>
       )}
     </View>
   );
@@ -175,6 +266,7 @@ function makeStyles(c: {
       shadowOffset: { width: -2, height: 2 },
       elevation: 8,
     },
+    tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
     tabImg: { width: 38, height: 38 },
     tabLiveDot: {
       position: "absolute",
