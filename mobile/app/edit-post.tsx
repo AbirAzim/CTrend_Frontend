@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,8 +24,8 @@ import { GET_POST_BY_ID, UPDATE_POST, CATEGORIES } from "@ctrend/shared/graphql/
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
-import { ImagePositionEditor } from "../components/ImagePositionEditor";
-import { DEFAULT_IMAGE_FOCAL, hasCustomFocal } from "../lib/imageFocal";
+import { CompareImageCropper } from "../components/CompareImageCropper";
+import { DEFAULT_IMAGE_FOCAL } from "../lib/imageFocal";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 
@@ -161,7 +161,11 @@ export default function EditPostScreen() {
   // Whether the post already has votes — gates the replace-photo warning.
   const [hasVotes, setHasVotes] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
-  const [positionIdx, setPositionIdx] = useState<number | null>(null);
+  // Pending crop for an option image. `reset` = true when it's a replace with a
+  // different photo (wipes votes); false when cropping/repositioning the same one.
+  const [cropper, setCropper] = useState<{ idx: number; uri: string; reset: boolean } | null>(null);
+  // Whether this edit must wipe votes (replace different photo / remove option).
+  const votesResetRef = useRef(false);
   // Poll-only: post-level body/context photos. Existing ones carry votes —
   // replacing/removing one resets votes; adding new ones is safe.
   const [bodyImages, setBodyImages] = useState<
@@ -306,6 +310,7 @@ export default function EditPostScreen() {
     setUploadingIdx(null);
   }
 
+  // Pick a DIFFERENT photo for an option, then crop it (replace → wipes votes).
   async function pickOptionImage(idx: number) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -313,28 +318,27 @@ export default function EditPostScreen() {
         Alert.alert("Permission needed", "Gallery access is required.");
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        quality: 0.92,
-        // Compare images frame portrait; poll thumbnails are square-ish.
-        allowsEditing: true,
-        aspect: isPoll ? [1, 1] : [4, 5],
-      });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.92 });
       if (result.canceled || !result.assets[0]) return;
-      const asset = result.assets[0];
-      await uploadOptionImage(idx, asset.uri, asset.mimeType ?? "image/jpeg", asset.fileName ?? undefined);
+      setCropper({ idx, uri: result.assets[0].uri, reset: true });
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Upload failed");
     }
   }
 
-  // Swapping an existing option's image resets votes — confirm first when votes
-  // exist. Repositioning (focal) never resets, so it's not gated.
+  /** Crop & reposition the CURRENT option image — never resets votes. */
+  function cropExistingOption(idx: number) {
+    const url = options[idx]?.imageUrl;
+    if (!url) { void pickOptionImage(idx); return; }
+    setCropper({ idx, uri: url, reset: false });
+  }
+
+  // Replacing an existing option with a DIFFERENT photo wipes votes — confirm.
   function requestReplaceImage(idx: number) {
     if (hasVotes && options[idx]?.imageUrl) {
       Alert.alert(
         isPoll ? "Replace photo?" : "Replace image?",
-        `Replacing this ${isPoll ? "option's photo" : "image"} will remove all current votes on this post. Repositioning the existing ${isPoll ? "photo" : "image"} keeps the votes.`,
+        `Replacing this with a different ${isPoll ? "photo" : "image"} will remove all current votes. Cropping or repositioning the same one keeps the votes.`,
         [
           { text: "Cancel", style: "cancel" },
           { text: "Replace anyway", style: "destructive", onPress: () => void pickOptionImage(idx) },
@@ -403,23 +407,30 @@ export default function EditPostScreen() {
 
   function requestReplaceBody(id: string) {
     const img = bodyImages.find((b) => b.id === id);
+    const go = () => {
+      if (img?.existing) votesResetRef.current = true;
+      void pickBodyImage(id);
+    };
     if (img?.existing && img.url && hasVotes) {
       Alert.alert(
         "Replace photo?",
         "Replacing this context photo will remove all current votes on this poll.",
         [
           { text: "Cancel", style: "cancel" },
-          { text: "Replace anyway", style: "destructive", onPress: () => void pickBodyImage(id) },
+          { text: "Replace anyway", style: "destructive", onPress: go },
         ],
       );
       return;
     }
-    void pickBodyImage(id);
+    go();
   }
 
   function removeBodyImage(id: string) {
     const img = bodyImages.find((b) => b.id === id);
-    const doRemove = () => setBodyImages((prev) => prev.filter((b) => b.id !== id));
+    const doRemove = () => {
+      if (img?.existing) votesResetRef.current = true;
+      setBodyImages((prev) => prev.filter((b) => b.id !== id));
+    };
     if (img?.existing && img.url && hasVotes) {
       Alert.alert(
         "Remove photo?",
@@ -483,8 +494,8 @@ export default function EditPostScreen() {
             input: {
               caption: caption.trim() || undefined,
               categoryId,
-              // Context/body photos. Backend resets votes if an existing one
-              // changed/was removed; adding is safe.
+              // Crop = keep votes; replace/remove a photo = reset (flag set above).
+              resetVotes: votesResetRef.current,
               imageUrls: bodyImages.map((b) => b.url.trim()).filter((u) => u.length > 0),
               options: labeled.map((o) => ({
                 label: o.label.trim(),
@@ -517,6 +528,7 @@ export default function EditPostScreen() {
           input: {
             caption: caption.trim() || undefined,
             categoryId,
+            resetVotes: votesResetRef.current,
             options: options.map((o) => ({
               label: o.label,
               imageUrl: o.imageUrl,
@@ -621,10 +633,10 @@ export default function EditPostScreen() {
             {isPoll ? "POLL OPTIONS" : "COMPARE OPTIONS"}
           </Text>
           <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>
-            Edit labels and reposition {isPoll ? "photos" : "images"} anytime — votes stay intact.
+            Tap a {isPoll ? "photo" : "image"} to crop & reposition it — labels and crops stay free.
             {hasVotes
-              ? ` Replacing ${isPoll ? "an option's photo" : "an image"} resets all votes (you'll be asked to confirm).`
-              : " You can also swap them freely until the first vote is cast."}
+              ? ` Replacing one with a different ${isPoll ? "photo" : "image"} resets votes (you'll be asked to confirm).`
+              : " You can also replace them freely until the first vote is cast."}
           </Text>
           {options.map((opt, i) => {
             const hasImage = Boolean(opt.imageUrl);
@@ -632,7 +644,7 @@ export default function EditPostScreen() {
               <View key={i} style={[st.optionRow, { borderTopColor: colors.border }]}>
                 <Pressable
                   style={[st.optionThumb, { backgroundColor: colors.section, overflow: "hidden" }]}
-                  onPress={() => requestReplaceImage(i)}
+                  onPress={() => (hasImage ? cropExistingOption(i) : requestReplaceImage(i))}
                 >
                   {hasImage ? (
                     <Image
@@ -667,11 +679,9 @@ export default function EditPostScreen() {
                     {hasImage ? (
                       <Pressable
                         style={[st.optionActionBtn, { borderColor: colors.border, backgroundColor: colors.section }]}
-                        onPress={() => setPositionIdx(i)}
+                        onPress={() => cropExistingOption(i)}
                       >
-                        <Text style={[st.optionActionText, { color: colors.subtext }]}>
-                          ↔ Position{hasCustomFocal(opt.imageFocalX ?? DEFAULT_IMAGE_FOCAL, opt.imageFocalY ?? DEFAULT_IMAGE_FOCAL) ? " ·" : ""}
-                        </Text>
+                        <Text style={[st.optionActionText, { color: colors.subtext }]}>✂️ Crop & reposition</Text>
                       </Pressable>
                     ) : null}
                     <Pressable
@@ -972,22 +982,21 @@ export default function EditPostScreen() {
         </Pressable>
       </Modal>
 
-      {/* Image position (focal) editor — focal-only, never resets votes */}
-      {positionIdx !== null && options[positionIdx]?.imageUrl ? (
-        <ImagePositionEditor
-          visible
-          src={options[positionIdx].imageUrl}
-          label={options[positionIdx].label?.trim() || `Option ${positionIdx + 1}`}
-          focalX={options[positionIdx].imageFocalX ?? DEFAULT_IMAGE_FOCAL}
-          focalY={options[positionIdx].imageFocalY ?? DEFAULT_IMAGE_FOCAL}
-          onChange={(x, y) =>
-            setOptions((prev) =>
-              prev.map((o, j) => (j === positionIdx ? { ...o, imageFocalX: x, imageFocalY: y } : o)),
-            )
-          }
-          onClose={() => setPositionIdx(null)}
-        />
-      ) : null}
+      {/* Crop + reposition editor (same as create). Re-cropping the same image
+          keeps votes; a replace (reset:true) wipes them. */}
+      <CompareImageCropper
+        visible={cropper !== null}
+        uri={cropper?.uri ?? null}
+        aspect={isPoll ? 1 : 1.25}
+        onCancel={() => setCropper(null)}
+        onDone={(croppedUri) => {
+          const target = cropper;
+          setCropper(null);
+          if (!target) return;
+          if (target.reset) votesResetRef.current = true;
+          void uploadOptionImage(target.idx, croppedUri, "image/jpeg");
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

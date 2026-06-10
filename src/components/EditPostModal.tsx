@@ -3,7 +3,6 @@ import { useMutation, useQuery } from "@apollo/client";
 import { CATEGORIES, EXTEND_POST_VOTING, UPDATE_POST } from "../graphql/feed";
 import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "./DateTimePicker";
-import { ImagePositionEditor } from "./ImagePositionEditor";
 import { CompareImageCropper } from "./CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL } from "../lib/imageFocal";
 import { useImageUpload } from "../lib/useImageUpload";
@@ -160,15 +159,14 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     post.endingSoonLeadMinutes ?? 5,
   );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
-  // Open image-position (focal) editor for this compare item index.
-  const [positionIdx, setPositionIdx] = useState<number | null>(null);
-  // Same, for a poll option index.
-  const [pollPositionIdx, setPollPositionIdx] = useState<number | null>(null);
-  // Pending crop for a freshly chosen file before it's uploaded.
-  const [cropper, setCropper] = useState<{ idx: number; url: string } | null>(null);
+  // Pending crop. `reset` = replace with a different photo (wipes votes); false
+  // = crop/reposition the same image. `poll` routes the result to poll options.
+  const [cropper, setCropper] = useState<{ idx: number; url: string; reset: boolean; poll: boolean } | null>(null);
   const [pollUploadingIdx, setPollUploadingIdx] = useState<number | null>(null);
   const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const pollFileRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // True once a replace/remove happened → votes must be wiped on save.
+  const resetVotesRef = useRef(false);
   const { uploadImage } = useImageUpload();
 
   const votingOpen = post.isVotingOpen !== false && votingEndsAt
@@ -208,10 +206,11 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, label: value } : item)));
   }
 
-  function setItemFocal(idx: number, imageFocalX: number, imageFocalY: number) {
-    setItems((prev) =>
-      prev.map((item, i) => (i === idx ? { ...item, imageFocalX, imageFocalY } : item)),
-    );
+  /** Crop & reposition the CURRENT compare image — never resets votes. */
+  function cropExistingItem(idx: number) {
+    const url = items[idx]?.imageUrl;
+    if (!url) { fileRefs.current[idx]?.click(); return; }
+    setCropper({ idx, url, reset: false, poll: false });
   }
 
   function addItem() {
@@ -236,15 +235,14 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   }
 
   /**
-   * Picking a new file for an item. For an existing option that already has
-   * votes, swapping the image wipes those votes — so confirm first.
+   * Replace an existing compare option with a DIFFERENT photo. That wipes votes
+   * when the post has any — so confirm first.
    */
   function requestReplace(idx: number) {
     if (items[idx]?.existing && hasVotes) {
       const ok = window.confirm(
-        "Replacing this image will remove all current votes on this post. " +
-          "Repositioning the existing image (Adjust position) keeps the votes. " +
-          "Replace the image anyway?",
+        "Replacing this with a different photo will remove all current votes. " +
+          "Cropping or repositioning the same image keeps the votes. Replace anyway?",
       );
       if (!ok) return;
     }
@@ -257,43 +255,19 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
     );
   }
 
-  function setPollFocal(idx: number, imageFocalX: number, imageFocalY: number) {
-    setPollOptions((prev) =>
-      prev.map((opt, i) => (i === idx ? { ...opt, imageFocalX, imageFocalY } : opt)),
-    );
+  /** Crop & reposition the CURRENT poll option photo — never resets votes. */
+  function cropExistingPoll(idx: number) {
+    const url = pollOptions[idx]?.imageUrl;
+    if (!url) { pollFileRefs.current[idx]?.click(); return; }
+    setCropper({ idx, url, reset: false, poll: true });
   }
 
-  // Poll thumbnails upload directly (no crop step — matches poll create); a new
-  // image resets that option's focal point.
-  async function handlePollFileUpload(idx: number, file: File) {
-    setPollUploadingIdx(idx);
-    try {
-      const url = await uploadImage(file);
-      setPollOptions((prev) =>
-        prev.map((opt, i) =>
-          i === idx
-            ? {
-                ...opt,
-                imageUrl: url,
-                imageFocalX: DEFAULT_IMAGE_FOCAL,
-                imageFocalY: DEFAULT_IMAGE_FOCAL,
-              }
-            : opt,
-        ),
-      );
-    } catch {
-      setError("Image upload failed. Try again.");
-    }
-    setPollUploadingIdx(null);
-  }
-
-  // Swapping an existing option's photo resets votes — confirm when votes exist.
+  // Replacing an existing option's photo with a different one resets votes.
   function requestPollReplace(idx: number) {
     if (idx < pollLockedCount && pollOptions[idx]?.imageUrl && hasVotes) {
       const ok = window.confirm(
-        "Replacing this option's photo will remove all current votes on this poll. " +
-          "Repositioning the existing photo (Adjust position) keeps the votes. " +
-          "Replace the photo anyway?",
+        "Replacing this with a different photo will remove all current votes. " +
+          "Cropping the same photo keeps the votes. Replace anyway?",
       );
       if (!ok) return;
     }
@@ -328,6 +302,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
       );
       if (!ok) return;
     }
+    if (img?.existing) resetVotesRef.current = true;
     setBodyImages((prev) => prev.filter((b) => b.id !== id));
   }
 
@@ -339,6 +314,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
       );
       if (!ok) return;
     }
+    if (img?.existing) resetVotesRef.current = true;
     bodyFileRefs.current[id]?.click();
   }
 
@@ -356,31 +332,44 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
 
   // A freshly chosen file goes through the crop+zoom editor first (same as the
   // create flow) so every compare image gets a uniform shape.
+  // A newly picked compare file → crop (replace, so it resets votes for an
+  // existing option).
   function handleFilePicked(idx: number, file: File) {
-    setCropper({ idx, url: URL.createObjectURL(file) });
+    setCropper({ idx, url: URL.createObjectURL(file), reset: items[idx]?.existing === true, poll: false });
   }
 
-  async function uploadCroppedFile(idx: number, file: File) {
-    setUploadingIdx(idx);
+  // A newly picked poll-option file → crop (replace existing → reset).
+  function handlePollFilePicked(idx: number, file: File) {
+    setCropper({ idx, url: URL.createObjectURL(file), reset: idx < pollLockedCount, poll: true });
+  }
+
+  // Apply a cropped file to its compare item or poll option, uploading it. When
+  // it was a replace (cropper.reset) the post's votes get wiped on save.
+  async function uploadCroppedFile(idx: number, file: File, poll: boolean, reset: boolean) {
+    if (poll) setPollUploadingIdx(idx);
+    else setUploadingIdx(idx);
     try {
       const url = await uploadImage(file);
-      // A new image resets the focal point — the crop already framed it.
-      setItems((prev) =>
-        prev.map((item, i) =>
-          i === idx
-            ? {
-                ...item,
-                imageUrl: url,
-                imageFocalX: DEFAULT_IMAGE_FOCAL,
-                imageFocalY: DEFAULT_IMAGE_FOCAL,
-              }
-            : item,
-        ),
-      );
+      if (reset) resetVotesRef.current = true;
+      // The crop already framed it → reset focal to default.
+      if (poll) {
+        setPollOptions((prev) =>
+          prev.map((opt, i) =>
+            i === idx ? { ...opt, imageUrl: url, imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL } : opt,
+          ),
+        );
+      } else {
+        setItems((prev) =>
+          prev.map((item, i) =>
+            i === idx ? { ...item, imageUrl: url, imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL } : item,
+          ),
+        );
+      }
     } catch {
       setError("Image upload failed. Try again.");
     }
-    setUploadingIdx(null);
+    if (poll) setPollUploadingIdx(null);
+    else setUploadingIdx(null);
   }
 
   async function handleExtendDeadline() {
@@ -474,8 +463,9 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             postId: post.id,
             input: {
               ...sharedInput,
-              // Context/body photos. The backend resets votes if an existing one
-              // changed/was removed (existingImageUrlsChanged); adding is safe.
+              resetVotes: resetVotesRef.current,
+              // Context/body photos. Replacing/removing an existing one flags
+              // resetVotes; adding is safe.
               imageUrls: bodyImages
                 .map((b) => b.url.trim())
                 .filter((u) => u.length > 0),
@@ -508,8 +498,8 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
           postId: post.id,
           input: {
             ...sharedInput,
-            // imageUrls drive the backend's vote-reset check: an unchanged URL
-            // (label/position edit) keeps votes; a swapped URL resets them.
+            // Crop/reposition keeps votes; a replace/remove sets resetVotes.
+            resetVotes: resetVotesRef.current,
             imageUrls: items.map((it) => it.imageUrl.trim()),
             options: items.map((it) => ({
               label: it.label.trim() || "Option",
@@ -827,9 +817,10 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                             <button
                               type="button"
                               className="cx-edit-item-action"
-                              onClick={() => setPollPositionIdx(idx)}
+                              disabled={pollUploadingIdx !== null}
+                              onClick={() => cropExistingPoll(idx)}
                             >
-                              ↔ Adjust position
+                              ✂️ Crop & reposition
                             </button>
                           )}
                           <button
@@ -851,7 +842,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                             style={{ display: "none" }}
                             onChange={(e) => {
                               const f = e.target.files?.[0];
-                              if (f) void handlePollFileUpload(idx, f);
+                              if (f) handlePollFilePicked(idx, f);
                               e.target.value = "";
                             }}
                           />
@@ -923,9 +914,10 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                         <button
                           type="button"
                           className="cx-edit-item-action"
-                          onClick={() => setPositionIdx(idx)}
+                          disabled={uploadingIdx !== null}
+                          onClick={() => cropExistingItem(idx)}
                         >
-                          ↔ Adjust position
+                          ✂️ Crop & reposition
                         </button>
                       )}
                       <button
@@ -996,41 +988,19 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
         </div>
       </div>
 
-      {positionIdx !== null && items[positionIdx]?.imageUrl ? (
-        <ImagePositionEditor
-          src={items[positionIdx].imageUrl}
-          label={items[positionIdx].label || `Option ${positionIdx + 1}`}
-          focalX={items[positionIdx].imageFocalX}
-          focalY={items[positionIdx].imageFocalY}
-          onChange={(fx, fy) => setItemFocal(positionIdx, fx, fy)}
-          onClose={() => setPositionIdx(null)}
-        />
-      ) : null}
-
-      {pollPositionIdx !== null && pollOptions[pollPositionIdx]?.imageUrl ? (
-        <ImagePositionEditor
-          src={pollOptions[pollPositionIdx].imageUrl as string}
-          label={pollOptions[pollPositionIdx].label || `Option ${pollPositionIdx + 1}`}
-          focalX={pollOptions[pollPositionIdx].imageFocalX ?? DEFAULT_IMAGE_FOCAL}
-          focalY={pollOptions[pollPositionIdx].imageFocalY ?? DEFAULT_IMAGE_FOCAL}
-          onChange={(fx, fy) => setPollFocal(pollPositionIdx, fx, fy)}
-          onClose={() => setPollPositionIdx(null)}
-        />
-      ) : null}
-
       {cropper ? (
         <CompareImageCropper
           src={cropper.url}
           aspect={1}
           onCancel={() => {
-            URL.revokeObjectURL(cropper.url);
+            if (cropper.url.startsWith("blob:")) URL.revokeObjectURL(cropper.url);
             setCropper(null);
           }}
           onDone={(file) => {
-            const idx = cropper.idx;
-            URL.revokeObjectURL(cropper.url);
+            const { idx, url, poll, reset } = cropper;
+            if (url.startsWith("blob:")) URL.revokeObjectURL(url);
             setCropper(null);
-            void uploadCroppedFile(idx, file);
+            void uploadCroppedFile(idx, file, poll, reset);
           }}
         />
       ) : null}

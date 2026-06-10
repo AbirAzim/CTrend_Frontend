@@ -27,10 +27,9 @@ import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campai
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
-import { ImagePositionEditor } from "../../components/ImagePositionEditor";
 import { CompareImageCropper } from "../../components/CompareImageCropper";
 import { AppActionSheet } from "../../components/AppDialog";
-import { hasCustomFocal, DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
+import { DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -259,7 +258,6 @@ export default function CreateScreen() {
   const [categoryModal, setCategoryModal] = useState(false);
   const [campaignId, setCampaignId] = useState("");
   const [campaignModal, setCampaignModal] = useState(false);
-  const [positionSlotId, setPositionSlotId] = useState<string | null>(null);
   const [imageSheetSlotId, setImageSheetSlotId] = useState<string | null>(null);
   // Pending crop: compare images pass through the crop+zoom editor before upload.
   const [cropper, setCropper] = useState<{ slotId: string; uri: string } | null>(null);
@@ -336,6 +334,9 @@ export default function CreateScreen() {
   // different post (the tab stays mounted) always re-hydrates, and stale data
   // for the previous post is never applied.
   const editLoadedRef = useRef<string | null>(null);
+  // Set true when an existing image is REPLACED with a different photo (or an
+  // option is removed) → votes are wiped. Cropping the same image leaves it false.
+  const votesResetRef = useRef(false);
   useEffect(() => {
     const post = editData?.getPostById;
     if (!isEdit || !post) return;
@@ -344,6 +345,7 @@ export default function CreateScreen() {
     if (post.id !== editId) return;
     if (editLoadedRef.current === editId) return;
     editLoadedRef.current = editId ?? null;
+    votesResetRef.current = false;
     // Polls have a different edit model (locked photos, label-only) handled by
     // the dedicated poll-aware editor. Hand off so feed/keeps edits work too.
     if ((post.format ?? "").toLowerCase() === "poll") {
@@ -481,6 +483,9 @@ export default function CreateScreen() {
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.92, allowsEditing: isPoll });
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
+      // Picking a brand-new photo for an existing option = a replace → wipes votes.
+      const slot = slots.find((s) => s.id === slotId);
+      if (isEdit && slot?.locked) votesResetRef.current = true;
       if (!isPoll) {
         setCropper({ slotId, uri: asset.uri });
         return;
@@ -509,17 +514,23 @@ export default function CreateScreen() {
     return (p.optionStats ?? []).some((s) => (s.count ?? 0) > 0);
   })();
 
+  /** Crop & reposition the CURRENT image (same as create) — never resets votes. */
+  function cropExisting(slot: Slot) {
+    const src = slot.localUri || slot.publicUrl;
+    if (!src) { openImageOptions(slot.id); return; }
+    setCropper({ slotId: slot.id, uri: src });
+  }
+
   /**
-   * Open the image picker for a slot. Labels and position stay freely editable;
-   * only swapping the actual image resets votes — so for an existing option that
-   * already has votes, confirm first.
+   * Replace an option's image with a DIFFERENT photo. For an existing option
+   * that already has votes, that wipes the votes — so confirm first.
    */
   function requestReplace(slot: Slot) {
     if (slot.locked && editPostHasVotes) {
       Alert.alert(
         "Replace image?",
-        "Replacing this image will remove all current votes on this post. " +
-          "Repositioning the existing image keeps the votes.",
+        "Replacing this with a different photo will remove all current votes. " +
+          "Cropping or repositioning the same image keeps the votes.",
         [
           { text: "Cancel", style: "cancel" },
           {
@@ -632,6 +643,9 @@ export default function CreateScreen() {
         // Always send caption so clearing it persists; "" clears the campaign too.
         caption: caption.trim() || undefined,
         campaignId,
+        // Only replacing a photo with a different one (or removing an option)
+        // wipes votes; cropping the same image keeps them.
+        resetVotes: votesResetRef.current,
       };
       const wasGlobal = Boolean(editData?.getPostById?.isUserGlobalBroadcast);
       if (!isAdmin && allowUserGlobalPosts && broadcastGlobally !== wasGlobal) {
@@ -748,10 +762,10 @@ export default function CreateScreen() {
         <View style={{ gap: 12 }}>
           {isEdit && (
             <Text style={[st.lockedNote, { color: colors.muted, backgroundColor: colors.section, borderColor: colors.border }]}>
-              Edit labels and reposition images anytime — votes stay intact.
+              Tap a photo to crop & reposition it — labels and crops stay free.
               {editPostHasVotes
-                ? " Replacing an image resets all votes (you'll be asked to confirm)."
-                : " You can also swap images freely until the first vote is cast."}
+                ? " Replacing a photo with a different one resets votes (you'll be asked to confirm)."
+                : " You can also replace photos freely until the first vote is cast."}
             </Text>
           )}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
@@ -761,10 +775,10 @@ export default function CreateScreen() {
               const locked = Boolean(slot.locked);
               return (
                 <View key={slot.id} style={{ width: slotW, gap: 6 }}>
-                  {/* Image tile */}
+                  {/* Image tile — tap crops/repositions the current image */}
                   <Pressable
                     style={[st.slotTile, { borderColor: slot.error ? "#ef4444" : hasImage ? colors.accent + "66" : colors.border }]}
-                    onPress={() => requestReplace(slot)}
+                    onPress={() => (hasImage ? cropExisting(slot) : openImageOptions(slot.id))}
                   >
                     {hasImage ? (
                       <Image source={{ uri: imgSrc ?? slot.publicUrl ?? "" }} style={st.slotImg} contentFit="cover" />
@@ -790,7 +804,7 @@ export default function CreateScreen() {
                     )}
                     {hasImage && (
                       <View style={st.slotReplaceHint}>
-                        <Text style={st.slotReplaceHintText}>Tap to replace</Text>
+                        <Text style={st.slotReplaceHintText}>Tap to crop</Text>
                       </View>
                     )}
                     {slots.length > 2 && !locked && (
@@ -800,16 +814,14 @@ export default function CreateScreen() {
                     )}
                   </Pressable>
                   {slot.error ? <Text style={st.slotError}>{slot.error}</Text> : null}
-                  {/* Position editor trigger — available for any image (focal-only,
-                      never resets votes). */}
-                  {hasImage && (slot.localUri || slot.publicUrl) ? (
+                  {/* Replace with a different photo (resets votes when the post
+                      already has any). Cropping the same image is free (tap tile). */}
+                  {hasImage ? (
                     <Pressable
                       style={[st.positionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
-                      onPress={() => setPositionSlotId(slot.id)}
+                      onPress={() => requestReplace(slot)}
                     >
-                      <Text style={[st.positionBtnText, { color: colors.subtext }]}>
-                        ⊹ Position{hasCustomFocal(slot.imageFocalX, slot.imageFocalY) ? " ·" : ""}
-                      </Text>
+                      <Text style={[st.positionBtnText, { color: colors.subtext }]}>🔁 Replace photo</Text>
                     </Pressable>
                   ) : null}
                   {/* Paste URL — new options only */}
@@ -1193,31 +1205,12 @@ export default function CreateScreen() {
         </Pressable>
       </Modal>
 
-      {/* Image position editor */}
-      {(() => {
-        const slot = slots.find((s) => s.id === positionSlotId);
-        const src = slot ? (slot.localUri ?? slot.publicUrl) : null;
-        if (!slot || !src) return null;
-        const idx = slots.indexOf(slot);
-        return (
-          <ImagePositionEditor
-            visible
-            src={src}
-            label={slot.label.trim() || `Option ${SLOT_LABELS[idx] ?? idx + 1}`}
-            focalX={slot.imageFocalX}
-            focalY={slot.imageFocalY}
-            onChange={(x, y) => patchSlot(slot.id, { imageFocalX: x, imageFocalY: y })}
-            onClose={() => setPositionSlotId(null)}
-          />
-        );
-      })()}
-
       {/* Crop + zoom editor (compare images) */}
       <CompareImageCropper
         visible={cropper !== null}
         uri={cropper?.uri ?? null}
         /* Match the post cell shape: 3+ options render as squares, 2 as portrait. */
-        aspect={slots.length >= 3 ? 1 : 1.55}
+        aspect={slots.length >= 3 ? 1 : 1.25}
         onCancel={() => setCropper(null)}
         onDone={(croppedUri) => {
           const target = cropper;

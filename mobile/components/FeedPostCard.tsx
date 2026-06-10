@@ -66,7 +66,7 @@ const CARD_MARGIN_H = 12;
 const CARD_CONTENT_W = SCREEN_W - CARD_MARGIN_H * 2;
 const MULTI_GRID_GAP = 2;
 const IMG_W = (SCREEN_W - 2) / 2;
-const IMG_H = IMG_W * 1.55;
+const IMG_H = IMG_W * 1.25;
 
 // Per-count compare grid recipes. Each entry is the number of images per row,
 // top → bottom. Cells are all the same square size (sized to the widest row),

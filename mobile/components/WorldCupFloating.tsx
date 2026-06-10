@@ -1,22 +1,11 @@
 import { useQuery } from "@apollo/client/react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  Vibration,
-  View,
-} from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
-import { Image } from "expo-image";
 import { useTheme } from "../context/ThemeContext";
 import {
   type WcFixture,
@@ -30,92 +19,28 @@ import {
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
 
-const POS_KEY = "ctrend_wc_float_pos";
-const BUBBLE = 54;
-const HALF = BUBBLE / 2;
+const TROPHY = require("../assets/worldcup-trophy.png");
 
 type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: boolean };
 type FixturesData = { worldCupFixtures: WcFixture[] };
 type CampaignsData = { activeCampaigns: Campaign[] };
-type Pos = { x: number; y: number };
 
 /**
- * App-wide draggable World Cup bubble (chat-head style). Drag it anywhere, park
- * it half-off any edge to tuck it away, tap to open the live/upcoming card.
+ * Fixed World Cup trophy tab pinned to the right edge (half-peeking). Tap to
+ * slide out the live/upcoming card; the tab hides while the card is open.
  */
 export function WorldCupFloating() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const followed = useFollowedTeam();
-  const { width: W, height: H } = useWindowDimensions();
+  const { height: H } = useWindowDimensions();
 
-  const [pos, setPos] = useState<Pos>({ x: W - BUBBLE - 14, y: H - BUBBLE - 150 });
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
-  // Refs so the PanResponder (created once) always sees the latest position.
-  const posRef = useRef(pos);
-  posRef.current = pos;
-  const boundsRef = useRef({ W, H });
-  boundsRef.current = { W, H };
-  // Scale animation to signal "grabbed".
-  const scale = useRef(new Animated.Value(1)).current;
-  function animateScale(to: number) {
-    Animated.spring(scale, { toValue: to, useNativeDriver: true, friction: 6, tension: 140 }).start();
-  }
-
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
   }, []);
-
-  // Hydrate saved position.
-  useEffect(() => {
-    void AsyncStorage.getItem(POS_KEY).then((raw) => {
-      if (!raw) return;
-      try {
-        const p = JSON.parse(raw) as Pos;
-        setPos(clampTuck(p, boundsRef.current.W, boundsRef.current.H));
-      } catch {
-        /* ignore */
-      }
-    });
-  }, []);
-
-  const panRef = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.hypot(g.dx, g.dy) > 4,
-      onPanResponderMove: (_e, g) => {
-        const base = baseRef.current;
-        const { W: bw, H: bh } = boundsRef.current;
-        setPos(clampTuck({ x: base.x + g.dx, y: base.y + g.dy }, bw, bh));
-      },
-      onPanResponderGrant: () => {
-        baseRef.current = posRef.current;
-        // Haptic + grow so it's clear the bubble is grabbed.
-        Vibration.vibrate(12);
-        animateScale(1.22);
-      },
-      onPanResponderRelease: (_e, g) => {
-        animateScale(1);
-        if (Math.hypot(g.dx, g.dy) <= 4) {
-          // Tap → toggle card; pull on-screen when opening.
-          const { W: bw, H: bh } = boundsRef.current;
-          if (!expandedRef.current) setPos((p) => clampVisible(p, bw, bh, insetsRef.current));
-          setExpanded((v) => !v);
-        } else {
-          Vibration.vibrate(8);
-          void AsyncStorage.setItem(POS_KEY, JSON.stringify(posRef.current)).catch(() => {});
-        }
-      },
-      onPanResponderTerminate: () => animateScale(1),
-    }),
-  );
-  const baseRef = useRef<Pos>(pos);
-  const expandedRef = useRef(expanded);
-  expandedRef.current = expanded;
-  const insetsRef = useRef(insets);
-  insetsRef.current = insets;
 
   const { data: campData } = useQuery<CampaignsData>(ACTIVE_CAMPAIGNS, {
     fetchPolicy: "cache-and-network",
@@ -139,112 +64,86 @@ export function WorldCupFloating() {
   if (live.length === 0 && nextDays.length === 0) return null;
 
   const st = makeStyles(colors);
-  const centerX = pos.x + HALF;
-  const centerY = pos.y + HALF;
-  const sideRight = centerX > W / 2;
-  const sideBottom = centerY > H / 2;
 
   function openMatch(f: WcFixture) {
-    setExpanded(false);
+    setOpen(false);
     router.push((f.campaignPostId ? `/post/${f.campaignPostId}` : "/world-cup") as `/${string}`);
   }
 
-  const cardAnchor: { left?: number; right?: number; top?: number; bottom?: number } = {};
-  if (sideRight) cardAnchor.right = 12;
-  else cardAnchor.left = 12;
-  if (sideBottom) cardAnchor.bottom = insets.bottom + 84;
-  else cardAnchor.top = insets.top + 56;
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {expanded ? (
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setExpanded(false)} />
-      ) : null}
-
-      {expanded ? (
-        <View style={[st.card, cardAnchor]}>
-          <View style={st.head}>
-            <Pressable
-              style={st.title}
-              onPress={() => {
-                setExpanded(false);
-                router.push("/world-cup" as `/${string}`);
-              }}
-            >
-              <Text style={st.trophy}>🏆</Text>
-              <Text style={st.titleText} numberOfLines={1}>
-                {wcCampaign?.name || "World Cup"}
-                {followed ? ` · ${followed}` : ""}
-              </Text>
-            </Pressable>
-            <Pressable style={st.iconBtn} onPress={() => setExpanded(false)} hitSlop={6}>
-              <Text style={st.iconBtnText}>✕</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView style={st.body} keyboardShouldPersistTaps="handled">
-            {live.map((f) => (
-              <Pressable key={f.id} style={[st.row, st.rowLive]} onPress={() => openMatch(f)}>
-                <View style={st.liveBadge}>
-                  <Text style={st.liveBadgeText}>LIVE {liveMinute(f.kickoff)}&apos;</Text>
-                </View>
-                <Text style={st.teams} numberOfLines={1}>
-                  {f.homeTeam.shortName} {f.score.home ?? 0}–{f.score.away ?? 0} {f.awayTeam.shortName}
+      {open ? (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          <View style={[st.card, { right: 12, bottom: insets.bottom + 88 }]}>
+            <View style={st.head}>
+              <Pressable
+                style={st.title}
+                onPress={() => {
+                  setOpen(false);
+                  router.push("/world-cup" as `/${string}`);
+                }}
+              >
+                <Image source={TROPHY} style={st.headTrophy} contentFit="contain" />
+                <Text style={st.titleText} numberOfLines={1}>
+                  {wcCampaign?.name || "World Cup"}
+                  {followed ? ` · ${followed}` : ""}
                 </Text>
               </Pressable>
-            ))}
-            {nextDays.map((g) => (
-              <View key={g.key}>
-                <Text style={st.dayLabel}>{g.label}</Text>
-                {g.fixtures.map((f) => (
-                  <Pressable key={f.id} style={st.row} onPress={() => openMatch(f)}>
-                    <Text style={st.teams} numberOfLines={1}>
-                      {f.homeTeam.shortName} <Text style={st.v}>v</Text> {f.awayTeam.shortName}
-                    </Text>
-                    <View style={st.timeCol}>
-                      <Text style={st.time}>{formatTime(f.kickoff)}</Text>
-                      <Text style={st.countdown}>{countdownToKickoff(f.kickoff)}</Text>
-                    </View>
-                    {f.campaignPostId ? (
-                      <View style={st.voteChip}>
-                        <Text style={st.voteChipText}>Vote</Text>
-                      </View>
-                    ) : null}
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
+              <Pressable style={st.iconBtn} onPress={() => setOpen(false)} hitSlop={6}>
+                <Text style={st.iconBtnText}>✕</Text>
+              </Pressable>
+            </View>
 
-      <Animated.View
-        {...panRef.current.panHandlers}
-        style={[st.bubble, { left: pos.x, top: pos.y, transform: [{ scale }] }]}
-      >
-        <Image
-          source={require("../assets/worldcup-trophy.png")}
-          style={st.bubbleImg}
-          contentFit="contain"
-        />
-        {live.length > 0 ? <View style={st.bubbleLiveDot} /> : null}
-      </Animated.View>
+            <ScrollView style={st.body} keyboardShouldPersistTaps="handled">
+              {live.map((f) => (
+                <Pressable key={f.id} style={[st.row, st.rowLive]} onPress={() => openMatch(f)}>
+                  <View style={st.liveBadge}>
+                    <Text style={st.liveBadgeText}>LIVE {liveMinute(f.kickoff)}&apos;</Text>
+                  </View>
+                  <Text style={st.teams} numberOfLines={1}>
+                    {f.homeTeam.shortName} {f.score.home ?? 0}–{f.score.away ?? 0} {f.awayTeam.shortName}
+                  </Text>
+                </Pressable>
+              ))}
+              {nextDays.map((g) => (
+                <View key={g.key}>
+                  <Text style={st.dayLabel}>{g.label}</Text>
+                  {g.fixtures.map((f) => (
+                    <Pressable key={f.id} style={st.row} onPress={() => openMatch(f)}>
+                      <Text style={st.teams} numberOfLines={1}>
+                        {f.homeTeam.shortName} <Text style={st.v}>v</Text> {f.awayTeam.shortName}
+                      </Text>
+                      <View style={st.timeCol}>
+                        <Text style={st.time}>{formatTime(f.kickoff)}</Text>
+                        <Text style={st.countdown}>{countdownToKickoff(f.kickoff)}</Text>
+                      </View>
+                      {f.campaignPostId ? (
+                        <View style={st.voteChip}>
+                          <Text style={st.voteChipText}>Vote</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </>
+      ) : (
+        // Half-peeking tab pinned to the right edge.
+        <Pressable
+          style={[st.tab, { top: Math.round(H * 0.46) }]}
+          onPress={() => setOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open World Cup matches"
+        >
+          <Image source={TROPHY} style={st.tabImg} contentFit="contain" />
+          {live.length > 0 ? <View style={st.tabLiveDot} /> : null}
+        </Pressable>
+      )}
     </View>
   );
-}
-
-function clampTuck(p: Pos, W: number, H: number): Pos {
-  return {
-    x: Math.max(-HALF, Math.min(p.x, W - HALF)),
-    y: Math.max(-HALF, Math.min(p.y, H - HALF)),
-  };
-}
-
-function clampVisible(p: Pos, W: number, H: number, insets: { top: number; bottom: number }): Pos {
-  return {
-    x: Math.max(8, Math.min(p.x, W - BUBBLE - 8)),
-    y: Math.max(insets.top + 8, Math.min(p.y, H - BUBBLE - insets.bottom - 8)),
-  };
 }
 
 function makeStyles(c: {
@@ -257,31 +156,43 @@ function makeStyles(c: {
   section: string;
 }) {
   return StyleSheet.create({
-    bubble: {
+    tab: {
       position: "absolute",
-      width: BUBBLE,
-      height: BUBBLE,
-      backgroundColor: "transparent",
+      right: -16,
+      width: 60,
+      height: 56,
+      borderTopLeftRadius: 28,
+      borderBottomLeftRadius: 28,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderRightWidth: 0,
+      borderColor: c.border,
       alignItems: "center",
       justifyContent: "center",
+      paddingRight: 14,
       zIndex: 1000,
+      shadowColor: "#000",
+      shadowOpacity: 0.22,
+      shadowRadius: 8,
+      shadowOffset: { width: -2, height: 2 },
+      elevation: 8,
     },
-    bubbleImg: { width: BUBBLE, height: BUBBLE },
-    bubbleLiveDot: {
+    tabImg: { width: 38, height: 38 },
+    tabLiveDot: {
       position: "absolute",
-      top: 4,
-      right: 4,
-      width: 13,
-      height: 13,
-      borderRadius: 7,
+      top: 6,
+      left: 8,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
       backgroundColor: "#ef4444",
       borderWidth: 2,
-      borderColor: "#fff",
+      borderColor: c.card,
     },
     card: {
       position: "absolute",
-      width: 250,
-      maxWidth: "78%",
+      width: 252,
+      maxWidth: "80%",
       backgroundColor: c.card,
       borderWidth: 1,
       borderColor: c.border,
@@ -303,7 +214,7 @@ function makeStyles(c: {
       backgroundColor: c.accent,
     },
     title: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
-    trophy: { fontSize: 14 },
+    headTrophy: { width: 22, height: 22 },
     titleText: { color: "#fff", fontWeight: "800", fontSize: 13, flexShrink: 1 },
     iconBtn: {
       width: 24,
