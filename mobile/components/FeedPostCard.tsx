@@ -395,47 +395,82 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		compareWrap: { flexDirection: 'row' as const, gap: 3 },
 		compareCell: { flex: 1, height: IMG_H, overflow: 'hidden' as const },
 		compareCellLoser: { opacity: 0.5 },
+		// Colored glow border on the cell the viewer picked (mirrors web's
+		// `box-shadow: inset 0 0 0 3px <optionColor>`).
+		compareCellPicked: { borderWidth: 2.5 },
 		compareImg: { width: '100%' as const, height: '100%' as const },
 		pctOverlay: {
 			position: 'absolute' as const,
 			bottom: 0,
 			left: 0,
 			right: 0,
-			paddingVertical: 10,
-			paddingHorizontal: 10,
-			backgroundColor: 'rgba(0,0,0,0.55)',
+			paddingTop: 16,
+			paddingBottom: 9,
+			paddingHorizontal: 8,
+			backgroundColor: 'rgba(15,23,42,0.6)',
 			alignItems: 'center' as const,
+		},
+		// Percentage shown inside a glassy rounded pill (web `ig-compare-pct-main`).
+		pctMainPill: {
+			minWidth: 52,
+			paddingHorizontal: 11,
+			paddingVertical: 3,
+			borderRadius: 999,
+			backgroundColor: 'rgba(2,6,23,0.55)',
+			borderWidth: 1,
+			borderColor: 'rgba(255,255,255,0.22)',
+			alignItems: 'center' as const,
+			justifyContent: 'center' as const,
 		},
 		pctText: {
 			color: '#ffffff',
-			fontSize: 20,
+			fontSize: 18,
 			fontWeight: '900' as const,
 			letterSpacing: -0.5,
 		},
 		pctLabel: {
-			color: 'rgba(255,255,255,0.75)',
+			color: 'rgba(255,255,255,0.92)',
 			fontSize: 11,
-			marginTop: 2,
+			marginTop: 4,
 			fontWeight: '600' as const,
+			textAlign: 'center' as const,
+		},
+		// Per-cell progress meter under the label (web `ig-compare-meter`).
+		compareMeter: {
+			width: '82%' as const,
+			height: 6,
+			borderRadius: 999,
+			backgroundColor: 'rgba(255,255,255,0.24)',
+			overflow: 'hidden' as const,
+			marginTop: 6,
+		},
+		compareMeterFill: {
+			height: '100%' as const,
+			borderRadius: 999,
 		},
 		votedBadgeRow: {
 			position: 'absolute' as const,
-			top: 12,
-			left: 0,
-			right: 0,
-			alignItems: 'center' as const,
+			top: 8,
+			left: 8,
+			alignItems: 'flex-start' as const,
 		},
+		// Glassy green "VOTED" pin, top-left (mirrors web `cx-voted-pin`).
 		votedBadge: {
-			backgroundColor: GREEN,
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 4,
+			backgroundColor: 'rgba(16,185,129,0.32)',
 			borderRadius: 99,
-			paddingHorizontal: 12,
-			paddingVertical: 5,
+			borderWidth: 1,
+			borderColor: 'rgba(110,231,183,0.55)',
+			paddingHorizontal: 9,
+			paddingVertical: 4,
 		},
 		votedBadgeText: {
-			color: '#ffffff',
+			color: '#eafff5',
 			fontSize: 11,
 			fontWeight: '800' as const,
-			letterSpacing: 0.5,
+			letterSpacing: 0.6,
 		},
 		winnerBadgeRow: {
 			position: 'absolute' as const,
@@ -2116,6 +2151,7 @@ function FeedPostCardComponent({
 									(stat?.count ?? 0) > 0 &&
 									stat?.count === maxCount;
 								const isLoser = isVotingClosed && !isWinner;
+								const optionColor = MULTI_SPLIT_COLORS[i % 10];
 								return (
 									<Animated.View
 										key={`${post.id}-multi-${i}`}
@@ -2123,6 +2159,11 @@ function FeedPostCardComponent({
 											styles.multiCell,
 											{ width: multiCellWidth, height: multiCellWidth },
 											isLoser && { opacity: 0.5 },
+											isVoted &&
+												!isVotingClosed && [
+													st.compareCellPicked,
+													{ borderColor: optionColor },
+												],
 											{ transform: [{ scale: cellScale[i] }] },
 										]}>
 										<Pressable
@@ -2140,10 +2181,23 @@ function FeedPostCardComponent({
 												cachePolicy='memory-disk'
 											/>
 											<View style={st.pctOverlay}>
-												<Text style={st.pctText}>{pct}%</Text>
+												<View style={st.pctMainPill}>
+													<Text style={st.pctText}>{pct}%</Text>
+												</View>
 												<Text style={st.pctLabel} numberOfLines={1}>
 													{label}
 												</Text>
+												<View style={st.compareMeter}>
+													<View
+														style={[
+															st.compareMeterFill,
+															{
+																width: `${Math.max(0, Math.min(100, pct))}%`,
+																backgroundColor: optionColor,
+															},
+														]}
+													/>
+												</View>
 											</View>
 											<Animated.View
 												pointerEvents='none'
@@ -2194,12 +2248,18 @@ function FeedPostCardComponent({
 							const pct = i === 0 ? leftPct : rightPct;
 							const label = compareLabel(post, i);
 							const isWinner = isBinaryWinnerSide(i as 0 | 1);
+							const optionColor = MULTI_SPLIT_COLORS[i % 10];
 							return (
 								<Animated.View
 									key={`${post.id}-${i}`}
 									style={[
 										st.compareCell,
 										isVotingClosed && !isWinner && st.compareCellLoser,
+										picked &&
+											!isVotingClosed && [
+												st.compareCellPicked,
+												{ borderColor: optionColor },
+											],
 										{
 											transform: [{ scale: cellScale[i] }],
 											// Once closed, drop the animated vote-dim and let the
@@ -2225,10 +2285,23 @@ function FeedPostCardComponent({
 											cachePolicy='memory-disk'
 										/>
 										<View style={st.pctOverlay}>
-											<Text style={st.pctText}>{pct}%</Text>
+											<View style={st.pctMainPill}>
+												<Text style={st.pctText}>{pct}%</Text>
+											</View>
 											<Text style={st.pctLabel} numberOfLines={1}>
 												{label}
 											</Text>
+											<View style={st.compareMeter}>
+												<View
+													style={[
+														st.compareMeterFill,
+														{
+															width: `${Math.max(0, Math.min(100, pct))}%`,
+															backgroundColor: optionColor,
+														},
+													]}
+												/>
+											</View>
 										</View>
 										{/* Vote flash */}
 										<Animated.View
