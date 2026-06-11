@@ -13,6 +13,8 @@ export type WcFixture = {
   awayTeam: WcTeam;
   kickoff: string;
   status: string;
+  /** Live match minute from the provider while IN_PLAY/PAUSED; null otherwise. */
+  minute?: number | null;
   stage: string;
   group: string | null;
   matchday: number | null;
@@ -39,8 +41,21 @@ export const WC_STAGE_LABELS: Record<string, string> = {
   FINAL: "Final",
 };
 
+// Covers 90' + half-time + stoppage + extra time + penalties, with buffer.
+const LIVE_WINDOW_MS = 150 * 60 * 1000;
+
 export function isLive(f: WcFixture): boolean {
-  return f.status === "IN_PLAY" || f.status === "PAUSED";
+  if (f.status === "IN_PLAY" || f.status === "PAUSED") return true;
+  if (f.status === "FINISHED") return false;
+  // The provider's status often lags (free-tier sync delay), leaving a kicked-off
+  // match stuck on TIMED. Without this, such a match is neither "upcoming"
+  // (kickoff passed) nor "live" nor "finished" — so it vanishes from every
+  // section. Treat "kicked off, not finished, still within the match window" as
+  // live so it shows up instead of disappearing.
+  const ko = new Date(f.kickoff).getTime();
+  if (Number.isNaN(ko)) return false;
+  const now = Date.now();
+  return ko <= now && now < ko + LIVE_WINDOW_MS;
 }
 
 export function isFinished(f: WcFixture): boolean {

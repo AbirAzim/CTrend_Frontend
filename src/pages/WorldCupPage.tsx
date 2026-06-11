@@ -15,14 +15,19 @@ import {
   isLive,
   isUpcoming,
   liveFixtures,
-  liveMinute,
   upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
 
 function StatusBadge({ fixture }: { fixture: WcFixture }) {
   if (isLive(fixture)) {
-    return <span className="wc-badge wc-badge--live">LIVE {liveMinute(fixture.kickoff)}&apos;</span>;
+    // `minute` is the provider's real elapsed minute (null until the backend
+    // syncs a live status); fall back to a plain "LIVE" when it isn't there.
+    return (
+      <span className="wc-badge wc-badge--live">
+        {fixture.minute != null ? `LIVE ${fixture.minute}'` : "LIVE"}
+      </span>
+    );
   }
   if (isFinished(fixture)) {
     return <span className="wc-badge wc-badge--finished">FT</span>;

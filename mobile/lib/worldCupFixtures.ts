@@ -11,6 +11,8 @@ export type WcFixture = {
   awayTeam: WcTeam;
   kickoff: string;
   status: string;
+  /** Live match minute from the provider while IN_PLAY/PAUSED; null otherwise. */
+  minute?: number | null;
   stage: string;
   group: string | null;
   matchday: number | null;
@@ -36,8 +38,18 @@ export const WC_STAGE_LABELS: Record<string, string> = {
   FINAL: "Final",
 };
 
+// Covers 90' + half-time + stoppage + extra time + penalties, with buffer.
+const LIVE_WINDOW_MS = 150 * 60 * 1000;
+
 export function isLive(f: WcFixture): boolean {
-  return f.status === "IN_PLAY" || f.status === "PAUSED";
+  if (f.status === "IN_PLAY" || f.status === "PAUSED") return true;
+  if (f.status === "FINISHED") return false;
+  // Provider status can lag; treat a kicked-off, not-finished match within the
+  // match window as live so it doesn't vanish from every section.
+  const ko = new Date(f.kickoff).getTime();
+  if (Number.isNaN(ko)) return false;
+  const now = Date.now();
+  return ko <= now && now < ko + LIVE_WINDOW_MS;
 }
 
 export function isFinished(f: WcFixture): boolean {

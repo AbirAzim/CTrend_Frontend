@@ -17,7 +17,6 @@ import {
   isFinished,
   isLive,
   liveFixtures,
-  liveMinute,
   upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
@@ -64,7 +63,7 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
 
       <View style={st.center}>
         {live ? (
-          <Text style={st.liveBadge}>LIVE {liveMinute(fixture.kickoff)}&apos;</Text>
+          <Text style={st.liveBadge}>{fixture.minute != null ? `LIVE ${fixture.minute}'` : "LIVE"}</Text>
         ) : finished ? (
           <Text style={st.ftBadge}>FT</Text>
         ) : null}

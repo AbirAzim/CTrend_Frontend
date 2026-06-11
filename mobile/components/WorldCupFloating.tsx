@@ -15,7 +15,6 @@ import {
   groupByDay,
   involvesTeam,
   liveFixtures,
-  liveMinute,
   nextUpcoming,
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
@@ -180,7 +179,7 @@ export function WorldCupFloating() {
               {live.map((f) => (
                 <Pressable key={f.id} style={[st.row, st.rowLive]} onPress={() => openMatch(f)}>
                   <View style={st.liveBadge}>
-                    <Text style={st.liveBadgeText}>LIVE {liveMinute(f.kickoff)}&apos;</Text>
+                    <Text style={st.liveBadgeText}>{f.minute != null ? `LIVE ${f.minute}'` : "LIVE"}</Text>
                   </View>
                   <Text style={st.teams} numberOfLines={1}>
                     {f.homeTeam.shortName} {f.score.home ?? 0}–{f.score.away ?? 0} {f.awayTeam.shortName}
