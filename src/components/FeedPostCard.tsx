@@ -1861,29 +1861,15 @@ function FeedPostCardComponent({
                 <span className="cx-voting-ended-strip-lock">🔒</span>
               </div>
             )}
-            {/* Floating vote-status chip — binary compare only */}
-            {!isVotingClosed && isBinaryCompare && (
+            {/* Floating "Cast Vote" prompt — binary compare, only while the
+                viewer hasn't voted. Once voted, the green "VOTED" pin on the
+                chosen cell is the single indicator (no duplicate chip). */}
+            {!isVotingClosed && isBinaryCompare && !hasVoted && (
               <span
-                className={`cx-vote-status-chip cx-vote-status-chip--overlay${
-                  hasVoted
-                    ? " cx-vote-status-chip--voted" +
-                      (viewer === "DOWN"
-                        ? " cx-vote-status-chip--side-b cx-vote-status-chip--pos-right"
-                        : " cx-vote-status-chip--pos-left")
-                    : " cx-vote-status-chip--pending"
-                }`}
-                aria-label={hasVoted ? "You have voted on this post" : "You haven't voted yet"}
+                className="cx-vote-status-chip cx-vote-status-chip--overlay cx-vote-status-chip--pending"
+                aria-label="You haven't voted yet"
               >
-                {hasVoted ? (
-                  <>
-                    <svg viewBox="0 0 14 14" fill="currentColor" width="10" height="10" aria-hidden style={{opacity: 0.9}}>
-                      <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
-                    </svg>
-                    Voted
-                  </>
-                ) : (
-                  "Cast Vote"
-                )}
+                Cast Vote
               </span>
             )}
             {isBinaryCompare &&
