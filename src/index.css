@@ -2902,8 +2902,10 @@ a.cx-friend-avatar:hover {
   padding: 0;
   box-sizing: border-box;
 }
-/* 2-image compare: each half-width cell renders ~4:5 portrait (was too tall). */
-.ig-post-media-wrap--compare:not(.ig-post-media-wrap--compare-grid) {
+/* 2-image compare only: each half-width cell renders ~4:5 portrait. Multi-image
+   (--compare-rows) must NOT get this fixed ratio, or its extra rows get clipped
+   by overflow:hidden — its height comes from the stacked square rows instead. */
+.ig-post-media-wrap--compare:not(.ig-post-media-wrap--compare-grid):not(.ig-post-media-wrap--compare-rows) {
   aspect-ratio: 8 / 5;
 }
 
@@ -15211,15 +15213,28 @@ a.cx-profile-btn-accent {
 
   .admin-table--stack .admin-action-links-row,
   .admin-table--stack .admin-action-links {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     align-items: stretch;
     justify-content: flex-start;
+    gap: 8px;
   }
 
+  /* Two actions sit side-by-side (each ~half); 3+ wrap to the next line —
+     cleaner than a stack of full-width boxes. */
   .admin-table--stack .admin-action-link {
-    width: 100%;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
     box-sizing: border-box;
-    white-space: normal;
+    white-space: nowrap;
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
+  /* Color swatch + label hug the right edge instead of floating mid-row. */
+  .admin-table--stack .admin-cat-color {
+    justify-content: flex-end;
+    flex: 1;
   }
 
   .admin-table--stack .admin-table-num {
