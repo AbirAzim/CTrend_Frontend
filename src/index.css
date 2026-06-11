@@ -3991,55 +3991,38 @@ a.cx-friend-avatar:hover {
 /* ── 3. Voted pin — persistent corner star badge on the chosen image ─── */
 /* Gradient circle with a ★ star inside — "my pick", no text, no rings */
 @keyframes cx-voted-pin-in {
-  0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
-  55%  { transform: scale(1.2) rotate(8deg);  opacity: 1; }
-  75%  { transform: scale(0.91) rotate(-3deg); }
-  100% { transform: scale(1) rotate(0deg);    opacity: 1; }
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
 }
 
+/* "VOTED" badge — top-left of the chosen image so it never covers the
+   subject's face. Greenish glassy/transparent pill, uniform for every option
+   (mirrors the mobile app's voted UI). */
 .cx-voted-pin {
   position: absolute;
-  /* Lower-right of the image, above the percentage overlay */
-  bottom: 60px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  /* default: light emerald (binary-a / classic bar) */
-  background: linear-gradient(135deg, #10b981, #6ee7b7);
-  border: 2.5px solid rgba(255 255 255 / 0.92);
-  box-shadow:
-    0 3px 12px rgba(52 211 153 / 0.5),
-    0 0 0 4px rgba(52 211 153 / 0.18);
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(110, 231, 183, 0.55);
+  -webkit-backdrop-filter: blur(7px) saturate(1.1);
+  backdrop-filter: blur(7px) saturate(1.1);
+  color: #eafff5;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(6, 78, 59, 0.35);
   pointer-events: none;
   z-index: 7;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #065f46;
-  animation: cx-voted-pin-in 0.52s var(--cx-ease-spring) forwards;
+  white-space: nowrap;
+  animation: cx-voted-pin-in 0.5s var(--cx-ease-spring) forwards;
 }
-
-/* Binary-B picked: light orange to match the right-side vote colour */
-.ig-compare-cell--binary-b .cx-voted-pin {
-  background: linear-gradient(135deg, #fb923c, #fdba74);
-  color: #7c2d12;
-  box-shadow:
-    0 3px 12px rgba(251 146 60 / 0.5),
-    0 0 0 4px rgba(251 146 60 / 0.2);
-}
-
-/* Per-option voted-pin colors */
-.ig-compare-cell--multi-0 .cx-voted-pin { background: linear-gradient(135deg, #34d399, #6ee7b7); color: #064e3b; box-shadow: 0 3px 12px rgba(52 211 153 / 0.5), 0 0 0 4px rgba(52 211 153 / 0.2); }
-.ig-compare-cell--multi-1 .cx-voted-pin { background: linear-gradient(135deg, #fb923c, #fed7aa); color: #7c2d12; box-shadow: 0 3px 12px rgba(251 146 60 / 0.5), 0 0 0 4px rgba(251 146 60 / 0.2); }
-.ig-compare-cell--multi-2 .cx-voted-pin { background: linear-gradient(135deg, #a78bfa, #ddd6fe); color: #3b0764; box-shadow: 0 3px 12px rgba(167 139 250 / 0.5), 0 0 0 4px rgba(167 139 250 / 0.2); }
-.ig-compare-cell--multi-3 .cx-voted-pin { background: linear-gradient(135deg, #fb7185, #fecdd3); color: #881337; box-shadow: 0 3px 12px rgba(251 113 133 / 0.5), 0 0 0 4px rgba(251 113 133 / 0.2); }
-.ig-compare-cell--multi-4 .cx-voted-pin { background: linear-gradient(135deg, #fbbf24, #fde68a); color: #78350f; box-shadow: 0 3px 12px rgba(251 191 36 / 0.5), 0 0 0 4px rgba(251 191 36 / 0.2); }
-.ig-compare-cell--multi-5 .cx-voted-pin { background: linear-gradient(135deg, #22d3ee, #a5f3fc); color: #164e63; box-shadow: 0 3px 12px rgba(34 211 238 / 0.5), 0 0 0 4px rgba(34 211 238 / 0.2); }
-.ig-compare-cell--multi-6 .cx-voted-pin { background: linear-gradient(135deg, #a3e635, #d9f99d); color: #1a2e05; box-shadow: 0 3px 12px rgba(163 230 53 / 0.5), 0 0 0 4px rgba(163 230 53 / 0.2); }
-.ig-compare-cell--multi-7 .cx-voted-pin { background: linear-gradient(135deg, #14b8a6, #99f6e4); color: #042f2e; box-shadow: 0 3px 12px rgba(20 184 166 / 0.5), 0 0 0 4px rgba(20 184 166 / 0.2); }
-.ig-compare-cell--multi-8 .cx-voted-pin { background: linear-gradient(135deg, #38bdf8, #bae6fd); color: #082f49; box-shadow: 0 3px 12px rgba(56 189 248 / 0.5), 0 0 0 4px rgba(56 189 248 / 0.2); }
-.ig-compare-cell--multi-9 .cx-voted-pin { background: linear-gradient(135deg, #e879f9, #f5d0fe); color: #4a044e; box-shadow: 0 3px 12px rgba(232 121 249 / 0.5), 0 0 0 4px rgba(232 121 249 / 0.2); }
 
 /* ── 4. Unchosen cells dim when user has voted ───────────────────────── */
 /* Your choice "spotlights" — everything else steps back */

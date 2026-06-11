@@ -1923,9 +1923,10 @@ function FeedPostCardComponent({
                     {/* Permanent "your pick" seal — top-right corner pin */}
                     {picked && !isVotingClosed && (
                       <span className="cx-voted-pin" aria-label="Your choice">
-                        <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
-                          <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
+                        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" width="11" height="11" aria-hidden>
+                          <path d="M2.5 7.5 5.5 10.5 11.5 4" />
                         </svg>
+                        VOTED
                       </span>
                     )}
                     {/* One-shot light flash on vote */}
@@ -1993,9 +1994,10 @@ function FeedPostCardComponent({
                         />
                         {picked && !isVotingClosed && (
                           <span className="cx-voted-pin" aria-label="Your choice">
-                            <svg viewBox="0 0 14 14" fill="currentColor" width="12" height="12" aria-hidden>
-                              <path d="M7 12.5C7 12.5 1 8.5 1 4.5A3 3 0 0 1 7 3.1 3 3 0 0 1 13 4.5C13 8.5 7 12.5 7 12.5Z"/>
+                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" width="11" height="11" aria-hidden>
+                              <path d="M2.5 7.5 5.5 10.5 11.5 4" />
                             </svg>
+                            VOTED
                           </span>
                         )}
                         {justVotedIndex === i && !isVotingClosed && (
