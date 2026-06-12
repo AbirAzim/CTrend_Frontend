@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   FlatList,
   Modal,
   PanResponder,
@@ -477,11 +478,40 @@ export default function ChatScreen() {
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlatList<Message>>(null);
+  const appStateRef = useRef(AppState.currentState);
+
+  const client = useApolloClient();
 
   // Clear any in-progress reply when switching conversations
   useEffect(() => {
     setReplyTarget(null);
   }, [conversationId]);
+
+  // Catch messages that arrived while the phone was locked (WebSocket was suspended).
+  // On foreground resume, re-fetch the latest page and merge any unseen messages.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === "active" && conversationId) {
+        void client.query<MessagesData>({
+          query: GET_MESSAGES,
+          variables: { conversationId, skip: 0, take: PAGE_SIZE },
+          fetchPolicy: "network-only",
+        }).then(({ data }) => {
+          const fresh = [...(data.messages ?? [])].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          setMessages((prev) => {
+            const newMsgs = fresh.filter((m) => !seenIds.current.has(m.id));
+            if (newMsgs.length === 0) return prev;
+            newMsgs.forEach((m) => seenIds.current.add(m.id));
+            return [...newMsgs, ...prev];
+          });
+        }).catch(() => {});
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [client, conversationId]);
 
   // ── Fetch conversation metadata for header ──────────────────────────────────
   const { data: convsData } = useQuery<ConversationsData>(MY_CONVERSATIONS, {
@@ -874,7 +904,6 @@ export default function ChatScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const client = useApolloClient();
   const typingLabel = Array.from(typingUsers.values()).join(", ");
   const canSend = (text.trim().length > 0 || imageUri !== null) && !sending && !imageUploading;
 
