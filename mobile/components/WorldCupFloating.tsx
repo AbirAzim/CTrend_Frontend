@@ -41,7 +41,7 @@ type CampaignsData = { activeCampaigns: Campaign[] };
 
 const TAB_W = 72;
 const TAB_H = 52;
-const IDLE_OPACITY = 0.72;
+const IDLE_OPACITY = 0.5;
 
 export function WorldCupFloating() {
   const { colors } = useTheme();
@@ -74,6 +74,7 @@ export function WorldCupFloating() {
 
   const dragY = useRef(new Animated.Value(defaultY)).current;
   const tabOpacity = useRef(new Animated.Value(IDLE_OPACITY)).current;
+  const blinkAnim = useRef(new Animated.Value(1)).current;
   const lastOffsetY = useRef(defaultY);
   const atEdge = useRef(false);
 
@@ -154,10 +155,28 @@ export function WorldCupFloating() {
   const nextDays = groupByDay(nextUpcoming(filtered, 3));
   const recent = finishedFixtures(filtered).slice(0, 3);
 
+  // Flags are only shown when a match is live; trophy otherwise.
+  const liveFixture = live[0] ?? null;
+
+  // Blink the flags whenever a live match is ongoing — must be before early returns.
+  useEffect(() => {
+    if (!liveFixture) {
+      blinkAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, { toValue: 0.3, duration: 550, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 1, duration: 550, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [liveFixture?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!wcCampaign) return null;
   if (live.length === 0 && nextDays.length === 0 && recent.length === 0) return null;
 
-  const previewFixture = live[0] ?? upcomingFixtures(filtered)[0] ?? null;
   const st = makeStyles(colors);
 
   function openMatch(f: WcFixture) {
@@ -271,16 +290,18 @@ export function WorldCupFloating() {
             accessibilityRole="button"
             accessibilityLabel="Open World Cup fixtures. Drag to move."
           >
-            {previewFixture ? (
-              <View style={st.tabFlags}>
-                {previewFixture.homeTeam.crest
-                  ? <Image source={{ uri: previewFixture.homeTeam.crest }} style={st.tabFlag} contentFit="contain" />
-                  : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(previewFixture.homeTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
-                <Text style={st.tabFlagSep}>v</Text>
-                {previewFixture.awayTeam.crest
-                  ? <Image source={{ uri: previewFixture.awayTeam.crest }} style={st.tabFlag} contentFit="contain" />
-                  : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(previewFixture.awayTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
-              </View>
+            {liveFixture ? (
+              <Animated.View style={{ opacity: blinkAnim }}>
+                <View style={st.tabFlags}>
+                  {liveFixture.homeTeam.crest
+                    ? <Image source={{ uri: liveFixture.homeTeam.crest }} style={st.tabFlag} contentFit="contain" />
+                    : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(liveFixture.homeTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
+                  <Text style={st.tabFlagSep}>v</Text>
+                  {liveFixture.awayTeam.crest
+                    ? <Image source={{ uri: liveFixture.awayTeam.crest }} style={st.tabFlag} contentFit="contain" />
+                    : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(liveFixture.awayTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
+                </View>
+              </Animated.View>
             ) : (
               <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
             )}
@@ -307,17 +328,10 @@ function makeStyles(c: {
       width: TAB_W,
       height: TAB_H,
       borderRadius: 16,
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.border,
+      backgroundColor: "transparent",
       alignItems: "center",
       justifyContent: "center",
       zIndex: 1000,
-      shadowColor: "#000",
-      shadowOpacity: 0.22,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 8,
     },
     tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
     tabImg: { width: 36, height: 36 },

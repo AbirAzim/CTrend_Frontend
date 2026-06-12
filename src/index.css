@@ -20127,22 +20127,22 @@ a.cx-profile-btn-accent {
   position: fixed;
   width: 58px;
   height: 56px;
-  border: 1px solid var(--ig-border);
+  border: none;
   border-radius: 14px;
-  background: var(--ig-surface, #fff);
+  background: transparent;
   z-index: 1000;
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
-  transition: box-shadow 0.15s ease, opacity 0.15s ease;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
   user-select: none;
   touch-action: none;
 }
-:root[data-theme="dark"] .wc-tab { background: #1b1d22; }
-.wc-tab:hover { box-shadow: 0 6px 20px rgb(0 0 0 / 0.26); opacity: 1 !important; }
-.wc-tab--dragging { cursor: grabbing; box-shadow: 0 10px 28px rgb(0 0 0 / 0.32); opacity: 1 !important; }
+:root[data-theme="dark"] .wc-tab { background: transparent; }
+.wc-tab:hover { opacity: 1 !important; }
+.wc-tab--dragging { cursor: grabbing; opacity: 1 !important; }
 .wc-tab-img {
   width: 38px;
   height: 38px;
@@ -20174,6 +20174,7 @@ a.cx-profile-btn-accent {
 }
 .wc-tab-flag-sep { font-size: 0.6rem; font-weight: 700; color: var(--ig-text-muted); }
 .wc-tab--live { border-color: rgb(239 68 68 / 0.6); }
+.wc-tab--live .wc-tab-flags { animation: wc-tab-pulse 1.1s ease-in-out infinite; }
 .wc-tab--live::after {
   content: "";
   position: absolute;

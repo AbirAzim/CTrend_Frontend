@@ -15,7 +15,6 @@ import {
   liveFixtures,
   needsSecondTick,
   nextUpcoming,
-  upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
 
@@ -112,8 +111,8 @@ export function WorldCupFloating() {
   if (!wcCampaign) return null;
   if (live.length === 0 && nextDays.length === 0 && recent.length === 0) return null;
 
-  // Next upcoming/live fixture for flag display in the tab
-  const previewFixture = live[0] ?? upcomingFixtures(filtered)[0] ?? null;
+  // Flags are only shown when a match is live; trophy otherwise.
+  const liveFixture = live[0] ?? null;
 
   function openMatch(f: WcFixture) {
     setOpen(false);
@@ -165,15 +164,15 @@ export function WorldCupFloating() {
         aria-label="Open World Cup fixtures — drag to move"
         onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
       >
-        {previewFixture ? (
+        {liveFixture ? (
           <div className="wc-tab-flags">
-            {previewFixture.homeTeam.crest
-              ? <img src={previewFixture.homeTeam.crest} className="wc-tab-flag" alt={previewFixture.homeTeam.shortName ?? ""} />
-              : <span className="wc-tab-flag wc-tab-flag--ph">{(previewFixture.homeTeam.shortName ?? "?").slice(0, 2)}</span>}
+            {liveFixture.homeTeam.crest
+              ? <img src={liveFixture.homeTeam.crest} className="wc-tab-flag" alt={liveFixture.homeTeam.shortName ?? ""} />
+              : <span className="wc-tab-flag wc-tab-flag--ph">{(liveFixture.homeTeam.shortName ?? "?").slice(0, 2)}</span>}
             <span className="wc-tab-flag-sep">v</span>
-            {previewFixture.awayTeam.crest
-              ? <img src={previewFixture.awayTeam.crest} className="wc-tab-flag" alt={previewFixture.awayTeam.shortName ?? ""} />
-              : <span className="wc-tab-flag wc-tab-flag--ph">{(previewFixture.awayTeam.shortName ?? "?").slice(0, 2)}</span>}
+            {liveFixture.awayTeam.crest
+              ? <img src={liveFixture.awayTeam.crest} className="wc-tab-flag" alt={liveFixture.awayTeam.shortName ?? ""} />
+              : <span className="wc-tab-flag wc-tab-flag--ph">{(liveFixture.awayTeam.shortName ?? "?").slice(0, 2)}</span>}
           </div>
         ) : (
           <img src="/worldcup-trophy.png" className="wc-tab-img" alt="" />
