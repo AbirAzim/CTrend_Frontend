@@ -108,7 +108,7 @@ export function WorldCupFloating() {
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
   const live = liveFixtures(filtered);
   const nextDays = groupByDay(nextUpcoming(filtered, 3));
-  const recent = finishedFixtures(filtered).slice(0, 3);
+  const recent = finishedFixtures(filtered).slice(0, 2);
 
   if (!wcCampaign) return null;
   if (live.length === 0 && nextDays.length === 0 && recent.length === 0) return null;

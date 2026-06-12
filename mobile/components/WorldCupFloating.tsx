@@ -30,7 +30,6 @@ import {
   liveFixtures,
   needsSecondTick,
   nextUpcoming,
-  upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
 import trophyAsset from "../assets/worldcup-trophy.png";
@@ -155,7 +154,7 @@ export function WorldCupFloating() {
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
   const live = liveFixtures(filtered);
   const nextDays = groupByDay(nextUpcoming(filtered, 3));
-  const recent = finishedFixtures(filtered).slice(0, 3);
+  const recent = finishedFixtures(filtered).slice(0, 2);
 
   // Flags are only shown when a match is live; trophy otherwise.
   const liveFixture = live[0] ?? null;

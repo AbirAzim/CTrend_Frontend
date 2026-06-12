@@ -1955,7 +1955,6 @@ function FeedPostCardComponent({
 	const categoryName = post.category?.name?.trim();
 
 	// Campaign match lifecycle
-	const campaignHasWinner = Boolean(campaign?.hasWinner);
 	const isMatchPost = Boolean(post.matchType);
 	const showCampaignWinner = Boolean(post.campaignWinner) && isMatchPost;
 	const campaignWinnerOptionLabel =
