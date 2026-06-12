@@ -140,12 +140,26 @@ export function formatDayTime(iso: string): string {
 export function countdownToKickoff(iso: string): string {
   const ms = new Date(iso).getTime() - Date.now();
   if (ms <= 0) return "Kicking off";
-  const mins = Math.floor(ms / 60000);
+  if (ms < 60_000) return `in ${Math.floor(ms / 1000)}s`;
+  const mins = Math.floor(ms / 60_000);
   if (mins < 60) return `in ${mins}m`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `in ${hours}h ${mins % 60}m`;
   const days = Math.floor(hours / 24);
   return `in ${days}d ${hours % 24}h`;
+}
+
+export function needsSecondTick(fixtures: WcFixture[]): boolean {
+  return fixtures.some((f) => {
+    const ms = new Date(f.kickoff).getTime() - Date.now();
+    return ms > 0 && ms < 60_000;
+  });
+}
+
+export function finishedFixtures(fixtures: WcFixture[]): WcFixture[] {
+  return fixtures.filter(isFinished).sort(
+    (a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime(),
+  );
 }
 
 export function liveMinute(iso: string): number {

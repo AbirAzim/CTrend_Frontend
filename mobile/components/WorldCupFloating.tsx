@@ -3,7 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  Vibration,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
@@ -11,11 +21,14 @@ import { useTheme } from "../context/ThemeContext";
 import {
   type WcFixture,
   countdownToKickoff,
+  finishedFixtures,
   formatTime,
   groupByDay,
   involvesTeam,
   liveFixtures,
+  needsSecondTick,
   nextUpcoming,
+  upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
 import trophyAsset from "../assets/worldcup-trophy.png";
@@ -24,51 +37,68 @@ type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: bool
 type FixturesData = { worldCupFixtures: WcFixture[] };
 type CampaignsData = { activeCampaigns: Campaign[] };
 
-/**
- * Fixed World Cup trophy tab pinned to the right edge (half-peeking). Tap to
- * slide out the live/upcoming card; the tab hides while the card is open.
- */
+const TAB_W = 72;
+const TAB_H = 52;
+const IDLE_OPACITY = 0.72;
+
 export function WorldCupFloating() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const followed = useFollowedTeam();
-  const { height: H } = useWindowDimensions();
+  const { width: W, height: H } = useWindowDimensions();
 
   const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
+  const [hintVisible, setHintVisible] = useState(false);
+
+  // Adaptive tick
+  const allFixturesRef = useRef<WcFixture[]>([]);
   useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 30_000);
-    return () => clearInterval(t);
+    let id: ReturnType<typeof setTimeout>;
+    function schedule() {
+      const fast = needsSecondTick(allFixturesRef.current);
+      id = setTimeout(() => { setTick((n) => n + 1); schedule(); }, fast ? 1000 : 30_000);
+    }
+    schedule();
+    return () => clearTimeout(id);
   }, []);
 
-  // ── Draggable, semi-transparent edge tab ──────────────────────────────────
-  // The tab can be dragged up/down so it never permanently blocks content, and
-  // it sits at reduced opacity while idle (full opacity while touched). The drop
-  // position is remembered across sessions.
-  const TAB_H = 56;
-  const IDLE_OPACITY = 0.55;
-  const baseTop = Math.round(H * 0.46);
-  const minRel = insets.top + 8 - baseTop;
-  const maxRel = H - insets.bottom - TAB_H - 92 - baseTop;
-  const minRelRef = useRef(minRel);
-  const maxRelRef = useRef(maxRel);
-  minRelRef.current = minRel;
-  maxRelRef.current = maxRel;
-  const dragY = useRef(new Animated.Value(0)).current;
+  // ── 2D draggable tab ─────────────────────────────────────────────────────────
+  const minX = 0;
+  const maxX = W - TAB_W;
+  const minY = insets.top + 8;
+  const maxY = H - insets.bottom - TAB_H - 92;
+
+  const defaultX = W - TAB_W - 10;       // fully visible, 10 from right edge
+  const defaultY = Math.round(H * 0.46); // ~mid-screen vertically
+
+  const dragXY = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const tabOpacity = useRef(new Animated.Value(IDLE_OPACITY)).current;
-  const lastOffset = useRef(0);
-  // Tracks whether the tab is currently pinned to a clamp edge, so the edge
-  // "bump" haptic fires once on arrival rather than every move frame.
+  const lastOffset = useRef({ x: defaultX, y: defaultY });
   const atEdge = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem("ctrend_wc_tab_y").then((v) => {
-      if (v == null) return;
-      const rel = Number(v);
-      if (Number.isNaN(rel)) return;
-      const clamped = Math.max(minRelRef.current, Math.min(maxRelRef.current, rel));
-      lastOffset.current = clamped;
-      dragY.setValue(clamped);
+    AsyncStorage.getItem("ctrend_wc_tab_pos_2d").then((v) => {
+      let cx = defaultX;
+      let cy = defaultY;
+      if (v) {
+        try {
+          const p = JSON.parse(v) as { x: number; y: number };
+          cx = Math.max(minX, Math.min(maxX, p.x));
+          cy = Math.max(minY, Math.min(maxY, p.y));
+        } catch { /* ignore */ }
+      }
+      lastOffset.current = { x: cx, y: cy };
+      dragXY.setValue({ x: cx, y: cy });
+    });
+    AsyncStorage.getItem("ctrend_wc_hint_seen").then((v) => {
+      if (!v) {
+        setHintVisible(true);
+        setTimeout(() => {
+          setHintVisible(false);
+          void AsyncStorage.setItem("ctrend_wc_hint_seen", "1");
+        }, 3000);
+      }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -77,47 +107,47 @@ export function WorldCupFloating() {
 
   const pan = useRef(
     PanResponder.create({
-      // Tap falls through to the inner Pressable; only a real vertical drag grabs it.
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+        (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6),
       onPanResponderGrant: () => {
-        dragY.setOffset(lastOffset.current);
-        dragY.setValue(0);
+        dragXY.setOffset(lastOffset.current);
+        dragXY.setValue({ x: 0, y: 0 });
         atEdge.current = false;
         fadeTab(1);
-        Vibration.vibrate(10); // light "pick up" tick
+        Vibration.vibrate(10);
       },
-      onPanResponderMove: Animated.event([null, { dy: dragY }], {
-        useNativeDriver: false,
-        // Edge-bump haptic: buzz once when the drag reaches the top/bottom limit.
-        listener: (_e, g: { dy: number }) => {
-          const raw = lastOffset.current + g.dy;
-          const beyond = raw <= minRelRef.current || raw >= maxRelRef.current;
-          if (beyond && !atEdge.current) {
-            atEdge.current = true;
-            Vibration.vibrate(20);
-          } else if (!beyond && atEdge.current) {
-            atEdge.current = false;
-          }
+      onPanResponderMove: Animated.event(
+        [null, { dx: dragXY.x, dy: dragXY.y }],
+        {
+          useNativeDriver: false,
+          listener: (_e, g: { dx: number; dy: number }) => {
+            const rx = lastOffset.current.x + g.dx;
+            const ry = lastOffset.current.y + g.dy;
+            const beyond = rx <= minX || rx >= maxX || ry <= minY || ry >= maxY;
+            if (beyond && !atEdge.current) {
+              atEdge.current = true;
+              Vibration.vibrate(20);
+            } else if (!beyond && atEdge.current) {
+              atEdge.current = false;
+            }
+          },
         },
-      }),
+      ),
       onPanResponderRelease: (_, g) => {
-        dragY.flattenOffset();
-        const next = Math.max(
-          minRelRef.current,
-          Math.min(maxRelRef.current, lastOffset.current + g.dy),
-        );
-        lastOffset.current = next;
-        Animated.spring(dragY, {
-          toValue: next,
+        dragXY.flattenOffset();
+        const nx = Math.max(minX, Math.min(maxX, lastOffset.current.x + g.dx));
+        const ny = Math.max(minY, Math.min(maxY, lastOffset.current.y + g.dy));
+        lastOffset.current = { x: nx, y: ny };
+        Animated.spring(dragXY, {
+          toValue: { x: nx, y: ny },
           useNativeDriver: false,
           tension: 90,
           friction: 11,
         }).start();
-        void AsyncStorage.setItem("ctrend_wc_tab_y", String(next));
+        void AsyncStorage.setItem("ctrend_wc_tab_pos_2d", JSON.stringify({ x: nx, y: ny }));
         fadeTab(IDLE_OPACITY);
-        Vibration.vibrate(8); // soft "drop" tick
+        Vibration.vibrate(8);
       },
       onPanResponderTerminate: () => fadeTab(IDLE_OPACITY),
     }),
@@ -137,13 +167,16 @@ export function WorldCupFloating() {
   });
 
   const fixtures = data?.worldCupFixtures ?? [];
+  allFixturesRef.current = fixtures;
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
   const live = liveFixtures(filtered);
   const nextDays = groupByDay(nextUpcoming(filtered, 3));
+  const recent = finishedFixtures(filtered).slice(0, 3);
 
   if (!wcCampaign) return null;
-  if (live.length === 0 && nextDays.length === 0) return null;
+  if (live.length === 0 && nextDays.length === 0 && recent.length === 0) return null;
 
+  const previewFixture = live[0] ?? upcomingFixtures(filtered)[0] ?? null;
   const st = makeStyles(colors);
 
   function openMatch(f: WcFixture) {
@@ -154,68 +187,100 @@ export function WorldCupFloating() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {open ? (
-        <>
-          <View style={[st.card, { right: 12, bottom: insets.bottom + 88 }]}>
-            <View style={st.head}>
-              <Pressable
-                style={st.title}
-                onPress={() => {
-                  setOpen(false);
-                  router.push("/world-cup" as `/${string}`);
-                }}
-              >
-                <Image source={trophyAsset} style={st.headTrophy} contentFit="contain" />
-                <Text style={st.titleText} numberOfLines={1}>
-                  {wcCampaign?.name || "World Cup"}
-                  {followed ? ` · ${followed}` : ""}
-                </Text>
-              </Pressable>
-              <Pressable style={st.iconBtn} onPress={() => setOpen(false)} hitSlop={6}>
-                <Text style={st.iconBtnText}>✕</Text>
-              </Pressable>
-            </View>
+        <View style={[st.card, { right: 12, bottom: insets.bottom + 88 }]}>
+          <View style={st.head}>
+            <Pressable
+              style={st.title}
+              onPress={() => { setOpen(false); router.push("/world-cup" as `/${string}`); }}
+            >
+              <Image source={trophyAsset} style={st.headTrophy} contentFit="contain" />
+              <Text style={st.titleText} numberOfLines={1}>
+                {wcCampaign?.name || "World Cup"}
+                {followed ? ` · ${followed}` : ""}
+              </Text>
+            </Pressable>
+            <Pressable style={st.iconBtn} onPress={() => setOpen(false)} hitSlop={6}>
+              <Text style={st.iconBtnText}>─</Text>
+            </Pressable>
+          </View>
 
-            <ScrollView style={st.body} keyboardShouldPersistTaps="handled">
-              {live.map((f) => (
-                <Pressable key={f.id} style={[st.row, st.rowLive]} onPress={() => openMatch(f)}>
-                  <View style={st.liveBadge}>
-                    <Text style={st.liveBadgeText}>{f.minute != null ? `LIVE ${f.minute}'` : "LIVE"}</Text>
-                  </View>
+          <ScrollView style={st.body} keyboardShouldPersistTaps="handled">
+            {/* Live */}
+            {live.map((f) => (
+              <Pressable key={f.id} style={[st.row, st.rowLive]} onPress={() => openMatch(f)}>
+                <View style={st.liveBadge}>
+                  <Text style={st.liveBadgeText}>{f.minute != null ? `LIVE ${f.minute}'` : "LIVE"}</Text>
+                </View>
+                <View style={st.rowTeams}>
+                  {f.homeTeam.crest ? <Image source={{ uri: f.homeTeam.crest }} style={st.crest} contentFit="contain" /> : null}
                   <Text style={st.teams} numberOfLines={1}>
                     {f.homeTeam.shortName} {f.score.home ?? 0}–{f.score.away ?? 0} {f.awayTeam.shortName}
                   </Text>
-                </Pressable>
-              ))}
-              {nextDays.map((g) => (
-                <View key={g.key}>
-                  <Text style={st.dayLabel}>{g.label}</Text>
-                  {g.fixtures.map((f) => (
-                    <Pressable key={f.id} style={st.row} onPress={() => openMatch(f)}>
+                  {f.awayTeam.crest ? <Image source={{ uri: f.awayTeam.crest }} style={st.crest} contentFit="contain" /> : null}
+                </View>
+              </Pressable>
+            ))}
+
+            {/* Upcoming */}
+            {nextDays.map((g) => (
+              <View key={g.key}>
+                <Text style={st.dayLabel}>{g.label}</Text>
+                {g.fixtures.map((f) => (
+                  <Pressable key={f.id} style={st.row} onPress={() => openMatch(f)}>
+                    <View style={st.rowTeams}>
+                      {f.homeTeam.crest ? <Image source={{ uri: f.homeTeam.crest }} style={st.crest} contentFit="contain" /> : null}
                       <Text style={st.teams} numberOfLines={1}>
                         {f.homeTeam.shortName} <Text style={st.v}>v</Text> {f.awayTeam.shortName}
                       </Text>
-                      <View style={st.timeCol}>
-                        <Text style={st.time}>{formatTime(f.kickoff)}</Text>
-                        <Text style={st.countdown}>{countdownToKickoff(f.kickoff)}</Text>
-                      </View>
-                      {f.campaignPostId ? (
-                        <View style={st.voteChip}>
-                          <Text style={st.voteChipText}>Vote</Text>
-                        </View>
-                      ) : null}
-                    </Pressable>
-                  ))}
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </>
+                      {f.awayTeam.crest ? <Image source={{ uri: f.awayTeam.crest }} style={st.crest} contentFit="contain" /> : null}
+                    </View>
+                    <View style={st.timeCol}>
+                      <Text style={st.time}>{formatTime(f.kickoff)}</Text>
+                      <Text style={st.countdown}>{countdownToKickoff(f.kickoff)}</Text>
+                    </View>
+                    {f.campaignPostId ? (
+                      <View style={st.voteChip}><Text style={st.voteChipText}>Vote</Text></View>
+                    ) : null}
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+
+            {/* Results */}
+            {recent.length > 0 && (
+              <View>
+                <Text style={[st.dayLabel, st.dayLabelResults]}>Results</Text>
+                {recent.map((f) => (
+                  <Pressable key={f.id} style={[st.row, st.rowResult]} onPress={() => openMatch(f)}>
+                    <View style={st.rowTeams}>
+                      {f.homeTeam.crest ? <Image source={{ uri: f.homeTeam.crest }} style={st.crest} contentFit="contain" /> : null}
+                      <Text style={[st.teams, f.score.winner === "HOME_TEAM" && st.winner]} numberOfLines={1}>
+                        {f.homeTeam.shortName}
+                      </Text>
+                      <Text style={st.resultScore}>{f.score.home ?? "–"}–{f.score.away ?? "–"}</Text>
+                      <Text style={[st.teams, f.score.winner === "AWAY_TEAM" && st.winner]} numberOfLines={1}>
+                        {f.awayTeam.shortName}
+                      </Text>
+                      {f.awayTeam.crest ? <Image source={{ uri: f.awayTeam.crest }} style={st.crest} contentFit="contain" /> : null}
+                    </View>
+                    <View style={st.ftBadge}><Text style={st.ftText}>FT</Text></View>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
       ) : (
-        // Half-peeking tab pinned to the right edge — drag up/down to reposition.
+        // 2D draggable tab
         <Animated.View
           style={[
             st.tab,
-            { top: baseTop, opacity: tabOpacity, transform: [{ translateY: dragY }] },
+            {
+              opacity: tabOpacity,
+              transform: [{ translateX: dragXY.x }, { translateY: dragXY.y }],
+              left: 0,
+              top: 0,
+            },
           ]}
           {...pan.panHandlers}
         >
@@ -223,11 +288,28 @@ export function WorldCupFloating() {
             style={st.tabPressable}
             onPress={() => setOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel="Open World Cup matches. Drag up or down to move."
+            accessibilityLabel="Open World Cup fixtures. Drag to move."
           >
-            <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
+            {previewFixture ? (
+              <View style={st.tabFlags}>
+                {previewFixture.homeTeam.crest
+                  ? <Image source={{ uri: previewFixture.homeTeam.crest }} style={st.tabFlag} contentFit="contain" />
+                  : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(previewFixture.homeTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
+                <Text style={st.tabFlagSep}>v</Text>
+                {previewFixture.awayTeam.crest
+                  ? <Image source={{ uri: previewFixture.awayTeam.crest }} style={st.tabFlag} contentFit="contain" />
+                  : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(previewFixture.awayTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
+              </View>
+            ) : (
+              <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
+            )}
             {live.length > 0 ? <View style={st.tabLiveDot} /> : null}
           </Pressable>
+          {hintVisible && (
+            <View style={st.hint} pointerEvents="none">
+              <Text style={st.hintText}>Tap for fixtures</Text>
+            </View>
+          )}
         </Animated.View>
       )}
     </View>
@@ -235,53 +317,56 @@ export function WorldCupFloating() {
 }
 
 function makeStyles(c: {
-  card: string;
-  border: string;
-  text: string;
-  subtext: string;
-  muted: string;
-  accent: string;
-  section: string;
+  card: string; border: string; text: string; subtext: string;
+  muted: string; accent: string; section: string;
 }) {
   return StyleSheet.create({
     tab: {
       position: "absolute",
-      right: -16,
-      width: 60,
-      height: 56,
-      borderTopLeftRadius: 28,
-      borderBottomLeftRadius: 28,
+      width: TAB_W,
+      height: TAB_H,
+      borderRadius: 16,
       backgroundColor: c.card,
       borderWidth: 1,
-      borderRightWidth: 0,
       borderColor: c.border,
       alignItems: "center",
       justifyContent: "center",
-      paddingRight: 14,
       zIndex: 1000,
       shadowColor: "#000",
       shadowOpacity: 0.22,
       shadowRadius: 8,
-      shadowOffset: { width: -2, height: 2 },
+      shadowOffset: { width: 0, height: 2 },
       elevation: 8,
     },
     tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
-    tabImg: { width: 38, height: 38 },
-    tabLiveDot: {
-      position: "absolute",
-      top: 6,
-      left: 8,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: "#ef4444",
-      borderWidth: 2,
-      borderColor: c.card,
+    tabImg: { width: 36, height: 36 },
+    tabFlags: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 4 },
+    tabFlag: { width: 22, height: 22, borderRadius: 11 },
+    tabFlagPh: {
+      width: 22, height: 22, borderRadius: 11,
+      backgroundColor: c.section, alignItems: "center", justifyContent: "center",
     },
+    tabFlagPhText: { fontSize: 8, fontWeight: "700", color: c.muted },
+    tabFlagSep: { fontSize: 9, fontWeight: "700", color: c.muted },
+    tabLiveDot: {
+      position: "absolute", top: 6, right: 6,
+      width: 10, height: 10, borderRadius: 5,
+      backgroundColor: "#ef4444", borderWidth: 2, borderColor: c.card,
+    },
+    hint: {
+      position: "absolute",
+      right: TAB_W + 6,
+      top: (TAB_H - 28) / 2,
+      backgroundColor: "rgba(0,0,0,0.75)",
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    hintText: { color: "#fff", fontSize: 11, fontWeight: "600", whiteSpace: "nowrap" } as object,
     card: {
       position: "absolute",
-      width: 252,
-      maxWidth: "80%",
+      width: 268,
+      maxWidth: "85%",
       backgroundColor: c.card,
       borderWidth: 1,
       borderColor: c.border,
@@ -295,54 +380,52 @@ function makeStyles(c: {
       elevation: 12,
     },
     head: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 7,
-      paddingLeft: 10,
-      paddingRight: 6,
+      flexDirection: "row", alignItems: "center",
+      paddingVertical: 7, paddingLeft: 10, paddingRight: 6,
       backgroundColor: c.accent,
     },
     title: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
     headTrophy: { width: 22, height: 22 },
     titleText: { color: "#fff", fontWeight: "800", fontSize: 13, flexShrink: 1 },
     iconBtn: {
-      width: 24,
-      height: 24,
-      borderRadius: 6,
+      width: 28, height: 28, borderRadius: 8,
       backgroundColor: "rgba(255,255,255,0.2)",
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: "center", justifyContent: "center",
     },
-    iconBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-    body: { maxHeight: 280, padding: 6 },
+    iconBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+    body: { maxHeight: 300, padding: 6 },
     row: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingVertical: 7,
-      paddingHorizontal: 8,
-      backgroundColor: c.section,
-      borderRadius: 9,
-      marginBottom: 3,
+      flexDirection: "row", alignItems: "center", gap: 6,
+      paddingVertical: 7, paddingHorizontal: 8,
+      backgroundColor: c.section, borderRadius: 9, marginBottom: 3,
     },
     rowLive: { backgroundColor: "rgba(239,68,68,0.12)", borderWidth: 1, borderColor: "rgba(239,68,68,0.35)" },
+    rowResult: { backgroundColor: "rgba(100,100,100,0.07)" },
+    rowTeams: { flex: 1, flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
+    crest: { width: 16, height: 16, borderRadius: 8 },
     liveBadge: { backgroundColor: "#ef4444", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
     liveBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
-    teams: { flex: 1, minWidth: 0, fontWeight: "700", fontSize: 12.5, color: c.text },
+    teams: { flex: 1, minWidth: 0, fontWeight: "700", fontSize: 12, color: c.text },
+    winner: { color: c.accent },
     v: { color: c.muted, fontWeight: "600" },
     timeCol: { alignItems: "flex-end" },
     time: { fontSize: 12, fontWeight: "700", color: c.text },
     countdown: { fontSize: 10, fontWeight: "600", color: c.muted },
-    dayLabel: {
-      fontSize: 10,
-      fontWeight: "800",
-      letterSpacing: 0.4,
-      textTransform: "uppercase",
-      color: c.accent,
-      marginTop: 4,
-      marginBottom: 3,
-      marginLeft: 4,
+    resultScore: {
+      fontSize: 13, fontWeight: "800", color: c.text,
+      paddingHorizontal: 6, textAlign: "center",
     },
+    ftBadge: {
+      backgroundColor: c.section, borderRadius: 4,
+      paddingHorizontal: 5, paddingVertical: 2,
+    },
+    ftText: { fontSize: 9, fontWeight: "800", color: c.muted },
+    dayLabel: {
+      fontSize: 10, fontWeight: "800", letterSpacing: 0.4,
+      textTransform: "uppercase", color: c.accent,
+      marginTop: 4, marginBottom: 3, marginLeft: 4,
+    },
+    dayLabelResults: { color: c.subtext },
     voteChip: { backgroundColor: c.accent, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
     voteChipText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   });

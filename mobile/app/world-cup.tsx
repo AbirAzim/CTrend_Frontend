@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, Stack } from "expo-router";
@@ -10,6 +11,7 @@ import {
   WC_STAGE_LABELS,
   WC_STAGE_ORDER,
   countdownToKickoff,
+  finishedFixtures,
   fixtureTeams,
   formatTime,
   groupByDay,
@@ -17,12 +19,117 @@ import {
   isFinished,
   isLive,
   liveFixtures,
+  needsSecondTick,
   upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
 
 type FixturesData = { worldCupFixtures: WcFixture[] };
 type Palette = ReturnType<typeof useTheme>["colors"];
+
+// ─── Group standings ──────────────────────────────────────────────────────────
+
+type TeamStanding = {
+  name: string; shortName: string; crest: string | null;
+  played: number; won: number; drawn: number; lost: number;
+  gf: number; ga: number; gd: number; pts: number;
+};
+
+function computeGroupTables(fixtures: WcFixture[]) {
+  const tables = new Map<string, Map<string, TeamStanding>>();
+  for (const f of fixtures) {
+    if (f.stage !== "GROUP_STAGE" || !f.group) continue;
+    if (!tables.has(f.group)) tables.set(f.group, new Map());
+    const gMap = tables.get(f.group)!;
+    for (const side of [f.homeTeam, f.awayTeam]) {
+      const key = side.name ?? "";
+      if (!key || key === "TBD" || gMap.has(key)) continue;
+      gMap.set(key, { name: side.name ?? "TBD", shortName: side.shortName ?? side.name ?? "TBD", crest: side.crest ?? null, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 });
+    }
+  }
+  for (const f of fixtures) {
+    if (f.stage !== "GROUP_STAGE" || !f.group || f.status !== "FINISHED") continue;
+    if (f.score?.home == null || f.score?.away == null) continue;
+    const gMap = tables.get(f.group);
+    if (!gMap) continue;
+    const home = gMap.get(f.homeTeam.name ?? "");
+    const away = gMap.get(f.awayTeam.name ?? "");
+    if (!home || !away) continue;
+    home.played++; away.played++;
+    home.gf += f.score.home; home.ga += f.score.away;
+    away.gf += f.score.away; away.ga += f.score.home;
+    if (f.score.winner === "HOME_TEAM") { home.won++; home.pts += 3; away.lost++; }
+    else if (f.score.winner === "AWAY_TEAM") { away.won++; away.pts += 3; home.lost++; }
+    else { home.drawn++; home.pts++; away.drawn++; away.pts++; }
+    home.gd = home.gf - home.ga;
+    away.gd = away.gf - away.ga;
+  }
+  return [...tables.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([group, gMap]) => ({
+      group,
+      label: group.replace("GROUP_", "Group "),
+      teams: [...gMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.name.localeCompare(b.name)),
+    }));
+}
+
+function GroupStandings({ fixtures, st }: { fixtures: WcFixture[]; st: ReturnType<typeof makeStyles> }) {
+  const tables = computeGroupTables(fixtures);
+  if (!tables.length) return null;
+  return (
+    <View>
+      <Text style={st.sectionTitle}>📊 Group Standings</Text>
+      <View style={st.standingsLegend}>
+        <View style={[st.legendDot, st.legendDotQualify]} />
+        <Text style={st.legendText}>Top 2 qualify  </Text>
+        <View style={[st.legendDot, st.legendDotPossible]} />
+        <Text style={st.legendText}>Best 3rd may qualify</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.standingsRow}>
+        {tables.map((table) => (
+          <View key={table.group} style={st.standingCard}>
+            <Text style={st.standingCardHead}>{table.label}</Text>
+            {/* Header */}
+            <View style={st.stRow}>
+              <View style={st.stTeamCell}><Text style={st.stHeader}>Team</Text></View>
+              <Text style={[st.stStatCell, st.stHeader]}>P</Text>
+              <Text style={[st.stStatCell, st.stHeader]}>W</Text>
+              <Text style={[st.stStatCell, st.stHeader]}>D</Text>
+              <Text style={[st.stStatCell, st.stHeader]}>L</Text>
+              <Text style={[st.stStatCell, st.stHeader]}>GD</Text>
+              <Text style={[st.stPtsCell, st.stHeader]}>Pts</Text>
+            </View>
+            {table.teams.map((team, i) => (
+              <View
+                key={team.name}
+                style={[
+                  st.stRow,
+                  i < 2 ? st.stRowQualify : i === 2 ? st.stRowPossible : undefined,
+                ]}
+              >
+                <View style={st.stTeamCell}>
+                  <Text style={st.stPos}>{i + 1}</Text>
+                  {team.crest
+                    ? <Image source={{ uri: team.crest }} style={st.stCrest} contentFit="contain" />
+                    : <View style={st.stCrestPh} />}
+                  <Text style={st.stName} numberOfLines={1}>{team.shortName}</Text>
+                </View>
+                <Text style={st.stStatCell}>{team.played}</Text>
+                <Text style={st.stStatCell}>{team.won}</Text>
+                <Text style={st.stStatCell}>{team.drawn}</Text>
+                <Text style={st.stStatCell}>{team.lost}</Text>
+                <Text style={st.stStatCell}>{team.gd > 0 ? `+${team.gd}` : team.gd}</Text>
+                <Text style={st.stPtsCell}>{team.pts}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Fixture row ──────────────────────────────────────────────────────────────
 
 function TeamCrest({ crest, name, size = 26 }: { crest: string; name: string; size?: number }) {
   if (!crest) return null;
@@ -94,11 +201,14 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
   );
 }
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function WorldCupScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const followed = useFollowedTeam();
   const st = makeStyles(colors);
+  const [, setTick] = useState(0);
 
   const { data, loading, error } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
     fetchPolicy: "cache-and-network",
@@ -106,10 +216,23 @@ export default function WorldCupScreen() {
   });
 
   const fixtures = data?.worldCupFixtures ?? [];
+
+  // Adaptive tick for second-level countdown
+  useEffect(() => {
+    let id: ReturnType<typeof setTimeout>;
+    function schedule() {
+      const fast = needsSecondTick(upcomingFixtures(fixtures));
+      id = setTimeout(() => { setTick((n) => n + 1); schedule(); }, fast ? 1000 : 30_000);
+    }
+    schedule();
+    return () => clearTimeout(id);
+  }); // re-runs when fixtures changes
+
   const teams = fixtureTeams(fixtures);
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
   const live = liveFixtures(filtered);
   const upcomingDays = groupByDay(upcomingFixtures(filtered));
+  const recent = finishedFixtures(filtered);
 
   const byStage: Record<string, WcFixture[]> = {};
   for (const f of filtered) (byStage[f.stage] ??= []).push(f);
@@ -195,6 +318,17 @@ export default function WorldCupScreen() {
             ))}
           </View>
         )}
+
+        {recent.length > 0 && (
+          <View>
+            <Text style={st.sectionTitle}>🏁 Results</Text>
+            {recent.slice(0, 10).map((f) => (
+              <FixtureRow key={f.id} fixture={f} st={st} />
+            ))}
+          </View>
+        )}
+
+        <GroupStandings fixtures={filtered} st={st} />
 
         {fixtures.length > 0 && (
           <>
@@ -294,5 +428,48 @@ function makeStyles(c: Palette) {
     kickoffCountdown: { fontSize: 10, fontWeight: "600", color: c.muted },
     voteChip: { backgroundColor: c.accent, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, marginTop: 3 },
     voteChipText: { color: "#fff", fontSize: 10.5, fontWeight: "800" },
+    // ── Standings ──────────────────────────────────────────────────────────────
+    standingsLegend: { flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 4 },
+    legendDot: { width: 10, height: 10, borderRadius: 5 },
+    legendDotQualify: { backgroundColor: "rgba(34,197,94,0.35)" },
+    legendDotPossible: { backgroundColor: "rgba(234,179,8,0.30)" },
+    legendText: { fontSize: 10.5, color: c.muted },
+    standingsRow: { gap: 10, paddingRight: 4, paddingBottom: 4 },
+    standingCard: {
+      width: 248,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    standingCardHead: {
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+      color: "#fff",
+      backgroundColor: c.accent,
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+    },
+    stRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 5,
+      paddingHorizontal: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    stRowQualify: { backgroundColor: "rgba(34,197,94,0.09)" },
+    stRowPossible: { backgroundColor: "rgba(234,179,8,0.08)" },
+    stTeamCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
+    stStatCell: { width: 22, textAlign: "center", fontSize: 11, color: c.subtext },
+    stPtsCell: { width: 26, textAlign: "center", fontSize: 12, fontWeight: "800", color: c.text },
+    stHeader: { fontWeight: "800", fontSize: 10, color: c.muted },
+    stPos: { fontSize: 10, fontWeight: "700", color: c.muted, width: 14, textAlign: "center" },
+    stCrest: { width: 16, height: 16, borderRadius: 8 },
+    stCrestPh: { width: 16, height: 16, borderRadius: 8, backgroundColor: c.section },
+    stName: { flex: 1, fontSize: 12, fontWeight: "700", color: c.text },
   });
 }

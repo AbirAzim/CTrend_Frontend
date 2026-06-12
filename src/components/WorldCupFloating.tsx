@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { useNavigate } from "react-router-dom";
 import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
@@ -6,29 +6,86 @@ import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
 import {
   type WcFixture,
   countdownToKickoff,
+  finishedFixtures,
   formatTime,
   groupByDay,
   involvesTeam,
   liveFixtures,
+  needsSecondTick,
   nextUpcoming,
+  upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { useFollowedTeam } from "../lib/wcTeam";
 
 type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: boolean };
 
-/**
- * Fixed World Cup trophy tab pinned to the right edge (half-peeking). Tap to
- * slide out the live/upcoming card; the tab hides while the card is open.
- */
+const STORAGE_KEY = "ctrend_wc_tab_pos";
+
+function loadPos(): { x: number; y: number } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as { x: number; y: number };
+    if (typeof p.x !== "number" || typeof p.y !== "number") return null;
+    return p;
+  } catch {
+    return null;
+  }
+}
+
+function savePos(pos: { x: number; y: number }) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+}
+
+function clampPos(x: number, y: number, tabW = 52, tabH = 56): { x: number; y: number } {
+  return {
+    x: Math.max(-(tabW / 2), Math.min(window.innerWidth - tabW / 2, x)),
+    y: Math.max(0, Math.min(window.innerHeight - tabH, y)),
+  };
+}
+
+function defaultPos(): { x: number; y: number } {
+  return clampPos(window.innerWidth - 36, Math.round(window.innerHeight * 0.46));
+}
+
 export function WorldCupFloating() {
   const navigate = useNavigate();
   const followed = useFollowedTeam();
   const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const dragRef = useRef({ startX: 0, startY: 0, ox: 0, oy: 0, moved: false });
+  const tabRef = useRef<HTMLDivElement>(null);
 
+  // Load saved position
   useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 30_000);
-    return () => clearInterval(t);
+    const saved = loadPos();
+    setPos(saved ?? defaultPos());
+    // Show hint for 3 s on first load
+    if (!localStorage.getItem("ctrend_wc_hint_seen")) {
+      setShowHint(true);
+      setTimeout(() => {
+        setShowHint(false);
+        localStorage.setItem("ctrend_wc_hint_seen", "1");
+      }, 3000);
+    }
+  }, []);
+
+  // Adaptive tick: 1 s when near kickoff, else 30 s
+  const allFixturesRef = useRef<WcFixture[]>([]);
+  useEffect(() => {
+    function schedule() {
+      const fast = needsSecondTick(allFixturesRef.current);
+      const id = setTimeout(() => {
+        setTick((n) => n + 1);
+        schedule();
+      }, fast ? 1000 : 30_000);
+      return id;
+    }
+    const id = schedule();
+    return () => clearTimeout(id);
   }, []);
 
   const { data: campData } = useQuery<{ activeCampaigns: Campaign[] }>(ACTIVE_CAMPAIGNS, {
@@ -45,31 +102,94 @@ export function WorldCupFloating() {
   });
 
   const fixtures = data?.worldCupFixtures ?? [];
+  allFixturesRef.current = fixtures;
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
   const live = liveFixtures(filtered);
   const nextDays = groupByDay(nextUpcoming(filtered, 3));
+  const recent = finishedFixtures(filtered).slice(0, 3);
 
   if (!wcCampaign) return null;
-  if (live.length === 0 && nextDays.length === 0) return null;
+  if (live.length === 0 && nextDays.length === 0 && recent.length === 0) return null;
+
+  // Next upcoming/live fixture for flag display in the tab
+  const previewFixture = live[0] ?? upcomingFixtures(filtered)[0] ?? null;
 
   function openMatch(f: WcFixture) {
     setOpen(false);
-    // With a vote post → open it. Otherwise jump to the schedule page and focus
-    // this exact match (so the click always lands somewhere visible).
     navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : `/world-cup?focus=${f.id}`);
   }
 
+  // ── Drag handlers ────────────────────────────────────────────────────────────
+  function onPointerDown(e: React.PointerEvent) {
+    if (open) return;
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      ox: pos?.x ?? defaultPos().x,
+      oy: pos?.y ?? defaultPos().y,
+      moved: false,
+    };
+    setDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragRef.current.moved = true;
+    const next = clampPos(dragRef.current.ox + dx, dragRef.current.oy + dy);
+    setPos(next);
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    if (!dragging) return;
+    setDragging(false);
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    const next = clampPos(dragRef.current.ox + dx, dragRef.current.oy + dy);
+    setPos(next);
+    savePos(next);
+    if (!dragRef.current.moved) setOpen(true); // tap without drag → open
+  }
+
+  if (!pos) return null;
+
   if (!open) {
     return (
-      <button
-        type="button"
-        className={`wc-tab${live.length > 0 ? " wc-tab--live" : ""}`}
-        aria-label="Open World Cup matches"
-        onClick={() => setOpen(true)}
+      <div
+        ref={tabRef}
+        className={`wc-tab${live.length > 0 ? " wc-tab--live" : ""}${dragging ? " wc-tab--dragging" : ""}`}
+        style={{ left: pos.x, top: pos.y }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        role="button"
+        tabIndex={0}
+        aria-label="Open World Cup fixtures — drag to move"
+        onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
       >
-        <img src="/worldcup-trophy.png" className="wc-tab-img" alt="" />
+        {previewFixture ? (
+          <div className="wc-tab-flags">
+            {previewFixture.homeTeam.crest
+              ? <img src={previewFixture.homeTeam.crest} className="wc-tab-flag" alt={previewFixture.homeTeam.shortName ?? ""} />
+              : <span className="wc-tab-flag wc-tab-flag--ph">{(previewFixture.homeTeam.shortName ?? "?").slice(0, 2)}</span>}
+            <span className="wc-tab-flag-sep">v</span>
+            {previewFixture.awayTeam.crest
+              ? <img src={previewFixture.awayTeam.crest} className="wc-tab-flag" alt={previewFixture.awayTeam.shortName ?? ""} />
+              : <span className="wc-tab-flag wc-tab-flag--ph">{(previewFixture.awayTeam.shortName ?? "?").slice(0, 2)}</span>}
+          </div>
+        ) : (
+          <img src="/worldcup-trophy.png" className="wc-tab-img" alt="" />
+        )}
         {live.length > 0 && <span className="wc-tab-live-dot" />}
-      </button>
+        {showHint && (
+          <div className="wc-tab-hint" aria-hidden>
+            Tap for fixtures
+            <span className="wc-tab-hint-arrow" />
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -84,8 +204,8 @@ export function WorldCupFloating() {
               {followed ? ` · ${followed}` : ""}
             </span>
           </button>
-          <button type="button" className="wc-float-icon-btn" aria-label="Close" onClick={() => setOpen(false)}>
-            ✕
+          <button type="button" className="wc-float-icon-btn" aria-label="Minimise" onClick={() => setOpen(false)}>
+            ─
           </button>
         </div>
 
@@ -95,9 +215,13 @@ export function WorldCupFloating() {
               {live.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row wc-float-row--live" onClick={() => openMatch(f)}>
                   <span className="wc-float-live-badge">{f.minute != null ? `LIVE ${f.minute}'` : "LIVE"}</span>
-                  <span className="wc-float-teams">
-                    {f.homeTeam.shortName ?? "TBD"} {f.score?.home ?? 0}–{f.score?.away ?? 0} {f.awayTeam.shortName ?? "TBD"}
-                  </span>
+                  <div className="wc-float-row-teams">
+                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
+                    <span className="wc-float-teams">
+                      {f.homeTeam.shortName} {f.score?.home ?? 0}–{f.score?.away ?? 0} {f.awayTeam.shortName}
+                    </span>
+                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
+                  </div>
                 </button>
               ))}
             </div>
@@ -107,9 +231,13 @@ export function WorldCupFloating() {
               <p className="wc-float-day-label">{g.label}</p>
               {g.fixtures.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row" onClick={() => openMatch(f)}>
-                  <span className="wc-float-teams">
-                    {f.homeTeam.shortName ?? "TBD"} <span className="wc-float-v">v</span> {f.awayTeam.shortName ?? "TBD"}
-                  </span>
+                  <div className="wc-float-row-teams">
+                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
+                    <span className="wc-float-teams">
+                      {f.homeTeam.shortName} <span className="wc-float-v">v</span> {f.awayTeam.shortName}
+                    </span>
+                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
+                  </div>
                   <span className="wc-float-time">
                     {formatTime(f.kickoff)}
                     <span className="wc-float-countdown">{countdownToKickoff(f.kickoff)}</span>
@@ -119,6 +247,29 @@ export function WorldCupFloating() {
               ))}
             </div>
           ))}
+          {recent.length > 0 && (
+            <div className="wc-float-day">
+              <p className="wc-float-day-label wc-float-day-label--results">Results</p>
+              {recent.map((f) => (
+                <button key={f.id} type="button" className="wc-float-row wc-float-row--result" onClick={() => openMatch(f)}>
+                  <div className="wc-float-row-teams">
+                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
+                    <span className={`wc-float-teams${f.score?.winner === "HOME_TEAM" ? " wc-float-teams--winner" : ""}`}>
+                      {f.homeTeam.shortName}
+                    </span>
+                    <span className="wc-float-result-score">
+                      {f.score?.home ?? "–"}–{f.score?.away ?? "–"}
+                    </span>
+                    <span className={`wc-float-teams${f.score?.winner === "AWAY_TEAM" ? " wc-float-teams--winner" : ""}`}>
+                      {f.awayTeam.shortName}
+                    </span>
+                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
+                  </div>
+                  <span className="wc-float-ft">FT</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
@@ -7,6 +7,7 @@ import {
   WC_STAGE_LABELS,
   WC_STAGE_ORDER,
   countdownToKickoff,
+  finishedFixtures,
   fixtureTeams,
   formatTime,
   groupByDay,
@@ -15,6 +16,7 @@ import {
   isLive,
   isUpcoming,
   liveFixtures,
+  needsSecondTick,
   upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
@@ -114,6 +116,105 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
   );
 }
 
+// ─── Group standings (points table) ──────────────────────────────────────────
+
+type TeamStanding = {
+  name: string; shortName: string; crest: string | null;
+  played: number; won: number; drawn: number; lost: number;
+  gf: number; ga: number; gd: number; pts: number;
+};
+
+function computeGroupTables(fixtures: WcFixture[]) {
+  const tables = new Map<string, Map<string, TeamStanding>>();
+  for (const f of fixtures) {
+    if (f.stage !== "GROUP_STAGE" || !f.group) continue;
+    if (!tables.has(f.group)) tables.set(f.group, new Map());
+    const gMap = tables.get(f.group)!;
+    for (const side of [f.homeTeam, f.awayTeam]) {
+      const key = side.name ?? "";
+      if (!key || key === "TBD" || gMap.has(key)) continue;
+      gMap.set(key, { name: side.name ?? "TBD", shortName: side.shortName ?? side.name ?? "TBD", crest: side.crest, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0 });
+    }
+  }
+  for (const f of fixtures) {
+    if (f.stage !== "GROUP_STAGE" || !f.group || f.status !== "FINISHED") continue;
+    if (f.score?.home == null || f.score?.away == null) continue;
+    const gMap = tables.get(f.group);
+    if (!gMap) continue;
+    const home = gMap.get(f.homeTeam.name ?? "");
+    const away = gMap.get(f.awayTeam.name ?? "");
+    if (!home || !away) continue;
+    home.played++; away.played++;
+    home.gf += f.score.home; home.ga += f.score.away;
+    away.gf += f.score.away; away.ga += f.score.home;
+    if (f.score.winner === "HOME_TEAM") { home.won++; home.pts += 3; away.lost++; }
+    else if (f.score.winner === "AWAY_TEAM") { away.won++; away.pts += 3; home.lost++; }
+    else { home.drawn++; home.pts++; away.drawn++; away.pts++; }
+    home.gd = home.gf - home.ga;
+    away.gd = away.gf - away.ga;
+  }
+  return [...tables.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([group, gMap]) => ({
+      group,
+      label: group.replace("GROUP_", "Group "),
+      teams: [...gMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.name.localeCompare(b.name)),
+    }));
+}
+
+function GroupStandings({ fixtures }: { fixtures: WcFixture[] }) {
+  const tables = computeGroupTables(fixtures);
+  if (!tables.length) return null;
+  return (
+    <section className="wc-stage wc-standings">
+      <h2 className="wc-stage-title">📊 Group Standings</h2>
+      <p className="wc-standings-note">
+        <span className="wc-gs-dot wc-gs-dot--qualify" />Top 2 qualify &nbsp;
+        <span className="wc-gs-dot wc-gs-dot--possible" />Best 3rd may qualify
+      </p>
+      <div className="wc-standings-grid">
+        {tables.map((table) => (
+          <div key={table.group} className="wc-standing-card">
+            <div className="wc-standing-head">{table.label}</div>
+            <table className="wc-standing-table">
+              <thead>
+                <tr>
+                  <th className="wc-st-th wc-st-th--team">Team</th>
+                  <th className="wc-st-th" title="Played">P</th>
+                  <th className="wc-st-th" title="Won">W</th>
+                  <th className="wc-st-th" title="Drawn">D</th>
+                  <th className="wc-st-th" title="Lost">L</th>
+                  <th className="wc-st-th" title="Goal Difference">GD</th>
+                  <th className="wc-st-th wc-st-th--pts" title="Points">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {table.teams.map((team, i) => (
+                  <tr key={team.name} className={`wc-st-row${i < 2 ? " wc-st-row--qualify" : i === 2 ? " wc-st-row--possible" : ""}`}>
+                    <td className="wc-st-td wc-st-td--team">
+                      <span className="wc-st-pos">{i + 1}</span>
+                      {team.crest
+                        ? <img src={team.crest} alt={team.shortName} className="wc-st-crest" />
+                        : <span className="wc-st-crest-ph" />}
+                      <span className="wc-st-name">{team.shortName}</span>
+                    </td>
+                    <td className="wc-st-td">{team.played}</td>
+                    <td className="wc-st-td">{team.won}</td>
+                    <td className="wc-st-td">{team.drawn}</td>
+                    <td className="wc-st-td">{team.lost}</td>
+                    <td className="wc-st-td">{team.gd > 0 ? `+${team.gd}` : team.gd}</td>
+                    <td className="wc-st-td wc-st-td--pts">{team.pts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function GroupSection({ group, fixtures }: { group: string; fixtures: WcFixture[] }) {
   const label = group.replace("GROUP_", "Group ");
   const sorted = [...fixtures].sort(
@@ -176,13 +277,26 @@ export function WorldCupPage() {
   const followed = useFollowedTeam();
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
+  const [, setTick] = useState(0);
 
   const fixtures = data?.worldCupFixtures ?? [];
   const teams = fixtureTeams(fixtures);
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
 
+  // Adaptive tick for second-level countdown
+  useEffect(() => {
+    let id: ReturnType<typeof setTimeout>;
+    function schedule() {
+      const fast = needsSecondTick(upcomingFixtures(filtered));
+      id = setTimeout(() => { setTick((n) => n + 1); schedule(); }, fast ? 1000 : 30_000);
+    }
+    schedule();
+    return () => clearTimeout(id);
+  }); // re-runs when filtered changes
+
   const live = liveFixtures(filtered);
   const upcomingDays = groupByDay(upcomingFixtures(filtered));
+  const recent = finishedFixtures(filtered);
 
   const byStage: Record<string, WcFixture[]> = {};
   for (const f of filtered) (byStage[f.stage] ??= []).push(f);
@@ -291,6 +405,19 @@ export function WorldCupPage() {
           ))}
         </section>
       )}
+
+      {recent.length > 0 && (
+        <section className="wc-stage wc-stage--results">
+          <h2 className="wc-stage-title">🏁 Results</h2>
+          <div className="wc-fixture-list wc-fixture-list--knockout">
+            {recent.slice(0, 10).map((f) => (
+              <FixtureRow key={f.id} fixture={f} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <GroupStandings fixtures={filtered} />
 
       {fixtures.length > 0 && (
         <>
