@@ -45,6 +45,7 @@ import type { FeedPostView, VoteDirectionGql } from "../types/feed";
 import { MODERATOR_PLATFORM_NAME, PLATFORM_BRAND_LOGO_URL } from "../lib/moderatorBrand";
 import { PostCampaignBadge } from "./PostCampaignBadge";
 import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
+import { PostCampaignWinnerBanner } from "./PostCampaignWinnerBanner";
 import { ContentReportModal } from "./ContentReportModal";
 import { imageObjectPosition } from "../lib/imageFocal";
 import { categoryColorRgb } from "../lib/categoryColor";
@@ -1501,6 +1502,21 @@ function FeedPostCardComponent({
         null
       : null;
 
+  // Campaign match lifecycle
+  const campaignHasWinner = Boolean(post.campaign?.hasWinner);
+  const showCampaignWinner = Boolean(post.campaignWinner) && campaignHasWinner;
+  const campaignWinnerOptionLabel =
+    post.campaignWinner?.winningOption != null
+      ? post.postOptions?.[post.campaignWinner.winningOption]?.label ??
+        post.optionStats?.find((s) => s.index === post.campaignWinner?.winningOption)?.label ??
+        null
+      : null;
+  const showMatchInProgress =
+    !showCampaignWinner &&
+    post.isVotingOpen === false &&
+    campaignHasWinner &&
+    post.campaign != null;
+
   return (
     <article
       className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
@@ -2071,6 +2087,19 @@ function FeedPostCardComponent({
           winner={post.voteWinner}
           optionLabel={winnerOptionLabel}
         />
+      ) : null}
+
+      {showCampaignWinner && post.campaignWinner ? (
+        <PostCampaignWinnerBanner
+          winner={post.campaignWinner}
+          campaign={post.campaign}
+          winningOptionLabel={campaignWinnerOptionLabel}
+        />
+      ) : showMatchInProgress ? (
+        <div className="cx-match-in-progress" role="status" aria-live="polite">
+          <span className="cx-match-in-progress-icon" aria-hidden>⚽</span>
+          <span>Match in progress — calculating winner…</span>
+        </div>
       ) : null}
 
       <div className="cx-post-footer">

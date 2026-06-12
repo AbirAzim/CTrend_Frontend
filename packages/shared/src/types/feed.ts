@@ -83,6 +83,8 @@ export type FeedPostView = {
   campaign?: FeedPostCampaignView | null;
   /** Random prize-draw winner after voting closes (Phase 24). */
   voteWinner?: FeedPostVoteWinnerView | null;
+  /** Campaign match winner — set after winnerScheduledAt passes and result is processed. */
+  campaignWinner?: FeedPostCampaignWinnerView | null;
 };
 
 export type FeedPostCampaignView = {
@@ -92,6 +94,22 @@ export type FeedPostCampaignView = {
   bannerText?: string | null;
   bannerImageUrl?: string | null;
   prizePerWinner: number;
+  hasWinner?: boolean | null;
+  hasRewards?: boolean | null;
+};
+
+export type FeedPostCampaignWinnerView = {
+  id: string;
+  winningOption?: number | null;
+  note?: string | null;
+  prize?: number | null;
+  createdAt?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
 };
 
 export type FeedPostVoteWinnerView = {

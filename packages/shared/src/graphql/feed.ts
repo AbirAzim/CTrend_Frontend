@@ -9,6 +9,21 @@ export const POST_CAMPAIGN_FIELDS = `
     bannerText
     bannerImageUrl
     prizePerWinner
+    hasWinner
+    hasRewards
+  }
+  campaignWinner {
+    id
+    winningOption
+    note
+    prize
+    createdAt
+    user {
+      id
+      username
+      displayName
+      profileImageUrl
+    }
   }
 `;
 

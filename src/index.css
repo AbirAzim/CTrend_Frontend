@@ -1904,6 +1904,142 @@ body.capacitor .ig-bottom-nav {
   color: #fde68a;
 }
 
+/* Campaign match winner reveal banner */
+.cx-campaign-winner {
+  position: relative;
+  margin: 0 10px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.cx-campaign-winner-glow {
+  position: absolute;
+  inset: -20% -10%;
+  background: radial-gradient(
+    ellipse 70% 80% at 50% 0%,
+    rgb(16 185 129 / 0.35),
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: cx-winner-glow 2.8s ease-in-out infinite alternate;
+}
+
+.cx-campaign-winner-inner {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgb(16 185 129 / 0.45);
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    rgb(236 253 245 / 0.98) 0%,
+    rgb(209 250 229 / 0.92) 100%
+  );
+  box-shadow: 0 8px 22px rgb(0 150 100 / 0.13);
+}
+
+.cx-campaign-winner-trophy {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgb(0 150 100 / 0.25));
+}
+
+.cx-campaign-winner-kicker {
+  margin: 0 0 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(6 95 70);
+}
+
+.cx-campaign-winner-option {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgb(6 78 59);
+}
+
+.cx-campaign-winner-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cx-campaign-winner-name {
+  font-family: var(--cx-font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(6 95 70);
+  text-decoration: none;
+}
+
+.cx-campaign-winner-name:hover {
+  text-decoration: underline;
+}
+
+.cx-campaign-winner-prize {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: rgb(6 95 70 / 0.8);
+}
+
+.cx-campaign-winner-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgb(6 95 70);
+}
+
+:root[data-theme="dark"] .cx-campaign-winner-inner {
+  background: linear-gradient(
+    135deg,
+    rgb(6 36 24 / 0.85) 0%,
+    rgb(2 18 12 / 0.95) 100%
+  );
+  border-color: rgb(52 211 153 / 0.35);
+}
+
+:root[data-theme="dark"] .cx-campaign-winner-kicker,
+:root[data-theme="dark"] .cx-campaign-winner-option,
+:root[data-theme="dark"] .cx-campaign-winner-name,
+:root[data-theme="dark"] .cx-campaign-winner-prize,
+:root[data-theme="dark"] .cx-campaign-winner-note {
+  color: #6ee7b7;
+}
+
+/* Match in progress state (between voting close and winner reveal) */
+.cx-match-in-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgb(16 185 129 / 0.3);
+  background: rgb(209 250 229 / 0.5);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgb(6 95 70);
+}
+
+.cx-match-in-progress-icon {
+  font-size: 1.1rem;
+  animation: cx-bounce-soccer 1.2s ease-in-out infinite;
+}
+
+@keyframes cx-bounce-soccer {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+:root[data-theme="dark"] .cx-match-in-progress {
+  background: rgb(6 36 24 / 0.55);
+  border-color: rgb(52 211 153 / 0.25);
+  color: #6ee7b7;
+}
+
 .ig-create-campaign-hint {
   margin: 4px 0 0;
 }

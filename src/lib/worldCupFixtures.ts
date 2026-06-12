@@ -21,6 +21,12 @@ export type WcFixture = {
   // API returns null for matches that haven't produced a score yet (upcoming).
   score: WcScore | null;
   campaignPostId: string | null;
+  autoScheduled?: boolean | null;
+  hasDrawOption?: boolean | null;
+  /** ISO string — set when the match is detected as FINISHED by syncLiveScores. */
+  matchEndedAt?: string | null;
+  /** ISO string — when the winner countdown ends and CampaignWinner is created. */
+  winnerScheduledAt?: string | null;
 };
 
 export const WC_STAGE_ORDER: Record<string, number> = {
@@ -162,4 +168,41 @@ export function countdownToKickoff(iso: string): string {
 export function liveMinute(iso: string): number {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
   return Math.max(1, Math.min(mins, 130));
+}
+
+// ─── Campaign post lifecycle helpers ──────────────────────────────────────────
+
+export type CampaignPostState =
+  | "vote_open"      // voting still accepting entries
+  | "in_progress"    // match is live (or between voting close and match end)
+  | "counting_down"  // match ended, winner countdown running
+  | "winner_revealed"; // CampaignWinner exists
+
+/**
+ * Derive the lifecycle state of a campaign post from the post's fields.
+ * All date strings should be ISO strings from the API.
+ */
+export function getCampaignPostState(opts: {
+  isVotingOpen?: boolean | null;
+  votingEndsAt?: string | null;
+  winnerScheduledAt?: string | null;
+  hasWinner?: boolean | null;
+  campaignWinnerExists: boolean;
+}): CampaignPostState {
+  if (opts.campaignWinnerExists) return "winner_revealed";
+  if (opts.isVotingOpen) return "vote_open";
+  if (!opts.hasWinner) return "in_progress";
+  if (opts.winnerScheduledAt && new Date(opts.winnerScheduledAt).getTime() > Date.now()) {
+    return "counting_down";
+  }
+  return "in_progress";
+}
+
+/** Countdown string "4:32" for the winner reveal timer. */
+export function winnerCountdown(winnerScheduledAt: string): string {
+  const ms = Math.max(0, new Date(winnerScheduledAt).getTime() - Date.now());
+  const totalSecs = Math.ceil(ms / 1000);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
 }

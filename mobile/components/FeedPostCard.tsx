@@ -52,6 +52,7 @@ import { MODERATOR_PLATFORM_NAME } from '@ctrend/shared/lib/moderatorBrand';
 import logoAsset from '../assets/logo.png';
 import { PostCampaignBadge } from './PostCampaignBadge';
 import { PostVoteWinnerBanner } from './PostVoteWinnerBanner';
+import { PostCampaignWinnerBanner } from './PostCampaignWinnerBanner';
 import { VoteCoachmark } from './VoteCoachmark';
 import { imageContentPosition } from '../lib/imageFocal';
 import {
@@ -1941,6 +1942,19 @@ function FeedPostCardComponent({
 	const timeLabel = formatRelativeTime(post.scheduledAt ?? post.createdAt);
 	const campaign = post.campaign ?? null;
 	const categoryName = post.category?.name?.trim();
+
+	// Campaign match lifecycle
+	const campaignHasWinner = Boolean(campaign?.hasWinner);
+	const showCampaignWinner = Boolean(post.campaignWinner) && campaignHasWinner;
+	const campaignWinnerOptionLabel =
+		post.campaignWinner?.winningOption != null
+			? compareLabel(post, post.campaignWinner.winningOption)
+			: null;
+	const showMatchInProgress =
+		!showCampaignWinner &&
+		isVotingClosed &&
+		campaignHasWinner &&
+		campaign != null;
 	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
@@ -2487,6 +2501,19 @@ function FeedPostCardComponent({
 							: null
 					}
 				/>
+			) : null}
+
+			{showCampaignWinner && post.campaignWinner ? (
+				<PostCampaignWinnerBanner
+					winner={post.campaignWinner}
+					campaign={campaign}
+					winningOptionLabel={campaignWinnerOptionLabel}
+				/>
+			) : showMatchInProgress ? (
+				<View style={matchInProgressStyles.container}>
+					<Text style={matchInProgressStyles.icon}>⚽</Text>
+					<Text style={matchInProgressStyles.text}>Match in progress — calculating winner…</Text>
+				</View>
 			) : null}
 
 			{(() => {
@@ -3332,4 +3359,28 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	reportSubmitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+});
+
+const matchInProgressStyles = StyleSheet.create({
+	container: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginHorizontal: 14,
+		marginTop: 4,
+		marginBottom: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: 'rgba(16,185,129,0.3)',
+		backgroundColor: 'rgba(16,185,129,0.08)',
+	},
+	icon: { fontSize: 18 },
+	text: {
+		flex: 1,
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#065f46',
+	},
 });

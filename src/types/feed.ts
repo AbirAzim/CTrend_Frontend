@@ -85,6 +85,7 @@ export type FeedPostView = {
   } | null;
   campaign?: FeedPostCampaignView | null;
   voteWinner?: FeedPostVoteWinnerView | null;
+  campaignWinner?: FeedPostCampaignWinnerView | null;
 };
 
 export type VoteOptionStatView = {
@@ -101,6 +102,22 @@ export type FeedPostCampaignView = {
   bannerText?: string | null;
   bannerImageUrl?: string | null;
   prizePerWinner: number;
+  hasWinner?: boolean | null;
+  hasRewards?: boolean | null;
+};
+
+export type FeedPostCampaignWinnerView = {
+  id: string;
+  winningOption?: number | null;
+  note?: string | null;
+  prize?: number | null;
+  createdAt?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
 };
 
 export type FeedPostVoteWinnerView = {

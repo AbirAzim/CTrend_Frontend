@@ -27,6 +27,10 @@ export const WORLD_CUP_FIXTURES = gql`
         winner
       }
       campaignPostId
+      autoScheduled
+      hasDrawOption
+      matchEndedAt
+      winnerScheduledAt
     }
   }
 `;

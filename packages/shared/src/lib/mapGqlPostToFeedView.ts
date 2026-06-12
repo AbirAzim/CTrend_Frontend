@@ -1,4 +1,4 @@
-import type { FeedPostView, PostFormat, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
+import type { FeedPostCampaignWinnerView, FeedPostView, PostFormat, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
 
 function mapViewerVote(
   viewerVote: string | null | undefined,
@@ -86,10 +86,25 @@ export function mapGqlPostToFeedView(p: {
     bannerText?: string | null;
     bannerImageUrl?: string | null;
     prizePerWinner: number;
+    hasWinner?: boolean | null;
+    hasRewards?: boolean | null;
   } | null;
   voteWinner?: {
     selectedOptionIndex?: number | null;
     pickedAt?: string | null;
+    user?: {
+      id: string;
+      username: string;
+      displayName?: string | null;
+      profileImageUrl?: string | null;
+    } | null;
+  } | null;
+  campaignWinner?: {
+    id: string;
+    winningOption?: number | null;
+    note?: string | null;
+    prize?: number | null;
+    createdAt?: string | null;
     user?: {
       id: string;
       username: string;
@@ -177,6 +192,8 @@ export function mapGqlPostToFeedView(p: {
           bannerText: p.campaign.bannerText ?? null,
           bannerImageUrl: p.campaign.bannerImageUrl ?? null,
           prizePerWinner: p.campaign.prizePerWinner,
+          hasWinner: p.campaign.hasWinner ?? null,
+          hasRewards: p.campaign.hasRewards ?? null,
         }
       : null,
     voteWinner: p.voteWinner?.user
@@ -185,6 +202,16 @@ export function mapGqlPostToFeedView(p: {
           pickedAt: p.voteWinner.pickedAt ?? null,
           user: p.voteWinner.user,
         }
+      : null,
+    campaignWinner: p.campaignWinner
+      ? ({
+          id: p.campaignWinner.id,
+          winningOption: p.campaignWinner.winningOption ?? null,
+          note: p.campaignWinner.note ?? null,
+          prize: p.campaignWinner.prize ?? null,
+          createdAt: p.campaignWinner.createdAt ?? null,
+          user: p.campaignWinner.user ?? null,
+        } satisfies FeedPostCampaignWinnerView)
       : null,
   };
 }

@@ -18,6 +18,10 @@ export type WcFixture = {
   matchday: number | null;
   score: WcScore;
   campaignPostId: string | null;
+  autoScheduled?: boolean | null;
+  hasDrawOption?: boolean | null;
+  matchEndedAt?: string | null;
+  winnerScheduledAt?: string | null;
 };
 
 export const WC_STAGE_ORDER: Record<string, number> = {
