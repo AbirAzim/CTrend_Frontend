@@ -20554,3 +20554,30 @@ a.cx-profile-btn-accent {
   padding-top: 12px;
   border-top: 1px solid var(--ig-border);
 }
+/* ── World Cup page tab bar ─────────────────────────────────────────────────── */
+.wc-tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--ig-border);
+  margin-bottom: 4px;
+  background: var(--ig-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.wc-tab-btn {
+  flex: 1;
+  padding: 10px 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.wc-tab-btn:hover { color: var(--cx-ink); }
+.wc-tab-btn--active {
+  color: var(--cx-accent, #6366f1);
+  border-bottom-color: var(--cx-accent, #6366f1);
+}

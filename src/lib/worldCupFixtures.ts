@@ -51,7 +51,8 @@ export const WC_STAGE_LABELS: Record<string, string> = {
 const LIVE_WINDOW_MS = 150 * 60 * 1000;
 
 export function isLive(f: WcFixture): boolean {
-  if (f.status === "IN_PLAY" || f.status === "PAUSED") return true;
+  if (f.status === "IN_PLAY" || f.status === "PAUSED" ||
+      f.status === "EXTRA_TIME" || f.status === "PENALTY") return true;
   if (f.status === "FINISHED") return false;
   // The provider's status often lags (free-tier sync delay), leaving a kicked-off
   // match stuck on TIMED. Without this, such a match is neither "upcoming"
@@ -178,6 +179,21 @@ export function finishedFixtures(fixtures: WcFixture[]): WcFixture[] {
   return fixtures.filter(isFinished).sort(
     (a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime(),
   );
+}
+
+/** Human-readable badge for a live fixture: "HT", "ET 93'", "PENS", "45'" etc. */
+export function liveBadgeLabel(f: WcFixture): string {
+  if (f.status === "PAUSED") return "HT";
+  if (f.status === "PENALTY") return "PENS";
+  if (f.status === "EXTRA_TIME") return f.minute != null ? `ET ${f.minute}'` : "ET";
+  return f.minute != null ? `${f.minute}'` : "LIVE";
+}
+
+/** True when the fixture's campaign post should be visible (published ~24h before kickoff). */
+export function canVoteOnFixture(f: WcFixture): boolean {
+  if (!f.campaignPostId) return false;
+  if (!isUpcoming(f)) return false;
+  return new Date(f.kickoff).getTime() - Date.now() < 25 * 60 * 60 * 1000;
 }
 
 /** Rough elapsed minutes for a live match (no real clock from the API). */

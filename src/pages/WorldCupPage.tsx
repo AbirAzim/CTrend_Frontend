@@ -6,6 +6,7 @@ import {
   type WcFixture,
   WC_STAGE_LABELS,
   WC_STAGE_ORDER,
+  canVoteOnFixture,
   countdownToKickoff,
   finishedFixtures,
   fixtureTeams,
@@ -14,7 +15,7 @@ import {
   involvesTeam,
   isFinished,
   isLive,
-  isUpcoming,
+  liveBadgeLabel,
   liveFixtures,
   needsSecondTick,
   upcomingFixtures,
@@ -23,11 +24,9 @@ import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
 
 function StatusBadge({ fixture }: { fixture: WcFixture }) {
   if (isLive(fixture)) {
-    // `minute` is the provider's real elapsed minute (null until the backend
-    // syncs a live status); fall back to a plain "LIVE" when it isn't there.
     return (
       <span className="wc-badge wc-badge--live">
-        {fixture.minute != null ? `LIVE ${fixture.minute}'` : "LIVE"}
+        {liveBadgeLabel(fixture)}
       </span>
     );
   }
@@ -62,9 +61,8 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
   const navigate = useNavigate();
   const live = isLive(fixture);
   const finished = isFinished(fixture);
-  const upcoming = isUpcoming(fixture);
   const hasScore = finished || live;
-  const canVote = !!fixture.campaignPostId && upcoming;
+  const canVote = canVoteOnFixture(fixture);
 
   const homeWon = fixture.score?.winner === "HOME_TEAM";
   const awayWon = fixture.score?.winner === "AWAY_TEAM";
@@ -278,6 +276,7 @@ export function WorldCupPage() {
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [, setTick] = useState(0);
+  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">("fixtures");
 
   const fixtures = data?.worldCupFixtures ?? [];
   const teams = fixtureTeams(fixtures);
@@ -363,6 +362,22 @@ export function WorldCupPage() {
         </div>
       )}
 
+      {/* Tab bar */}
+      <div className="wc-tab-bar" role="tablist">
+        {(["fixtures", "results", "standings"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            className={`wc-tab-btn${activeTab === tab ? " wc-tab-btn--active" : ""}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === "fixtures" ? "Fixtures" : tab === "results" ? "Results" : "Standings"}
+          </button>
+        ))}
+      </div>
+
       {loading && fixtures.length === 0 && (
         <p className="wc-status-msg">Loading fixtures…</p>
       )}
@@ -377,59 +392,70 @@ export function WorldCupPage() {
         </p>
       )}
 
-      {live.length > 0 && (
-        <section className="wc-stage wc-stage--live">
-          <h2 className="wc-stage-title">
-            <span className="wc-live-dot" /> Live now
-          </h2>
-          <div className="wc-fixture-list wc-fixture-list--knockout">
-            {live.map((f) => (
-              <FixtureRow key={f.id} fixture={f} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {upcomingDays.length > 0 && (
-        <section className="wc-stage wc-stage--upnext">
-          <h2 className="wc-stage-title">⏱ Up next</h2>
-          {upcomingDays.map((g) => (
-            <div className="wc-day" key={g.key}>
-              <h3 className="wc-day-title">{g.label}</h3>
+      {activeTab === "fixtures" && (
+        <>
+          {live.length > 0 && (
+            <section className="wc-stage wc-stage--live">
+              <h2 className="wc-stage-title">
+                <span className="wc-live-dot" /> Live now
+              </h2>
               <div className="wc-fixture-list wc-fixture-list--knockout">
-                {g.fixtures.map((f) => (
+                {live.map((f) => (
                   <FixtureRow key={f.id} fixture={f} />
                 ))}
               </div>
-            </div>
-          ))}
-        </section>
-      )}
+            </section>
+          )}
 
-      {recent.length > 0 && (
-        <section className="wc-stage wc-stage--results">
-          <h2 className="wc-stage-title">🏁 Results</h2>
-          <div className="wc-fixture-list wc-fixture-list--knockout">
-            {recent.slice(0, 10).map((f) => (
-              <FixtureRow key={f.id} fixture={f} />
-            ))}
-          </div>
-        </section>
-      )}
+          {upcomingDays.length > 0 && (
+            <section className="wc-stage wc-stage--upnext">
+              <h2 className="wc-stage-title">⏱ Up next</h2>
+              {upcomingDays.map((g) => (
+                <div className="wc-day" key={g.key}>
+                  <h3 className="wc-day-title">{g.label}</h3>
+                  <div className="wc-fixture-list wc-fixture-list--knockout">
+                    {g.fixtures.map((f) => (
+                      <FixtureRow key={f.id} fixture={f} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
 
-      <GroupStandings fixtures={filtered} />
+          {fixtures.length > 0 && (
+            <>
+              <h2 className="wc-section-divider">Full schedule</h2>
+              {sortedStages.map((stage) => (
+                <StageSection key={stage} stage={stage} fixtures={byStage[stage]!} />
+              ))}
+            </>
+          )}
 
-      {fixtures.length > 0 && (
-        <>
-          <h2 className="wc-section-divider">Full schedule</h2>
-          {sortedStages.map((stage) => (
-            <StageSection key={stage} stage={stage} fixtures={byStage[stage]!} />
-          ))}
+          {followed && filtered.length === 0 && fixtures.length > 0 && (
+            <p className="wc-status-msg">No matches found for {followed}.</p>
+          )}
         </>
       )}
 
-      {followed && filtered.length === 0 && (
-        <p className="wc-status-msg">No matches found for {followed}.</p>
+      {activeTab === "results" && (
+        <>
+          {recent.length === 0 ? (
+            <p className="wc-status-msg">No results yet.</p>
+          ) : (
+            <section className="wc-stage wc-stage--results">
+              <div className="wc-fixture-list wc-fixture-list--knockout">
+                {recent.map((f) => (
+                  <FixtureRow key={f.id} fixture={f} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {activeTab === "standings" && (
+        <GroupStandings fixtures={filtered} />
       )}
     </div>
   );

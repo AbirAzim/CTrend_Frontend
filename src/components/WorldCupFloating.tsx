@@ -5,11 +5,13 @@ import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
 import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
 import {
   type WcFixture,
+  canVoteOnFixture,
   countdownToKickoff,
   finishedFixtures,
   formatTime,
   groupByDay,
   involvesTeam,
+  liveBadgeLabel,
   liveFixtures,
   needsSecondTick,
   nextUpcoming,
@@ -19,33 +21,32 @@ import { useFollowedTeam } from "../lib/wcTeam";
 
 type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: boolean };
 
-const STORAGE_KEY = "ctrend_wc_tab_pos";
+const STORAGE_KEY_Y = "ctrend_wc_tab_pos_y";
+const TAB_H = 56;
 
-function loadPos(): { x: number; y: number } | null {
+function loadPosY(): number | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY_Y);
     if (!raw) return null;
-    const p = JSON.parse(raw) as { x: number; y: number };
-    if (typeof p.x !== "number" || typeof p.y !== "number") return null;
-    return p;
+    const v = parseFloat(raw);
+    return Number.isNaN(v) ? null : v;
   } catch {
     return null;
   }
 }
 
-function savePos(pos: { x: number; y: number }) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+function savePosY(y: number) {
+  localStorage.setItem(STORAGE_KEY_Y, String(y));
 }
 
-function clampPos(x: number, y: number, tabW = 52, tabH = 56): { x: number; y: number } {
-  return {
-    x: Math.max(-(tabW / 2), Math.min(window.innerWidth - tabW / 2, x)),
-    y: Math.max(0, Math.min(window.innerHeight - tabH, y)),
-  };
+function clampY(y: number): number {
+  const minY = 60;
+  const maxY = window.innerHeight - TAB_H - 20;
+  return Math.max(minY, Math.min(maxY, y));
 }
 
-function defaultPos(): { x: number; y: number } {
-  return clampPos(window.innerWidth - 36, Math.round(window.innerHeight * 0.46));
+function defaultPosY(): number {
+  return clampY(Math.round(window.innerHeight * 0.46));
 }
 
 export function WorldCupFloating() {
@@ -53,16 +54,16 @@ export function WorldCupFloating() {
   const followed = useFollowedTeam();
   const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [posY, setPosY] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const dragRef = useRef({ startX: 0, startY: 0, ox: 0, oy: 0, moved: false });
+  const dragRef = useRef({ startY: 0, oy: 0, moved: false });
   const tabRef = useRef<HTMLDivElement>(null);
 
   // Load saved position
   useEffect(() => {
-    const saved = loadPos();
-    setPos(saved ?? defaultPos());
+    const saved = loadPosY();
+    setPosY(saved !== null ? clampY(saved) : defaultPosY());
     // Show hint for 3 s on first load
     if (!localStorage.getItem("ctrend_wc_hint_seen")) {
       setShowHint(true);
@@ -119,14 +120,12 @@ export function WorldCupFloating() {
     navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : `/world-cup?focus=${f.id}`);
   }
 
-  // ── Drag handlers ────────────────────────────────────────────────────────────
+  // ── Vertical-only drag handlers ──────────────────────────────────────────────
   function onPointerDown(e: React.PointerEvent) {
     if (open) return;
     dragRef.current = {
-      startX: e.clientX,
       startY: e.clientY,
-      ox: pos?.x ?? defaultPos().x,
-      oy: pos?.y ?? defaultPos().y,
+      oy: posY ?? defaultPosY(),
       moved: false,
     };
     setDragging(true);
@@ -135,32 +134,29 @@ export function WorldCupFloating() {
 
   function onPointerMove(e: React.PointerEvent) {
     if (!dragging) return;
-    const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragRef.current.moved = true;
-    const next = clampPos(dragRef.current.ox + dx, dragRef.current.oy + dy);
-    setPos(next);
+    if (Math.abs(dy) > 4) dragRef.current.moved = true;
+    setPosY(clampY(dragRef.current.oy + dy));
   }
 
   function onPointerUp(e: React.PointerEvent) {
     if (!dragging) return;
     setDragging(false);
-    const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
-    const next = clampPos(dragRef.current.ox + dx, dragRef.current.oy + dy);
-    setPos(next);
-    savePos(next);
+    const next = clampY(dragRef.current.oy + dy);
+    setPosY(next);
+    savePosY(next);
     if (!dragRef.current.moved) setOpen(true); // tap without drag → open
   }
 
-  if (!pos) return null;
+  if (posY === null) return null;
 
   if (!open) {
     return (
       <div
         ref={tabRef}
         className={`wc-tab${live.length > 0 ? " wc-tab--live" : ""}${dragging ? " wc-tab--dragging" : ""}`}
-        style={{ left: pos.x, top: pos.y }}
+        style={{ right: 10, top: posY }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -214,7 +210,7 @@ export function WorldCupFloating() {
             <div className="wc-float-live">
               {live.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row wc-float-row--live" onClick={() => openMatch(f)}>
-                  <span className="wc-float-live-badge">{f.minute != null ? `LIVE ${f.minute}'` : "LIVE"}</span>
+                  <span className="wc-float-live-badge">{liveBadgeLabel(f)}</span>
                   <div className="wc-float-row-teams">
                     {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
                     <span className="wc-float-teams">
@@ -242,7 +238,7 @@ export function WorldCupFloating() {
                     {formatTime(f.kickoff)}
                     <span className="wc-float-countdown">{countdownToKickoff(f.kickoff)}</span>
                   </span>
-                  {f.campaignPostId && <span className="wc-float-vote">Vote</span>}
+                  {canVoteOnFixture(f) && <span className="wc-float-vote">Vote</span>}
                 </button>
               ))}
             </div>

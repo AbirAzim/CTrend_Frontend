@@ -10,6 +10,7 @@ import {
   type WcFixture,
   WC_STAGE_LABELS,
   WC_STAGE_ORDER,
+  canVoteOnFixture,
   countdownToKickoff,
   finishedFixtures,
   fixtureTeams,
@@ -18,6 +19,7 @@ import {
   involvesTeam,
   isFinished,
   isLive,
+  liveBadgeLabel,
   liveFixtures,
   needsSecondTick,
   upcomingFixtures,
@@ -150,7 +152,7 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
   const hasScore = live || finished;
   const homeWon = fixture.score.winner === "HOME_TEAM";
   const awayWon = fixture.score.winner === "AWAY_TEAM";
-  const canVote = !!fixture.campaignPostId && !hasScore;
+  const canVote = canVoteOnFixture(fixture);
 
   return (
     <Pressable
@@ -170,7 +172,7 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
 
       <View style={st.center}>
         {live ? (
-          <Text style={st.liveBadge}>{fixture.minute != null ? `LIVE ${fixture.minute}'` : "LIVE"}</Text>
+          <Text style={st.liveBadge}>{liveBadgeLabel(fixture)}</Text>
         ) : finished ? (
           <Text style={st.ftBadge}>FT</Text>
         ) : null}
@@ -209,6 +211,7 @@ export default function WorldCupScreen() {
   const followed = useFollowedTeam();
   const st = makeStyles(colors);
   const [, setTick] = useState(0);
+  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">("fixtures");
 
   const { data, loading, error } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
     fetchPolicy: "cache-and-network",
@@ -240,6 +243,12 @@ export default function WorldCupScreen() {
     (a, b) => (WC_STAGE_ORDER[a] ?? 99) - (WC_STAGE_ORDER[b] ?? 99),
   );
 
+  const TAB_LABELS: Record<typeof activeTab, string> = {
+    fixtures: "Fixtures",
+    results: "Results",
+    standings: "Standings",
+  };
+
   return (
     <View style={[st.flex, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -249,6 +258,21 @@ export default function WorldCupScreen() {
         </Pressable>
         <Text style={[st.screenTitle, { color: colors.text }]}>🏆 World Cup 2026</Text>
         <View style={{ width: 56 }} />
+      </View>
+
+      {/* Sticky tab bar */}
+      <View style={st.tabBar}>
+        {(["fixtures", "results", "standings"] as const).map((tab) => (
+          <Pressable
+            key={tab}
+            style={[st.tabBtn, activeTab === tab && st.tabBtnActive]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[st.tabBtnText, activeTab === tab && st.tabBtnTextActive]}>
+              {TAB_LABELS[tab]}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <ScrollView
@@ -296,62 +320,69 @@ export default function WorldCupScreen() {
           <Text style={st.statusMsg}>No fixtures yet. An admin can sync them.</Text>
         ) : null}
 
-        {live.length > 0 && (
-          <View>
-            <Text style={st.sectionTitle}>🔴 Live now</Text>
-            {live.map((f) => (
-              <FixtureRow key={f.id} fixture={f} st={st} />
-            ))}
-          </View>
-        )}
-
-        {upcomingDays.length > 0 && (
-          <View>
-            <Text style={st.sectionTitle}>⏱ Up next</Text>
-            {upcomingDays.map((g) => (
-              <View key={g.key}>
-                <Text style={st.dayTitle}>{g.label}</Text>
-                {g.fixtures.map((f) => (
+        {activeTab === "fixtures" && (
+          <>
+            {live.length > 0 && (
+              <View>
+                <Text style={st.sectionTitle}>🔴 Live now</Text>
+                {live.map((f) => (
                   <FixtureRow key={f.id} fixture={f} st={st} />
                 ))}
               </View>
-            ))}
-          </View>
-        )}
+            )}
 
-        {recent.length > 0 && (
-          <View>
-            <Text style={st.sectionTitle}>🏁 Results</Text>
-            {recent.slice(0, 10).map((f) => (
-              <FixtureRow key={f.id} fixture={f} st={st} />
-            ))}
-          </View>
-        )}
+            {upcomingDays.length > 0 && (
+              <View>
+                <Text style={st.sectionTitle}>⏱ Up next</Text>
+                {upcomingDays.map((g) => (
+                  <View key={g.key}>
+                    <Text style={st.dayTitle}>{g.label}</Text>
+                    {g.fixtures.map((f) => (
+                      <FixtureRow key={f.id} fixture={f} st={st} />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            )}
 
-        <GroupStandings fixtures={filtered} st={st} />
+            {fixtures.length > 0 && (
+              <>
+                <Text style={st.dividerTitle}>Full schedule</Text>
+                {sortedStages.map((stage) => {
+                  const stageFixtures = [...byStage[stage]!].sort(
+                    (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
+                  );
+                  return (
+                    <View key={stage} style={{ marginBottom: 10 }}>
+                      <Text style={st.stageTitle}>{WC_STAGE_LABELS[stage] ?? stage}</Text>
+                      {stageFixtures.map((f) => (
+                        <FixtureRow key={f.id} fixture={f} st={st} />
+                      ))}
+                    </View>
+                  );
+                })}
+              </>
+            )}
 
-        {fixtures.length > 0 && (
-          <>
-            <Text style={st.dividerTitle}>Full schedule</Text>
-            {sortedStages.map((stage) => {
-              const stageFixtures = [...byStage[stage]!].sort(
-                (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
-              );
-              return (
-                <View key={stage} style={{ marginBottom: 10 }}>
-                  <Text style={st.stageTitle}>{WC_STAGE_LABELS[stage] ?? stage}</Text>
-                  {stageFixtures.map((f) => (
-                    <FixtureRow key={f.id} fixture={f} st={st} />
-                  ))}
-                </View>
-              );
-            })}
+            {followed && filtered.length === 0 && fixtures.length > 0 ? (
+              <Text style={st.statusMsg}>No matches found for {followed}.</Text>
+            ) : null}
           </>
         )}
 
-        {followed && filtered.length === 0 ? (
-          <Text style={st.statusMsg}>No matches found for {followed}.</Text>
-        ) : null}
+        {activeTab === "results" && (
+          <>
+            {recent.length === 0 ? (
+              <Text style={st.statusMsg}>No results yet.</Text>
+            ) : (
+              recent.map((f) => <FixtureRow key={f.id} fixture={f} st={st} />)
+            )}
+          </>
+        )}
+
+        {activeTab === "standings" && (
+          <GroupStandings fixtures={filtered} st={st} />
+        )}
       </ScrollView>
     </View>
   );
@@ -369,6 +400,22 @@ function makeStyles(c: Palette) {
     },
     back: { fontSize: 15, fontWeight: "600", width: 56 },
     screenTitle: { fontSize: 17, fontWeight: "800" },
+    tabBar: {
+      flexDirection: "row",
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+      backgroundColor: c.bg,
+    },
+    tabBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderBottomWidth: 2,
+      borderBottomColor: "transparent",
+    },
+    tabBtnActive: { borderBottomColor: c.accent },
+    tabBtnText: { fontSize: 13, fontWeight: "700", color: c.muted },
+    tabBtnTextActive: { color: c.accent },
     chipRow: { gap: 8, paddingVertical: 2, paddingRight: 8 },
     chip: {
       paddingHorizontal: 12,

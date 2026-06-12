@@ -20,11 +20,13 @@ import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
 import { useTheme } from "../context/ThemeContext";
 import {
   type WcFixture,
+  canVoteOnFixture,
   countdownToKickoff,
   finishedFixtures,
   formatTime,
   groupByDay,
   involvesTeam,
+  liveBadgeLabel,
   liveFixtures,
   needsSecondTick,
   nextUpcoming,
@@ -63,33 +65,27 @@ export function WorldCupFloating() {
     return () => clearTimeout(id);
   }, []);
 
-  // ── 2D draggable tab ─────────────────────────────────────────────────────────
-  const minX = 0;
-  const maxX = W - TAB_W;
-  const minY = insets.top + 8;
-  const maxY = H - insets.bottom - TAB_H - 92;
+  // ── Vertical-only draggable tab (fixed on right edge) ───────────────────────
+  const tabX = W - TAB_W - 10;             // fixed X, 10px from right edge
+  const minY = insets.top + 56;            // padding so it can't stick to status bar
+  const maxY = H - insets.bottom - TAB_H - 96; // padding above bottom nav
 
-  const defaultX = W - TAB_W - 10;       // fully visible, 10 from right edge
-  const defaultY = Math.round(H * 0.46); // ~mid-screen vertically
+  const defaultY = Math.round(H * 0.46);
 
-  const dragXY = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const dragY = useRef(new Animated.Value(defaultY)).current;
   const tabOpacity = useRef(new Animated.Value(IDLE_OPACITY)).current;
-  const lastOffset = useRef({ x: defaultX, y: defaultY });
+  const lastOffsetY = useRef(defaultY);
   const atEdge = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem("ctrend_wc_tab_pos_2d").then((v) => {
-      let cx = defaultX;
+    AsyncStorage.getItem("ctrend_wc_tab_pos_y").then((v) => {
       let cy = defaultY;
       if (v) {
-        try {
-          const p = JSON.parse(v) as { x: number; y: number };
-          cx = Math.max(minX, Math.min(maxX, p.x));
-          cy = Math.max(minY, Math.min(maxY, p.y));
-        } catch { /* ignore */ }
+        const parsed = parseFloat(v);
+        if (!Number.isNaN(parsed)) cy = Math.max(minY, Math.min(maxY, parsed));
       }
-      lastOffset.current = { x: cx, y: cy };
-      dragXY.setValue({ x: cx, y: cy });
+      lastOffsetY.current = cy;
+      dragY.setValue(cy);
     });
     AsyncStorage.getItem("ctrend_wc_hint_seen").then((v) => {
       if (!v) {
@@ -108,44 +104,29 @@ export function WorldCupFloating() {
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6),
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6,
       onPanResponderGrant: () => {
-        dragXY.setOffset(lastOffset.current);
-        dragXY.setValue({ x: 0, y: 0 });
         atEdge.current = false;
         fadeTab(1);
         Vibration.vibrate(10);
       },
-      onPanResponderMove: Animated.event(
-        [null, { dx: dragXY.x, dy: dragXY.y }],
-        {
-          useNativeDriver: false,
-          listener: (_e, g: { dx: number; dy: number }) => {
-            const rx = lastOffset.current.x + g.dx;
-            const ry = lastOffset.current.y + g.dy;
-            const beyond = rx <= minX || rx >= maxX || ry <= minY || ry >= maxY;
-            if (beyond && !atEdge.current) {
-              atEdge.current = true;
-              Vibration.vibrate(20);
-            } else if (!beyond && atEdge.current) {
-              atEdge.current = false;
-            }
-          },
-        },
-      ),
+      onPanResponderMove: (_, g) => {
+        const ry = lastOffsetY.current + g.dy;
+        dragY.setValue(ry);
+        const beyond = ry <= minY || ry >= maxY;
+        if (beyond && !atEdge.current) { atEdge.current = true; Vibration.vibrate(20); }
+        else if (!beyond && atEdge.current) { atEdge.current = false; }
+      },
       onPanResponderRelease: (_, g) => {
-        dragXY.flattenOffset();
-        const nx = Math.max(minX, Math.min(maxX, lastOffset.current.x + g.dx));
-        const ny = Math.max(minY, Math.min(maxY, lastOffset.current.y + g.dy));
-        lastOffset.current = { x: nx, y: ny };
-        Animated.spring(dragXY, {
-          toValue: { x: nx, y: ny },
+        const ny = Math.max(minY, Math.min(maxY, lastOffsetY.current + g.dy));
+        lastOffsetY.current = ny;
+        Animated.spring(dragY, {
+          toValue: ny,
           useNativeDriver: false,
           tension: 90,
           friction: 11,
         }).start();
-        void AsyncStorage.setItem("ctrend_wc_tab_pos_2d", JSON.stringify({ x: nx, y: ny }));
+        void AsyncStorage.setItem("ctrend_wc_tab_pos_y", String(ny));
         fadeTab(IDLE_OPACITY);
         Vibration.vibrate(8);
       },
@@ -209,7 +190,7 @@ export function WorldCupFloating() {
             {live.map((f) => (
               <Pressable key={f.id} style={[st.row, st.rowLive]} onPress={() => openMatch(f)}>
                 <View style={st.liveBadge}>
-                  <Text style={st.liveBadgeText}>{f.minute != null ? `LIVE ${f.minute}'` : "LIVE"}</Text>
+                  <Text style={st.liveBadgeText}>{liveBadgeLabel(f)}</Text>
                 </View>
                 <View style={st.rowTeams}>
                   {f.homeTeam.crest ? <Image source={{ uri: f.homeTeam.crest }} style={st.crest} contentFit="contain" /> : null}
@@ -238,7 +219,7 @@ export function WorldCupFloating() {
                       <Text style={st.time}>{formatTime(f.kickoff)}</Text>
                       <Text style={st.countdown}>{countdownToKickoff(f.kickoff)}</Text>
                     </View>
-                    {f.campaignPostId ? (
+                    {canVoteOnFixture(f) ? (
                       <View style={st.voteChip}><Text style={st.voteChipText}>Vote</Text></View>
                     ) : null}
                   </Pressable>
@@ -277,8 +258,8 @@ export function WorldCupFloating() {
             st.tab,
             {
               opacity: tabOpacity,
-              transform: [{ translateX: dragXY.x }, { translateY: dragXY.y }],
-              left: 0,
+              transform: [{ translateY: dragY }],
+              left: tabX,
               top: 0,
             },
           ]}
