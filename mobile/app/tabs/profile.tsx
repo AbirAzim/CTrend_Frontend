@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  BackHandler,
   Dimensions,
   LayoutAnimation,
   LayoutChangeEvent,
@@ -42,13 +43,9 @@ import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
 import ProfileCompareCard from "../../components/ProfileCompareCard";
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = Math.floor((SCREEN_W - 38) / 2); // 2×14 padding + 10 gap
 const TAB_BAR_H = 64 + 14;
-const DEFAULT_CONTENT_H = Math.round(SCREEN_H * 0.52);
-const DEFAULT_PEOPLE_H = Math.round(SCREEN_H * 0.4);
-const MIN_SECTION_H = 160;
-const MAX_SECTION_H = SCREEN_H;
 
 // Smooth height animation when expanding/collapsing accordion sections.
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -200,61 +197,6 @@ function Section({
   );
 }
 
-// ─── Drag-to-resize handle ───────────────────────────────────────────────────
-
-// Height reserved in section body so content doesn't sit under the overlay handle.
-const HANDLE_SPACE = 70;
-
-// Rendered outside the ScrollView so no ScrollView can intercept the gesture.
-function OverlayResizeHandle({ pageY, height, setHeight, min, max, colors }: {
-  pageY: number;
-  height: number;
-  setHeight: (h: number) => void;
-  min: number;
-  max: number;
-  colors: ReturnType<typeof useTheme>["colors"];
-}) {
-  const heightRef = useRef(height);
-  heightRef.current = height;
-  const startY = useRef(0);
-  const startH = useRef(0);
-
-  return (
-    <View
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-      onResponderTerminationRequest={() => false}
-      onResponderGrant={(e) => {
-        startY.current = e.nativeEvent.pageY;
-        startH.current = heightRef.current;
-      }}
-      onResponderMove={(e) => {
-        const dy = e.nativeEvent.pageY - startY.current;
-        const next = Math.max(min, Math.min(max, startH.current - dy));
-        setHeight(Math.round(next));
-      }}
-      style={{
-        position: "absolute",
-        top: pageY,
-        left: 0,
-        right: 0,
-        zIndex: 999,
-        elevation: 8,
-        backgroundColor: colors.card,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: colors.border,
-        alignItems: "center",
-        paddingVertical: 14,
-        gap: 6,
-        marginBottom: 14,
-      }}
-    >
-      <View style={[st.resizePill, { backgroundColor: colors.accent }]} />
-      <Text style={[st.resizeHint, { color: colors.subtext }]}>↕  drag to resize</Text>
-    </View>
-  );
-}
-
 // ─── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
@@ -289,80 +231,38 @@ export default function ProfileScreen() {
   const [contentTab, setContentTab] = useState<"drops" | "scheduled" | "kept" | "voted">("drops");
   const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
   const [peopleTab, setPeopleTab] = useState<"friends" | "received" | "sent" | "suggestions">("friends");
-  const [contentHeight, setContentHeight] = useState(DEFAULT_CONTENT_H);
-  const [peopleHeight, setPeopleHeight] = useState(DEFAULT_PEOPLE_H);
   const [search, setSearch] = useState("");
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
 
-  // Accordion open/close state — everything collapsed by default for a clean,
-  // uncluttered first impression. Users expand what they want to see.
   const [openContent, setOpenContent] = useState(false);
   const [openPeople, setOpenPeople] = useState(false);
   const [openLegal, setOpenLegal] = useState(false);
   const [showAllInterests, setShowAllInterests] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  const peopleY = useRef(0);
-  const contentY = useRef(0);
 
-  // Marker refs for overlay handle positioning
-  const wrapperRef = useRef<View>(null);
-  const contentMarkerRef = useRef<View>(null);
-  const peopleMarkerRef = useRef<View>(null);
-  const [contentHandleY, setContentHandleY] = useState(-1);
-  const [peopleHandleY, setPeopleHandleY] = useState(-1);
-
-  const toggleContent = () => { animateLayout(); setOpenContent((v) => !v); };
+  const toggleContent = () => setOpenContent((v) => !v);
   const toggleLegal = () => { animateLayout(); setOpenLegal((v) => !v); };
-  const togglePeople = () => { animateLayout(); setOpenPeople((v) => !v); };
+  const togglePeople = () => setOpenPeople((v) => !v);
 
-  // Measure handle positions relative to the wrapper View (not screen) so
-  // position:'absolute' top values match regardless of status-bar/nav height.
+  // Android hardware back closes the full-screen section overlay.
   useEffect(() => {
-    if (!openContent) { setContentHandleY(-1); return; }
-    const t = setTimeout(() => {
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
-      contentMarkerRef.current?.measureLayout(
-        wrapper,
-        (_x, y) => { if (y >= 0) setContentHandleY(y); },
-        () => {},
-      );
-    }, 400);
-    return () => clearTimeout(t);
-  }, [openContent]);
+    if (!openContent && !openPeople) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (openContent) { setOpenContent(false); return true; }
+      if (openPeople) { setOpenPeople(false); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [openContent, openPeople]);
 
-  useEffect(() => {
-    if (!openPeople) { setPeopleHandleY(-1); return; }
-    const t = setTimeout(() => {
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
-      peopleMarkerRef.current?.measureLayout(
-        wrapper,
-        (_x, y) => { if (y >= 0) setPeopleHandleY(y); },
-        () => {},
-      );
-    }, 400);
-    return () => clearTimeout(t);
-  }, [openPeople]);
-
-  // Friends stat / count → open People, focus the Friends tab, scroll it into view.
   function jumpToFriends() {
     setPeopleTab("friends");
-    animateLayout();
     setOpenPeople(true);
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(peopleY.current - 12, 0), animated: true });
-    }, 160);
   }
 
-  // Compares / Votes / Kept stats → open "Your content" on the matching tab + scroll.
   function openContentOn(tab: "drops" | "kept" | "voted") {
     setContentTab(tab);
-    animateLayout();
     setOpenContent(true);
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(contentY.current - 12, 0), animated: true });
-    }, 160);
   }
 
   const setLoading = (id: string, on: boolean) =>
@@ -526,7 +426,7 @@ export default function ProfileScreen() {
   const loading = meLoading && !me;
 
   return (
-    <View ref={wrapperRef} style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
     <ScrollView
       ref={scrollRef}
       style={st.scroll}
@@ -670,410 +570,51 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
-          {/* ── Your content (collapsible: drops / scheduled / kept / voted) ── */}
-          <Section
-            icon="📊"
-            title="Your content"
-            subtitle={
-              posts.length + savedPosts.length + scheduledPosts.length === 0
-                ? "Share your first compare"
-                : `${posts.length} drops · ${scheduledPosts.length} scheduled · ${savedPosts.length} kept`
-            }
-            open={openContent}
-            onToggle={toggleContent}
-            colors={colors}
-            onLayout={(e) => { contentY.current = e.nativeEvent.layout.y; }}
+          {/* ── Your content (opens full-screen) ── */}
+          <Pressable
+            style={[st.section, st.sectionHead, { borderTopColor: colors.border }]}
+            onPress={toggleContent}
+            android_ripple={{ color: colors.accent + "11" }}
           >
-          {/* Zero-height marker — measured to position the overlay handle */}
-          <View ref={contentMarkerRef} style={{ height: 0 }} collapsable={false} />
-          <View style={{ height: HANDLE_SPACE }} />
-
-          {/* ── Drops / Kept / Voted tab row ── */}
-          <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
-            <Pressable
-              style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-              onPress={() => setContentTab("drops")}
-            >
-              <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
-                ✦ Drops{posts.length > 0 ? ` (${posts.length})` : ""}
+            <View style={[st.sectionIcon, { backgroundColor: colors.accent + "1a" }]}>
+              <Text style={{ fontSize: 16 }}>📊</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>Your content</Text>
+              <Text style={[st.sectionSub, { color: colors.muted }]} numberOfLines={1}>
+                {posts.length + savedPosts.length + scheduledPosts.length === 0
+                  ? "Share your first compare"
+                  : `${posts.length} drops · ${scheduledPosts.length} scheduled · ${savedPosts.length} kept`}
               </Text>
-            </Pressable>
-            <Pressable
-              style={[st.tabBtn, contentTab === "scheduled" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-              onPress={() => setContentTab("scheduled")}
-            >
-              <Text numberOfLines={1} style={[st.tabBtnText, { color: contentTab === "scheduled" ? colors.accent : colors.muted }]}>
-                ⏰ Sched{scheduledPosts.length > 0 ? ` (${scheduledPosts.length})` : ""}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-              onPress={() => setContentTab("kept")}
-            >
-              <Text style={[st.tabBtnText, { color: contentTab === "kept" ? colors.accent : colors.muted }]}>
-                🔖 Kept{savedPosts.length > 0 ? ` (${savedPosts.length})` : ""}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-              onPress={() => setContentTab("voted")}
-            >
-              <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
-                🗳️ Voted
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* ── Content section (resizable nested scroll) ── */}
-          <View style={{ height: contentHeight }}>
-
-            {/* ── Drops grid ── */}
-            {contentTab === "drops" && (
-              postsLoading && posts.length === 0 ? (
-                <View style={st.centerBox}>
-                  <ActivityIndicator color={colors.accent} />
-                </View>
-              ) : posts.length === 0 ? (
-                <View style={[st.emptyBox, { borderColor: colors.border }]}>
-                  <Text style={[st.emptyText, { color: colors.muted }]}>No posts yet — drop something!</Text>
-                </View>
-              ) : (
-                <ScrollView
-                  nestedScrollEnabled={false}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={st.gridContainer}
-                >
-                  <View style={st.grid}>
-                    {posts.map((p) => (
-                      <View key={p.id} style={{ width: CARD_W }}>
-                        <ProfileCompareCard
-                          post={p}
-                          variant="drops"
-                          onEdit={() => router.push(`/post/${p.id}` as `/${string}`)}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              )
-            )}
-
-            {/* ── Scheduled list ── */}
-            {contentTab === "scheduled" && (
-              scheduledLoading && scheduledPosts.length === 0 ? (
-                <View style={st.centerBox}>
-                  <ActivityIndicator color={colors.accent} />
-                </View>
-              ) : scheduledPosts.length === 0 ? (
-                <View style={[st.emptyBox, { borderColor: colors.border }]}>
-                  <Text style={[st.emptyText, { color: colors.muted }]}>
-                    No scheduled posts. Pick "Schedule for later" when creating a post.
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView
-                  nestedScrollEnabled={false}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ padding: 14, gap: 12 }}
-                >
-                  {scheduledPosts.map((p) => {
-                    const img0 = p.imageUrls?.[0] ?? p.options?.[0]?.imageUrl ?? null;
-                    const img1 = p.imageUrls?.[1] ?? p.options?.[1]?.imageUrl ?? null;
-                    const live = scheduledCountdown(p.scheduledAt) === "Going live…";
-                    const goesAt = p.scheduledAt
-                      ? new Date(p.scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-                      : null;
-                    return (
-                      <View key={p.id} style={[st.schedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        <View style={[st.schedThumbStrip, { backgroundColor: colors.section }]}>
-                          {img0 ? (
-                            <Image source={{ uri: img0 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
-                          ) : (
-                            <View style={[st.schedThumb, { alignItems: "center", justifyContent: "center" }]}>
-                              <Text style={{ fontSize: 22 }}>🖼</Text>
-                            </View>
-                          )}
-                          {img1 ? (
-                            <Image source={{ uri: img1 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
-                          ) : null}
-                        </View>
-                        <View style={st.schedBody}>
-                          {p.contentText ? (
-                            <Text style={[st.schedCaption, { color: colors.text }]} numberOfLines={2}>{p.contentText}</Text>
-                          ) : null}
-                          <View style={st.schedMetaRow}>
-                            <View style={[st.schedPill, { backgroundColor: live ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
-                              <Text style={[st.schedPillText, { color: live ? "#22c55e" : "#f59e0b" }]}>
-                                {live ? "🟢 Going live" : `⏱ in ${scheduledCountdown(p.scheduledAt)}`}
-                              </Text>
-                            </View>
-                            {p.category?.name ? (
-                              <Text style={[st.schedCategory, { color: colors.muted }]}>{p.category.name}</Text>
-                            ) : null}
-                          </View>
-                          {goesAt && !live ? (
-                            <Text style={[st.schedDate, { color: colors.muted }]}>Goes live at {goesAt}</Text>
-                          ) : null}
-                          <View style={st.schedActions}>
-                            <Pressable
-                              style={[st.schedEditBtn, { borderColor: colors.accent }]}
-                              onPress={() => router.push(`/edit-post?postId=${p.id}` as `/${string}`)}
-                            >
-                              <Text style={[st.schedEditText, { color: colors.accent }]}>Edit</Text>
-                            </Pressable>
-                            <Pressable
-                              style={[st.schedCancelBtn, { borderColor: "#f87171" }]}
-                              onPress={() => void handleCancelScheduled(p.id)}
-                            >
-                              <Text style={st.schedCancelText}>Cancel</Text>
-                            </Pressable>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              )
-            )}
-
-            {/* ── Kept grid ── */}
-            {contentTab === "kept" && (
-              savedPosts.length === 0 ? (
-                <View style={[st.emptyBox, { borderColor: colors.border }]}>
-                  <Text style={[st.emptyText, { color: colors.muted }]}>No saved posts yet</Text>
-                </View>
-              ) : (
-                <ScrollView
-                  nestedScrollEnabled={false}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={st.gridContainer}
-                >
-                  <View style={st.grid}>
-                    {savedPosts.map((p) => (
-                      <View key={p.id} style={{ width: CARD_W }}>
-                        <ProfileCompareCard post={p} variant="kept" />
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              )
-            )}
-
-            {/* ── Voted tab ── */}
-            {contentTab === "voted" && (
-              <View style={{ flex: 1 }}>
-                {/* Segmented All / Anonymous filter */}
-                <View style={[st.votedFilterWrap, { backgroundColor: colors.section }]}>
-                  {(["all", "anonymous"] as const).map((f) => (
-                    <Pressable
-                      key={f}
-                      style={[
-                        st.votedFilterBtn,
-                        votedFilter === f && [st.votedFilterBtnActive, { backgroundColor: colors.card }],
-                      ]}
-                      onPress={() => setVotedFilter(f)}
-                    >
-                      <Text style={[st.votedFilterText, { color: votedFilter === f ? colors.accent : colors.muted }]}>
-                        {f === "all" ? "All votes" : "👻 Anonymous"}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                {votedLoading && votedPosts.length === 0 ? (
-                  <View style={st.centerBox}>
-                    <ActivityIndicator color={colors.accent} />
-                  </View>
-                ) : votedPosts.length === 0 ? (
-                  <View style={[st.emptyBox, { borderColor: colors.border }]}>
-                    <Text style={[st.emptyText, { color: colors.muted }]}>
-                      {votedFilter === "anonymous"
-                        ? "You haven't voted anonymously on any posts yet."
-                        : "You haven't voted on any posts yet."}
-                    </Text>
-                  </View>
-                ) : (
-                  <ScrollView
-                    nestedScrollEnabled={false}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={st.gridContainer}
-                    style={{ flex: 1 }}
-                  >
-                    <View style={st.grid}>
-                      {votedPosts.map((p) => (
-                        <View key={p.id} style={{ width: CARD_W }}>
-                          <ProfileCompareCard post={p} variant="voted" />
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                )}
-              </View>
-            )}
-          </View>
-          </Section>
-
-          {/* ── People (collapsible) ── */}
-          <Section
-            icon="👥"
-            title="People"
-            subtitle={
-              friends.length > 0
-                ? `${friends.length} friend${friends.length === 1 ? "" : "s"}${requestedMe.length > 0 ? ` · ${requestedMe.length} request${requestedMe.length === 1 ? "" : "s"}` : ""}`
-                : "Find people to connect with"
-            }
-            badge={requestedMe.length}
-            open={openPeople}
-            onToggle={togglePeople}
-            colors={colors}
-            onLayout={(e) => { peopleY.current = e.nativeEvent.layout.y; }}
+            </View>
+            <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "600", marginRight: 2 }}>›</Text>
+          </Pressable>
+          {/* ── People (opens full-screen) ── */}
+          <Pressable
+            style={[st.section, st.sectionHead, { borderTopColor: colors.border }]}
+            onPress={togglePeople}
+            android_ripple={{ color: colors.accent + "11" }}
           >
-          {/* Zero-height marker — measured to position the overlay handle */}
-          <View ref={peopleMarkerRef} style={{ height: 0 }} collapsable={false} />
-          <View style={{ height: HANDLE_SPACE }} />
-
-          {/* Search */}
-          <View style={[st.searchWrap, { backgroundColor: colors.section, borderColor: colors.border }]}>
-            <Text style={{ fontSize: 14, color: colors.muted }}>🔍</Text>
-            <TextInput
-              style={[st.searchInput, { color: colors.text }]}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search by name, username or email…"
-              placeholderTextColor={colors.muted}
-            />
-            {search.length > 0 && (
-              <Pressable onPress={() => setSearch("")} hitSlop={8}>
-                <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* People sub-tabs */}
-          <View style={[st.peopleTabRow, { borderBottomColor: colors.border }]}>
-            {([
-              { key: "friends", label: `Friends${friends.length > 0 ? ` (${friends.length})` : ""}` },
-              { key: "received", label: `Received${requestedMe.length > 0 ? ` (${requestedMe.length})` : ""}` },
-              { key: "sent", label: `Sent${requestedByMe.length > 0 ? ` (${requestedByMe.length})` : ""}` },
-              { key: "suggestions", label: "Suggestions" },
-            ] as const).map((t) => (
-              <Pressable
-                key={t.key}
-                style={[st.peopleTabBtn, peopleTab === t.key && [st.peopleTabBtnActive, { borderBottomColor: colors.accent }]]}
-                onPress={() => setPeopleTab(t.key)}
-              >
-                <Text numberOfLines={1} style={[st.peopleTabText, { color: peopleTab === t.key ? colors.accent : colors.muted }]}>{t.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* People tab content */}
-          <View style={{ height: peopleHeight }}>
-          <ScrollView
-            nestedScrollEnabled={false}
-            showsVerticalScrollIndicator={false}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
-          >
-            {peopleTab === "friends" && (
-              filteredFriends.length === 0 ? (
-                search ? (
-                  <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No friends match.</Text>
-                ) : (
-                  <View style={st.friendsEmpty}>
-                    <Text style={{ fontSize: 40 }}>👋</Text>
-                    <Text style={[st.friendsEmptyTitle, { color: colors.text }]}>No friends yet</Text>
-                    <Text style={[st.friendsEmptyText, { color: colors.muted }]}>
-                      Find people to compare with — add friends to see their drops and vote together.
-                    </Text>
-                    <Pressable
-                      style={[st.findFriendsBtn, { backgroundColor: colors.accent }]}
-                      onPress={() => { animateLayout(); setPeopleTab("suggestions"); }}
-                    >
-                      <Text style={st.findFriendsBtnText}>🔍  Find friends</Text>
-                    </Pressable>
-                  </View>
-                )
-              ) : filteredFriends.map((f) => (
-                <PersonRow
-                  key={f.id} person={f} colors={colors}
-                  actionLoading={actionLoadingIds.has(f.id)}
-                  rightSlot={
-                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                      <Pressable style={[st.iconBtn, { backgroundColor: colors.accent }]} onPress={() => void handleDm(f.id)}>
-                        <Text style={{ fontSize: 14 }}>💬</Text>
-                      </Pressable>
-                      <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleUnfriend(f.id)}>
-                        <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Unfriend</Text>
-                      </Pressable>
-                    </View>
-                  }
-                />
-              ))
-            )}
-
-            {peopleTab === "received" && (
-              requestedMe.length === 0 ? (
-                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No incoming requests</Text>
-              ) : requestedMe.map((f) => (
-                <PersonRow
-                  key={f.id} person={f} colors={colors}
-                  actionLoading={actionLoadingIds.has(f.id)}
-                  rightSlot={
-                    <View style={{ flexDirection: "row", gap: 6 }}>
-                      <Pressable style={st.acceptBtn} onPress={() => void handleRespond(f.id, true)}>
-                        <Text style={st.acceptBtnText}>Accept</Text>
-                      </Pressable>
-                      <Pressable style={[st.rejectBtn, { borderColor: colors.border }]} onPress={() => void handleRespond(f.id, false)}>
-                        <Text style={[st.rejectBtnText, { color: colors.subtext }]}>Reject</Text>
-                      </Pressable>
-                    </View>
-                  }
-                />
-              ))
-            )}
-
-            {peopleTab === "sent" && (
-              requestedByMe.length === 0 ? (
-                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No sent requests</Text>
-              ) : requestedByMe.map((f) => (
-                <PersonRow
-                  key={f.id} person={f} colors={colors}
-                  actionLoading={actionLoadingIds.has(f.id)}
-                  rightSlot={
-                    <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-                      <View style={[st.pendingBadge, { borderColor: "#f59e0b55", backgroundColor: "#f59e0b22" }]}>
-                        <Text style={{ fontSize: 10, fontWeight: "700", color: "#f59e0b" }}>PENDING</Text>
-                      </View>
-                      <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleCancelRequest(f.id)}>
-                        <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Cancel</Text>
-                      </Pressable>
-                    </View>
-                  }
-                />
-              ))
-            )}
-
-            {peopleTab === "suggestions" && (
-              suggestions.length === 0 ? (
-                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>
-                  {search ? "No suggestions match." : "No suggestions"}
-                </Text>
-              ) : suggestions.map((f) => (
-                <PersonRow
-                  key={f.id} person={f} colors={colors}
-                  actionLoading={actionLoadingIds.has(f.id)}
-                  rightSlot={
-                    <Pressable style={[st.addBtn, { backgroundColor: colors.accent }]} onPress={() => void handleAddFriend(f.id)}>
-                      <Text style={st.addBtnText}>Add</Text>
-                    </Pressable>
-                  }
-                />
-              ))
-            )}
-          </ScrollView>
-          </View>
-          </Section>
+            <View style={[st.sectionIcon, { backgroundColor: colors.accent + "1a" }]}>
+              <Text style={{ fontSize: 16 }}>👥</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>People</Text>
+              <Text style={[st.sectionSub, { color: colors.muted }]} numberOfLines={1}>
+                {friends.length > 0
+                  ? `${friends.length} friend${friends.length === 1 ? "" : "s"}${requestedMe.length > 0 ? ` · ${requestedMe.length} request${requestedMe.length === 1 ? "" : "s"}` : ""}`
+                  : "Find people to connect with"}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              {requestedMe.length > 0 && (
+                <View style={[st.sectionBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={st.sectionBadgeText}>{requestedMe.length > 99 ? "99+" : requestedMe.length}</Text>
+                </View>
+              )}
+              <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "600", marginRight: 2 }}>›</Text>
+            </View>
+          </Pressable>
 
           {/* ── Legal & about (collapsible) ── */}
           <Section
@@ -1119,13 +660,338 @@ export default function ProfileScreen() {
       )}
     </ScrollView>
 
-    {/* Overlay handles — siblings of ScrollView so no ScrollView can intercept the drag */}
-    {openContent && contentHandleY >= 0 && (
-      <OverlayResizeHandle pageY={contentHandleY} height={contentHeight} setHeight={setContentHeight} min={MIN_SECTION_H} max={MAX_SECTION_H} colors={colors} />
+    {/* ── Your content — full-screen overlay ── */}
+    {openContent && (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 100, backgroundColor: colors.bg }]}>
+        <View style={[st.overlayBar, { paddingTop: insets.top, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <Pressable onPress={() => setOpenContent(false)} style={st.overlayBackBtn}>
+            <Text style={[st.overlayBackText, { color: colors.accent }]}>‹  Back</Text>
+          </Pressable>
+          <Text style={[st.overlayTitle, { color: colors.text }]}>Your content</Text>
+          <View style={{ width: 64 }} />
+        </View>
+        <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
+          <Pressable
+            style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+            onPress={() => setContentTab("drops")}
+          >
+            <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
+              ✦ Drops{posts.length > 0 ? ` (${posts.length})` : ""}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[st.tabBtn, contentTab === "scheduled" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+            onPress={() => setContentTab("scheduled")}
+          >
+            <Text numberOfLines={1} style={[st.tabBtnText, { color: contentTab === "scheduled" ? colors.accent : colors.muted }]}>
+              ⏰ Sched{scheduledPosts.length > 0 ? ` (${scheduledPosts.length})` : ""}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+            onPress={() => setContentTab("kept")}
+          >
+            <Text style={[st.tabBtnText, { color: contentTab === "kept" ? colors.accent : colors.muted }]}>
+              🔖 Kept{savedPosts.length > 0 ? ` (${savedPosts.length})` : ""}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
+            onPress={() => setContentTab("voted")}
+          >
+            <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
+              🗳️ Voted
+            </Text>
+          </Pressable>
+        </View>
+        <View style={{ flex: 1 }}>
+          {contentTab === "drops" && (
+            postsLoading && posts.length === 0 ? (
+              <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
+            ) : posts.length === 0 ? (
+              <View style={[st.emptyBox, { borderColor: colors.border }]}>
+                <Text style={[st.emptyText, { color: colors.muted }]}>No posts yet — drop something!</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.gridContainer}>
+                <View style={st.grid}>
+                  {posts.map((p) => (
+                    <View key={p.id} style={{ width: CARD_W }}>
+                      <ProfileCompareCard post={p} variant="drops" onEdit={() => router.push(`/post/${p.id}` as `/${string}`)} />
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            )
+          )}
+          {contentTab === "scheduled" && (
+            scheduledLoading && scheduledPosts.length === 0 ? (
+              <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
+            ) : scheduledPosts.length === 0 ? (
+              <View style={[st.emptyBox, { borderColor: colors.border }]}>
+                <Text style={[st.emptyText, { color: colors.muted }]}>
+                  No scheduled posts. Pick "Schedule for later" when creating a post.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 14, gap: 12 }}>
+                {scheduledPosts.map((p) => {
+                  const img0 = p.imageUrls?.[0] ?? p.options?.[0]?.imageUrl ?? null;
+                  const img1 = p.imageUrls?.[1] ?? p.options?.[1]?.imageUrl ?? null;
+                  const live = scheduledCountdown(p.scheduledAt) === "Going live…";
+                  const goesAt = p.scheduledAt
+                    ? new Date(p.scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                    : null;
+                  return (
+                    <View key={p.id} style={[st.schedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={[st.schedThumbStrip, { backgroundColor: colors.section }]}>
+                        {img0 ? (
+                          <Image source={{ uri: img0 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
+                        ) : (
+                          <View style={[st.schedThumb, { alignItems: "center", justifyContent: "center" }]}>
+                            <Text style={{ fontSize: 22 }}>🖼</Text>
+                          </View>
+                        )}
+                        {img1 ? (
+                          <Image source={{ uri: img1 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
+                        ) : null}
+                      </View>
+                      <View style={st.schedBody}>
+                        {p.contentText ? (
+                          <Text style={[st.schedCaption, { color: colors.text }]} numberOfLines={2}>{p.contentText}</Text>
+                        ) : null}
+                        <View style={st.schedMetaRow}>
+                          <View style={[st.schedPill, { backgroundColor: live ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
+                            <Text style={[st.schedPillText, { color: live ? "#22c55e" : "#f59e0b" }]}>
+                              {live ? "🟢 Going live" : `⏱ in ${scheduledCountdown(p.scheduledAt)}`}
+                            </Text>
+                          </View>
+                          {p.category?.name ? (
+                            <Text style={[st.schedCategory, { color: colors.muted }]}>{p.category.name}</Text>
+                          ) : null}
+                        </View>
+                        {goesAt && !live ? (
+                          <Text style={[st.schedDate, { color: colors.muted }]}>Goes live at {goesAt}</Text>
+                        ) : null}
+                        <View style={st.schedActions}>
+                          <Pressable
+                            style={[st.schedEditBtn, { borderColor: colors.accent }]}
+                            onPress={() => router.push(`/edit-post?postId=${p.id}` as `/${string}`)}
+                          >
+                            <Text style={[st.schedEditText, { color: colors.accent }]}>Edit</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[st.schedCancelBtn, { borderColor: "#f87171" }]}
+                            onPress={() => void handleCancelScheduled(p.id)}
+                          >
+                            <Text style={st.schedCancelText}>Cancel</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )
+          )}
+          {contentTab === "kept" && (
+            savedPosts.length === 0 ? (
+              <View style={[st.emptyBox, { borderColor: colors.border }]}>
+                <Text style={[st.emptyText, { color: colors.muted }]}>No saved posts yet</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.gridContainer}>
+                <View style={st.grid}>
+                  {savedPosts.map((p) => (
+                    <View key={p.id} style={{ width: CARD_W }}>
+                      <ProfileCompareCard post={p} variant="kept" />
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            )
+          )}
+          {contentTab === "voted" && (
+            <View style={{ flex: 1 }}>
+              <View style={[st.votedFilterWrap, { backgroundColor: colors.section }]}>
+                {(["all", "anonymous"] as const).map((f) => (
+                  <Pressable
+                    key={f}
+                    style={[st.votedFilterBtn, votedFilter === f && [st.votedFilterBtnActive, { backgroundColor: colors.card }]]}
+                    onPress={() => setVotedFilter(f)}
+                  >
+                    <Text style={[st.votedFilterText, { color: votedFilter === f ? colors.accent : colors.muted }]}>
+                      {f === "all" ? "All votes" : "👻 Anonymous"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {votedLoading && votedPosts.length === 0 ? (
+                <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
+              ) : votedPosts.length === 0 ? (
+                <View style={[st.emptyBox, { borderColor: colors.border }]}>
+                  <Text style={[st.emptyText, { color: colors.muted }]}>
+                    {votedFilter === "anonymous"
+                      ? "You haven't voted anonymously on any posts yet."
+                      : "You haven't voted on any posts yet."}
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.gridContainer} style={{ flex: 1 }}>
+                  <View style={st.grid}>
+                    {votedPosts.map((p) => (
+                      <View key={p.id} style={{ width: CARD_W }}>
+                        <ProfileCompareCard post={p} variant="voted" />
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
     )}
-    {openPeople && peopleHandleY >= 0 && (
-      <OverlayResizeHandle pageY={peopleHandleY} height={peopleHeight} setHeight={setPeopleHeight} min={MIN_SECTION_H} max={MAX_SECTION_H} colors={colors} />
+
+    {/* ── People — full-screen overlay ── */}
+    {openPeople && (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 100, backgroundColor: colors.bg }]}>
+        <View style={[st.overlayBar, { paddingTop: insets.top, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <Pressable onPress={() => setOpenPeople(false)} style={st.overlayBackBtn}>
+            <Text style={[st.overlayBackText, { color: colors.accent }]}>‹  Back</Text>
+          </Pressable>
+          <Text style={[st.overlayTitle, { color: colors.text }]}>People</Text>
+          <View style={{ width: 64 }} />
+        </View>
+        <View style={[st.searchWrap, { backgroundColor: colors.section, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 14, color: colors.muted }}>🔍</Text>
+          <TextInput
+            style={[st.searchInput, { color: colors.text }]}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name, username or email…"
+            placeholderTextColor={colors.muted}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch("")} hitSlop={8}>
+              <Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+        <View style={[st.peopleTabRow, { borderBottomColor: colors.border }]}>
+          {([
+            { key: "friends", label: `Friends${friends.length > 0 ? ` (${friends.length})` : ""}` },
+            { key: "received", label: `Received${requestedMe.length > 0 ? ` (${requestedMe.length})` : ""}` },
+            { key: "sent", label: `Sent${requestedByMe.length > 0 ? ` (${requestedByMe.length})` : ""}` },
+            { key: "suggestions", label: "Suggestions" },
+          ] as const).map((t) => (
+            <Pressable
+              key={t.key}
+              style={[st.peopleTabBtn, peopleTab === t.key && [st.peopleTabBtnActive, { borderBottomColor: colors.accent }]]}
+              onPress={() => setPeopleTab(t.key)}
+            >
+              <Text numberOfLines={1} style={[st.peopleTabText, { color: peopleTab === t.key ? colors.accent : colors.muted }]}>{t.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24 }}>
+          {peopleTab === "friends" && (
+            filteredFriends.length === 0 ? (
+              search ? (
+                <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No friends match.</Text>
+              ) : (
+                <View style={st.friendsEmpty}>
+                  <Text style={{ fontSize: 40 }}>👋</Text>
+                  <Text style={[st.friendsEmptyTitle, { color: colors.text }]}>No friends yet</Text>
+                  <Text style={[st.friendsEmptyText, { color: colors.muted }]}>
+                    Find people to compare with — add friends to see their drops and vote together.
+                  </Text>
+                  <Pressable
+                    style={[st.findFriendsBtn, { backgroundColor: colors.accent }]}
+                    onPress={() => setPeopleTab("suggestions")}
+                  >
+                    <Text style={st.findFriendsBtnText}>🔍  Find friends</Text>
+                  </Pressable>
+                </View>
+              )
+            ) : filteredFriends.map((f) => (
+              <PersonRow
+                key={f.id} person={f} colors={colors}
+                actionLoading={actionLoadingIds.has(f.id)}
+                rightSlot={
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <Pressable style={[st.iconBtn, { backgroundColor: colors.accent }]} onPress={() => void handleDm(f.id)}>
+                      <Text style={{ fontSize: 14 }}>💬</Text>
+                    </Pressable>
+                    <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleUnfriend(f.id)}>
+                      <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Unfriend</Text>
+                    </Pressable>
+                  </View>
+                }
+              />
+            ))
+          )}
+          {peopleTab === "received" && (
+            requestedMe.length === 0 ? (
+              <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No incoming requests</Text>
+            ) : requestedMe.map((f) => (
+              <PersonRow
+                key={f.id} person={f} colors={colors}
+                actionLoading={actionLoadingIds.has(f.id)}
+                rightSlot={
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <Pressable style={st.acceptBtn} onPress={() => void handleRespond(f.id, true)}>
+                      <Text style={st.acceptBtnText}>Accept</Text>
+                    </Pressable>
+                    <Pressable style={[st.rejectBtn, { borderColor: colors.border }]} onPress={() => void handleRespond(f.id, false)}>
+                      <Text style={[st.rejectBtnText, { color: colors.subtext }]}>Reject</Text>
+                    </Pressable>
+                  </View>
+                }
+              />
+            ))
+          )}
+          {peopleTab === "sent" && (
+            requestedByMe.length === 0 ? (
+              <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>No sent requests</Text>
+            ) : requestedByMe.map((f) => (
+              <PersonRow
+                key={f.id} person={f} colors={colors}
+                actionLoading={actionLoadingIds.has(f.id)}
+                rightSlot={
+                  <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                    <View style={[st.pendingBadge, { borderColor: "#f59e0b55", backgroundColor: "#f59e0b22" }]}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#f59e0b" }}>PENDING</Text>
+                    </View>
+                    <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleCancelRequest(f.id)}>
+                      <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                }
+              />
+            ))
+          )}
+          {peopleTab === "suggestions" && (
+            suggestions.length === 0 ? (
+              <Text style={[st.emptyText, { color: colors.muted, paddingVertical: 16 }]}>
+                {search ? "No suggestions match." : "No suggestions"}
+              </Text>
+            ) : suggestions.map((f) => (
+              <PersonRow
+                key={f.id} person={f} colors={colors}
+                actionLoading={actionLoadingIds.has(f.id)}
+                rightSlot={
+                  <Pressable style={[st.addBtn, { backgroundColor: colors.accent }]} onPress={() => void handleAddFriend(f.id)}>
+                    <Text style={st.addBtnText}>Add</Text>
+                  </Pressable>
+                }
+              />
+            ))
+          )}
+        </ScrollView>
+      </View>
     )}
+
     </View>
   );
 }
@@ -1155,25 +1021,6 @@ const st = StyleSheet.create({
   interestTagText: { fontSize: 12, fontWeight: "600" },
   interestMore: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 2, borderStyle: "dashed" },
   interestMoreText: { fontSize: 12, fontWeight: "700" },
-
-  // Drag-to-resize handle
-  resizeHandle: {
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: 14,
-    gap: 6,
-  },
-  resizePill: {
-    width: 52,
-    height: 5,
-    borderRadius: 3,
-  },
-  resizeHint: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
 
   // Collapsible sections (accordion)
   section: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 2 },
@@ -1299,6 +1146,12 @@ const st = StyleSheet.create({
   addBtn: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6 },
   addBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
   pendingBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+
+  // Full-screen section overlays
+  overlayBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  overlayBackBtn: { paddingHorizontal: 12, paddingVertical: 10, minWidth: 64 },
+  overlayBackText: { fontSize: 16, fontWeight: "700" },
+  overlayTitle: { fontSize: 16, fontWeight: "800", flex: 1, textAlign: "center" },
 
   // Profile footer (settings & legal)
   profileFooter: { marginTop: 8, paddingHorizontal: 16, paddingBottom: 8 },
