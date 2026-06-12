@@ -45,8 +45,10 @@ import ProfileCompareCard from "../../components/ProfileCompareCard";
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const CARD_W = Math.floor((SCREEN_W - 38) / 2); // 2×14 padding + 10 gap
 const TAB_BAR_H = 64 + 14;
-const SECTION_H = Math.round(SCREEN_H * 0.52);
-const PEOPLE_H = Math.round(SCREEN_H * 0.4);
+const DEFAULT_CONTENT_H = Math.round(SCREEN_H * 0.52);
+const DEFAULT_PEOPLE_H = Math.round(SCREEN_H * 0.4);
+const MIN_SECTION_H = 160;
+const MAX_SECTION_H = SCREEN_H;
 
 // Smooth height animation when expanding/collapsing accordion sections.
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -198,6 +200,61 @@ function Section({
   );
 }
 
+// ─── Drag-to-resize handle ───────────────────────────────────────────────────
+
+// Height reserved in section body so content doesn't sit under the overlay handle.
+const HANDLE_SPACE = 70;
+
+// Rendered outside the ScrollView so no ScrollView can intercept the gesture.
+function OverlayResizeHandle({ pageY, height, setHeight, min, max, colors }: {
+  pageY: number;
+  height: number;
+  setHeight: (h: number) => void;
+  min: number;
+  max: number;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) {
+  const heightRef = useRef(height);
+  heightRef.current = height;
+  const startY = useRef(0);
+  const startH = useRef(0);
+
+  return (
+    <View
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={(e) => {
+        startY.current = e.nativeEvent.pageY;
+        startH.current = heightRef.current;
+      }}
+      onResponderMove={(e) => {
+        const dy = e.nativeEvent.pageY - startY.current;
+        const next = Math.max(min, Math.min(max, startH.current - dy));
+        setHeight(Math.round(next));
+      }}
+      style={{
+        position: "absolute",
+        top: pageY,
+        left: 0,
+        right: 0,
+        zIndex: 999,
+        elevation: 8,
+        backgroundColor: colors.card,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.border,
+        alignItems: "center",
+        paddingVertical: 14,
+        gap: 6,
+        marginBottom: 14,
+      }}
+    >
+      <View style={[st.resizePill, { backgroundColor: colors.accent }]} />
+      <Text style={[st.resizeHint, { color: colors.subtext }]}>↕  drag to resize</Text>
+    </View>
+  );
+}
+
 // ─── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
@@ -232,6 +289,8 @@ export default function ProfileScreen() {
   const [contentTab, setContentTab] = useState<"drops" | "scheduled" | "kept" | "voted">("drops");
   const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
   const [peopleTab, setPeopleTab] = useState<"friends" | "received" | "sent" | "suggestions">("friends");
+  const [contentHeight, setContentHeight] = useState(DEFAULT_CONTENT_H);
+  const [peopleHeight, setPeopleHeight] = useState(DEFAULT_PEOPLE_H);
   const [search, setSearch] = useState("");
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
 
@@ -245,9 +304,46 @@ export default function ProfileScreen() {
   const peopleY = useRef(0);
   const contentY = useRef(0);
 
+  // Marker refs for overlay handle positioning
+  const wrapperRef = useRef<View>(null);
+  const contentMarkerRef = useRef<View>(null);
+  const peopleMarkerRef = useRef<View>(null);
+  const [contentHandleY, setContentHandleY] = useState(-1);
+  const [peopleHandleY, setPeopleHandleY] = useState(-1);
+
   const toggleContent = () => { animateLayout(); setOpenContent((v) => !v); };
   const toggleLegal = () => { animateLayout(); setOpenLegal((v) => !v); };
   const togglePeople = () => { animateLayout(); setOpenPeople((v) => !v); };
+
+  // Measure handle positions relative to the wrapper View (not screen) so
+  // position:'absolute' top values match regardless of status-bar/nav height.
+  useEffect(() => {
+    if (!openContent) { setContentHandleY(-1); return; }
+    const t = setTimeout(() => {
+      const wrapper = wrapperRef.current;
+      if (!wrapper) return;
+      contentMarkerRef.current?.measureLayout(
+        wrapper,
+        (_x, y) => { if (y >= 0) setContentHandleY(y); },
+        () => {},
+      );
+    }, 400);
+    return () => clearTimeout(t);
+  }, [openContent]);
+
+  useEffect(() => {
+    if (!openPeople) { setPeopleHandleY(-1); return; }
+    const t = setTimeout(() => {
+      const wrapper = wrapperRef.current;
+      if (!wrapper) return;
+      peopleMarkerRef.current?.measureLayout(
+        wrapper,
+        (_x, y) => { if (y >= 0) setPeopleHandleY(y); },
+        () => {},
+      );
+    }, 400);
+    return () => clearTimeout(t);
+  }, [openPeople]);
 
   // Friends stat / count → open People, focus the Friends tab, scroll it into view.
   function jumpToFriends() {
@@ -430,13 +526,15 @@ export default function ProfileScreen() {
   const loading = meLoading && !me;
 
   return (
+    <View ref={wrapperRef} style={{ flex: 1, backgroundColor: colors.bg }}>
     <ScrollView
       ref={scrollRef}
-      style={[st.scroll, { backgroundColor: colors.bg }]}
+      style={st.scroll}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
       showsVerticalScrollIndicator={false}
       onScroll={handleScroll}
       scrollEventThrottle={16}
+      scrollEnabled={!openContent && !openPeople}
     >
       {loading ? (
         <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 60 }} />
@@ -586,6 +684,10 @@ export default function ProfileScreen() {
             colors={colors}
             onLayout={(e) => { contentY.current = e.nativeEvent.layout.y; }}
           >
+          {/* Zero-height marker — measured to position the overlay handle */}
+          <View ref={contentMarkerRef} style={{ height: 0 }} collapsable={false} />
+          <View style={{ height: HANDLE_SPACE }} />
+
           {/* ── Drops / Kept / Voted tab row ── */}
           <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
             <Pressable
@@ -622,8 +724,8 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* ── Content section (fixed height, nested scroll) ── */}
-          <View style={{ height: SECTION_H }}>
+          {/* ── Content section (resizable nested scroll) ── */}
+          <View style={{ height: contentHeight }}>
 
             {/* ── Drops grid ── */}
             {contentTab === "drops" && (
@@ -637,7 +739,7 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <ScrollView
-                  nestedScrollEnabled
+                  nestedScrollEnabled={false}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={st.gridContainer}
                 >
@@ -670,7 +772,7 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <ScrollView
-                  nestedScrollEnabled
+                  nestedScrollEnabled={false}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{ padding: 14, gap: 12 }}
                 >
@@ -742,7 +844,7 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <ScrollView
-                  nestedScrollEnabled
+                  nestedScrollEnabled={false}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={st.gridContainer}
                 >
@@ -792,7 +894,7 @@ export default function ProfileScreen() {
                   </View>
                 ) : (
                   <ScrollView
-                    nestedScrollEnabled
+                    nestedScrollEnabled={false}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={st.gridContainer}
                     style={{ flex: 1 }}
@@ -826,6 +928,9 @@ export default function ProfileScreen() {
             colors={colors}
             onLayout={(e) => { peopleY.current = e.nativeEvent.layout.y; }}
           >
+          {/* Zero-height marker — measured to position the overlay handle */}
+          <View ref={peopleMarkerRef} style={{ height: 0 }} collapsable={false} />
+          <View style={{ height: HANDLE_SPACE }} />
 
           {/* Search */}
           <View style={[st.searchWrap, { backgroundColor: colors.section, borderColor: colors.border }]}>
@@ -863,10 +968,11 @@ export default function ProfileScreen() {
           </View>
 
           {/* People tab content */}
+          <View style={{ height: peopleHeight }}>
           <ScrollView
-            nestedScrollEnabled
+            nestedScrollEnabled={false}
             showsVerticalScrollIndicator={false}
-            style={{ height: PEOPLE_H }}
+            style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
           >
             {peopleTab === "friends" && (
@@ -966,6 +1072,7 @@ export default function ProfileScreen() {
               ))
             )}
           </ScrollView>
+          </View>
           </Section>
 
           {/* ── Legal & about (collapsible) ── */}
@@ -1011,6 +1118,15 @@ export default function ProfileScreen() {
         </>
       )}
     </ScrollView>
+
+    {/* Overlay handles — siblings of ScrollView so no ScrollView can intercept the drag */}
+    {openContent && contentHandleY >= 0 && (
+      <OverlayResizeHandle pageY={contentHandleY} height={contentHeight} setHeight={setContentHeight} min={MIN_SECTION_H} max={MAX_SECTION_H} colors={colors} />
+    )}
+    {openPeople && peopleHandleY >= 0 && (
+      <OverlayResizeHandle pageY={peopleHandleY} height={peopleHeight} setHeight={setPeopleHeight} min={MIN_SECTION_H} max={MAX_SECTION_H} colors={colors} />
+    )}
+    </View>
   );
 }
 
@@ -1039,6 +1155,25 @@ const st = StyleSheet.create({
   interestTagText: { fontSize: 12, fontWeight: "600" },
   interestMore: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 2, borderStyle: "dashed" },
   interestMoreText: { fontSize: 12, fontWeight: "700" },
+
+  // Drag-to-resize handle
+  resizeHandle: {
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: 14,
+    gap: 6,
+  },
+  resizePill: {
+    width: 52,
+    height: 5,
+    borderRadius: 3,
+  },
+  resizeHint: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
 
   // Collapsible sections (accordion)
   section: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 2 },

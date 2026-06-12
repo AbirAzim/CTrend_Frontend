@@ -21,7 +21,9 @@ import { useFollowedTeam } from "../lib/wcTeam";
 type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: boolean };
 
 const STORAGE_KEY_Y = "ctrend_wc_tab_pos_y";
-const TAB_H = 56;
+const TAB_H = 68;
+// Pixels the tab sticks out past the right edge (clips there naturally).
+const TAB_OVERHANG = 22;
 
 function loadPosY(): number | null {
   try {
@@ -155,7 +157,7 @@ export function WorldCupFloating() {
       <div
         ref={tabRef}
         className={`wc-tab${live.length > 0 ? " wc-tab--live" : ""}${dragging ? " wc-tab--dragging" : ""}`}
-        style={{ right: 10, top: posY }}
+        style={{ right: -TAB_OVERHANG, top: posY }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

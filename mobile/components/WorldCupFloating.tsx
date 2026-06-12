@@ -39,9 +39,11 @@ type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: bool
 type FixturesData = { worldCupFixtures: WcFixture[] };
 type CampaignsData = { activeCampaigns: Campaign[] };
 
-const TAB_W = 72;
-const TAB_H = 52;
-const IDLE_OPACITY = 0.5;
+const TAB_W = 90;
+const TAB_H = 66;
+const IDLE_OPACITY = 0.88;
+// How much of the tab is visible — the rest is clipped by the screen edge.
+const TAB_VISIBLE_FRAC = 0.68;
 
 export function WorldCupFloating() {
   const { colors } = useTheme();
@@ -66,7 +68,7 @@ export function WorldCupFloating() {
   }, []);
 
   // ── Vertical-only draggable tab (fixed on right edge) ───────────────────────
-  const tabX = W - TAB_W - 10;             // fixed X, 10px from right edge
+  const tabX = W - Math.round(TAB_W * TAB_VISIBLE_FRAC); // partially off right edge
   const minY = insets.top + 56;            // padding so it can't stick to status bar
   const maxY = H - insets.bottom - TAB_H - 96; // padding above bottom nav
 
@@ -334,9 +336,9 @@ function makeStyles(c: {
       zIndex: 1000,
     },
     tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
-    tabImg: { width: 36, height: 36 },
-    tabFlags: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 4 },
-    tabFlag: { width: 22, height: 22, borderRadius: 11 },
+    tabImg: { width: 44, height: 44 },
+    tabFlags: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6 },
+    tabFlag: { width: 28, height: 28, borderRadius: 14 },
     tabFlagPh: {
       width: 22, height: 22, borderRadius: 11,
       backgroundColor: c.section, alignItems: "center", justifyContent: "center",
@@ -344,13 +346,13 @@ function makeStyles(c: {
     tabFlagPhText: { fontSize: 8, fontWeight: "700", color: c.muted },
     tabFlagSep: { fontSize: 9, fontWeight: "700", color: c.muted },
     tabLiveDot: {
-      position: "absolute", top: 6, right: 6,
-      width: 10, height: 10, borderRadius: 5,
+      position: "absolute", top: 8, right: 8,
+      width: 12, height: 12, borderRadius: 6,
       backgroundColor: "#ef4444", borderWidth: 2, borderColor: c.card,
     },
     hint: {
       position: "absolute",
-      right: TAB_W + 6,
+      right: Math.round(TAB_W * TAB_VISIBLE_FRAC) + 6,
       top: (TAB_H - 28) / 2,
       backgroundColor: "rgba(0,0,0,0.75)",
       borderRadius: 8,
