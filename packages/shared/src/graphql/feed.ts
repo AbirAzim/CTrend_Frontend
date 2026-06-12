@@ -39,6 +39,13 @@ export const POST_VOTE_WINNER_FIELDS = `
       profileImageUrl
     }
   }
+  matchType
+  matchScore {
+    home
+    away
+    status
+    minute
+  }
 `;
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */

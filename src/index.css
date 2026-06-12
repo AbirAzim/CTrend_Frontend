@@ -2933,6 +2933,51 @@ a.cx-friend-avatar:hover {
   transform: translateX(-50%) translateY(0);
 }
 
+.cx-match-score-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: default;
+}
+.cx-match-score-chip--live {
+  color: #16a34a;
+  background: rgb(22 163 74 / 0.1);
+  border-color: rgb(22 163 74 / 0.35);
+}
+:root[data-theme="dark"] .cx-match-score-chip--live {
+  color: #4ade80;
+  background: rgb(74 222 128 / 0.12);
+  border-color: rgb(74 222 128 / 0.3);
+}
+.cx-match-score-chip--ht {
+  color: #d97706;
+  background: rgb(217 119 6 / 0.1);
+  border-color: rgb(217 119 6 / 0.35);
+}
+:root[data-theme="dark"] .cx-match-score-chip--ht {
+  color: #fbbf24;
+  background: rgb(251 191 36 / 0.12);
+  border-color: rgb(251 191 36 / 0.3);
+}
+.cx-match-score-chip--ft {
+  color: #64748b;
+  background: rgb(100 116 139 / 0.1);
+  border-color: rgb(100 116 139 / 0.3);
+}
+:root[data-theme="dark"] .cx-match-score-chip--ft {
+  color: #94a3b8;
+  background: rgb(148 163 184 / 0.12);
+  border-color: rgb(148 163 184 / 0.25);
+}
+
 .ig-more-btn {
   border: none;
   background: rgb(15 23 42 / 0.05);

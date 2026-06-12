@@ -115,6 +115,13 @@ export function mapGqlPostToFeedView(p: {
       profileImageUrl?: string | null;
     } | null;
   } | null;
+  matchType?: boolean | null;
+  matchScore?: {
+    home?: number | null;
+    away?: number | null;
+    status?: string | null;
+    minute?: number | null;
+  } | null;
 }): FeedPostView {
   const imageUrls = (p.imageUrls ?? []).filter(
     (u) => typeof u === "string" && u.trim().length > 0,
@@ -225,6 +232,15 @@ export function mapGqlPostToFeedView(p: {
           createdAt: p.campaignWinner.createdAt ?? null,
           user: p.campaignWinner.user ?? null,
         } satisfies FeedPostCampaignWinnerView)
+      : null,
+    matchType: p.matchType ?? false,
+    matchScore: p.matchScore
+      ? {
+          home: p.matchScore.home ?? null,
+          away: p.matchScore.away ?? null,
+          status: p.matchScore.status ?? null,
+          minute: p.matchScore.minute ?? null,
+        }
       : null,
   };
 }

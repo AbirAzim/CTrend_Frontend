@@ -85,6 +85,18 @@ export type FeedPostView = {
   voteWinner?: FeedPostVoteWinnerView | null;
   /** Campaign match winner — set after winnerScheduledAt passes and result is processed. */
   campaignWinner?: FeedPostCampaignWinnerView | null;
+  /**
+   * True for fixture-linked match posts (auto-scheduled World Cup posts).
+   * voteWinner is always null; winner is announced via campaignWinner after match ends.
+   */
+  matchType?: boolean;
+  /** Live/final score for match posts. null for regular posts or before kickoff. */
+  matchScore?: {
+    home: number | null;
+    away: number | null;
+    status: string | null;
+    minute: number | null;
+  } | null;
 };
 
 export type FeedPostCampaignView = {

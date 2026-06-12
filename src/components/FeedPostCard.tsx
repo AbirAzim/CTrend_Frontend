@@ -829,6 +829,20 @@ function FeedPostCardComponent({
       {categoryName}
     </span>
   ) : null;
+
+  const ms = post.matchScore;
+  const matchScoreChip =
+    ms && ms.status && ms.status !== "TIMED" ? (
+      <span
+        className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"}`}
+      >
+        {ms.status === "IN_PLAY"
+          ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0} – ${ms.away ?? 0}`
+          : ms.status === "PAUSED"
+          ? `HT  ${ms.home ?? 0} – ${ms.away ?? 0}`
+          : `FT  ${ms.home ?? 0} – ${ms.away ?? 0}`}
+      </span>
+    ) : null;
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
@@ -1488,7 +1502,9 @@ function FeedPostCardComponent({
   const isPlatformPost = post.postType === "system";
   const isUserGlobalPost = Boolean(post.isUserGlobalBroadcast) && !isPlatformPost;
   const hasCampaign = Boolean(post.campaign);
+  const isMatchPost = Boolean(post.matchType);
   const showVoteWinner =
+    !isMatchPost &&
     post.isVotingOpen === false &&
     post.voteWinner?.user &&
     (post.upvoteCount + post.downvoteCount > 0 ||
@@ -1503,19 +1519,17 @@ function FeedPostCardComponent({
       : null;
 
   // Campaign match lifecycle
-  const campaignHasWinner = Boolean(post.campaign?.hasWinner);
-  const showCampaignWinner = Boolean(post.campaignWinner) && campaignHasWinner;
+  const showCampaignWinner = Boolean(post.campaignWinner) && isMatchPost;
   const campaignWinnerOptionLabel =
     post.campaignWinner?.winningOption != null
       ? post.postOptions?.[post.campaignWinner.winningOption]?.label ??
         post.optionStats?.find((s) => s.index === post.campaignWinner?.winningOption)?.label ??
         null
       : null;
+  // Show "match in progress" only for fixture-linked posts where voting has
+  // closed (kickoff passed) but the real match result isn't in yet.
   const showMatchInProgress =
-    !showCampaignWinner &&
-    post.isVotingOpen === false &&
-    campaignHasWinner &&
-    post.campaign != null;
+    isMatchPost && post.isVotingOpen === false && !showCampaignWinner;
 
   return (
     <article
@@ -1541,7 +1555,7 @@ function FeedPostCardComponent({
               <span className="ig-post-username-row">
                 <span className="ig-post-username">{MODERATOR_PLATFORM_NAME}</span>
                 <span className="cx-platform-post-badge">Platform</span>
-                {categoryChip}
+                {categoryChip}{matchScoreChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>
@@ -1578,7 +1592,7 @@ function FeedPostCardComponent({
                 {isUserGlobalPost ? (
                   <span className="cx-user-global-post-badge">Global</span>
                 ) : null}
-                {categoryChip}
+                {categoryChip}{matchScoreChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>
@@ -1609,7 +1623,7 @@ function FeedPostCardComponent({
                 <span className="ig-post-username">
                   {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
                 </span>
-                {categoryChip}
+                {categoryChip}{matchScoreChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
             </div>

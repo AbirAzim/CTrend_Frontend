@@ -86,6 +86,13 @@ export type FeedPostView = {
   campaign?: FeedPostCampaignView | null;
   voteWinner?: FeedPostVoteWinnerView | null;
   campaignWinner?: FeedPostCampaignWinnerView | null;
+  matchType?: boolean;
+  matchScore?: {
+    home: number | null;
+    away: number | null;
+    status: string | null;
+    minute: number | null;
+  } | null;
 };
 
 export type VoteOptionStatView = {

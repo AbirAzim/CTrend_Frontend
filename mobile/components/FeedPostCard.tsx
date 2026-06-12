@@ -337,6 +337,17 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontSize: 10,
 			fontWeight: '800' as const,
 		},
+		matchScoreBadge: {
+			borderRadius: 999,
+			borderWidth: 1,
+			paddingHorizontal: 8,
+			paddingVertical: 1,
+		},
+		matchScoreText: {
+			fontSize: 10,
+			fontWeight: '800' as const,
+			letterSpacing: 0.3,
+		},
 		platformBadge: {
 			fontSize: 9,
 			fontWeight: '700' as const,
@@ -1945,16 +1956,16 @@ function FeedPostCardComponent({
 
 	// Campaign match lifecycle
 	const campaignHasWinner = Boolean(campaign?.hasWinner);
-	const showCampaignWinner = Boolean(post.campaignWinner) && campaignHasWinner;
+	const isMatchPost = Boolean(post.matchType);
+	const showCampaignWinner = Boolean(post.campaignWinner) && isMatchPost;
 	const campaignWinnerOptionLabel =
 		post.campaignWinner?.winningOption != null
 			? compareLabel(post, post.campaignWinner.winningOption)
 			: null;
+	// Show "match in progress" only for fixture-linked posts where voting has
+	// closed (kickoff passed) but the real match result isn't in yet.
 	const showMatchInProgress =
-		!showCampaignWinner &&
-		isVotingClosed &&
-		campaignHasWinner &&
-		campaign != null;
+		isMatchPost && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
@@ -2025,6 +2036,34 @@ function FeedPostCardComponent({
 										{showCatTip ? '🏷 Category' : categoryName}
 									</Text>
 								</Pressable>
+							) : null}
+							{post.matchScore && post.matchScore.status !== 'TIMED' ? (
+								<View style={[st.matchScoreBadge, {
+									backgroundColor: post.matchScore.status === 'IN_PLAY'
+										? '#16a34a22'
+										: post.matchScore.status === 'PAUSED'
+										? '#f59e0b22'
+										: '#6b728022',
+									borderColor: post.matchScore.status === 'IN_PLAY'
+										? '#16a34a'
+										: post.matchScore.status === 'PAUSED'
+										? '#f59e0b'
+										: '#6b7280',
+								}]}>
+									<Text style={[st.matchScoreText, {
+										color: post.matchScore.status === 'IN_PLAY'
+											? '#16a34a'
+											: post.matchScore.status === 'PAUSED'
+											? '#f59e0b'
+											: '#9ca3af',
+									}]}>
+										{post.matchScore.status === 'IN_PLAY'
+											? `⚽ ${post.matchScore.minute ?? 0}'  ${post.matchScore.home ?? 0} – ${post.matchScore.away ?? 0}`
+											: post.matchScore.status === 'PAUSED'
+											? `HT  ${post.matchScore.home ?? 0} – ${post.matchScore.away ?? 0}`
+											: `FT  ${post.matchScore.home ?? 0} – ${post.matchScore.away ?? 0}`}
+									</Text>
+								</View>
 							) : null}
 						</View>
 						{timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
@@ -2492,7 +2531,7 @@ function FeedPostCardComponent({
 			) : null}
 
 			{/* ── Two-zone action rail ── */}
-			{isVotingClosed && post.voteWinner?.user ? (
+			{isVotingClosed && !isMatchPost && post.voteWinner?.user ? (
 				<PostVoteWinnerBanner
 					winner={post.voteWinner}
 					optionLabel={
