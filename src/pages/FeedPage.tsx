@@ -34,6 +34,7 @@ type CampaignFilterRow = {
   id: string;
   name: string;
   isDefault?: boolean | null;
+  fixturesEnabled?: boolean | null;
 };
 
 function friendName(f: FriendRow): string {
@@ -307,9 +308,22 @@ export function FeedPage() {
   }, [campaignsData?.activeCampaigns]);
   const activeCampaign = campaignFilters.find((c) => c.id === activeCampaignId) ?? null;
 
+  // For fixture-enabled campaigns (World Cup), sort posts so the current/nearest
+  // match appears first. Sort by proximity of votingEndsAt to now: the live match
+  // (voting just closed) and the next upcoming match both sort to the top.
+  const sortedPosts = useMemo(() => {
+    if (!activeCampaign?.fixturesEnabled) return posts;
+    const now = Date.now();
+    return [...posts].sort((a, b) => {
+      const aKey = a.votingEndsAt ? Math.abs(new Date(a.votingEndsAt).getTime() - now) : Infinity;
+      const bKey = b.votingEndsAt ? Math.abs(new Date(b.votingEndsAt).getTime() - now) : Infinity;
+      return aKey - bKey;
+    });
+  }, [posts, activeCampaign?.fixturesEnabled]);
+
   const visiblePosts = useMemo(
-    () => posts.slice(0, visibleCount),
-    [posts, visibleCount],
+    () => sortedPosts.slice(0, visibleCount),
+    [sortedPosts, visibleCount],
   );
 
   const showApiError = !useMockFeed && Boolean(error);
