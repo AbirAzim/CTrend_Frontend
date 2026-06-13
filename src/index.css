@@ -2029,27 +2029,31 @@ body.capacitor .ig-bottom-nav {
   margin: 0 10px 12px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgb(16 185 129 / 0.3);
-  background: rgb(209 250 229 / 0.5);
+  border: 1px solid rgb(100 116 139 / 0.3);
+  background: rgb(100 116 139 / 0.07);
   font-size: 0.82rem;
   font-weight: 600;
-  color: rgb(6 95 70);
+  color: var(--cx-ink);
+}
+.cx-match-in-progress--live {
+  border-color: rgb(34 197 94 / 0.35);
+  background: rgb(34 197 94 / 0.09);
+  color: rgb(21 128 61);
 }
 
 .cx-match-in-progress-icon {
   font-size: 1.1rem;
-  animation: cx-bounce-soccer 1.2s ease-in-out infinite;
-}
-
-@keyframes cx-bounce-soccer {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
 }
 
 :root[data-theme="dark"] .cx-match-in-progress {
-  background: rgb(6 36 24 / 0.55);
-  border-color: rgb(52 211 153 / 0.25);
-  color: #6ee7b7;
+  background: rgb(100 116 139 / 0.1);
+  border-color: rgb(100 116 139 / 0.25);
+  color: var(--cx-ink);
+}
+:root[data-theme="dark"] .cx-match-in-progress--live {
+  background: rgb(34 197 94 / 0.1);
+  border-color: rgb(52 211 153 / 0.3);
+  color: #86efac;
 }
 
 .ig-create-campaign-hint {

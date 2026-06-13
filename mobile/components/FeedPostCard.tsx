@@ -2011,8 +2011,8 @@ function FeedPostCardComponent({
 			: null;
 	// Show "match in progress" only for fixture-linked posts where voting has
 	// closed (kickoff passed) but the real match result isn't in yet.
-	const showMatchInProgress =
-		isMatchPost && isVotingClosed && !showCampaignWinner;
+	const showMatchLive = isMatchPost && isLiveMatch;
+	const showMatchCalculating = isMatchPost && !isLiveMatch && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
@@ -2601,13 +2601,18 @@ function FeedPostCardComponent({
 					campaign={campaign}
 					winningOptionLabel={campaignWinnerOptionLabel}
 				/>
-			) : showMatchInProgress ? (
+			) : showMatchLive ? (
+				<View style={[matchInProgressStyles.container, matchInProgressStyles.containerLive]}>
+					<Text style={matchInProgressStyles.icon}>🟢</Text>
+					<Text style={matchInProgressStyles.text}>Match is live</Text>
+				</View>
+			) : showMatchCalculating ? (
 				<View style={matchInProgressStyles.container}>
-					<Text style={matchInProgressStyles.icon}>⚽</Text>
+					<Text style={matchInProgressStyles.icon}>⏳</Text>
 					<Text style={matchInProgressStyles.text}>
 						{winnerCountdown
-							? `Winner announced in ${winnerCountdown}`
-							: 'Match in progress — calculating winner…'}
+							? `Calculating winner — revealed in ${winnerCountdown}`
+							: 'Calculating winner…'}
 					</Text>
 				</View>
 			) : null}
@@ -3469,8 +3474,12 @@ const matchInProgressStyles = StyleSheet.create({
 		paddingVertical: 10,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: 'rgba(16,185,129,0.3)',
-		backgroundColor: 'rgba(16,185,129,0.08)',
+		borderColor: 'rgba(100,116,139,0.3)',
+		backgroundColor: 'rgba(100,116,139,0.08)',
+	},
+	containerLive: {
+		borderColor: 'rgba(34,197,94,0.35)',
+		backgroundColor: 'rgba(34,197,94,0.09)',
 	},
 	icon: { fontSize: 18 },
 	text: {

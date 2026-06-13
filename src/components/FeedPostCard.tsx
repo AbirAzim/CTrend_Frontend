@@ -1528,11 +1528,12 @@ function FeedPostCardComponent({
       : null;
   // Show "match in progress" only for fixture-linked posts where voting has
   // closed (kickoff passed) but the real match result isn't in yet.
-  const showMatchInProgress =
-    isMatchPost && post.isVotingOpen === false && !showCampaignWinner;
-
   const isLiveMatch =
     post.matchScore?.status === "IN_PLAY" || post.matchScore?.status === "PAUSED";
+
+  const showMatchLive = isMatchPost && isLiveMatch;
+  const showMatchCalculating =
+    isMatchPost && !isLiveMatch && post.isVotingOpen === false && !showCampaignWinner;
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)
@@ -2124,13 +2125,18 @@ function FeedPostCardComponent({
           campaign={post.campaign}
           winningOptionLabel={campaignWinnerOptionLabel}
         />
-      ) : showMatchInProgress ? (
+      ) : showMatchLive ? (
+        <div className="cx-match-in-progress cx-match-in-progress--live" role="status" aria-live="polite">
+          <span className="cx-match-in-progress-icon" aria-hidden>🟢</span>
+          <span>Match is live</span>
+        </div>
+      ) : showMatchCalculating ? (
         <div className="cx-match-in-progress" role="status" aria-live="polite">
-          <span className="cx-match-in-progress-icon" aria-hidden>⚽</span>
+          <span className="cx-match-in-progress-icon" aria-hidden>⏳</span>
           <span>
             {winnerCountdownLabel
-              ? `Winner announced in ${winnerCountdownLabel}`
-              : "Match in progress — calculating winner…"}
+              ? `Calculating winner — revealed in ${winnerCountdownLabel}`
+              : "Calculating winner…"}
           </span>
         </div>
       ) : null}
