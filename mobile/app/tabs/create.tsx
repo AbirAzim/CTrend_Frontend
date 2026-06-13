@@ -245,8 +245,9 @@ export default function CreateScreen() {
   const isEdit = Boolean(editId);
 
   // Post layout: `compare` (image grid) or `poll` (stacked option rows).
-  const [format, setFormat] = useState<"compare" | "poll">("compare");
+  const [format, setFormat] = useState<"compare" | "poll" | "announcement">("compare");
   const isPoll = format === "poll";
+  const isAnnouncement = format === "announcement";
 
   const [slots, setSlots] = useState<Slot[]>([makeSlot("1"), makeSlot("2")]);
   // Poll-only body/context images (post-level imageUrls). Optional, 0+.
@@ -321,8 +322,8 @@ export default function CreateScreen() {
       .filter((u) => u.length > 0);
     return {
       id: "preview",
-      format: format as "compare" | "poll",
-      postType: isAdmin && platformWide ? "system" : "user",
+      format: format as "compare" | "poll" | "announcement",
+      postType: isAdmin && (platformWide || isAnnouncement) ? "system" : "user",
       isUserGlobalBroadcast: broadcastGlobally || null,
       authorId: user?.id ?? "preview",
       authorUsername: user?.username ?? "you",
@@ -341,7 +342,7 @@ export default function CreateScreen() {
       downvoteCount: 0,
       viewerVote: null,
       mySelectedOptionIndex: null,
-      isVotingOpen: true,
+      isVotingOpen: isAnnouncement ? false : true,
       createdAt: new Date().toISOString(),
       category: selectedCat ? { id: selectedCat.id, name: selectedCat.name ?? "", slug: null, color: null } : null,
       campaign: selectedCampaign ? { id: selectedCampaign.id, name: selectedCampaign.name, slug: "", prizePerWinner: 0, hasRewards: null, hasWinner: null } : null,
@@ -349,7 +350,7 @@ export default function CreateScreen() {
       hypeCount: 0,
       saveCount: 0,
     };
-  }, [format, slots, caption, user, isAdmin, platformWide, broadcastGlobally, bodyImages, selectedCat, selectedCampaign]);
+  }, [format, isAnnouncement, slots, caption, user, isAdmin, platformWide, broadcastGlobally, bodyImages, selectedCat, selectedCampaign]);
 
   // Platform setting: can normal users broadcast a post globally? (Phase 36)
   const { data: platformSettingsData } = useQuery<{ platformSettings: { allowUserGlobalPosts: boolean } }>(
@@ -643,7 +644,11 @@ export default function CreateScreen() {
     let imageUrls: string[];
     let options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
 
-    if (isPoll) {
+    if (isAnnouncement) {
+      // Announcement: no options, images from bodyImages list (up to 6).
+      options = [];
+      imageUrls = bodyImages.map((b) => b.publicUrl).filter((u): u is string => Boolean(u));
+    } else if (isPoll) {
       if (slots.some((s) => s.uploading) || bodyImages.some((b) => b.uploading)) {
         setSubmitError("Please wait for uploads to finish."); return;
       }
@@ -719,8 +724,9 @@ export default function CreateScreen() {
     }
 
     try {
-      const mutFn = isAdmin && platformWide ? createSystemPost : createPost;
-      await mutFn({ variables: { input }, refetchQueries: isAdmin && platformWide ? [] : [{ query: FEED_POSTS }] });
+      const useSystem = isAdmin && (platformWide || isAnnouncement);
+      const mutFn = useSystem ? createSystemPost : createPost;
+      await mutFn({ variables: { input }, refetchQueries: useSystem ? [] : [{ query: FEED_POSTS }] });
       resetForm();
       router.replace("/tabs");
     } catch (err: unknown) {
@@ -771,7 +777,7 @@ export default function CreateScreen() {
             <View style={{ width: 60 }} />
           )}
           <Text style={[st.screenTitle, { color: colors.text }]}>
-            {isEdit ? "Edit Compare" : isPoll ? "New Poll" : "New Compare"}
+            {isEdit ? "Edit Compare" : isAnnouncement ? "New Announcement" : isPoll ? "New Poll" : "New Compare"}
           </Text>
           <View style={{ width: 60 }} />
         </View>
@@ -779,7 +785,11 @@ export default function CreateScreen() {
         {/* ── Format switcher (create only) ── */}
         {!isEdit && (
           <View style={[st.formatSwitch, { backgroundColor: colors.section, borderColor: colors.border }]}>
-            {(["compare", "poll"] as const).map((f) => {
+            {([
+              { f: "compare", label: "🖼  Compare" },
+              { f: "poll", label: "📊  Poll" },
+              ...(isAdmin ? [{ f: "announcement", label: "📢  Announce" }] : []),
+            ] as Array<{ f: "compare" | "poll" | "announcement"; label: string }>).map(({ f, label }) => {
               const active = format === f;
               return (
                 <Pressable
@@ -788,7 +798,7 @@ export default function CreateScreen() {
                   onPress={() => setFormat(f)}
                 >
                   <Text style={[st.formatBtnText, { color: active ? "#fff" : colors.subtext }]}>
-                    {f === "compare" ? "🖼  Compare" : "📊  Poll"}
+                    {label}
                   </Text>
                 </Pressable>
               );
@@ -797,7 +807,39 @@ export default function CreateScreen() {
         )}
 
         {/* ── Compare slots (2-col grid) ── */}
-        {!isPoll ? (
+        {isAnnouncement ? (
+          /* ── Announcement images ── */
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, gap: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 14 }}>🖼</Text>
+              <Text style={[st.settingKey, { color: colors.text }]}>Images</Text>
+              <Text style={[st.optional, { color: colors.muted }]}>optional · up to 6</Text>
+            </View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+              {bodyImages.map((b) => (
+                <View key={b.id} style={[st.bodyCell, { borderColor: colors.border, backgroundColor: colors.section }]}>
+                  {b.uploading ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : b.publicUrl || b.localUri ? (
+                    <Image source={{ uri: (b.publicUrl ?? b.localUri) as string }} style={st.bodyCellImg} contentFit="cover" />
+                  ) : null}
+                  <Pressable style={st.bodyRemove} onPress={() => removeBodyImage(b.id)} hitSlop={6}>
+                    <Text style={st.bodyRemoveText}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+              {bodyImages.length < 6 && (
+                <Pressable
+                  style={[st.bodyAdd, { borderColor: colors.accent + "88" }]}
+                  onPress={() => void pickAndUploadBody()}
+                >
+                  <Text style={[st.pollThumbPlus, { color: colors.accent }]}>＋</Text>
+                  <Text style={[st.optional, { color: colors.accent }]}>Add</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        ) : !isPoll ? (
         <View style={{ gap: 12 }}>
           {isEdit && (
             <Text style={[st.lockedNote, { color: colors.muted, backgroundColor: colors.section, borderColor: colors.border }]}>
@@ -1079,7 +1121,7 @@ export default function CreateScreen() {
               style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
               value={caption}
               onChangeText={setCaption}
-              placeholder={isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
+              placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
               placeholderTextColor={colors.muted}
               multiline
               numberOfLines={3}
@@ -1087,34 +1129,38 @@ export default function CreateScreen() {
             />
           </View>
 
-          {/* Set voting deadline */}
-          <View style={[st.settingRow, !deadlineEnabled ? {} : { borderBottomColor: colors.border }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 14 }}>⏱</Text>
-              <Text style={[st.settingKey, { color: colors.text }]}>Set voting deadline</Text>
-              <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
-            </View>
-            <Switch
-              value={deadlineEnabled}
-              onValueChange={setDeadlineEnabled}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor="#fff"
-            />
-          </View>
-          {deadlineEnabled && (
-            <View style={{ gap: 10, paddingBottom: 6, paddingTop: 4 }}>
-              <DateTimePicker
-                colors={colors} enabled={deadlineEnabled} onToggle={setDeadlineEnabled}
-                presetHours={deadlinePreset} onPresetChange={setDeadlinePreset}
-                customDate={deadlineCustom} onCustomChange={setDeadlineCustom}
-                showCustom={deadlineEnabled}
-              />
-            </View>
+          {/* Set voting deadline — hidden for announcements */}
+          {!isAnnouncement && (
+            <>
+              <View style={[st.settingRow, !deadlineEnabled ? {} : { borderBottomColor: colors.border }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 14 }}>⏱</Text>
+                  <Text style={[st.settingKey, { color: colors.text }]}>Set voting deadline</Text>
+                  <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
+                </View>
+                <Switch
+                  value={deadlineEnabled}
+                  onValueChange={setDeadlineEnabled}
+                  trackColor={{ false: colors.border, true: colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {deadlineEnabled && (
+                <View style={{ gap: 10, paddingBottom: 6, paddingTop: 4 }}>
+                  <DateTimePicker
+                    colors={colors} enabled={deadlineEnabled} onToggle={setDeadlineEnabled}
+                    presetHours={deadlinePreset} onPresetChange={setDeadlinePreset}
+                    customDate={deadlineCustom} onCustomChange={setDeadlineCustom}
+                    showCustom={deadlineEnabled}
+                  />
+                </View>
+              )}
+            </>
           )}
         </View>
 
-        {/* Schedule date picker — only shown when schedule mode is active */}
-        {scheduleEnabled && (
+        {/* Schedule date picker — only shown when schedule mode is active (not for announcements) */}
+        {!isAnnouncement && scheduleEnabled && (
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.accent + "66" }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
               <Text style={{ fontSize: 16 }}>🕐</Text>
@@ -1146,10 +1192,10 @@ export default function CreateScreen() {
             >
               {isSubmitting && !scheduleEnabled
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={st.launchBtnText}>{isEdit ? "Save changes" : isAdmin && platformWide ? "Launch platform-wide →" : "Launch it →"}</Text>
+                : <Text style={st.launchBtnText}>{isEdit ? "Save changes" : isAnnouncement ? "Post announcement →" : isAdmin && platformWide ? "Launch platform-wide →" : "Launch it →"}</Text>
               }
             </Pressable>
-            {!isEdit && (
+            {!isEdit && !isAnnouncement && (
               <Pressable
                 style={[st.scheduleBtn, { borderColor: colors.border, backgroundColor: scheduleEnabled ? colors.accent + "18" : colors.section }]}
                 onPress={() => setScheduleEnabled((v) => !v)}

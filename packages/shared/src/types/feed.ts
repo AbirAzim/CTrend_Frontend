@@ -4,8 +4,8 @@ export type PostStatus = "published" | "scheduled";
 
 export type FeedPostType = "user" | "system" | "org";
 
-/** Post layout: `compare` = side-by-side images, `poll` = stacked option rows. */
-export type PostFormat = "compare" | "poll";
+/** Post layout: `compare` = side-by-side images, `poll` = stacked option rows, `announcement` = admin info post no voting. */
+export type PostFormat = "compare" | "poll" | "announcement";
 
 export type FeedPostView = {
   id: string;

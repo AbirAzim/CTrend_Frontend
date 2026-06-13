@@ -425,6 +425,27 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			lineHeight: 21,
 			fontWeight: '400' as const,
 		},
+		captionAnnouncement: {
+			fontSize: 15,
+			lineHeight: 23,
+			paddingBottom: 12,
+		},
+		annHeader: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			paddingHorizontal: 14,
+			paddingVertical: 7,
+			backgroundColor: isDark ? 'rgba(234,88,12,0.15)' : 'rgba(234,88,12,0.09)',
+			borderTopWidth: 1,
+			borderBottomWidth: 1,
+			borderColor: isDark ? 'rgba(234,88,12,0.35)' : 'rgba(234,88,12,0.22)',
+		},
+		annHeaderText: {
+			fontSize: 11,
+			fontWeight: '800' as const,
+			letterSpacing: 0.8,
+			color: isDark ? '#fb923c' : '#c2410c',
+		},
 		compareWrap: { flexDirection: 'row' as const, gap: 3 },
 		compareCell: { flex: 1, height: IMG_H, overflow: 'hidden' as const },
 		compareCellLoser: { opacity: 0.5 },
@@ -1104,6 +1125,73 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 	};
 }
 
+function AnnouncementImageGrid({ urls }: { urls: string[] }) {
+	const count = urls.length;
+	const gap = 2;
+	const screenWidth = Dimensions.get('window').width;
+	const halfW = (screenWidth - gap) / 2;
+
+	if (count === 1) {
+		return (
+			<Image
+				source={{ uri: urls[0] }}
+				style={{ width: '100%', aspectRatio: 16 / 9 }}
+				contentFit='cover'
+				cachePolicy='memory-disk'
+			/>
+		);
+	}
+	if (count === 2) {
+		return (
+			<View style={{ flexDirection: 'row', gap }}>
+				{urls.map((u, i) => (
+					<Image key={i} source={{ uri: u }} style={{ width: halfW, aspectRatio: 1 }} contentFit='cover' cachePolicy='memory-disk' />
+				))}
+			</View>
+		);
+	}
+	if (count === 3) {
+		return (
+			<View>
+				<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='cover' cachePolicy='memory-disk' />
+				<View style={{ flexDirection: 'row', gap, marginTop: gap }}>
+					{urls.slice(1).map((u, i) => (
+						<Image key={i} source={{ uri: u }} style={{ width: halfW, aspectRatio: 1 }} contentFit='cover' cachePolicy='memory-disk' />
+					))}
+				</View>
+			</View>
+		);
+	}
+	if (count === 4) {
+		return (
+			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
+				{urls.map((u, i) => (
+					<Image key={i} source={{ uri: u }} style={{ width: halfW, aspectRatio: 1 }} contentFit='cover' cachePolicy='memory-disk' />
+				))}
+			</View>
+		);
+	}
+	// 5 or 6: first large, then 2-col grid
+	const extra = count - 5;
+	return (
+		<View>
+			<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='cover' cachePolicy='memory-disk' />
+			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap, marginTop: gap }}>
+				{urls.slice(1, 5).map((u, i) => (
+					<View key={i} style={{ width: halfW, aspectRatio: 1 }}>
+						<Image source={{ uri: u }} style={{ width: '100%', height: '100%' }} contentFit='cover' cachePolicy='memory-disk' />
+						{i === 3 && extra > 0 && (
+							<View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+								<Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>+{extra + 1}</Text>
+							</View>
+						)}
+					</View>
+				))}
+			</View>
+		</View>
+	);
+}
+
 function FeedPostCardComponent({
 	post,
 	variant = 'feed',
@@ -1313,8 +1401,9 @@ function FeedPostCardComponent({
 	});
 	const multiTotal = activeStats?.reduce((sum, s) => sum + s.count, 0) ?? 0;
 
-	// ── Poll format — stacked text/thumbnail rows, each its own colour ──
-	const isPoll = post.format === 'poll';
+	// ── Post format flags ──
+	const isAnnouncement = post.format === 'announcement';
+	const isPoll = !isAnnouncement && post.format === 'poll';
 	const pollOptions = post.postOptions ?? [];
 	const pollOptionCount = isPoll
 		? Math.max(pollOptions.length, activeStats?.length ?? 0)
@@ -2134,11 +2223,24 @@ function FeedPostCardComponent({
 			{/* Campaign ribbon */}
 			{campaign ? <PostCampaignBadge campaign={campaign} /> : null}
 
-			{/* Caption */}
-			{post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
+			{/* Announcement header strip */}
+			{isAnnouncement && (
+				<View style={st.annHeader}>
+					<Text style={st.annHeaderText}>📢  ANNOUNCEMENT</Text>
+				</View>
+			)}
 
-			{/* Compare images */}
-			{isPoll ? (
+			{/* Caption */}
+			{post.caption ? (
+				<Text style={[st.caption, isAnnouncement && st.captionAnnouncement]}>
+					{post.caption}
+				</Text>
+			) : null}
+
+			{/* Announcement image grid */}
+			{isAnnouncement && post.imageUrls.length > 0 ? (
+				<AnnouncementImageGrid urls={post.imageUrls} />
+			) : isPoll ? (
 				<View>
 					{post.imageUrls.length > 0 ? (
 						<View style={st.pollBodyMedia}>
@@ -2694,14 +2796,18 @@ function FeedPostCardComponent({
 						isSave: true,
 						active: saved,
 					},
-					{
-						i: 5,
-						icon: 'people-outline',
-						accessLabel: 'Voters',
-						onPress: () => openVoters(null),
-						count: votersTotal,
-						isVoters: true,
-					},
+					...(!isAnnouncement
+						? [
+								{
+									i: 5,
+									icon: 'people-outline',
+									accessLabel: 'Voters',
+									onPress: () => openVoters(null),
+									count: votersTotal,
+									isVoters: true,
+								} as ChipDef,
+							]
+						: []),
 				];
 
 				return (
@@ -2772,8 +2878,8 @@ function FeedPostCardComponent({
 							)}
 						</View>
 
-						{/* Zone 2 — status + see details (compare & poll posts) */}
-						{statusText ? (
+						{/* Zone 2 — status + see details (compare & poll posts, not announcements) */}
+						{!isAnnouncement && statusText ? (
 							<View style={st.actionRailContext}>
 								<Text
 									style={[

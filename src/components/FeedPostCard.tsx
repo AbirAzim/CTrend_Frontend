@@ -289,6 +289,59 @@ type Props = {
   highlightCommentId?: string | null;
 };
 
+function AnnouncementImageGrid({ urls }: { urls: string[] }) {
+  const count = urls.length;
+  if (count === 1) {
+    return (
+      <div className="cx-ann-grid cx-ann-grid--1">
+        <img src={urls[0]} alt="" className="cx-ann-img" loading="lazy" decoding="async" />
+      </div>
+    );
+  }
+  if (count === 2) {
+    return (
+      <div className="cx-ann-grid cx-ann-grid--2">
+        {urls.map((u, i) => <img key={i} src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />)}
+      </div>
+    );
+  }
+  if (count === 3) {
+    return (
+      <div className="cx-ann-grid cx-ann-grid--3">
+        <img src={urls[0]} alt="" className="cx-ann-img cx-ann-img--main" loading="lazy" decoding="async" />
+        <div className="cx-ann-grid-sub">
+          {urls.slice(1).map((u, i) => <img key={i} src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />)}
+        </div>
+      </div>
+    );
+  }
+  if (count === 4) {
+    return (
+      <div className="cx-ann-grid cx-ann-grid--4">
+        {urls.map((u, i) => <img key={i} src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />)}
+      </div>
+    );
+  }
+  // 5 or 6: first image large, rest in 2-col grid below (up to 5 shown with "+N more")
+  const shown = urls.slice(0, 5);
+  const extra = count - 5;
+  return (
+    <div className="cx-ann-grid cx-ann-grid--5plus">
+      <img src={urls[0]} alt="" className="cx-ann-img cx-ann-img--main" loading="lazy" decoding="async" />
+      <div className="cx-ann-grid-sub">
+        {shown.slice(1).map((u, i) => (
+          <div key={i} className="cx-ann-img-wrap">
+            <img src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />
+            {i === 3 && extra > 0 && (
+              <div className="cx-ann-img-more">+{extra + 1}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FeedPostCardComponent({
   post,
   voteMode,
@@ -880,7 +933,8 @@ function FeedPostCardComponent({
   // fill bar + % after voting. Reuses the same N-option vote path as multi
   // compare; option labels/images come from `postOptions`, not `imageUrls`
   // (those hold optional body/context images shown above the rows).
-  const isPoll = (post.format ?? "compare") === "poll";
+  const isAnnouncement = post.format === "announcement";
+  const isPoll = !isAnnouncement && (post.format ?? "compare") === "poll";
   const pollOptions = post.postOptions ?? [];
   const pollOptionCount = isPoll
     ? Math.max(pollOptions.length, activeOptionStats?.length ?? 0)
@@ -1483,7 +1537,7 @@ function FeedPostCardComponent({
       ? multiPickDisplayed !== null
       : viewer !== null; // classic UP/DOWN bar
 
-  const showClassicVoteBar = !compareUrls && !isPoll;
+  const showClassicVoteBar = !isAnnouncement && !compareUrls && !isPoll;
   const postAuthorAvatarCandidates = authorAvatarUrlCandidates(
     post.authorProfileImageUrl,
     post.authorEmail,
@@ -1712,14 +1766,23 @@ function FeedPostCardComponent({
 
       {post.campaign ? <PostCampaignBadge campaign={post.campaign} /> : null}
 
+      {isAnnouncement && (
+        <div className="cx-announcement-header">
+          <span className="cx-announcement-icon" aria-hidden>📢</span>
+          <span>ANNOUNCEMENT</span>
+        </div>
+      )}
+
       {/* Caption — always visible above the compare images */}
       {post.caption && (
-        <div className="cx-post-caption-bar">
+        <div className={`cx-post-caption-bar${isAnnouncement ? " cx-post-caption-bar--announcement" : ""}`}>
           {linkifyText(post.caption)}
         </div>
       )}
 
-      {isPoll ? (
+      {isAnnouncement ? (
+        post.imageUrls.length > 0 ? <AnnouncementImageGrid urls={post.imageUrls} /> : null
+      ) : isPoll ? (
         <>
           {post.imageUrls.length > 0 ? (
             <div className="ig-post-media-wrap cx-poll-body-media">
@@ -2284,7 +2347,7 @@ function FeedPostCardComponent({
           </div>
         ) : null}
 
-        {!compareUrls && !isPoll ? (
+        {!isAnnouncement && !compareUrls && !isPoll ? (
           <div
             className={`cx-pulse-card cx-pulse-card--compact${voteFx ? " cx-pulse-card--votefx" : ""}`}
             aria-live="polite"
@@ -2409,40 +2472,44 @@ function FeedPostCardComponent({
               <span className="cx-action-chip-count">{saveLiveCount}</span>
             ) : null}
           </button>
-          <button
-            type="button"
-            className="cx-action-chip"
-            aria-label="See who voted"
-            title="Voters"
-            onClick={() => void openVotersList()}
-          >
-            <IconUsers />
-            {totalVoteCount > 0 ? (
-              <span className="cx-action-chip-count">{totalVoteCount}</span>
-            ) : null}
-          </button>
-          </div>
-          <div className="cx-action-rail-context">
-            <span
-              className={`cx-action-status-line${isVotingClosed ? " cx-action-status-line--result" : ""}`}
-            >
-              {isVotingClosed
-                ? `🏆 ${votingWinnerSummary || "Results are in"}`
-                : `${votingHasEndDate ? "⏳ " : ""}${votingStatusLabel}`}
-            </span>
+          {!isAnnouncement ? (
             <button
               type="button"
-              className="cx-action-rail-details"
-              aria-expanded={detailsOpen}
-              aria-controls={`post-details-${post.id}`}
-              onClick={() => setDetailsOpen((prev) => !prev)}
+              className="cx-action-chip"
+              aria-label="See who voted"
+              title="Voters"
+              onClick={() => void openVotersList()}
             >
-              {detailsOpen ? "Hide details" : "See details"}
-              <span className="cx-action-rail-details-arrow" aria-hidden>
-                {detailsOpen ? "‹" : "›"}
-              </span>
+              <IconUsers />
+              {totalVoteCount > 0 ? (
+                <span className="cx-action-chip-count">{totalVoteCount}</span>
+              ) : null}
             </button>
+          ) : null}
           </div>
+          {!isAnnouncement ? (
+            <div className="cx-action-rail-context">
+              <span
+                className={`cx-action-status-line${isVotingClosed ? " cx-action-status-line--result" : ""}`}
+              >
+                {isVotingClosed
+                  ? `🏆 ${votingWinnerSummary || "Results are in"}`
+                  : `${votingHasEndDate ? "⏳ " : ""}${votingStatusLabel}`}
+              </span>
+              <button
+                type="button"
+                className="cx-action-rail-details"
+                aria-expanded={detailsOpen}
+                aria-controls={`post-details-${post.id}`}
+                onClick={() => setDetailsOpen((prev) => !prev)}
+              >
+                {detailsOpen ? "Hide details" : "See details"}
+                <span className="cx-action-rail-details-arrow" aria-hidden>
+                  {detailsOpen ? "‹" : "›"}
+                </span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {commentsOpen ? (

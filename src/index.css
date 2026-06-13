@@ -2056,6 +2056,72 @@ body.capacitor .ig-bottom-nav {
   color: #86efac;
 }
 
+/* ── Announcement post ─────────────────────────────────────────────────── */
+.cx-announcement-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: linear-gradient(90deg, rgb(234 88 12 / 0.12) 0%, rgb(239 68 68 / 0.08) 100%);
+  border-top: 1px solid rgb(234 88 12 / 0.25);
+  border-bottom: 1px solid rgb(234 88 12 / 0.25);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #c2410c;
+  text-transform: uppercase;
+}
+:root[data-theme="dark"] .cx-announcement-header {
+  background: linear-gradient(90deg, rgb(234 88 12 / 0.18) 0%, rgb(239 68 68 / 0.1) 100%);
+  border-color: rgb(234 88 12 / 0.35);
+  color: #fb923c;
+}
+.cx-announcement-icon {
+  font-size: 0.9rem;
+}
+.cx-post-caption-bar--announcement {
+  font-size: 0.97rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  padding: 12px 14px;
+}
+
+/* Announcement image grid */
+.cx-ann-grid {
+  display: grid;
+  gap: 2px;
+  overflow: hidden;
+}
+.cx-ann-grid--1 { grid-template-columns: 1fr; }
+.cx-ann-grid--2 { grid-template-columns: 1fr 1fr; }
+.cx-ann-grid--3 { grid-template-columns: 1fr; }
+.cx-ann-grid--3 .cx-ann-grid-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.cx-ann-grid--4 { grid-template-columns: 1fr 1fr; }
+.cx-ann-grid--5plus { grid-template-columns: 1fr; }
+.cx-ann-grid--5plus .cx-ann-grid-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.cx-ann-img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  aspect-ratio: 16/9;
+}
+.cx-ann-grid--1 .cx-ann-img { aspect-ratio: 16/9; max-height: 420px; }
+.cx-ann-grid--3 .cx-ann-img--main,
+.cx-ann-grid--5plus .cx-ann-img--main { aspect-ratio: 16/9; }
+.cx-ann-grid-sub .cx-ann-img { aspect-ratio: 1/1; }
+.cx-ann-img-wrap { position: relative; }
+.cx-ann-img-more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
 .ig-create-campaign-hint {
   margin: 4px 0 0;
 }

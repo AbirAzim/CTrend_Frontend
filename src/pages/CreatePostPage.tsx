@@ -80,9 +80,10 @@ export function CreatePostPage() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState("");
   const [broadcastGlobally, setBroadcastGlobally] = useState(false);
-  /** Post layout: `compare` (image grid) or `poll` (stacked option rows). */
-  const [format, setFormat] = useState<"compare" | "poll">("compare");
+  /** Post layout: `compare` (image grid), `poll` (stacked option rows), or `announcement` (admin info post). */
+  const [format, setFormat] = useState<"compare" | "poll" | "announcement">("compare");
   const isPoll = format === "poll";
+  const isAnnouncement = format === "announcement";
   /** Poll-only body/context images (post-level `imageUrls`). Optional, 0+. */
   const [bodyImages, setBodyImages] = useState<
     Array<{ id: string; imageUrl: string; localPreview?: string }>
@@ -98,12 +99,12 @@ export function CreatePostPage() {
 
   function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
-    if (!isPoll) {
+    if (!isPoll && !isAnnouncement) {
       // Compare images go through the crop+zoom editor for a uniform shape.
       setCropper({ id, url: URL.createObjectURL(file) });
       return;
     }
-    // Poll option thumbnails upload directly.
+    // Poll/announcement images upload directly.
     void uploadFileToItem(id, file);
   }
 
@@ -246,7 +247,7 @@ export function CreatePostPage() {
       authorDisplayName: user?.displayName ?? null,
       authorProfileImageUrl: user?.profileImageUrl ?? null,
       caption: caption.trim() || null,
-      imageUrls: format === "compare" ? compareImages : bodyImages.map((b) => b.imageUrl).filter(Boolean),
+      imageUrls: format === "compare" ? compareImages : bodyImages.map((b) => b.imageUrl).filter((u): u is string => Boolean(u)),
       postOptions: items.map((it) => ({
         label: it.title.trim() || "",
         imageUrl: it.imageUrl || it.localPreview || null,
@@ -258,7 +259,7 @@ export function CreatePostPage() {
       downvoteCount: 0,
       viewerVote: null,
       mySelectedOptionIndex: null,
-      isVotingOpen: true,
+      isVotingOpen: isAnnouncement ? false : true,
       createdAt: new Date().toISOString(),
       votingEndsAt: votingEndEnabled && votingEndsAt ? localInputToUtcIso(votingEndsAt) : null,
       category: previewCategory,
@@ -267,7 +268,7 @@ export function CreatePostPage() {
       hypeCount: 0,
       saveCount: 0,
     };
-  }, [format, items, caption, user, isAdmin, postType, broadcastGlobally, bodyImages, previewCategory, previewCampaign, votingEndEnabled, votingEndsAt]);
+  }, [format, isAnnouncement, items, caption, user, isAdmin, postType, broadcastGlobally, bodyImages, previewCategory, previewCampaign, votingEndEnabled, votingEndsAt]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -302,7 +303,11 @@ export function CreatePostPage() {
       imageFocalY?: number;
     }>;
 
-    if (isPoll) {
+    if (isAnnouncement) {
+      // Announcement: no options, body images from bodyImages list.
+      options = [];
+      imageUrls = bodyImages.map((b) => b.imageUrl.trim()).filter((u) => u.length > 0);
+    } else if (isPoll) {
       const labeledCount = items.filter((it) => it.title.trim().length > 0).length;
       if (labeledCount < 2) {
         setError("Please add at least two poll options with labels.");
@@ -359,7 +364,7 @@ export function CreatePostPage() {
 
     const input: {
       categoryId: string;
-      format: "COMPARE" | "POLL";
+      format: "COMPARE" | "POLL" | "ANNOUNCEMENT";
       imageUrls: string[];
       options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
       votingEndsAt?: string;
@@ -370,7 +375,7 @@ export function CreatePostPage() {
       broadcastGlobally?: boolean;
     } = {
       categoryId: category,
-      format: format.toUpperCase() as "COMPARE" | "POLL",
+      format: format.toUpperCase() as "COMPARE" | "POLL" | "ANNOUNCEMENT",
       imageUrls,
       options,
     };
@@ -393,8 +398,9 @@ export function CreatePostPage() {
       input.broadcastGlobally = true;
     }
 
+    const useSystemMutate = isAdmin && (postType === "system" || isAnnouncement);
     try {
-      const mutate = isAdmin && postType === "system" ? createSystemPost : createPost;
+      const mutate = useSystemMutate ? createSystemPost : createPost;
       await mutate({
         variables: { input },
         // Don't refetch feed for scheduled posts — they won't appear there yet
@@ -427,7 +433,7 @@ export function CreatePostPage() {
         const retryInput = { ...input };
         delete retryInput.votingEndsAt;
         try {
-          const mutate = isAdmin && postType === "system" ? createSystemPost : createPost;
+          const mutate = useSystemMutate ? createSystemPost : createPost;
           await mutate({
             variables: { input: retryInput },
           });
@@ -490,10 +496,16 @@ export function CreatePostPage() {
   return (
     <div className="ig-create-page">
       <div className="ig-create-hero">
-        <span className="ig-create-hero-chip">{isPoll ? "New Poll" : "New Compare"}</span>
-        <h1 className="ig-create-title">What's your take?</h1>
+        <span className="ig-create-hero-chip">
+          {isAnnouncement ? "New Announcement" : isPoll ? "New Poll" : "New Compare"}
+        </span>
+        <h1 className="ig-create-title">
+          {isAnnouncement ? "Share an announcement" : "What's your take?"}
+        </h1>
         <p className="ig-create-lead">
-          {isPoll
+          {isAnnouncement
+            ? "Post platform-wide info with images and links."
+            : isPoll
             ? "Ask a question. Let the crowd pick a side."
             : "Drop your picks. Let the crowd decide."}
         </p>
@@ -506,8 +518,8 @@ export function CreatePostPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={!isPoll}
-            className={`ig-format-switch-btn${!isPoll ? " ig-format-switch-btn--active" : ""}`}
+            aria-selected={format === "compare"}
+            className={`ig-format-switch-btn${format === "compare" ? " ig-format-switch-btn--active" : ""}`}
             onClick={() => setFormat("compare")}
           >
             🖼 Compare
@@ -515,12 +527,23 @@ export function CreatePostPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={isPoll}
-            className={`ig-format-switch-btn${isPoll ? " ig-format-switch-btn--active" : ""}`}
+            aria-selected={format === "poll"}
+            className={`ig-format-switch-btn${format === "poll" ? " ig-format-switch-btn--active" : ""}`}
             onClick={() => setFormat("poll")}
           >
             📊 Poll
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={format === "announcement"}
+              className={`ig-format-switch-btn${format === "announcement" ? " ig-format-switch-btn--active" : ""}`}
+              onClick={() => setFormat("announcement")}
+            >
+              📢 Announcement
+            </button>
+          )}
         </div>
 
         {/* ── Audience: Friends vs Global (only when admin allows global) ── */}
@@ -586,7 +609,53 @@ export function CreatePostPage() {
           </div>
         )}
 
-        {!isPoll ? (
+        {isAnnouncement ? (
+          <div className="ig-poll-body-edit">
+            <span className="ig-settings-label">
+              <span className="ig-settings-icon">🖼</span> Images
+              <span className="ig-settings-optional">optional · up to 6</span>
+            </span>
+            <div className="ig-poll-body-grid">
+              {bodyImages.map((b) => (
+                <div className="ig-poll-body-cell" key={b.id}>
+                  <input
+                    ref={(el) => { bodyFileRefs.current[b.id] = el; }}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                    style={{ display: "none" }}
+                    onChange={(ev) => void handleBodyFileChange(b.id, ev.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    className={`ig-poll-body-thumb${b.imageUrl || b.localPreview ? " ig-poll-body-thumb--filled" : ""}`}
+                    style={b.imageUrl || b.localPreview ? { backgroundImage: `url(${b.imageUrl || b.localPreview})` } : undefined}
+                    onClick={() => bodyFileRefs.current[b.id]?.click()}
+                    disabled={bodyUploadingId === b.id}
+                    aria-label="Upload image"
+                  >
+                    {bodyUploadingId === b.id ? (
+                      <span className="ig-compare-spinner" />
+                    ) : b.imageUrl || b.localPreview ? null : (
+                      <span className="ig-poll-edit-thumb-plus" aria-hidden>＋</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="ig-poll-body-remove"
+                    onClick={() => removeBodyImage(b.id)}
+                    aria-label="Remove image"
+                  >✕</button>
+                </div>
+              ))}
+              {bodyImages.length < 6 && (
+                <button type="button" className="ig-poll-body-add" onClick={addBodyImage}>
+                  <span aria-hidden>＋</span>
+                  <span>Add image</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : !isPoll ? (
         <>
         {/* ── Compare slots ── */}
         <div className="ig-create-vs-wrap">
@@ -910,43 +979,46 @@ export function CreatePostPage() {
               className="ig-settings-textarea"
               value={caption}
               onChange={(ev) => setCaption(ev.target.value)}
-              placeholder={isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
+              placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
               autoComplete="off"
             />
           </div>
 
-          <div className="ig-settings-divider" />
-
-          <div className="ig-settings-row ig-settings-row--col">
-            <label className="ig-voting-toggle">
-              <span className="ig-settings-label" style={{ minWidth: 0, flex: 1 }}>
-                <span className="ig-settings-icon">⏱</span> Set voting deadline
-                <span className="ig-settings-optional">optional</span>
-              </span>
-              <span className="ig-toggle-switch-wrap">
-                <input
-                  type="checkbox"
-                  checked={votingEndEnabled}
-                  onChange={(e) => {
-                    setVotingEndEnabled(e.target.checked);
-                    if (!e.target.checked) setVotingEndsAt("");
-                  }}
-                />
-                <span className="ig-toggle-switch" aria-hidden />
-              </span>
-            </label>
-            {votingEndEnabled && (
-              <DateTimePicker
-                value={votingEndsAt}
-                onChange={setVotingEndsAt}
-                minDate={new Date(Date.now() + 60_000).toISOString()}
-              />
-            )}
-          </div>
+          {!isAnnouncement && (
+            <>
+              <div className="ig-settings-divider" />
+              <div className="ig-settings-row ig-settings-row--col">
+                <label className="ig-voting-toggle">
+                  <span className="ig-settings-label" style={{ minWidth: 0, flex: 1 }}>
+                    <span className="ig-settings-icon">⏱</span> Set voting deadline
+                    <span className="ig-settings-optional">optional</span>
+                  </span>
+                  <span className="ig-toggle-switch-wrap">
+                    <input
+                      type="checkbox"
+                      checked={votingEndEnabled}
+                      onChange={(e) => {
+                        setVotingEndEnabled(e.target.checked);
+                        if (!e.target.checked) setVotingEndsAt("");
+                      }}
+                    />
+                    <span className="ig-toggle-switch" aria-hidden />
+                  </span>
+                </label>
+                {votingEndEnabled && (
+                  <DateTimePicker
+                    value={votingEndsAt}
+                    onChange={setVotingEndsAt}
+                    minDate={new Date(Date.now() + 60_000).toISOString()}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Schedule date picker (shown when schedule mode active) ── */}
-        {scheduleEnabled && (
+        {!isAnnouncement && scheduleEnabled && (
           <div className="ig-schedule-picker-wrap">
             <label className="ig-schedule-picker-label">
               ⏰ When should this go live?
@@ -980,7 +1052,7 @@ export function CreatePostPage() {
         ) : null}
 
         {/* ── Action buttons ── */}
-        {scheduleEnabled ? (
+        {!isAnnouncement && scheduleEnabled ? (
           <button
             type="submit"
             className="ig-create-submit"
@@ -995,16 +1067,18 @@ export function CreatePostPage() {
               className="ig-create-submit ig-create-submit--main"
               disabled={loading || !!uploadingId || !!bodyUploadingId}
             >
-              {loading ? "Posting…" : "Launch it →"}
+              {loading ? "Posting…" : isAnnouncement ? "Post announcement →" : "Launch it →"}
             </button>
-            <button
-              type="button"
-              className="ig-create-submit ig-create-submit--schedule"
-              disabled={loading || !!uploadingId || !!bodyUploadingId}
-              onClick={() => setScheduleEnabled(true)}
-            >
-              ⏰ Schedule
-            </button>
+            {!isAnnouncement && (
+              <button
+                type="button"
+                className="ig-create-submit ig-create-submit--schedule"
+                disabled={loading || !!uploadingId || !!bodyUploadingId}
+                onClick={() => setScheduleEnabled(true)}
+              >
+                ⏰ Schedule
+              </button>
+            )}
           </div>
         )}
         <button
