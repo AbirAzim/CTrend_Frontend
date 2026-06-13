@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +32,8 @@ import { AppActionSheet } from "../../components/AppDialog";
 import { DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { FeedPostCard } from "../../components/FeedPostCard";
+import type { FeedPostView } from "@ctrend/shared/types/feed";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -271,6 +273,7 @@ export default function CreateScreen() {
 
   // Schedule
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const [schedulePreset, setSchedulePreset] = useState<number | null>(24);
   const [scheduleCustom, setScheduleCustom] = useState<Date>(() => {
     const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); return d;
@@ -311,6 +314,42 @@ export default function CreateScreen() {
     return (a.name ?? "").localeCompare(b.name ?? "");
   });
   const selectedCampaign = campaigns.find((c) => c.id === campaignId);
+
+  const previewPost = useMemo((): FeedPostView => {
+    const compareImages = slots
+      .map((s) => s.publicUrl || s.localUri || "")
+      .filter((u) => u.length > 0);
+    return {
+      id: "preview",
+      format: format as "compare" | "poll",
+      postType: isAdmin && platformWide ? "system" : "user",
+      isUserGlobalBroadcast: broadcastGlobally || null,
+      authorId: user?.id ?? "preview",
+      authorUsername: user?.username ?? "you",
+      authorDisplayName: user?.displayName ?? null,
+      authorProfileImageUrl: user?.profileImageUrl ?? null,
+      caption: caption.trim() || null,
+      imageUrls: format === "compare" ? compareImages : bodyImages.map((b) => b.publicUrl || b.localUri || "").filter(Boolean),
+      postOptions: slots.map((s) => ({
+        label: s.label.trim() || "",
+        imageUrl: s.publicUrl || s.localUri || null,
+        imageFocalX: s.imageFocalX,
+        imageFocalY: s.imageFocalY,
+      })),
+      optionStats: [],
+      upvoteCount: 0,
+      downvoteCount: 0,
+      viewerVote: null,
+      mySelectedOptionIndex: null,
+      isVotingOpen: true,
+      createdAt: new Date().toISOString(),
+      category: selectedCat ? { id: selectedCat.id, name: selectedCat.name ?? "", slug: null, color: null } : null,
+      campaign: selectedCampaign ? { id: selectedCampaign.id, name: selectedCampaign.name, slug: "", prizePerWinner: 0, hasRewards: null, hasWinner: null } : null,
+      commentCount: 0,
+      hypeCount: 0,
+      saveCount: 0,
+    };
+  }, [format, slots, caption, user, isAdmin, platformWide, broadcastGlobally, bodyImages, selectedCat, selectedCampaign]);
 
   // Platform setting: can normal users broadcast a post globally? (Phase 36)
   const { data: platformSettingsData } = useQuery<{ platformSettings: { allowUserGlobalPosts: boolean } }>(
@@ -1131,11 +1170,36 @@ export default function CreateScreen() {
               {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={st.launchBtnText}>🕐 Confirm schedule →</Text>}
             </Pressable>
           )}
+          <Pressable
+            onPress={() => setPreviewVisible(true)}
+            style={[st.previewBtn, { borderColor: colors.border }]}
+          >
+            <Text style={[st.previewBtnText, { color: colors.muted }]}>👁  Preview</Text>
+          </Pressable>
           <Pressable onPress={confirmCancel} hitSlop={10} style={{ alignItems: "center", paddingVertical: 4 }}>
             <Text style={[st.cancelText, { color: colors.muted }]}>Cancel</Text>
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Feed preview modal */}
+      <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={() => setPreviewVisible(false)}>
+        <View style={st.previewOverlay}>
+          <View style={[st.previewModal, { backgroundColor: colors.bg }]}>
+            <View style={[st.previewHead, { borderBottomColor: colors.border }]}>
+              <Text style={[st.previewHeadTitle, { color: colors.muted }]}>FEED PREVIEW</Text>
+              <Pressable onPress={() => setPreviewVisible(false)} hitSlop={12} style={st.previewCloseBtn}>
+                <Text style={[st.previewCloseText, { color: colors.muted }]}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+              <View pointerEvents="none">
+                <FeedPostCard post={previewPost} variant="feed" />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Category modal */}
       <Modal visible={categoryModal} transparent animationType="slide" onRequestClose={() => setCategoryModal(false)}>
@@ -1393,6 +1457,15 @@ const st = StyleSheet.create({
   scheduleBtnText: { fontSize: 14, fontWeight: "700" },
   confirmScheduleBtn: { borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   cancelText: { fontSize: 14, fontWeight: "600" },
+
+  previewBtn: { borderWidth: 1.5, borderStyle: "dashed", borderRadius: 14, paddingVertical: 13, alignItems: "center" },
+  previewBtnText: { fontSize: 14, fontWeight: "700" },
+  previewOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: 0 },
+  previewModal: { flex: 1, marginTop: 48 },
+  previewHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth },
+  previewHeadTitle: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  previewCloseBtn: { padding: 4 },
+  previewCloseText: { fontSize: 16, fontWeight: "700" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 12, paddingHorizontal: 16, maxHeight: "70%" },

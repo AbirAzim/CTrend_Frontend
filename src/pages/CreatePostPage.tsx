@@ -11,6 +11,8 @@ import { useAuth } from "../context/AuthContext";
 import { ImagePositionEditor } from "../components/ImagePositionEditor";
 import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
+import { FeedPostCard } from "../components/FeedPostCard";
+import type { FeedPostView } from "../types/feed";
 
 type DraftCompareItem = {
   id: string;
@@ -215,6 +217,57 @@ export function CreatePostPage() {
       return a.name.localeCompare(b.name);
     });
   }, [isAdmin, adminCampaignsData?.campaigns, activeCampaignsData?.activeCampaigns]);
+
+  const [showPreview, setShowPreview] = useState(false);
+
+  const previewCategory = useMemo(() => {
+    if (!categoryId) return null;
+    const cat = (categoriesData?.categories ?? []).find((c) => c.id === categoryId);
+    return cat ? { id: cat.id, name: cat.name ?? "", slug: null, color: null } : null;
+  }, [categoryId, categoriesData]);
+
+  const previewCampaign = useMemo(() => {
+    if (!campaignId) return null;
+    const c = campaignOptions.find((c) => c.id === campaignId);
+    return c ? { id: c.id, name: c.name, slug: "", prizePerWinner: 0, hasRewards: null, hasWinner: null } : null;
+  }, [campaignId, campaignOptions]);
+
+  const previewPost = useMemo((): FeedPostView => {
+    const compareImages = items
+      .map((it) => it.imageUrl || it.localPreview || "")
+      .filter((u) => u.length > 0);
+    return {
+      id: "preview",
+      format,
+      postType: isAdmin && postType === "system" ? "system" : "user",
+      isUserGlobalBroadcast: broadcastGlobally || null,
+      authorId: user?.id ?? "preview",
+      authorUsername: user?.username ?? "you",
+      authorDisplayName: user?.displayName ?? null,
+      authorProfileImageUrl: user?.profileImageUrl ?? null,
+      caption: caption.trim() || null,
+      imageUrls: format === "compare" ? compareImages : bodyImages.map((b) => b.imageUrl).filter(Boolean),
+      postOptions: items.map((it) => ({
+        label: it.title.trim() || "",
+        imageUrl: it.imageUrl || it.localPreview || null,
+        imageFocalX: it.imageFocalX,
+        imageFocalY: it.imageFocalY,
+      })),
+      optionStats: [],
+      upvoteCount: 0,
+      downvoteCount: 0,
+      viewerVote: null,
+      mySelectedOptionIndex: null,
+      isVotingOpen: true,
+      createdAt: new Date().toISOString(),
+      votingEndsAt: votingEndEnabled && votingEndsAt ? localInputToUtcIso(votingEndsAt) : null,
+      category: previewCategory,
+      campaign: previewCampaign,
+      commentCount: 0,
+      hypeCount: 0,
+      saveCount: 0,
+    };
+  }, [format, items, caption, user, isAdmin, postType, broadcastGlobally, bodyImages, previewCategory, previewCampaign, votingEndEnabled, votingEndsAt]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -954,6 +1007,13 @@ export function CreatePostPage() {
             </button>
           </div>
         )}
+        <button
+          type="button"
+          className="ig-create-preview-btn"
+          onClick={() => setShowPreview(true)}
+        >
+          👁 Preview
+        </button>
 
         <p className="ig-create-cancel">
           <Link to="/">Cancel</Link>
@@ -993,6 +1053,35 @@ export function CreatePostPage() {
           }}
         />
       ) : null}
+
+      {showPreview && (
+        <div
+          className="ig-preview-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Post preview"
+          onClick={() => setShowPreview(false)}
+        >
+          <div className="ig-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ig-preview-modal-head">
+              <span className="ig-preview-modal-title">Feed Preview</span>
+              <button
+                type="button"
+                className="ig-preview-close"
+                aria-label="Close preview"
+                onClick={() => setShowPreview(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="ig-preview-card-wrap">
+              <div style={{ pointerEvents: "none" }}>
+                <FeedPostCard post={previewPost} voteMode="local" showPermalinkToolbar={false} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8042,6 +8042,76 @@ a.cx-friend-avatar:hover {
   box-shadow: none;
 }
 
+/* ── Post Preview ── */
+.ig-create-preview-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 0;
+  background: none;
+  border: 1.5px dashed var(--ig-border);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--cx-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.ig-create-preview-btn:hover {
+  border-color: var(--cx-accent);
+  color: var(--cx-accent);
+}
+.ig-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgb(0 0 0 / 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 12px 40px;
+  overflow-y: auto;
+}
+.ig-preview-modal {
+  width: 100%;
+  max-width: 520px;
+  background: var(--ig-bg, #fafafa);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.25);
+}
+:root[data-theme="dark"] .ig-preview-modal { background: #16181d; }
+.ig-preview-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--ig-border);
+}
+.ig-preview-modal-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--cx-muted);
+  text-transform: uppercase;
+}
+.ig-preview-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--cx-muted);
+  padding: 4px 6px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.ig-preview-close:hover { color: var(--cx-ink); background: rgb(var(--cx-ink-rgb) / 0.06); }
+.ig-preview-card-wrap {
+  padding: 12px;
+  background: var(--ig-surface, #f0f0f0);
+}
+:root[data-theme="dark"] .ig-preview-card-wrap { background: #0f1115; }
+
 /* ── Scheduled Posts Page ── */
 .ig-scheduled-page {
   padding: 0 12px 40px;
