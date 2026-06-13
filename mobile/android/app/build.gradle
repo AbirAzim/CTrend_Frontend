@@ -105,7 +105,7 @@ android {
         applicationId 'com.ctrend.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 18
+        versionCode 19
         versionName "1.2.1"
         multiDexEnabled true
 
