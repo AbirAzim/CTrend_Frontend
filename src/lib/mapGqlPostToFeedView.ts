@@ -122,6 +122,7 @@ export function mapGqlPostToFeedView(p: {
     status?: string | null;
     minute?: number | null;
   } | null;
+  fixtureWinnerAt?: string | null;
 }): FeedPostView {
   const imageUrls = (p.imageUrls ?? []).filter(
     (u) => typeof u === "string" && u.trim().length > 0,
@@ -242,5 +243,6 @@ export function mapGqlPostToFeedView(p: {
           minute: p.matchScore.minute ?? null,
         }
       : null,
+    fixtureWinnerAt: p.fixtureWinnerAt ?? null,
   };
 }

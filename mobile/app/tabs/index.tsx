@@ -230,8 +230,8 @@ export default function FeedScreen() {
     loadingMoreRef.current = true;
     try {
       const res = await fetchMore({ variables: { campaignId, skip, take: PAGE_SIZE } });
-      const total = res.data?.feedPosts?.length ?? skip;
-      if (total - skip < PAGE_SIZE) hasMoreRef.current = false; // last page reached
+      const incoming = res.data?.feedPosts ?? [];
+      if (incoming.length < PAGE_SIZE) hasMoreRef.current = false; // last page reached
     } catch {
       // transient failure — allow a later retry
     } finally {

@@ -1531,9 +1531,24 @@ function FeedPostCardComponent({
   const showMatchInProgress =
     isMatchPost && post.isVotingOpen === false && !showCampaignWinner;
 
+  const isLiveMatch =
+    post.matchScore?.status === "IN_PLAY" || post.matchScore?.status === "PAUSED";
+
+  const winnerCountdownMs = post.fixtureWinnerAt
+    ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)
+    : null;
+  const winnerCountdownLabel = (() => {
+    if (!winnerCountdownMs) return null;
+    const totalSec = Math.floor(winnerCountdownMs / 1000);
+    if (totalSec <= 0) return null;
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m > 0 ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+  })();
+
   return (
     <article
-      className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}`}
+      className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}${isLiveMatch ? " ig-post--live" : ""}`}
     >
       {isEndingSoon ? (
         <div className="cx-vote-ending-soon-banner" role="status" aria-live="polite">
@@ -2112,7 +2127,11 @@ function FeedPostCardComponent({
       ) : showMatchInProgress ? (
         <div className="cx-match-in-progress" role="status" aria-live="polite">
           <span className="cx-match-in-progress-icon" aria-hidden>⚽</span>
-          <span>Match in progress — calculating winner…</span>
+          <span>
+            {winnerCountdownLabel
+              ? `Winner announced in ${winnerCountdownLabel}`
+              : "Match in progress — calculating winner…"}
+          </span>
         </div>
       ) : null}
 

@@ -93,6 +93,7 @@ export type FeedPostView = {
     status: string | null;
     minute: number | null;
   } | null;
+  fixtureWinnerAt?: string | null;
 };
 
 export type VoteOptionStatView = {

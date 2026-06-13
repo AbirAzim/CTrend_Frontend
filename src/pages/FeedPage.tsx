@@ -222,8 +222,8 @@ export function FeedPage() {
       const res = await fetchMoreFeed({
         variables: { campaignId: activeCampaignId || null, skip: serverCount, take: PAGE_SIZE },
       });
-      const total = (res.data?.feedPosts as unknown[] | undefined)?.length ?? serverCount;
-      if (total - serverCount < PAGE_SIZE) setHasMore(false); // last page reached
+      const incoming = (res.data?.feedPosts as unknown[] | undefined) ?? [];
+      if (incoming.length < PAGE_SIZE) setHasMore(false); // last page reached
     } catch {
       // transient failure — allow a later retry
     } finally {

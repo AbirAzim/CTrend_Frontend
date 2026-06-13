@@ -87,7 +87,7 @@ function GroupStandings({ fixtures, st }: { fixtures: WcFixture[]; st: ReturnTyp
         <View style={[st.legendDot, st.legendDotPossible]} />
         <Text style={st.legendText}>Best 3rd may qualify</Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.standingsRow}>
+      <View style={st.standingsRow}>
         {tables.map((table) => (
           <View key={table.group} style={st.standingCard}>
             <Text style={st.standingCardHead}>{table.label}</Text>
@@ -126,7 +126,7 @@ function GroupStandings({ fixtures, st }: { fixtures: WcFixture[]; st: ReturnTyp
             ))}
           </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -481,9 +481,8 @@ function makeStyles(c: Palette) {
     legendDotQualify: { backgroundColor: "rgba(34,197,94,0.35)" },
     legendDotPossible: { backgroundColor: "rgba(234,179,8,0.30)" },
     legendText: { fontSize: 10.5, color: c.muted },
-    standingsRow: { gap: 10, paddingRight: 4, paddingBottom: 4 },
+    standingsRow: { gap: 10, paddingBottom: 4 },
     standingCard: {
-      width: 248,
       backgroundColor: c.card,
       borderWidth: 1,
       borderColor: c.border,

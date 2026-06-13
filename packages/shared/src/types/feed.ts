@@ -97,6 +97,8 @@ export type FeedPostView = {
     status: string | null;
     minute: number | null;
   } | null;
+  /** ISO timestamp when the campaign winner will be revealed after match ends. */
+  fixtureWinnerAt?: string | null;
 };
 
 export type FeedPostCampaignView = {

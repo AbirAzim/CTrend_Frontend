@@ -238,6 +238,18 @@ function calcCountdown(endsAt: string | null | undefined): string | null {
 	return `${m}M ${pad(s)}S`;
 }
 
+function calcWinnerCountdown(winnerAt: string | null | undefined): string | null {
+	if (!winnerAt) return null;
+	const ms = new Date(winnerAt).getTime() - Date.now();
+	if (ms <= 0) return null;
+	const totalSec = Math.floor(ms / 1000);
+	const m = Math.floor(totalSec / 60);
+	const s = totalSec % 60;
+	const pad = (n: number) => String(n).padStart(2, '0');
+	if (m > 0) return `${m}m ${pad(s)}s`;
+	return `${s}s`;
+}
+
 function computeWinnerSummary(
 	isMulti: boolean,
 	up: number,
@@ -287,6 +299,15 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			shadowOffset: { width: 0, height: 6 },
 			shadowOpacity: isDark ? 0.22 : 0.07,
 			shadowRadius: 16,
+		},
+		cardLive: {
+			borderColor: '#22c55e',
+			borderWidth: 2,
+		},
+		liveBorderOverlay: {
+			borderRadius: 22,
+			borderWidth: 2,
+			borderColor: '#22c55e',
 		},
 		header: {
 			flexDirection: 'row' as const,
@@ -1109,6 +1130,10 @@ function FeedPostCardComponent({
 	const [countdownStr, setCountdownStr] = useState(() =>
 		calcCountdown(post.votingEndsAt),
 	);
+	const [winnerCountdown, setWinnerCountdown] = useState(() =>
+		calcWinnerCountdown(post.fixtureWinnerAt),
+	);
+	const livePulse = useRef(new Animated.Value(1)).current;
 	const voteInFlight = useRef(false);
 	const voteGuardUntil = useRef(0);
 	// intent >= 0 = vote that option; intent < 0 = withdraw
@@ -1308,6 +1333,29 @@ function FeedPostCardComponent({
 		}, 1000);
 		return () => clearInterval(timer);
 	}, [activeVotingEndsAt, isVotingClosed]);
+
+	// Winner reveal countdown (post-match)
+	useEffect(() => {
+		if (!post.fixtureWinnerAt) return;
+		const timer = setInterval(() => {
+			setWinnerCountdown(calcWinnerCountdown(post.fixtureWinnerAt));
+		}, 1000);
+		return () => clearInterval(timer);
+	}, [post.fixtureWinnerAt]);
+
+	// Pulse animation for live matches
+	const isLiveMatch = post.matchScore?.status === 'IN_PLAY' || post.matchScore?.status === 'PAUSED';
+	useEffect(() => {
+		if (!isLiveMatch) { livePulse.setValue(1); return; }
+		const loop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(livePulse, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+				Animated.timing(livePulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+			]),
+		);
+		loop.start();
+		return () => loop.stop();
+	}, [isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
 		variables: { postId: post.id },
@@ -1968,7 +2016,13 @@ function FeedPostCardComponent({
 	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
-		<View style={st.card}>
+		<View style={[st.card, isLiveMatch && st.cardLive]}>
+			{isLiveMatch && (
+				<Animated.View
+					style={[StyleSheet.absoluteFill, st.liveBorderOverlay, { opacity: livePulse }]}
+					pointerEvents="none"
+				/>
+			)}
 			{/* Ending-soon urgency banner */}
 			{isEndingSoon ? (
 				<View style={st.endingSoonBanner}>
@@ -2550,7 +2604,11 @@ function FeedPostCardComponent({
 			) : showMatchInProgress ? (
 				<View style={matchInProgressStyles.container}>
 					<Text style={matchInProgressStyles.icon}>⚽</Text>
-					<Text style={matchInProgressStyles.text}>Match in progress — calculating winner…</Text>
+					<Text style={matchInProgressStyles.text}>
+						{winnerCountdown
+							? `Winner announced in ${winnerCountdown}`
+							: 'Match in progress — calculating winner…'}
+					</Text>
 				</View>
 			) : null}
 

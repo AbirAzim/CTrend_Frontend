@@ -52,6 +52,7 @@ export const POST_CAMPAIGN_WINNER_FIELDS = `
     status
     minute
   }
+  fixtureWinnerAt
 `;
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
