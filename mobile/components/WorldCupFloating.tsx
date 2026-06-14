@@ -328,6 +328,12 @@ export function WorldCupFloating() {
               left: tabX,
               top: 0,
             },
+            !liveFixture && {
+              backgroundColor: "transparent",
+              borderWidth: 0,
+              shadowOpacity: 0,
+              elevation: 0,
+            },
           ]}
           {...pan.panHandlers}
         >
