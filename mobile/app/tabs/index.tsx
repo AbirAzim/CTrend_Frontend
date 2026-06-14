@@ -23,7 +23,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "@ctrend/shared/graphql/feed";
-import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
 import { MY_FRIENDS, FRIEND_SUGGESTIONS, FRIEND_REQUESTS } from "@ctrend/shared/graphql/friends";
 import { ME } from "@ctrend/shared/graphql/profile";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
@@ -292,13 +291,6 @@ export default function FeedScreen() {
   // live-queue posts, which aren't part of the server's offset window).
   serverCountRef.current = data?.feedPosts?.length ?? 0;
 
-  const { data: campaignsData } = useQuery<{ activeCampaigns: { id: string; fixturesEnabled?: boolean | null }[] }>(
-    ACTIVE_CAMPAIGNS,
-    { fetchPolicy: "cache-only" },
-  );
-  const activeCampaignFixtures = campaignsData?.activeCampaigns.find(
-    (c) => c.id === campaignId,
-  )?.fixturesEnabled ?? false;
 
   // Live-queue posts first, then the paged server list. Dedupe by id (offset
   // paging + live/polled inserts can briefly surface the same post twice) and

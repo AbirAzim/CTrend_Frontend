@@ -20611,6 +20611,7 @@ a.cx-profile-btn-accent {
   flex: 1;
   min-width: 0;
 }
+.wc-float-teams--wrap { white-space: normal; line-height: 1.3; }
 .wc-float-row--result { background: rgb(var(--cx-ink-rgb) / 0.03); }
 .wc-float-teams--winner { color: var(--cx-accent, #6366f1); font-weight: 800; }
 .wc-float-result-score {

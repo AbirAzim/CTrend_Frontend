@@ -286,7 +286,7 @@ export function WorldCupFloating() {
                 <button key={f.id} type="button" className="wc-float-row" onClick={() => openMatch(f)}>
                   <div className="wc-float-row-teams">
                     {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
-                    <span className="wc-float-teams">
+                    <span className="wc-float-teams wc-float-teams--wrap">
                       {f.homeTeam.shortName} <span className="wc-float-v">v</span> {f.awayTeam.shortName}
                     </span>
                     {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
