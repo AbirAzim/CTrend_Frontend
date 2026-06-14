@@ -308,26 +308,9 @@ export function FeedPage() {
   }, [campaignsData?.activeCampaigns]);
   const activeCampaign = campaignFilters.find((c) => c.id === activeCampaignId) ?? null;
 
-  // For fixture-enabled campaigns (World Cup), sort posts so the current/nearest
-  // match appears first. Sort by proximity of votingEndsAt to now: the live match
-  // (voting just closed) and the next upcoming match both sort to the top.
-  // Depends on post IDs only (not vote counts) so the order stays frozen during
-  // real-time subscription updates — it only re-sorts when the set of posts changes.
-  const postIdsKey = posts.map(p => p.id).join(",");
-  const sortedPosts = useMemo(() => {
-    if (!activeCampaign?.fixturesEnabled) return posts;
-    const now = Date.now();
-    return [...posts].sort((a, b) => {
-      const aKey = a.votingEndsAt ? Math.abs(new Date(a.votingEndsAt).getTime() - now) : Infinity;
-      const bKey = b.votingEndsAt ? Math.abs(new Date(b.votingEndsAt).getTime() - now) : Infinity;
-      return aKey - bKey;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCampaign?.fixturesEnabled, postIdsKey]);
-
   const visiblePosts = useMemo(
-    () => sortedPosts.slice(0, visibleCount),
-    [sortedPosts, visibleCount],
+    () => posts.slice(0, visibleCount),
+    [posts, visibleCount],
   );
 
   const showApiError = !useMockFeed && Boolean(error);

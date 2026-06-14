@@ -310,22 +310,7 @@ export default function FeedScreen() {
     return true;
   });
 
-  // For fixture-enabled campaigns (World Cup), sort by proximity of votingEndsAt
-  // to now so the live/nearest match always appears first.
-  // Deps on post IDs only — not vote counts — so order stays frozen during
-  // realtime subscription updates and only re-sorts on refresh/new posts.
-  const postIdsKey = postsRaw.map(p => p.id).join(",");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const posts: FeedPostView[] = useMemo(() => {
-    if (!activeCampaignFixtures) return postsRaw;
-    const now = Date.now();
-    return [...postsRaw].sort((a, b) => {
-      const aKey = a.votingEndsAt ? Math.abs(new Date(a.votingEndsAt).getTime() - now) : Infinity;
-      const bKey = b.votingEndsAt ? Math.abs(new Date(b.votingEndsAt).getTime() - now) : Infinity;
-      return aKey - bKey;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCampaignFixtures, postIdsKey]);
+  const posts: FeedPostView[] = postsRaw;
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     onData: ({ data: sub }) => {
