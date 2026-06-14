@@ -884,16 +884,19 @@ function FeedPostCardComponent({
   ) : null;
 
   const ms = post.matchScore;
+  const msTeamA = post.postOptions?.[0]?.label?.trim() || post.compareOptionLabels?.[0]?.trim() || null;
+  const msTeamB = post.postOptions?.[1]?.label?.trim() || post.compareOptionLabels?.[1]?.trim() || null;
+  const msTeamLine = msTeamA && msTeamB ? `${msTeamA} vs ${msTeamB}` : null;
   const matchScoreChip =
     ms && ms.status && ms.status !== "TIMED" ? (
       <span
         className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"}`}
       >
         {ms.status === "IN_PLAY"
-          ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0} – ${ms.away ?? 0}`
+          ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
           : ms.status === "PAUSED"
-          ? `HT  ${ms.home ?? 0} – ${ms.away ?? 0}`
-          : `FT  ${ms.home ?? 0} – ${ms.away ?? 0}`}
+          ? `HT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
+          : `FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
       </span>
     ) : null;
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
@@ -1441,7 +1444,8 @@ function FeedPostCardComponent({
       const winnerVotes = Math.round(
         activeOptionStats?.find((s) => s.index === winnerIndex)?.count ?? 0,
       );
-      return `${winnerLabel} won · ${topPct}% (${winnerVotes.toLocaleString()} votes)`;
+      const verb = post.matchType ? "leads" : "won";
+      return `${winnerLabel} ${verb} · ${topPct}% (${winnerVotes.toLocaleString()} votes)`;
     }
 
     if (isMultiCompare && compareUrls && compareUrls.length > 0) {
@@ -1458,7 +1462,8 @@ function FeedPostCardComponent({
       const winnerIndex = leaders[0]!.idx;
       const winnerLabel = compareOptionLabel(post, winnerIndex);
       const winnerVotes = multiCountsForSummary[winnerIndex] ?? 0;
-      return `${winnerLabel} won · ${topPct}% (${winnerVotes.toLocaleString()} votes)`;
+      const verb = post.matchType ? "leads" : "won";
+      return `${winnerLabel} ${verb} · ${topPct}% (${winnerVotes.toLocaleString()} votes)`;
     }
 
     if (binaryTotal <= 0 || leftPct == null || rightPct == null) {
@@ -1476,7 +1481,8 @@ function FeedPostCardComponent({
           : "Downvotes";
     const winnerVotes = winnerSide === 0 ? up : down;
     const winnerPct = winnerSide === 0 ? leftPct : rightPct;
-    return `${winnerLabel} won · ${winnerPct}% (${winnerVotes.toLocaleString()} votes)`;
+    const verb = post.matchType ? "leads" : "won";
+    return `${winnerLabel} ${verb} · ${winnerPct}% (${winnerVotes.toLocaleString()} votes)`;
   }, [
     isVotingClosed,
     isPoll,
@@ -2503,7 +2509,7 @@ function FeedPostCardComponent({
                 className={`cx-action-status-line${isVotingClosed ? " cx-action-status-line--result" : ""}`}
               >
                 {isVotingClosed
-                  ? `🏆 ${votingWinnerSummary || "Results are in"}`
+                  ? `${isMatchPost ? "📊" : "🏆"} ${votingWinnerSummary || "Results are in"}`
                   : `${votingHasEndDate ? "⏳ " : ""}${votingStatusLabel}`}
               </span>
               <button

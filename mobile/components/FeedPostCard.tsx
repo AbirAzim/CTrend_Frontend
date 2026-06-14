@@ -259,7 +259,9 @@ function computeWinnerSummary(
 		| null
 		| undefined,
 	getLabel: (i: number) => string,
+	isMatch = false,
 ): string {
+	const verb = isMatch ? 'leads' : 'won';
 	if (isMulti && stats && stats.length > 0) {
 		const total = stats.reduce((s, o) => s + o.count, 0);
 		if (total === 0) return 'No votes were cast';
@@ -271,7 +273,7 @@ function computeWinnerSummary(
 		}
 		const w = winners[0];
 		const pct = Math.round(w.percentage);
-		return `${w.label?.trim() || getLabel(w.index)} won · ${pct}% (${total.toLocaleString()} votes)`;
+		return `${w.label?.trim() || getLabel(w.index)} ${verb} · ${pct}% (${total.toLocaleString()} votes)`;
 	}
 	const total = up + down;
 	if (total === 0) return 'No votes were cast';
@@ -279,7 +281,7 @@ function computeWinnerSummary(
 	const winner = up > down ? getLabel(0) : getLabel(1);
 	const winCount = Math.max(up, down);
 	const pct = Math.round((100 * winCount) / total);
-	return `${winner} won · ${pct}% (${total.toLocaleString()} votes)`;
+	return `${winner} ${verb} · ${pct}% (${total.toLocaleString()} votes)`;
 }
 
 function makeStyles(c: ColorPalette, isDark: boolean) {
@@ -2218,11 +2220,15 @@ function FeedPostCardComponent({
 											? '#f59e0b'
 											: '#9ca3af',
 									}]}>
-										{post.matchScore.status === 'IN_PLAY'
-											? `⚽ ${post.matchScore.minute ?? 0}'  ${post.matchScore.home ?? 0} – ${post.matchScore.away ?? 0}`
-											: post.matchScore.status === 'PAUSED'
-											? `HT  ${post.matchScore.home ?? 0} – ${post.matchScore.away ?? 0}`
-											: `FT  ${post.matchScore.home ?? 0} – ${post.matchScore.away ?? 0}`}
+										{(() => {
+												const teamA = post.postOptions?.[0]?.label?.trim() || null;
+												const teamB = post.postOptions?.[1]?.label?.trim() || null;
+												const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
+												const sc = post.matchScore!;
+												if (sc.status === 'IN_PLAY') return `⚽ ${sc.minute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+												if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+												return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											})()}
 									</Text>
 								</View>
 							) : null}
@@ -2753,9 +2759,10 @@ function FeedPostCardComponent({
 					if (!hasCompare && !isPoll) return null;
 					if (isVotingClosed) {
 						return (
-							'🏆 ' +
+							(isMatchPost ? '📊 ' : '🏆 ') +
 							computeWinnerSummary(!isBinary, up, down, activeStats, (i) =>
 								compareLabel(post, i),
+								isMatchPost,
 							)
 						);
 					}

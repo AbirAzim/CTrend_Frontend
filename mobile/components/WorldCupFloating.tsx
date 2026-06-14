@@ -292,16 +292,14 @@ export function WorldCupFloating() {
             accessibilityLabel="Open World Cup fixtures. Drag to move."
           >
             {liveFixture ? (
-              <Animated.View style={{ opacity: blinkAnim }}>
-                <View style={st.tabFlags}>
-                  {liveFixture.homeTeam.crest
-                    ? <Image source={{ uri: liveFixture.homeTeam.crest }} style={st.tabFlag} contentFit="contain" />
-                    : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(liveFixture.homeTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
-                  <Text style={st.tabFlagSep}>v</Text>
-                  {liveFixture.awayTeam.crest
-                    ? <Image source={{ uri: liveFixture.awayTeam.crest }} style={st.tabFlag} contentFit="contain" />
-                    : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(liveFixture.awayTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
-                </View>
+              <Animated.View style={[st.tabFlags, { opacity: blinkAnim }]}>
+                {liveFixture.homeTeam.crest
+                  ? <Image source={{ uri: liveFixture.homeTeam.crest }} style={st.tabFlag} contentFit="contain" />
+                  : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(liveFixture.homeTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
+                <Text style={st.tabFlagSep}>·</Text>
+                {liveFixture.awayTeam.crest
+                  ? <Image source={{ uri: liveFixture.awayTeam.crest }} style={st.tabFlag} contentFit="contain" />
+                  : <View style={st.tabFlagPh}><Text style={st.tabFlagPhText}>{(liveFixture.awayTeam.shortName ?? "?").slice(0, 2)}</Text></View>}
               </Animated.View>
             ) : (
               <Image source={trophyAsset} style={st.tabImg} contentFit="contain" />
@@ -329,24 +327,31 @@ function makeStyles(c: {
       width: TAB_W,
       height: TAB_H,
       borderRadius: 16,
-      backgroundColor: "transparent",
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.border,
       alignItems: "center",
       justifyContent: "center",
       zIndex: 1000,
+      shadowColor: "#000",
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      shadowOffset: { width: -2, height: 2 },
+      elevation: 8,
     },
     tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
-    tabImg: { width: 44, height: 44 },
-    tabFlags: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6 },
-    tabFlag: { width: 28, height: 28, borderRadius: 14 },
+    tabImg: { width: 38, height: 38 },
+    tabFlags: { flexDirection: "column", alignItems: "center", gap: 2 },
+    tabFlag: { width: 26, height: 26, borderRadius: 13 },
     tabFlagPh: {
-      width: 22, height: 22, borderRadius: 11,
+      width: 26, height: 26, borderRadius: 13,
       backgroundColor: c.section, alignItems: "center", justifyContent: "center",
     },
-    tabFlagPhText: { fontSize: 8, fontWeight: "700", color: c.muted },
-    tabFlagSep: { fontSize: 9, fontWeight: "700", color: c.muted },
+    tabFlagPhText: { fontSize: 9, fontWeight: "700", color: c.muted },
+    tabFlagSep: { fontSize: 7, fontWeight: "700", color: c.muted, lineHeight: 8 },
     tabLiveDot: {
-      position: "absolute", top: 8, right: 8,
-      width: 12, height: 12, borderRadius: 6,
+      position: "absolute", top: 7, right: 10,
+      width: 10, height: 10, borderRadius: 5,
       backgroundColor: "#ef4444", borderWidth: 2, borderColor: c.card,
     },
     hint: {
