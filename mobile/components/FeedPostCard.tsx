@@ -154,6 +154,7 @@ type PostVoteUpdatedData = {
 		mySelectedOptionIndex?: number | null;
 		isVotingOpen?: boolean | null;
 		votingEndsAt?: string | null;
+		matchScore?: { status: string | null; home: number | null; away: number | null; winner: string | null } | null;
 		optionStats?: Array<{
 			index: number;
 			label: string;

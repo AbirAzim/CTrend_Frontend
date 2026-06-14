@@ -305,6 +305,7 @@ export default function FeedScreen() {
   const posts: FeedPostView[] = postsRaw;
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
+    skip: !isAuthenticated,
     onData: ({ data: sub }) => {
       const postId = sub.data?.newPosts?.postId;
       if (!postId) return;
@@ -324,6 +325,7 @@ export default function FeedScreen() {
   });
 
   useSubscription<{ postDeleted: { postId: string } }>(POST_DELETED_SUB, {
+    skip: !isAuthenticated,
     onData: ({ data: sub }) => {
       const postId = sub.data?.postDeleted?.postId;
       if (!postId) return;

@@ -362,6 +362,12 @@ export const POST_VOTE_UPDATED = gql`
       mySelectedOptionIndex
       votingEndsAt
       isVotingOpen
+      matchScore {
+        status
+        home
+        away
+        winner
+      }
       optionStats {
         index
         label
