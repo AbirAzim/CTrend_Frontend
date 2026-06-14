@@ -301,13 +301,13 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			shadowRadius: 16,
 		},
 		cardLive: {
-			borderColor: '#22c55e',
+			borderColor: 'rgba(34,197,94,0.45)',
 			borderWidth: 2,
 		},
 		liveBorderOverlay: {
 			borderRadius: 22,
 			borderWidth: 2,
-			borderColor: '#22c55e',
+			borderColor: 'rgba(34,197,94,0.45)',
 		},
 		header: {
 			flexDirection: 'row' as const,
@@ -1123,6 +1123,21 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			backgroundColor: c.card,
 		},
 	};
+}
+
+function LiveDot() {
+	const pulse = useRef(new Animated.Value(1)).current;
+	useEffect(() => {
+		Animated.loop(
+			Animated.sequence([
+				Animated.timing(pulse, { toValue: 0.2, duration: 600, useNativeDriver: true }),
+				Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+			])
+		).start();
+	}, [pulse]);
+	return (
+		<Animated.View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: '#4ade80', opacity: pulse }} />
+	);
 }
 
 function AnnouncementImageGrid({ urls }: { urls: string[] }) {
@@ -2100,8 +2115,12 @@ function FeedPostCardComponent({
 			: null;
 	// Show "match in progress" only for fixture-linked posts where voting has
 	// closed (kickoff passed) but the real match result isn't in yet.
+	const matchStatus = post.matchScore?.status ?? null;
+	const isMatchFinished = matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN' || matchStatus === 'AWARDED';
+	const isMatchNotStarted = !isLiveMatch && !isMatchFinished; // NS, TIMED, null, etc.
 	const showMatchLive = isMatchPost && isLiveMatch;
-	const showMatchCalculating = isMatchPost && !isLiveMatch && isVotingClosed && !showCampaignWinner;
+	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
+	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
 
 	return (
@@ -2705,8 +2724,13 @@ function FeedPostCardComponent({
 				/>
 			) : showMatchLive ? (
 				<View style={[matchInProgressStyles.container, matchInProgressStyles.containerLive]}>
-					<Text style={matchInProgressStyles.icon}>🟢</Text>
-					<Text style={matchInProgressStyles.text}>Match is live</Text>
+					<LiveDot />
+					<Text style={matchInProgressStyles.textLive}>Match is live</Text>
+				</View>
+			) : showMatchStartsSoon ? (
+				<View style={matchInProgressStyles.container}>
+					<Text style={matchInProgressStyles.icon}>⏰</Text>
+					<Text style={matchInProgressStyles.text}>Match starts soon · voting is closed</Text>
 				</View>
 			) : showMatchCalculating ? (
 				<View style={matchInProgressStyles.container}>
@@ -3584,14 +3608,20 @@ const matchInProgressStyles = StyleSheet.create({
 		backgroundColor: 'rgba(100,116,139,0.08)',
 	},
 	containerLive: {
-		borderColor: 'rgba(34,197,94,0.35)',
-		backgroundColor: 'rgba(34,197,94,0.09)',
+		borderColor: 'rgba(34,197,94,0.3)',
+		backgroundColor: 'rgba(34,197,94,0.07)',
 	},
 	icon: { fontSize: 18 },
 	text: {
 		flex: 1,
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#065f46',
+		color: '#94a3b8',
+	},
+	textLive: {
+		flex: 1,
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#4ade80',
 	},
 });

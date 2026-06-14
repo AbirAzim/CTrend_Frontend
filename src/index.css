@@ -1470,15 +1470,15 @@ body.capacitor .ig-bottom-nav {
 }
 
 .ig-post--live {
-  border-color: #22c55e;
+  border-color: rgb(34 197 94 / 0.45);
   box-shadow:
-    0 0 0 2px rgb(34 197 94 / 0.25),
-    0 8px 24px rgb(34 197 94 / 0.15);
+    0 0 0 1px rgb(34 197 94 / 0.18),
+    0 8px 24px rgb(34 197 94 / 0.1);
   animation: live-pulse 1.6s ease-in-out infinite;
 }
 @keyframes live-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.25), 0 8px 24px rgb(34 197 94 / 0.15); }
-  50%       { box-shadow: 0 0 0 4px rgb(34 197 94 / 0.5),  0 8px 32px rgb(34 197 94 / 0.3); }
+  0%, 100% { box-shadow: 0 0 0 1px rgb(34 197 94 / 0.18), 0 8px 24px rgb(34 197 94 / 0.1); }
+  50%       { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.35), 0 8px 32px rgb(34 197 94 / 0.18); }
 }
 
 .cx-post-campaign-ribbon {
@@ -2036,13 +2036,27 @@ body.capacitor .ig-bottom-nav {
   color: var(--cx-ink);
 }
 .cx-match-in-progress--live {
-  border-color: rgb(34 197 94 / 0.35);
-  background: rgb(34 197 94 / 0.09);
+  border-color: rgb(34 197 94 / 0.28);
+  background: rgb(34 197 94 / 0.07);
   color: rgb(21 128 61);
 }
 
 .cx-match-in-progress-icon {
   font-size: 1.1rem;
+}
+
+/* Blinking live dot */
+.cx-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: cx-live-blink 1.2s ease-in-out infinite;
+}
+@keyframes cx-live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
 }
 
 :root[data-theme="dark"] .cx-match-in-progress {
@@ -2051,9 +2065,12 @@ body.capacitor .ig-bottom-nav {
   color: var(--cx-ink);
 }
 :root[data-theme="dark"] .cx-match-in-progress--live {
-  background: rgb(34 197 94 / 0.1);
-  border-color: rgb(52 211 153 / 0.3);
-  color: #86efac;
+  background: rgb(34 197 94 / 0.08);
+  border-color: rgb(74 222 128 / 0.25);
+  color: #4ade80;
+}
+:root[data-theme="dark"] .cx-live-dot {
+  background: #4ade80;
 }
 
 /* ── Announcement post ─────────────────────────────────────────────────── */

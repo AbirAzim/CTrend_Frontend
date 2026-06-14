@@ -1584,10 +1584,15 @@ function FeedPostCardComponent({
   // closed (kickoff passed) but the real match result isn't in yet.
   const isLiveMatch =
     post.matchScore?.status === "IN_PLAY" || post.matchScore?.status === "PAUSED";
+  const matchStatus = post.matchScore?.status ?? null;
+  const isMatchFinished =
+    matchStatus === "FT" || matchStatus === "AET" || matchStatus === "PEN" || matchStatus === "AWARDED";
+  const isMatchNotStarted = !isLiveMatch && !isMatchFinished;
 
   const showMatchLive = isMatchPost && isLiveMatch;
+  const showMatchStartsSoon = isMatchPost && isMatchNotStarted && post.isVotingOpen === false && !showCampaignWinner;
   const showMatchCalculating =
-    isMatchPost && !isLiveMatch && post.isVotingOpen === false && !showCampaignWinner;
+    isMatchPost && isMatchFinished && post.isVotingOpen === false && !showCampaignWinner;
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)
@@ -2190,8 +2195,13 @@ function FeedPostCardComponent({
         />
       ) : showMatchLive ? (
         <div className="cx-match-in-progress cx-match-in-progress--live" role="status" aria-live="polite">
-          <span className="cx-match-in-progress-icon" aria-hidden>🟢</span>
+          <span className="cx-live-dot" aria-hidden />
           <span>Match is live</span>
+        </div>
+      ) : showMatchStartsSoon ? (
+        <div className="cx-match-in-progress" role="status" aria-live="polite">
+          <span className="cx-match-in-progress-icon" aria-hidden>⏰</span>
+          <span>Match starts soon · voting is closed</span>
         </div>
       ) : showMatchCalculating ? (
         <div className="cx-match-in-progress" role="status" aria-live="polite">
