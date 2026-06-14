@@ -1,10 +1,12 @@
 import { ApolloClient, HttpLink, InMemoryCache, split } from "@apollo/client";
+import { onError } from "@apollo/client/link/error";
 import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { persistCache, LocalStorageWrapper } from "apollo3-cache-persist";
 import { createClient } from "graphql-ws";
 import { readStoredToken } from "./authStorage";
+import { signalAuthExpired } from "./authExpiredState";
 
 const uri = import.meta.env.VITE_GRAPHQL_HTTP;
 if (!uri) {
@@ -65,6 +67,15 @@ export function onWsConnected(cb: () => void): () => void {
   return _wsClient.on("connected", cb);
 }
 
+const authErrorLink = onError(({ graphQLErrors, networkError }) => {
+  const isUnauthenticated =
+    graphQLErrors?.some((e) => e.extensions?.code === "UNAUTHENTICATED") ||
+    (networkError as { statusCode?: number } | null)?.statusCode === 401;
+  if (isUnauthenticated) signalAuthExpired();
+});
+
+const httpChain = authErrorLink.concat(authLink).concat(httpLink);
+
 const link = wsLink
   ? split(
       ({ query }) => {
@@ -75,9 +86,9 @@ const link = wsLink
         );
       },
       wsLink,
-      authLink.concat(httpLink),
+      httpChain,
     )
-  : authLink.concat(httpLink);
+  : httpChain;
 
 export const cache = new InMemoryCache({
   typePolicies: {

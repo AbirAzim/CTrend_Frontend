@@ -8,6 +8,7 @@ import { AppState, View } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { apolloClient, onWsConnected } from "../lib/apolloClient";
+import { onAuthExpired, clearAuthExpired } from "../lib/authExpiredState";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import { TabBarProvider } from "../context/TabBarContext";
@@ -467,6 +468,20 @@ function NotificationResponseHandler() {
   return null;
 }
 
+function AuthExpiredGate() {
+  const { logout, isAuthenticated } = useAuth();
+  useEffect(() => {
+    return onAuthExpired(() => {
+      clearAuthExpired();
+      void logout().then(() => {
+        router.replace("/auth/login");
+      });
+    });
+  }, [logout]);
+  void isAuthenticated; // consumed so lint doesn't complain
+  return null;
+}
+
 function ForceUpdateGate() {
   const { needsUpdate, installedVersionCode, minRequiredVersionCode, updateTitle, updateBody } =
     useForceUpdateRequired();
@@ -503,6 +518,7 @@ export default function RootLayout() {
                       <OfflineBanner />
                       <InAppNotificationBanner />
                       <WorldCupFloating />
+                      <AuthExpiredGate />
                       <ForceUpdateGate />
                     </ThemedRoot>
                   </KeyboardProvider>

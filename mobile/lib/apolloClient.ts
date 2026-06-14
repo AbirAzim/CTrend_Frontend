@@ -10,6 +10,7 @@ import {
   applyForceUpdateFromApolloNetworkError,
   applyForceUpdateFromGraphqlErrors,
 } from "./forceUpdateState";
+import { signalAuthExpired } from "./authExpiredState";
 import { readStoredToken } from "./authStorage";
 
 const HTTP_URL = process.env.EXPO_PUBLIC_GRAPHQL_HTTP;
@@ -23,6 +24,12 @@ const WS_URL = process.env.EXPO_PUBLIC_GRAPHQL_WS;
 const forceUpdateErrorLink = onError(({ graphQLErrors, networkError }) => {
   applyForceUpdateFromGraphqlErrors(graphQLErrors);
   applyForceUpdateFromApolloNetworkError(networkError);
+
+  const isUnauthenticated =
+    graphQLErrors?.some((e) => e.extensions?.code === "UNAUTHENTICATED") ||
+    (networkError as { statusCode?: number } | null)?.statusCode === 401;
+
+  if (isUnauthenticated) signalAuthExpired();
 });
 
 const authLink = setContext(async (_, { headers }) => {

@@ -1245,6 +1245,16 @@ function FeedPostCardComponent({
 	// intent >= 0 = vote that option; intent < 0 = withdraw
 	const pendingVote = useRef<{ intent: number } | null>(null);
 
+	// Guarantee voteInFlight resets if the card unmounts mid-flight (e.g. navigating
+	// away during a slow network). Without this, remounting the same card instance
+	// keeps the ref stuck at true and all taps are silently dropped.
+	useEffect(() => {
+		return () => {
+			voteInFlight.current = false;
+			pendingVote.current = null;
+		};
+	}, []);
+
 	const [moreMenuVisible, setMoreMenuVisible] = useState(false);
 	const [reportMenuVisible, setReportMenuVisible] = useState(false);
 	const [reportReasonId, setReportReasonId] =
@@ -1871,12 +1881,23 @@ function FeedPostCardComponent({
 		voteInFlight.current = true;
 		let currentIntent = intent;
 
+		// Race each mutation against a 10-second timeout so voteInFlight can never
+		// get permanently stuck when the server is slow or unreachable.
+		function withVoteTimeout<T>(p: Promise<T>): Promise<T> {
+			return Promise.race([
+				p,
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('vote_timeout')), 10_000),
+				),
+			]);
+		}
+
 		while (true) {
 			try {
 				if (currentIntent < 0) {
-					const result = await removeVoteMut({
+					const result = await withVoteTimeout(removeVoteMut({
 						variables: { postId: post.id },
-					});
+					}));
 					const payload = result.data?.removeVote;
 					if (payload?.countsPerOption?.length) {
 						const counts = payload.countsPerOption.map((n) =>
@@ -1903,13 +1924,13 @@ function FeedPostCardComponent({
 						voteGuardUntil.current = Date.now() + 500;
 					}
 				} else {
-					const result = await voteMut({
+					const result = await withVoteTimeout(voteMut({
 						variables: {
 							postId: post.id,
 							selectedOptionIndex: currentIntent,
 							anonymous: anon,
 						},
-					});
+					}));
 					const payload = result.data?.votePost;
 					if (payload?.countsPerOption?.length) {
 						const counts = payload.countsPerOption.map((n) =>

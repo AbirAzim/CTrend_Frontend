@@ -1,4 +1,7 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import { onAuthExpired, clearAuthExpired } from "./lib/authExpiredState";
 import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
 import { AppShell } from "./layouts/AppShell";
 import { AcceptInvitationPage } from "./pages/AcceptInvitationPage";
@@ -24,8 +27,22 @@ import { TermsOfServicePage } from "./pages/TermsOfServicePage";
 import { CreditsPage } from "./pages/CreditsPage";
 import { ChildSafetyPage } from "./pages/ChildSafetyPage";
 
+function AuthExpiredWatcher() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    return onAuthExpired(() => {
+      clearAuthExpired();
+      void logout().then(() => navigate("/login", { replace: true }));
+    });
+  }, [logout, navigate]);
+  return null;
+}
+
 export default function App() {
   return (
+    <>
+    <AuthExpiredWatcher />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
@@ -88,5 +105,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
