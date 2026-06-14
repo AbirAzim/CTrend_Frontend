@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
@@ -264,6 +265,7 @@ type RowProps = {
   colors: ColorPalette;
   actionLoadingIds: Set<string>;
   friendIdSet: Set<string>;
+  claimedPostIds: Set<string>;
   onPress: (n: GqlNotification) => void;
   onMarkRead: (notif: GqlNotification) => void;
   onArchive: (notif: GqlNotification) => void;
@@ -277,6 +279,7 @@ function NotifRow({
   st,
   actionLoadingIds,
   friendIdSet,
+  claimedPostIds,
   onPress,
   onMarkRead,
   onArchive,
@@ -285,11 +288,13 @@ function NotifRow({
   onClaim,
 }: RowProps) {
   const isLoading = actionLoadingIds.has(notif.id);
+  const claimPostId = notif.postId ?? notif.referenceId;
   const showClaim =
     notif.type === "VOTE_WINNER" &&
     notif.title.trim() !== "Prize claim submitted" &&
     !notif.body.toLowerCase().includes("claim is received") &&
-    Boolean(notif.postId || notif.referenceId);
+    Boolean(claimPostId) &&
+    !claimedPostIds.has(claimPostId!);
   const alreadyFriends =
     notif.type === "FRIEND_REQUEST" &&
     !!notif.referenceId &&
@@ -466,6 +471,15 @@ export default function NotificationsScreen() {
   const [items, setItems] = useState<GqlNotification[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
+  const [claimedPostIds, setClaimedPostIds] = useState<Set<string>>(new Set());
+
+  // Load persisted claimed prize postIds so the button stays hidden across navigations.
+  useEffect(() => {
+    AsyncStorage.getItem("ctrend_claimed_prizes").then((raw) => {
+      if (!raw) return;
+      try { setClaimedPostIds(new Set(JSON.parse(raw) as string[])); } catch { /* ignore */ }
+    });
+  }, []);
 
   const { data: friendsData } = useQuery<{ myFriends: Array<{ id: string }> }>(MY_FRIENDS, {
     fetchPolicy: "cache-and-network",
@@ -597,7 +611,12 @@ export default function NotificationsScreen() {
     setActionLoadingIds((prev) => new Set([...prev, notif.id]));
     try {
       await claimMut({ variables: { postId } });
-      // Server is source of truth; reflect submitted state and hide the button.
+      // Persist the claimed postId so the button stays hidden even after navigation.
+      setClaimedPostIds((prev) => {
+        const next = new Set(prev).add(postId);
+        void AsyncStorage.setItem("ctrend_claimed_prizes", JSON.stringify([...next]));
+        return next;
+      });
       setItems((prev) =>
         prev.map((n) =>
           n.id === notif.id
@@ -683,6 +702,7 @@ export default function NotificationsScreen() {
               colors={colors}
               actionLoadingIds={actionLoadingIds}
               friendIdSet={friendIdSet}
+              claimedPostIds={claimedPostIds}
               onPress={handlePress}
               onMarkRead={handleMarkRead}
               onArchive={handleArchive}

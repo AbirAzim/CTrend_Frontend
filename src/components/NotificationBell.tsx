@@ -97,6 +97,12 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
+  const [claimedPostIds, setClaimedPostIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("ctrend_claimed_prizes");
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch { return new Set(); }
+  });
   const ref = useRef<HTMLDivElement>(null);
 
   const { data: friendsData } = useQuery(MY_FRIENDS, {
@@ -280,6 +286,12 @@ export function NotificationBell() {
     setActionLoading(n.id, true);
     try {
       await claimPrizeMut({ variables: { postId } });
+      // Persist so button stays hidden after page reload.
+      setClaimedPostIds((prev) => {
+        const next = new Set(prev).add(postId);
+        try { localStorage.setItem("ctrend_claimed_prizes", JSON.stringify([...next])); } catch { /* ignore */ }
+        return next;
+      });
       updateNotification(n.id, {
         read: true,
         title: "Prize claim submitted",
@@ -340,11 +352,13 @@ export function NotificationBell() {
                   isPendingFriendRequestNotification(n) &&
                   !alreadyFriends &&
                   Boolean(n.referenceId);
+                const claimPostId = n.postId ?? n.referenceId;
                 const canClaimPrize =
                   n.type === "VOTE_WINNER" &&
                   n.title.trim() !== "Prize claim submitted" &&
                   !n.body.toLowerCase().includes("claim is received") &&
-                  Boolean(n.postId || n.referenceId);
+                  Boolean(claimPostId) &&
+                  !claimedPostIds.has(claimPostId!);
                 const hideVoteActor =
                   n.type === "POST_VOTE" &&
                   (!n.latestActorId ||
