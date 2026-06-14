@@ -22,6 +22,7 @@ type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: bool
 
 const STORAGE_KEY_Y = "ctrend_wc_tab_pos_y";
 const TAB_H = 68;
+const CARD_APPROX_H = 430;
 // Pixels the tab sticks out past the right edge (clips there naturally).
 const TAB_OVERHANG = 22;
 
@@ -46,6 +47,12 @@ function clampY(y: number): number {
   return Math.max(minY, Math.min(maxY, y));
 }
 
+function clampCardY(y: number): number {
+  const minY = 60;
+  const maxY = window.innerHeight - CARD_APPROX_H - 20;
+  return Math.max(minY, Math.min(Math.max(minY, maxY), y));
+}
+
 function defaultPosY(): number {
   return clampY(Math.round(window.innerHeight * 0.46));
 }
@@ -61,7 +68,13 @@ export function WorldCupFloating() {
   const dragRef = useRef({ startY: 0, oy: 0, moved: false });
   const tabRef = useRef<HTMLDivElement>(null);
 
-  // Load saved position
+  // Card drag state
+  const [cardY, setCardY] = useState<number | null>(null);
+  const [cardDragging, setCardDragging] = useState(false);
+  const cardDragRef = useRef({ startY: 0, oy: 0 });
+  const lastCardY = useRef<number | null>(null);
+
+  // Load saved tab position
   useEffect(() => {
     const saved = loadPosY();
     setPosY(saved !== null ? clampY(saved) : defaultPosY());
@@ -121,7 +134,7 @@ export function WorldCupFloating() {
     navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : `/world-cup?focus=${f.id}`);
   }
 
-  // ── Vertical-only drag handlers ──────────────────────────────────────────────
+  // ── Tab drag handlers ─────────────────────────────────────────────────────
   function onPointerDown(e: React.PointerEvent) {
     if (open) return;
     dragRef.current = {
@@ -147,7 +160,37 @@ export function WorldCupFloating() {
     const next = clampY(dragRef.current.oy + dy);
     setPosY(next);
     savePosY(next);
-    if (!dragRef.current.moved) setOpen(true); // tap without drag → open
+    if (!dragRef.current.moved) openCard(next); // tap without drag → open
+  }
+
+  // ── Card open / drag handlers ─────────────────────────────────────────────
+  function openCard(tabPosY?: number) {
+    const baseY = tabPosY ?? posY ?? defaultPosY();
+    const initial = lastCardY.current !== null
+      ? lastCardY.current
+      : clampCardY(baseY - 40);
+    lastCardY.current = initial;
+    setCardY(initial);
+    setOpen(true);
+  }
+
+  function onCardHandleDown(e: React.PointerEvent) {
+    cardDragRef.current = { startY: e.clientY, oy: cardY ?? 60 };
+    setCardDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  function onCardHandleMove(e: React.PointerEvent) {
+    if (!cardDragging) return;
+    const dy = e.clientY - cardDragRef.current.startY;
+    const next = clampCardY(cardDragRef.current.oy + dy);
+    setCardY(next);
+    lastCardY.current = next;
+  }
+
+  function onCardHandleUp() {
+    setCardDragging(false);
   }
 
   if (posY === null) return null;
@@ -164,7 +207,7 @@ export function WorldCupFloating() {
         role="button"
         tabIndex={0}
         aria-label="Open World Cup fixtures — drag to move"
-        onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
+        onKeyDown={(e) => e.key === "Enter" && openCard()}
       >
         {liveFixture ? (
           <div className="wc-tab-flags">
@@ -192,7 +235,21 @@ export function WorldCupFloating() {
 
   return (
     <>
-      <div className="wc-float-card wc-float-card--right wc-float-card--bottom" role="dialog" aria-label="World Cup matches">
+      <div
+        className="wc-float-card wc-float-card--right"
+        style={{ top: cardY ?? 60 }}
+        role="dialog"
+        aria-label="World Cup matches"
+      >
+        {/* Drag handle */}
+        <div
+          className={`wc-float-drag-handle${cardDragging ? " wc-float-drag-handle--active" : ""}`}
+          onPointerDown={onCardHandleDown}
+          onPointerMove={onCardHandleMove}
+          onPointerUp={onCardHandleUp}
+          onPointerCancel={onCardHandleUp}
+          aria-hidden
+        />
         <div className="wc-float-head">
           <button type="button" className="wc-float-title" onClick={() => { setOpen(false); navigate("/world-cup"); }}>
             <img src="/worldcup-trophy.png" className="wc-float-head-trophy" alt="" />

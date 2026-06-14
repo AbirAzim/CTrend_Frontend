@@ -20470,16 +20470,33 @@ a.cx-profile-btn-accent {
 }
 .wc-float-card--right { right: 12px; }
 .wc-float-card--left { left: 12px; }
-.wc-float-card--top { top: 64px; }
-.wc-float-card--bottom { bottom: 84px; }
 :root[data-theme="dark"] .wc-float-card {
   background: #1b1d22;
 }
+/* Drag handle strip — sits above the header, acts as drag target */
+.wc-float-drag-handle {
+  height: 20px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  touch-action: none;
+  user-select: none;
+}
+.wc-float-drag-handle::before {
+  content: "";
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.wc-float-drag-handle--active { cursor: grabbing; }
 .wc-float-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 8px 8px 10px;
+  padding: 6px 8px 8px 10px;
   background: linear-gradient(135deg, #0ea5e9, #6366f1);
   color: #fff;
 }

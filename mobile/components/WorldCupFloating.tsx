@@ -40,6 +40,7 @@ type CampaignsData = { activeCampaigns: Campaign[] };
 
 const TAB_W = 90;
 const TAB_H = 66;
+const CARD_APPROX_H = 380;
 const IDLE_OPACITY = 0.88;
 // How much of the tab is visible — the rest is clipped by the screen edge.
 const TAB_VISIBLE_FRAC = 0.68;
@@ -66,11 +67,10 @@ export function WorldCupFloating() {
     return () => clearTimeout(id);
   }, []);
 
-  // ── Vertical-only draggable tab (fixed on right edge) ───────────────────────
-  const tabX = W - Math.round(TAB_W * TAB_VISIBLE_FRAC); // partially off right edge
-  const minY = insets.top + 56;            // padding so it can't stick to status bar
-  const maxY = H - insets.bottom - TAB_H - 96; // padding above bottom nav
-
+  // ── Tab drag (vertical, right edge) ─────────────────────────────────────────
+  const tabX = W - Math.round(TAB_W * TAB_VISIBLE_FRAC);
+  const minY = insets.top + 56;
+  const maxY = H - insets.bottom - TAB_H - 96;
   const defaultY = Math.round(H * 0.46);
 
   const dragY = useRef(new Animated.Value(defaultY)).current;
@@ -136,6 +136,50 @@ export function WorldCupFloating() {
     }),
   ).current;
 
+  // ── Card drag (vertical, by header) ─────────────────────────────────────────
+  const cardMinY = insets.top + 8;
+  const cardMaxY = H - insets.bottom - CARD_APPROX_H - 80;
+  const cardDragY = useRef(new Animated.Value(0)).current;
+  const cardLastY = useRef(0);
+
+  const cardPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => { Vibration.vibrate(6); },
+      onPanResponderMove: (_, g) => {
+        cardDragY.setValue(cardLastY.current + g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        const ny = Math.max(cardMinY, Math.min(cardMaxY, cardLastY.current + g.dy));
+        cardLastY.current = ny;
+        Animated.spring(cardDragY, {
+          toValue: ny,
+          useNativeDriver: false,
+          tension: 90,
+          friction: 11,
+        }).start();
+        Vibration.vibrate(6);
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(cardDragY, {
+          toValue: cardLastY.current,
+          useNativeDriver: false,
+          tension: 90,
+          friction: 11,
+        }).start();
+      },
+    }),
+  ).current;
+
+  function openCard() {
+    // Position card near the tab's current Y, clamped to screen
+    const initialY = Math.max(cardMinY, Math.min(cardMaxY, lastOffsetY.current - 40));
+    cardLastY.current = initialY;
+    cardDragY.setValue(initialY);
+    setOpen(true);
+  }
+
   const { data: campData } = useQuery<CampaignsData>(ACTIVE_CAMPAIGNS, {
     fetchPolicy: "cache-and-network",
     errorPolicy: "all",
@@ -188,8 +232,10 @@ export function WorldCupFloating() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {open ? (
-        <View style={[st.card, { right: 12, bottom: insets.bottom + 88 }]}>
-          <View style={st.head}>
+        <Animated.View style={[st.card, { right: 12, top: cardDragY }]}>
+          {/* Drag handle — also used as PanResponder zone for the whole head */}
+          <View style={st.head} {...cardPan.panHandlers}>
+            <View style={st.dragHandleBar} pointerEvents="none" />
             <Pressable
               style={st.title}
               onPress={() => { setOpen(false); router.push("/world-cup" as `/${string}`); }}
@@ -270,9 +316,9 @@ export function WorldCupFloating() {
               </View>
             )}
           </ScrollView>
-        </View>
+        </Animated.View>
       ) : (
-        // 2D draggable tab
+        // Vertical-draggable tab
         <Animated.View
           style={[
             st.tab,
@@ -287,7 +333,7 @@ export function WorldCupFloating() {
         >
           <Pressable
             style={st.tabPressable}
-            onPress={() => setOpen(true)}
+            onPress={openCard}
             accessibilityRole="button"
             accessibilityLabel="Open World Cup fixtures. Drag to move."
           >
@@ -375,15 +421,24 @@ function makeStyles(c: {
       overflow: "hidden",
       zIndex: 1001,
       shadowColor: "#000",
-      shadowOpacity: 0.25,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 5 },
-      elevation: 12,
+      shadowOpacity: 0.28,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 14,
+    },
+    dragHandleBar: {
+      alignSelf: "center",
+      width: 32,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: "rgba(255,255,255,0.35)",
+      marginBottom: 5,
     },
     head: {
       flexDirection: "row", alignItems: "center",
-      paddingVertical: 7, paddingLeft: 10, paddingRight: 6,
+      paddingTop: 8, paddingBottom: 7, paddingLeft: 10, paddingRight: 6,
       backgroundColor: c.accent,
+      flexWrap: "wrap",
     },
     title: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
     headTrophy: { width: 22, height: 22 },
