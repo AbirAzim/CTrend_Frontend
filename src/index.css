@@ -2036,9 +2036,10 @@ body.capacitor .ig-bottom-nav {
   color: var(--cx-ink);
 }
 .cx-match-in-progress--live {
-  border-color: rgb(34 197 94 / 0.28);
-  background: rgb(34 197 94 / 0.07);
-  color: rgb(21 128 61);
+  border-color: rgb(249 115 22 / 0.35);
+  background: rgb(249 115 22 / 0.08);
+  color: rgb(194 65 12);
+  font-size: 0.92rem;
 }
 
 .cx-match-in-progress-icon {
@@ -2050,7 +2051,7 @@ body.capacitor .ig-bottom-nav {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #22c55e;
+  background: #f97316;
   flex-shrink: 0;
   animation: cx-live-blink 1.2s ease-in-out infinite;
 }
@@ -2062,15 +2063,15 @@ body.capacitor .ig-bottom-nav {
 :root[data-theme="dark"] .cx-match-in-progress {
   background: rgb(100 116 139 / 0.1);
   border-color: rgb(100 116 139 / 0.25);
-  color: var(--cx-ink);
+  color: #cbd5e1;
 }
 :root[data-theme="dark"] .cx-match-in-progress--live {
-  background: rgb(34 197 94 / 0.08);
-  border-color: rgb(74 222 128 / 0.25);
-  color: #4ade80;
+  background: rgb(249 115 22 / 0.1);
+  border-color: rgb(251 146 60 / 0.3);
+  color: #fb923c;
 }
 :root[data-theme="dark"] .cx-live-dot {
-  background: #4ade80;
+  background: #f97316;
 }
 
 /* ── Announcement post ─────────────────────────────────────────────────── */
@@ -20354,7 +20355,12 @@ a.cx-profile-btn-accent {
   user-select: none;
   touch-action: none;
 }
-:root[data-theme="dark"] .wc-tab { background: transparent; }
+:root[data-theme="dark"] .wc-tab {
+  background: rgba(30, 32, 46, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  box-shadow: -2px 2px 12px rgb(0 0 0 / 0.5);
+}
 .wc-tab:hover { opacity: 1 !important; }
 .wc-tab--dragging { cursor: grabbing; opacity: 1 !important; }
 .wc-tab-img {
@@ -20453,7 +20459,7 @@ a.cx-profile-btn-accent {
 .wc-float-card {
   position: fixed;
   z-index: 1001;
-  width: 280px;
+  width: 308px;
   max-width: calc(100vw - 24px);
   background: var(--ig-surface, #fff);
   border: 1px solid var(--ig-border);
@@ -20603,7 +20609,7 @@ a.cx-profile-btn-accent {
 }
 .wc-float-day-label--results { color: var(--ig-text-muted); }
 @media (max-width: 640px) {
-  .wc-float-card { width: 248px; }
+  .wc-float-card { width: 272px; }
   .wc-float-card--bottom { bottom: 72px; }
 }
 

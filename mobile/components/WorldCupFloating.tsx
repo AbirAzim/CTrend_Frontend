@@ -45,7 +45,7 @@ const IDLE_OPACITY = 0.88;
 const TAB_VISIBLE_FRAC = 0.68;
 
 export function WorldCupFloating() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const followed = useFollowedTeam();
   const { width: W, height: H } = useWindowDimensions();
@@ -178,7 +178,7 @@ export function WorldCupFloating() {
   if (!wcCampaign) return null;
   if (live.length === 0 && nextDays.length === 0 && recent.length === 0) return null;
 
-  const st = makeStyles(colors);
+  const st = makeStyles(colors, isDark);
 
   function openMatch(f: WcFixture) {
     setOpen(false);
@@ -320,26 +320,26 @@ export function WorldCupFloating() {
 function makeStyles(c: {
   card: string; border: string; text: string; subtext: string;
   muted: string; accent: string; section: string;
-}) {
+}, isDark: boolean) {
   return StyleSheet.create({
     tab: {
       position: "absolute",
       width: TAB_W,
       height: TAB_H,
       borderRadius: 16,
-      backgroundColor: c.card,
+      backgroundColor: isDark ? "#1e2030" : c.card,
       borderWidth: 1,
-      borderColor: c.border,
+      borderColor: isDark ? "rgba(255,255,255,0.15)" : c.border,
       alignItems: "center",
       justifyContent: "center",
       zIndex: 1000,
       shadowColor: "#000",
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
+      shadowOpacity: isDark ? 0.6 : 0.3,
+      shadowRadius: 10,
       shadowOffset: { width: -2, height: 2 },
-      elevation: 8,
+      elevation: 12,
     },
-    tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
+    tabPressable: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", paddingRight: Math.round(TAB_W * (1 - TAB_VISIBLE_FRAC)) },
     tabImg: { width: 38, height: 38 },
     tabFlags: { flexDirection: "column", alignItems: "center", gap: 2 },
     tabFlag: { width: 26, height: 26, borderRadius: 13 },

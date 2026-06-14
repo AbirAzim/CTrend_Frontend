@@ -1138,7 +1138,7 @@ function LiveDot() {
 		).start();
 	}, [pulse]);
 	return (
-		<Animated.View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: '#4ade80', opacity: pulse }} />
+		<Animated.View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: '#f97316', opacity: pulse }} />
 	);
 }
 
@@ -3615,20 +3615,20 @@ const matchInProgressStyles = StyleSheet.create({
 		backgroundColor: 'rgba(100,116,139,0.08)',
 	},
 	containerLive: {
-		borderColor: 'rgba(34,197,94,0.3)',
-		backgroundColor: 'rgba(34,197,94,0.07)',
+		borderColor: 'rgba(249,115,22,0.35)',
+		backgroundColor: 'rgba(249,115,22,0.08)',
 	},
 	icon: { fontSize: 18 },
 	text: {
 		flex: 1,
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#94a3b8',
+		color: '#cbd5e1',
 	},
 	textLive: {
 		flex: 1,
-		fontSize: 12,
+		fontSize: 14,
 		fontWeight: '700',
-		color: '#4ade80',
+		color: '#f97316',
 	},
 });
