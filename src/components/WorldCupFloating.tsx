@@ -23,8 +23,7 @@ type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: bool
 const STORAGE_KEY_Y = "ctrend_wc_tab_pos_y";
 const TAB_H = 68;
 const CARD_APPROX_H = 430;
-// Pixels the tab sticks out past the right edge (clips there naturally).
-const TAB_OVERHANG = 22;
+const TAB_OVERHANG = 0; // fully visible on web (unlike mobile which clips at the edge)
 
 function loadPosY(): number | null {
   try {
@@ -258,8 +257,8 @@ export function WorldCupFloating() {
               {followed ? ` · ${followed}` : ""}
             </span>
           </button>
-          <button type="button" className="wc-float-icon-btn" aria-label="Minimise" onClick={() => setOpen(false)}>
-            ─
+          <button type="button" className="wc-float-icon-btn" aria-label="Close" onClick={() => setOpen(false)}>
+            ✕
           </button>
         </div>
 

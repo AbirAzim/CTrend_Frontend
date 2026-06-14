@@ -247,7 +247,7 @@ export function WorldCupFloating() {
               </Text>
             </Pressable>
             <Pressable style={st.iconBtn} onPress={() => setOpen(false)} hitSlop={6}>
-              <Text style={st.iconBtnText}>─</Text>
+              <Text style={st.iconBtnText}>✕</Text>
             </Pressable>
           </View>
 
