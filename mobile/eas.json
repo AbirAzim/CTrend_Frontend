@@ -6,18 +6,12 @@
     "preview": {
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease --stacktrace",
-        "secretFiles": {
-          "GOOGLE_SERVICES_JSON": "./android/app/google-services.json"
-        }
+        "gradleCommand": ":app:assembleRelease --stacktrace"
       }
     },
     "production": {
       "android": {
-        "buildType": "app-bundle",
-        "secretFiles": {
-          "GOOGLE_SERVICES_JSON": "./android/app/google-services.json"
-        }
+        "buildType": "app-bundle"
       }
     }
   }
