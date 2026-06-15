@@ -72,6 +72,9 @@ mobile/android/captures/
 *.aab
 *.apk
 
+# Release binaries — never commit, store elsewhere
+mobile/releases/
+
 # iOS build artifacts
 mobile/ios/build/
 mobile/ios/Pods/
