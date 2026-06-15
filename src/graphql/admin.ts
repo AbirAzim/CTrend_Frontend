@@ -360,6 +360,9 @@ export const ADMIN_MODERATOR_THREAD_MESSAGES = gql`
       sentByAdminEmail
       text
       imageUrl
+      deleted
+      reactions { emoji count }
+      viewerReaction
       replyTo {
         messageId
         senderId

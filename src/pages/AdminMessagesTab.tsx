@@ -11,6 +11,7 @@ import {
   MARK_MODERATOR_THREAD_READ,
   SEND_MODERATOR_MESSAGES,
 } from "../graphql/admin";
+import { REACT_MESSAGE, DELETE_MESSAGE, MESSAGE_REACTION_EMOJIS } from "../graphql/messages";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { playMessageSound } from "../lib/notificationSound";
@@ -71,6 +72,9 @@ type ThreadMessageRow = {
   sentByAdminEmail?: string | null;
   text: string;
   imageUrl?: string | null;
+  deleted?: boolean | null;
+  reactions?: { emoji: string; count: number }[] | null;
+  viewerReaction?: string | null;
   replyTo?: ReplyPreviewRow | null;
   createdAt: string;
 };
@@ -231,6 +235,8 @@ export function AdminMessagesTab({
 
   const [sendModeratorMessages, { loading: sending }] = useMutation(SEND_MODERATOR_MESSAGES);
   const [markThreadRead] = useMutation(MARK_MODERATOR_THREAD_READ);
+  const [reactMut] = useMutation(REACT_MESSAGE);
+  const [deleteMut] = useMutation(DELETE_MESSAGE);
 
   const [liveThreadMessages, setLiveThreadMessages] = useState<ThreadMessageRow[]>([]);
 
@@ -299,6 +305,26 @@ export function AdminMessagesTab({
     } else {
       setRecipientIds((prev) => [...new Set([...prev, ...allIds])]);
     }
+  }
+
+  function handleReact(msg: ThreadMessageRow, emoji: string) {
+    const isRemove = msg.viewerReaction === emoji;
+    void reactMut({ variables: { messageId: msg.id, emoji: isRemove ? null : emoji } })
+      .then(() => void refetchThreadMessages())
+      .catch(() => {});
+  }
+
+  function handleCopyMsg(msg: ThreadMessageRow) {
+    const text = (msg.text ?? "").trim();
+    if (!text) return;
+    void navigator.clipboard.writeText(text);
+  }
+
+  function handleDeleteMsg(msg: ThreadMessageRow) {
+    if (!confirm("Delete this message for everyone?")) return;
+    void deleteMut({ variables: { messageId: msg.id } })
+      .then(() => void refetchThreadMessages())
+      .catch(() => {});
   }
 
   function openThread(userId: string) {
@@ -568,6 +594,7 @@ export function AdminMessagesTab({
                   username: msg.senderName,
                   profileImageUrl: msg.senderAvatar,
                 };
+                const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
                 return (
                   <div
                     key={msg.id}
@@ -576,93 +603,160 @@ export function AdminMessagesTab({
                   >
                     {!isModerator ? <AdminAvatar user={userAvatar} compact /> : null}
                     <div
-                      className={`admin-mod-bubble${isModerator ? " admin-mod-bubble--mod" : ""}`}
+                      className={`admin-mod-bubble${isModerator ? " admin-mod-bubble--mod" : ""}${msg.deleted ? " admin-mod-bubble--deleted" : ""}`}
                       title={
                         isModerator && msg.sentByAdminEmail
                           ? `Sent by ${msg.sentByAdminName} (${msg.sentByAdminEmail})`
                           : undefined
                       }
                     >
-                      {msg.replyTo ? (
+                      {msg.deleted ? (
+                        <p className="admin-mod-bubble-deleted">🚫 {isModerator ? "You unsent this message" : "Message deleted"}</p>
+                      ) : (
+                        <>
+                          {msg.replyTo ? (
+                            <button
+                              type="button"
+                              className="admin-mod-quoted"
+                              onClick={() => {
+                                const el = chatBodyRef.current?.querySelector<HTMLElement>(
+                                  `[data-admin-msg-id="${msg.replyTo!.messageId}"]`,
+                                );
+                                if (!el) return;
+                                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                el.classList.add("admin-mod-bubble-row--flash");
+                                setTimeout(
+                                  () => el.classList.remove("admin-mod-bubble-row--flash"),
+                                  1200,
+                                );
+                              }}
+                            >
+                              <span className="admin-mod-quoted-bar" aria-hidden />
+                              <span className="admin-mod-quoted-meta">
+                                <span className="admin-mod-quoted-name">{msg.replyTo.senderName}</span>
+                                <span className="admin-mod-quoted-text">
+                                  {msg.replyTo.text?.trim()
+                                    ? msg.replyTo.text
+                                    : msg.replyTo.imageUrl
+                                      ? "📷 Photo"
+                                      : "Message"}
+                                </span>
+                              </span>
+                              {msg.replyTo.imageUrl ? (
+                                <img src={msg.replyTo.imageUrl} alt="" className="admin-mod-quoted-thumb" />
+                              ) : null}
+                            </button>
+                          ) : null}
+                          <div className="admin-mod-bubble-head">
+                            {isModerator ? (
+                              <>
+                                <img src="/logo.png" alt="" width={18} height={18} className="admin-mod-thread-avatar" />
+                                <strong>{MODERATOR_BRAND_NAME}</strong>
+                                {msg.sentByAdminName ? (
+                                  <span className="admin-mod-sent-by">
+                                    via{" "}
+                                    {msg.sentByAdminId ? (
+                                      <button
+                                        type="button"
+                                        className="admin-mod-sent-by-link"
+                                        title={msg.sentByAdminEmail ?? undefined}
+                                        onClick={(e) => openAdminSenderProfile(msg.sentByAdminId!, e)}
+                                      >
+                                        {msg.sentByAdminName}
+                                      </button>
+                                    ) : (
+                                      msg.sentByAdminName
+                                    )}
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              <strong>{msg.senderName}</strong>
+                            )}
+                            <span className="muted small">{formatRelativeTime(msg.createdAt)}</span>
+                          </div>
+                          {msg.text ? <p className="admin-mod-bubble-text">{msg.text}</p> : null}
+                          {msg.imageUrl ? (
+                            <a href={msg.imageUrl} target="_blank" rel="noreferrer" className="admin-mod-bubble-image-wrap">
+                              <img src={msg.imageUrl} alt="" className="admin-mod-bubble-image" />
+                            </a>
+                          ) : null}
+                          {activeReactions.length > 0 ? (
+                            <div className="admin-mod-reaction-strip">
+                              {activeReactions.map((r) => (
+                                <button
+                                  key={r.emoji}
+                                  type="button"
+                                  className={`admin-mod-reaction-chip${msg.viewerReaction === r.emoji ? " admin-mod-reaction-chip--active" : ""}`}
+                                  onClick={() => handleReact(msg, r.emoji)}
+                                >
+                                  {r.emoji} {r.count}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                    {!msg.deleted ? (
+                      <div className="admin-mod-msg-actions">
+                        <div className="admin-mod-quick-react">
+                          {(MESSAGE_REACTION_EMOJIS as readonly string[]).map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              className={`admin-mod-quick-react-btn${msg.viewerReaction === emoji ? " admin-mod-quick-react-btn--active" : ""}`}
+                              onClick={() => handleReact(msg, emoji)}
+                              title={emoji}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
                         <button
                           type="button"
-                          className="admin-mod-quoted"
-                          onClick={() => {
-                            const el = chatBodyRef.current?.querySelector<HTMLElement>(
-                              `[data-admin-msg-id="${msg.replyTo!.messageId}"]`,
-                            );
-                            if (!el) return;
-                            el.scrollIntoView({ behavior: "smooth", block: "center" });
-                            el.classList.add("admin-mod-bubble-row--flash");
-                            setTimeout(
-                              () => el.classList.remove("admin-mod-bubble-row--flash"),
-                              1200,
-                            );
-                          }}
+                          className="admin-mod-reply-btn"
+                          aria-label="Reply"
+                          title="Reply"
+                          onClick={() => setReplyTarget(msg)}
                         >
-                          <span className="admin-mod-quoted-bar" aria-hidden />
-                          <span className="admin-mod-quoted-meta">
-                            <span className="admin-mod-quoted-name">{msg.replyTo.senderName}</span>
-                            <span className="admin-mod-quoted-text">
-                              {msg.replyTo.text?.trim()
-                                ? msg.replyTo.text
-                                : msg.replyTo.imageUrl
-                                  ? "📷 Photo"
-                                  : "Message"}
-                            </span>
-                          </span>
-                          {msg.replyTo.imageUrl ? (
-                            <img src={msg.replyTo.imageUrl} alt="" className="admin-mod-quoted-thumb" />
-                          ) : null}
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden>
+                            <polyline points="9 17 4 12 9 7" />
+                            <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                          </svg>
                         </button>
-                      ) : null}
-                      <div className="admin-mod-bubble-head">
+                        {msg.text?.trim() ? (
+                          <button
+                            type="button"
+                            className="admin-mod-reply-btn"
+                            aria-label="Copy"
+                            title="Copy"
+                            onClick={() => handleCopyMsg(msg)}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden>
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                          </button>
+                        ) : null}
                         {isModerator ? (
-                          <>
-                            <img src="/logo.png" alt="" width={18} height={18} className="admin-mod-thread-avatar" />
-                            <strong>{MODERATOR_BRAND_NAME}</strong>
-                            {msg.sentByAdminName ? (
-                              <span className="admin-mod-sent-by">
-                                via{" "}
-                                {msg.sentByAdminId ? (
-                                  <button
-                                    type="button"
-                                    className="admin-mod-sent-by-link"
-                                    title={msg.sentByAdminEmail ?? undefined}
-                                    onClick={(e) => openAdminSenderProfile(msg.sentByAdminId!, e)}
-                                  >
-                                    {msg.sentByAdminName}
-                                  </button>
-                                ) : (
-                                  msg.sentByAdminName
-                                )}
-                              </span>
-                            ) : null}
-                          </>
-                        ) : (
-                          <strong>{msg.senderName}</strong>
-                        )}
-                        <span className="muted small">{formatRelativeTime(msg.createdAt)}</span>
+                          <button
+                            type="button"
+                            className="admin-mod-reply-btn admin-mod-reply-btn--danger"
+                            aria-label="Delete"
+                            title="Delete"
+                            onClick={() => handleDeleteMsg(msg)}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden>
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                              <path d="M10 11v6M14 11v6" />
+                              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                            </svg>
+                          </button>
+                        ) : null}
                       </div>
-                      {msg.text ? <p className="admin-mod-bubble-text">{msg.text}</p> : null}
-                      {msg.imageUrl ? (
-                        <a href={msg.imageUrl} target="_blank" rel="noreferrer" className="admin-mod-bubble-image-wrap">
-                          <img src={msg.imageUrl} alt="" className="admin-mod-bubble-image" />
-                        </a>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      className="admin-mod-reply-btn"
-                      aria-label="Reply"
-                      title="Reply"
-                      onClick={() => setReplyTarget(msg)}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden>
-                        <polyline points="9 17 4 12 9 7" />
-                        <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-                      </svg>
-                    </button>
+                    ) : null}
                     {isModerator ? (
                       <img src="/logo.png" alt="" className="admin-mod-msg-avatar admin-mod-msg-avatar--logo" />
                     ) : null}

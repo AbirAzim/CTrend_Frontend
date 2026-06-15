@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "290108875479",
+    "project_id": "ke-jitbe",
+    "storage_bucket": "ke-jitbe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:290108875479:android:72453f65c2abd5dab74692",
+        "android_client_info": {
+          "package_name": "com.ctrend.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvpD67iTZGZv1JlAMT-vIQ60tB7C_Zk5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

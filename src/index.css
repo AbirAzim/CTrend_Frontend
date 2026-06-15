@@ -19674,6 +19674,45 @@ a.cx-profile-btn-accent {
 .admin-mod-bubble-row {
   position: relative;
 }
+.admin-mod-msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.admin-mod-bubble-row:hover .admin-mod-msg-actions {
+  opacity: 1;
+}
+.admin-mod-quick-react {
+  display: flex;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 4px;
+  gap: 1px;
+  margin-right: 4px;
+}
+.admin-mod-quick-react-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.1s;
+}
+.admin-mod-quick-react-btn:hover {
+  background: rgba(99,102,241,0.12);
+  transform: scale(1.18);
+}
+.admin-mod-quick-react-btn--active {
+  background: rgba(99,102,241,0.2);
+}
 .admin-mod-reply-btn {
   flex-shrink: 0;
   display: inline-flex;
@@ -19686,15 +19725,50 @@ a.cx-profile-btn-accent {
   background: transparent;
   color: var(--ig-text-secondary, #64748b);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s, background 0.12s, color 0.12s;
-}
-.admin-mod-bubble-row:hover .admin-mod-reply-btn {
-  opacity: 1;
+  transition: background 0.12s, color 0.12s;
 }
 .admin-mod-reply-btn:hover {
   background: rgba(99, 102, 241, 0.12);
   color: #6366f1;
+}
+.admin-mod-reply-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.admin-mod-reaction-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.admin-mod-reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--section);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.admin-mod-reaction-chip:hover {
+  background: rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.3);
+}
+.admin-mod-reaction-chip--active {
+  background: rgba(99,102,241,0.14);
+  border-color: rgba(99,102,241,0.45);
+}
+.admin-mod-bubble--deleted {
+  opacity: 0.55;
+}
+.admin-mod-bubble-deleted {
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ig-text-secondary, #64748b);
 }
 
 .admin-mod-quoted {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import {
@@ -12,10 +13,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ADMIN_MODERATOR_THREADS,
   ADMIN_MODERATOR_THREAD_MESSAGES,
@@ -24,11 +27,18 @@ import {
   ADMIN_MODERATOR_USER_MESSAGE,
   LIST_USERS,
 } from "@ctrend/shared/graphql/admin";
+import { REACT_MESSAGE, DELETE_MESSAGE, MESSAGE_REACTION_EMOJIS } from "@ctrend/shared/graphql/messages";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import logoAsset from "../../assets/logo.png";
+
+function replySnippet(text?: string | null, imageUrl?: string | null): string {
+  if (imageUrl && !text?.trim()) return "📷 Photo";
+  if (imageUrl) return "📷 " + (text?.trim() ?? "");
+  return text?.trim() ?? "";
+}
 
 const MODERATOR_BRAND_NAME = "Ke Jitbe Moderator";
 
@@ -53,6 +63,10 @@ type ThreadMessage = {
   sentByAdminName?: string | null;
   text: string;
   imageUrl?: string | null;
+  deleted?: boolean | null;
+  reactions?: { emoji: string; count: number }[] | null;
+  viewerReaction?: string | null;
+  replyTo?: { messageId: string; senderId: string; senderName: string; text?: string | null; imageUrl?: string | null } | null;
   createdAt: string;
 };
 
@@ -162,8 +176,11 @@ function ChatView({
 }) {
   const { showToast, ToastView } = useToast();
   const [messageText, setMessageText] = useState("");
+  const messageTextRef = useRef("");
   const [uploading, setUploading] = useState(false);
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ThreadMessage | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const { data, loading, refetch } = useQuery<MessagesData>(ADMIN_MODERATOR_THREAD_MESSAGES, {
@@ -173,6 +190,8 @@ function ChatView({
 
   const [markRead] = useMutation(MARK_MODERATOR_THREAD_READ);
   const [sendMut, { loading: sending }] = useMutation(SEND_MODERATOR_MESSAGES);
+  const [reactMut] = useMutation(REACT_MESSAGE);
+  const [deleteMut] = useMutation(DELETE_MESSAGE);
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
 
   useSubscription(ADMIN_MODERATOR_USER_MESSAGE, {
@@ -204,30 +223,72 @@ function ChatView({
     if (url) setPendingImageUrl(url);
   }
 
+  function handleTextChange(val: string) {
+    messageTextRef.current = val;
+    setMessageText(val);
+  }
+
   async function handleSend() {
-    const text = messageText.trim();
+    const text = messageTextRef.current.trim();
     if (!text && !pendingImageUrl) return;
+    const replyToId = replyTarget?.id;
     try {
       await sendMut({
         variables: {
           userIds: [thread.recipientUserId],
           text: text || " ",
           imageUrl: pendingImageUrl ?? undefined,
+          ...(replyToId ? { replyToId } : {}),
         },
       });
+      messageTextRef.current = "";
       setMessageText("");
       setPendingImageUrl(null);
+      setReplyTarget(null);
       void refetch();
     } catch {
       showToast("Failed to send", "error");
     }
   }
 
+  function handleReact(msg: ThreadMessage, emoji: string) {
+    const isRemove = msg.viewerReaction === emoji;
+    if (!isRemove) Vibration.vibrate(8);
+    setActiveReactMsgId(null);
+    void reactMut({ variables: { messageId: msg.id, emoji: isRemove ? null : emoji } })
+      .then(() => void refetch())
+      .catch(() => {});
+  }
+
+  function handleDelete(msg: ThreadMessage) {
+    setActiveReactMsgId(null);
+    Alert.alert("Delete message?", "This message will be removed for everyone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void deleteMut({ variables: { messageId: msg.id } })
+            .then(() => void refetch())
+            .catch(() => {});
+        },
+      },
+    ]);
+  }
+
+  function handleCopy(msg: ThreadMessage) {
+    const text = (msg.text ?? "").trim();
+    if (!text) return;
+    void Clipboard.setStringAsync(text);
+    setActiveReactMsgId(null);
+    showToast("Copied to clipboard", "success");
+  }
+
   const st = chatStyles(colors);
   const isBusy = sending || uploading;
 
   return (
-    <View style={[st.screen, { paddingBottom: insets.bottom }]}>
+    <View style={st.screen}>
       <ToastView />
 
       {/* Header */}
@@ -245,51 +306,159 @@ function ChatView({
         </View>
       </View>
 
-      {/* Messages */}
-      {loading && messages.length === 0 ? (
-        <View style={st.center}><ActivityIndicator color={colors.accent} /></View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={st.msgList}
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={
-            <View style={st.emptyChat}>
-              <ModeratorAvatar size={48} />
-              <Text style={[st.emptyChatTitle, { color: colors.text }]}>{MODERATOR_BRAND_NAME}</Text>
-              <Text style={[st.emptyChatSub, { color: colors.muted }]}>No messages yet</Text>
-            </View>
-          }
-          renderItem={({ item: m }) => {
-            const isAdmin = Boolean(m.sentByAdminId);
-            return (
-              <View style={[st.msgRow, isAdmin ? st.msgRight : st.msgLeft]}>
-                {!isAdmin && <Avatar name={m.senderName} imageUrl={m.senderAvatar} size={28} />}
-                <View style={{ maxWidth: "72%" }}>
-                  {!isAdmin && <Text style={[st.msgSender, { color: colors.muted }]}>{m.senderName}</Text>}
-                  <View style={[st.bubble, isAdmin ? st.bubbleAdmin : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
-                    {m.imageUrl ? (
-                      <Image source={{ uri: m.imageUrl }} style={st.msgImage} resizeMode="cover" />
-                    ) : null}
-                    {m.text.trim() && m.text.trim() !== " " ? (
-                      <Text style={[st.bubbleText, { color: isAdmin ? "#fff" : colors.text }]}>{m.text}</Text>
-                    ) : null}
-                  </View>
-                  <Text style={[st.msgTime, { color: colors.muted, alignSelf: isAdmin ? "flex-end" : "flex-start" }]}>
-                    {formatRelativeTime(m.createdAt)}{isAdmin && m.sentByAdminName ? ` · ${m.sentByAdminName}` : ""}
-                  </Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 56 : 0}
+      >
+        {/* Messages */}
+        {loading && messages.length === 0 ? (
+          <View style={st.center}><ActivityIndicator color={colors.accent} /></View>
+        ) : (
+          <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(m) => m.id}
+              contentContainerStyle={st.msgList}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+              onScrollBeginDrag={() => setActiveReactMsgId(null)}
+              ListEmptyComponent={
+                <View style={st.emptyChat}>
+                  <ModeratorAvatar size={48} />
+                  <Text style={[st.emptyChatTitle, { color: colors.text }]}>{MODERATOR_BRAND_NAME}</Text>
+                  <Text style={[st.emptyChatSub, { color: colors.muted }]}>No messages yet</Text>
                 </View>
-                {isAdmin && <ModeratorAvatar size={28} />}
-              </View>
-            );
-          }}
-        />
-      )}
+              }
+              renderItem={({ item: m }) => {
+                const isAdmin = Boolean(m.sentByAdminId);
+                const activeReactions: { emoji: string; count: number }[] = (m.reactions ?? []).filter((r: { emoji: string; count: number }) => r.count > 0);
+                const isReacting = activeReactMsgId === m.id;
 
-      {/* Input bar — sticks above keyboard */}
-      <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+                if (m.deleted) {
+                  return (
+                    <View style={[st.msgRow, isAdmin ? st.msgRight : st.msgLeft]}>
+                      {!isAdmin && <View style={{ width: 28, marginRight: 6 }} />}
+                      <View style={[st.bubble, st.bubbleDeleted, { borderColor: colors.border }]}>
+                        <Text style={[st.deletedText, { color: colors.muted }]}>
+                          🚫 {isAdmin ? "You unsent this message" : "Message deleted"}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                }
+
+                return (
+                  <View>
+                    {/* Reaction tray */}
+                    {isReacting && (
+                      <View style={[st.quickReactRow, isAdmin ? st.quickReactOwn : st.quickReactOther]}>
+                        {(MESSAGE_REACTION_EMOJIS as readonly string[]).map((emoji) => (
+                          <Pressable
+                            key={emoji}
+                            style={[st.quickReactBtn, m.viewerReaction === emoji && st.quickReactBtnActive]}
+                            onPress={() => handleReact(m, emoji)}
+                          >
+                            <Text style={st.quickReactEmoji}>{emoji}</Text>
+                          </Pressable>
+                        ))}
+                        {m.text?.trim() && m.text.trim() !== " " ? (
+                          <Pressable style={st.quickReactClose} onPress={() => handleCopy(m)} hitSlop={4}>
+                            <Ionicons name="copy-outline" size={15} color="rgba(255,255,255,0.9)" />
+                          </Pressable>
+                        ) : null}
+                        <Pressable style={st.quickReactClose} onPress={() => { setReplyTarget(m); setActiveReactMsgId(null); }} hitSlop={4}>
+                          <Ionicons name="arrow-undo-outline" size={15} color="rgba(255,255,255,0.9)" />
+                        </Pressable>
+                        {isAdmin && (
+                          <Pressable style={st.quickReactClose} onPress={() => handleDelete(m)} hitSlop={4}>
+                            <Ionicons name="trash-outline" size={15} color="rgba(248,113,113,0.95)" />
+                          </Pressable>
+                        )}
+                        <Pressable style={st.quickReactClose} onPress={() => setActiveReactMsgId(null)} hitSlop={4}>
+                          <Ionicons name="close" size={17} color="rgba(255,255,255,0.9)" />
+                        </Pressable>
+                      </View>
+                    )}
+
+                    <View style={[st.msgRow, isAdmin ? st.msgRight : st.msgLeft]}>
+                      {!isAdmin && <Avatar name={m.senderName} imageUrl={m.senderAvatar} size={28} />}
+                      <View style={{ maxWidth: "72%" }}>
+                        {!isAdmin && <Text style={[st.msgSender, { color: colors.muted }]}>{m.senderName}</Text>}
+
+                        {/* Quoted reply */}
+                        {m.replyTo ? (
+                          <View style={[st.quoted, { borderLeftColor: isAdmin ? "rgba(255,255,255,0.6)" : colors.accent, backgroundColor: isAdmin ? "rgba(255,255,255,0.14)" : colors.section }]}>
+                            <Text style={[st.quotedName, { color: isAdmin ? "rgba(255,255,255,0.9)" : colors.accent }]} numberOfLines={1}>
+                              {m.replyTo.senderName}
+                            </Text>
+                            <Text style={[st.quotedText, { color: isAdmin ? "rgba(255,255,255,0.75)" : colors.muted }]} numberOfLines={1}>
+                              {replySnippet(m.replyTo.text, m.replyTo.imageUrl)}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        <Pressable
+                          style={[st.bubble, isAdmin ? st.bubbleAdmin : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
+                          onLongPress={() => setActiveReactMsgId(isReacting ? null : m.id)}
+                          delayLongPress={480}
+                        >
+                          {m.imageUrl ? (
+                            <Image source={{ uri: m.imageUrl }} style={st.msgImage} resizeMode="cover" />
+                          ) : null}
+                          {m.text?.trim() && m.text.trim() !== " " ? (
+                            <Text style={[st.bubbleText, { color: isAdmin ? "#fff" : colors.text }]}>{m.text}</Text>
+                          ) : null}
+                        </Pressable>
+
+                        {/* Reaction strip */}
+                        {activeReactions.length > 0 && (
+                          <View style={st.reactionStrip}>
+                            {activeReactions.map((r) => (
+                              <Pressable
+                                key={r.emoji}
+                                onPress={() => handleReact(m, r.emoji)}
+                                style={[st.reactionChip, { backgroundColor: colors.section }, m.viewerReaction === r.emoji && st.reactionChipActive]}
+                              >
+                                <Text style={st.reactionChipText}>{r.emoji} {r.count}</Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        )}
+
+                        <Text style={[st.msgTime, { color: colors.muted, alignSelf: isAdmin ? "flex-end" : "flex-start" }]}>
+                          {formatRelativeTime(m.createdAt)}{isAdmin && m.sentByAdminName ? ` · ${m.sentByAdminName}` : ""}
+                        </Text>
+                      </View>
+                      {isAdmin && <ModeratorAvatar size={28} />}
+                    </View>
+                  </View>
+                );
+              }}
+            />
+        )}
+
+        {/* Reply bar */}
+        {replyTarget && (
+          <View style={[st.replyBar, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
+            <View style={[st.replyBarAccent, { backgroundColor: colors.accent }]} />
+            <View style={st.replyBarBody}>
+              <Text style={[st.replyBarTitle, { color: colors.accent }]} numberOfLines={1}>
+                Replying to {replyTarget.sentByAdminId ? replyTarget.sentByAdminName ?? "Moderator" : replyTarget.senderName}
+              </Text>
+              <Text style={[st.replyBarText, { color: colors.muted }]} numberOfLines={1}>
+                {replySnippet(replyTarget.text, replyTarget.imageUrl)}
+              </Text>
+            </View>
+            {replyTarget.imageUrl ? (
+              <Image source={{ uri: replyTarget.imageUrl }} style={st.replyBarThumb} resizeMode="cover" />
+            ) : null}
+            <Pressable style={st.replyBarClose} onPress={() => setReplyTarget(null)} hitSlop={8}>
+              <Text style={[st.replyBarCloseText, { color: colors.muted }]}>✕</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Image preview */}
         {pendingImageUrl && (
           <View style={[st.pendingImg, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
             <Image source={{ uri: pendingImageUrl }} style={st.pendingImgThumb} resizeMode="cover" />
@@ -298,7 +467,9 @@ function ChatView({
             </Pressable>
           </View>
         )}
-        <View style={[st.inputRow, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+
+        {/* Input bar */}
+        <View style={[st.inputRow, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 6 }]}>
           <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={st.attachBtn}>
             {uploading
               ? <ActivityIndicator size="small" color={colors.accent} />
@@ -309,21 +480,21 @@ function ChatView({
             placeholder="Type a moderator message…"
             placeholderTextColor={colors.muted}
             value={messageText}
-            onChangeText={setMessageText}
+            onChangeText={handleTextChange}
             multiline
             maxLength={2000}
           />
           <Pressable
             style={[st.sendBtn, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
             onPressIn={() => {
-              if (!isBusy && (messageText.trim() || pendingImageUrl)) void handleSend();
+              if (!isBusy && (messageTextRef.current.trim() || pendingImageUrl)) void handleSend();
             }}
             disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
           >
             {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.sendBtnText}>Send</Text>}
           </Pressable>
         </View>
-      </KeyboardStickyView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -731,16 +902,45 @@ function chatStyles(c: ReturnType<typeof useTheme>["colors"]) {
     msgSender: { fontSize: 10, marginBottom: 2 },
     bubble: { borderRadius: 16, overflow: "hidden" },
     bubbleAdmin: { backgroundColor: "#f59e0b" },
+    bubbleDeleted: { backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+    deletedText: { fontSize: 13, fontStyle: "italic" },
     bubbleText: { fontSize: 14, lineHeight: 20, paddingHorizontal: 12, paddingVertical: 8 },
     msgImage: { width: 200, height: 150, borderRadius: 12 },
     msgTime: { fontSize: 10, marginTop: 3 },
     emptyChat: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 10, paddingTop: 80 },
     emptyChatTitle: { fontSize: 16, fontWeight: "700" },
     emptyChatSub: { fontSize: 13 },
+    // Quick-react tray
+    quickReactRow: { flexDirection: "row", alignItems: "center", marginBottom: 6, marginHorizontal: 4, backgroundColor: "rgba(15,20,40,0.92)", borderRadius: 24, paddingVertical: 5, paddingHorizontal: 6, gap: 2 },
+    quickReactOwn: { alignSelf: "flex-end", marginRight: 40 },
+    quickReactOther: { alignSelf: "flex-start", marginLeft: 40 },
+    quickReactBtn: { paddingHorizontal: 6, paddingVertical: 4, borderRadius: 18 },
+    quickReactBtnActive: { backgroundColor: "rgba(99,102,241,0.35)" },
+    quickReactEmoji: { fontSize: 22 },
+    quickReactClose: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.14)", marginLeft: 2 },
+    // Quoted reply inside bubble
+    quoted: { borderLeftWidth: 3, borderTopLeftRadius: 8, borderBottomLeftRadius: 3, borderTopRightRadius: 8, borderBottomRightRadius: 8, paddingHorizontal: 9, paddingVertical: 5, marginBottom: 3, marginHorizontal: 0 },
+    quotedName: { fontSize: 11, fontWeight: "800", marginBottom: 1 },
+    quotedText: { fontSize: 12 },
+    // Reply bar above input
+    replyBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+    replyBarAccent: { width: 3, alignSelf: "stretch", borderRadius: 2 },
+    replyBarBody: { flex: 1 },
+    replyBarTitle: { fontSize: 12, fontWeight: "800" },
+    replyBarText: { fontSize: 12, marginTop: 1 },
+    replyBarThumb: { width: 34, height: 34, borderRadius: 6 },
+    replyBarClose: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+    replyBarCloseText: { fontSize: 13, fontWeight: "700" },
+    // Reaction strip
+    reactionStrip: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4, marginHorizontal: 2 },
+    reactionChip: { flexDirection: "row", alignItems: "center", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
+    reactionChipActive: { borderWidth: 1, borderColor: "rgba(99,102,241,0.45)", backgroundColor: "rgba(99,102,241,0.18)" },
+    reactionChipText: { fontSize: 13, fontWeight: "600" },
+    // Input
     pendingImg: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, gap: 10 },
     pendingImgThumb: { width: 48, height: 48, borderRadius: 8 },
     pendingImgRemove: { padding: 4 },
-    inputRow: { flexDirection: "row", alignItems: "flex-end", padding: 10, borderTopWidth: 1, gap: 6 },
+    inputRow: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 10, paddingTop: 10, gap: 6 },
     attachBtn: { paddingBottom: 10, paddingRight: 2 },
     attachIcon: { fontSize: 22 },
     inputField: { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
