@@ -456,6 +456,7 @@ export default function ChatScreen() {
   const seenIds = useRef(new Set<string>());
   const loadingMoreRef = useRef(false);
   const [text, setText] = useState("");
+  const textRef = useRef("");
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -816,6 +817,7 @@ export default function ChatScreen() {
 
   // ── Typing signal ───────────────────────────────────────────────────────────
   function handleTextChange(val: string) {
+    textRef.current = val;
     setText(val);
     if (!conversationId) return;
     void setTypingMut({ variables: { conversationId, isTyping: true } }).catch(() => {});
@@ -862,7 +864,7 @@ export default function ChatScreen() {
 
   // ── Send ────────────────────────────────────────────────────────────────────
   async function handleSend() {
-    const msgText = text.trim();
+    const msgText = textRef.current.trim();
     if (!msgText && !imageUri) return;
     if (!conversationId) return;
 
@@ -879,6 +881,7 @@ export default function ChatScreen() {
         setImageUploading(false);
       }
 
+      textRef.current = "";
       setText("");
       const replyToId = replyTarget?.messageId;
       setReplyTarget(null);
