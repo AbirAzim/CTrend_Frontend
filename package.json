@@ -8,6 +8,7 @@
     "mobile"
   ],
   "scripts": {
+    "postinstall": "node mobile/scripts/setup-secrets.js",
     "dev": "vite",
     "local": "VITE_GRAPHQL_HTTP=http://localhost:4000/graphql VITE_GRAPHQL_WS=ws://localhost:4000/graphql VITE_ENABLE_ENGAGEMENT_GQL=true vite",
     "build": "tsc -b && vite build",
