@@ -49,8 +49,8 @@
     "postinstall": "node scripts/setup-secrets.js",
     "prebuild": "expo prebuild",
     "apk": "cd android && CMAKE_BUILD_PARALLEL_LEVEL=1 ./gradlew assembleDebug --no-daemon",
-    "install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
-    "device": "npm run apk && npm run install",
+    "adb-install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "device": "npm run apk && npm run adb-install",
     "lint": "expo lint"
   },
   "private": true
