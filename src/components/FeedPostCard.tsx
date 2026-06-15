@@ -1592,7 +1592,7 @@ function FeedPostCardComponent({
     post.matchScore?.status === "IN_PLAY" || post.matchScore?.status === "PAUSED";
   const matchStatus = post.matchScore?.status ?? null;
   const isMatchFinished =
-    matchStatus === "FT" || matchStatus === "AET" || matchStatus === "PEN" || matchStatus === "AWARDED";
+    matchStatus === "FT" || matchStatus === "AET" || matchStatus === "PEN" || matchStatus === "AWARDED" || matchStatus === "FINISHED";
   const isMatchNotStarted = !isLiveMatch && !isMatchFinished;
 
   const showMatchLive = isMatchPost && isLiveMatch;
@@ -1609,7 +1609,7 @@ function FeedPostCardComponent({
     if (totalSec <= 0) return null;
     const m = Math.floor(totalSec / 60);
     const s = totalSec % 60;
-    return m > 0 ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+    return `${m}:${String(s).padStart(2, "0")}`;
   })();
 
   return (
@@ -2214,8 +2214,8 @@ function FeedPostCardComponent({
           <span className="cx-match-in-progress-icon" aria-hidden>⏳</span>
           <span>
             {winnerCountdownLabel
-              ? `Calculating winner — revealed in ${winnerCountdownLabel}`
-              : "Calculating winner…"}
+              ? `🏆 Winner reveals in ${winnerCountdownLabel}`
+              : "🏆 Revealing winner…"}
           </span>
         </div>
       ) : null}

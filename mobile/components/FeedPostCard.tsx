@@ -247,8 +247,7 @@ function calcWinnerCountdown(winnerAt: string | null | undefined): string | null
 	const m = Math.floor(totalSec / 60);
 	const s = totalSec % 60;
 	const pad = (n: number) => String(n).padStart(2, '0');
-	if (m > 0) return `${m}m ${pad(s)}s`;
-	return `${s}s`;
+	return `${m}:${pad(s)}`;
 }
 
 function computeWinnerSummary(
@@ -2140,7 +2139,7 @@ function FeedPostCardComponent({
 	// Show "match in progress" only for fixture-linked posts where voting has
 	// closed (kickoff passed) but the real match result isn't in yet.
 	const matchStatus = post.matchScore?.status ?? null;
-	const isMatchFinished = matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN' || matchStatus === 'AWARDED';
+	const isMatchFinished = matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN' || matchStatus === 'AWARDED' || matchStatus === 'FINISHED';
 	const isMatchNotStarted = !isLiveMatch && !isMatchFinished; // NS, TIMED, null, etc.
 	const showMatchLive = isMatchPost && isLiveMatch;
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
@@ -2765,8 +2764,8 @@ function FeedPostCardComponent({
 					<Text style={matchInProgressStyles.icon}>⏳</Text>
 					<Text style={matchInProgressStyles.text}>
 						{winnerCountdown
-							? `Calculating winner — revealed in ${winnerCountdown}`
-							: 'Calculating winner…'}
+							? `🏆 Winner reveals in ${winnerCountdown}`
+							: '🏆 Revealing winner…'}
 					</Text>
 				</View>
 			) : null}
