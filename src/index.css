@@ -14606,6 +14606,24 @@ a.cx-profile-btn-accent {
   font-size: 1rem;
 }
 
+.admin-mod-select-all {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-mod-select-all:hover {
+  background: var(--accent-dim, rgba(99,102,241,.08));
+}
+
 .admin-mod-user-list {
   display: flex;
   flex-direction: column;

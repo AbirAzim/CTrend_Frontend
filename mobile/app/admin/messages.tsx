@@ -425,6 +425,24 @@ export default function AdminMessagesScreen() {
     });
   }
 
+  function toggleSelectAll() {
+    const allIds = recipientUsers.map((u) => u.id);
+    const allSelected = allIds.every((id) => selectedRecipients.has(id));
+    if (allSelected) {
+      setSelectedRecipients((prev) => {
+        const next = new Set(prev);
+        allIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedRecipients((prev) => {
+        const next = new Set(prev);
+        allIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }
+
   function openThread(thread: Thread) {
     setActiveThread(thread);
     setActiveThreadId(thread.recipientUserId);
@@ -559,6 +577,20 @@ export default function AdminMessagesScreen() {
           data={recipientUsers}
           keyExtractor={(u) => u.id}
           nestedScrollEnabled
+          ListHeaderComponent={
+            recipientUsers.length > 0 ? (
+              <Pressable
+                style={[st.selectAllBtn, { borderColor: colors.border }]}
+                onPress={toggleSelectAll}
+              >
+                <Text style={[st.selectAllText, { color: colors.accent }]}>
+                  {recipientUsers.every((u) => selectedRecipients.has(u.id))
+                    ? "Deselect all"
+                    : `Select all (${recipientUsers.length})`}
+                </Text>
+              </Pressable>
+            ) : null
+          }
           ListEmptyComponent={<Text style={[st.emptyLabel, { color: colors.muted }]}>No users found</Text>}
           renderItem={({ item: u }) => {
             const selected = selectedRecipients.has(u.id);
@@ -660,6 +692,8 @@ function mainStyles(c: ReturnType<typeof useTheme>["colors"]) {
     threadPreview: { fontSize: 12 },
     badge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center" },
     badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+    selectAllBtn: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 4, alignSelf: "stretch" },
+    selectAllText: { fontSize: 12, fontWeight: "700" },
     recipientRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, gap: 9, borderBottomWidth: StyleSheet.hairlineWidth },
     checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
     recipientName: { fontSize: 13, fontWeight: "600" },

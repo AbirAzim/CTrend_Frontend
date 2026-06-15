@@ -291,6 +291,16 @@ export function AdminMessagesTab({
     );
   }
 
+  function toggleSelectAll() {
+    const allIds = userOptions.map((u) => u.id);
+    const allSelected = allIds.every((id) => recipientIds.includes(id));
+    if (allSelected) {
+      setRecipientIds((prev) => prev.filter((id) => !allIds.includes(id)));
+    } else {
+      setRecipientIds((prev) => [...new Set([...prev, ...allIds])]);
+    }
+  }
+
   function openThread(userId: string) {
     if (!isValidMongoObjectId(userId)) return;
     setThreadUserId(userId);
@@ -465,6 +475,17 @@ export function AdminMessagesTab({
                   </button>
                 ))}
               </div>
+            ) : null}
+            {userOptions.length > 0 ? (
+              <button
+                type="button"
+                className="admin-mod-select-all"
+                onClick={toggleSelectAll}
+              >
+                {userOptions.every((u) => recipientIds.includes(u.id))
+                  ? "Deselect all"
+                  : `Select all (${userOptions.length})`}
+              </button>
             ) : null}
             <div className="admin-mod-user-list">
               {usersLoading && userOptions.length === 0 ? (
