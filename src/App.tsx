@@ -33,7 +33,8 @@ function AuthExpiredWatcher() {
   useEffect(() => {
     return onAuthExpired(() => {
       clearAuthExpired();
-      void logout().then(() => navigate("/login", { replace: true }));
+      logout();
+      navigate("/login", { replace: true });
     });
   }, [logout, navigate]);
   return null;
