@@ -16,7 +16,7 @@ import {
   Vibration,
   View,
 } from "react-native";
-import { KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -637,7 +637,7 @@ export default function AdminMessagesScreen() {
 
   // ── Main split view ────────────────────────────────────────
   return (
-    <View style={[st.screen, { paddingBottom: insets.bottom }]}>
+    <View style={st.screen}>
       <ToastView />
 
       {/* Page header */}
@@ -647,6 +647,11 @@ export default function AdminMessagesScreen() {
           Chat as <Text style={{ color: colors.accent, fontWeight: "700" }}>{MODERATOR_BRAND_NAME}</Text> — users see the app logo
         </Text>
       </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
 
       {/* ── CONVERSATIONS section ── */}
       <View style={[st.section, { borderBottomColor: colors.border }]}>
@@ -790,8 +795,8 @@ export default function AdminMessagesScreen() {
         />
       </View>
 
-      {/* ── Compose bar — sticks above keyboard ── */}
-      <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+      {/* ── Compose bar ── */}
+      <View>
         {pendingImageUrl && (
           <View style={[st.pendingImg, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
             <Image source={{ uri: pendingImageUrl }} style={st.pendingImgThumb} resizeMode="cover" />
@@ -800,7 +805,7 @@ export default function AdminMessagesScreen() {
             </Pressable>
           </View>
         )}
-        <View style={[st.composeBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        <View style={[st.composeBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 10 }]}>
           {selectedRecipients.size > 0 && (
             <Text style={[st.composeTo, { color: colors.accent }]}>
               To: {selectedRecipients.size} recipient{selectedRecipients.size > 1 ? "s" : ""}
@@ -832,7 +837,9 @@ export default function AdminMessagesScreen() {
             </Pressable>
           </View>
         </View>
-      </KeyboardStickyView>
+      </View>
+
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -872,7 +879,7 @@ function mainStyles(c: ReturnType<typeof useTheme>["colors"]) {
     pendingImg: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, gap: 10 },
     pendingImgThumb: { width: 48, height: 48, borderRadius: 8 },
     pendingImgRemove: { padding: 4 },
-    composeBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10, gap: 4 },
+    composeBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 8, gap: 4 },
     composeTo: { fontSize: 12, fontWeight: "600" },
     composeRow: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
     attachBtn: { paddingBottom: 10, paddingRight: 2 },
