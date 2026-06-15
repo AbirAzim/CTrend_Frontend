@@ -13,7 +13,11 @@
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#312e81",
@@ -27,10 +31,21 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "kejitbe.app", "pathPrefix": "/post" },
-            { "scheme": "https", "host": "www.kejitbe.app", "pathPrefix": "/post" }
+            {
+              "scheme": "https",
+              "host": "kejitbe.app",
+              "pathPrefix": "/post"
+            },
+            {
+              "scheme": "https",
+              "host": "www.kejitbe.app",
+              "pathPrefix": "/post"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -55,6 +70,13 @@
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "34890f3c-051c-4f44-9a7a-38d89a084573"
+      }
+    },
+    "owner": "bk007"
   }
 }
