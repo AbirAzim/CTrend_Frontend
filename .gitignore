@@ -66,6 +66,8 @@ mobile/android/.idea/
 mobile/android/captures/
 *.jks
 *.keystore
+*.aab
+*.apk
 
 # iOS build artifacts
 mobile/ios/build/
