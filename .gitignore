@@ -25,6 +25,9 @@ UI_MISMATCH_IN_NATIVE/
 addviewat-crash-reference.png
 create-screen-reference.png
 
+# Private build guides (contain credentials — share via secure channel only)
+MAC_M1_BUILD_GUIDE.md
+
 # debug
 npm-debug.log*
 yarn-debug.log*
