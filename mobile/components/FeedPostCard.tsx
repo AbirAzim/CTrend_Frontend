@@ -63,6 +63,7 @@ import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 import { categoryChipColors } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
+import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Card has marginHorizontal:12 on each side, so its inner content is narrower
@@ -1143,7 +1144,7 @@ function LiveDot() {
 	);
 }
 
-function AnnouncementImageGrid({ urls }: { urls: string[] }) {
+function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImagePress: (index: number) => void }) {
 	const count = urls.length;
 	const gap = 2;
 	const screenWidth = Dimensions.get('window').width;
@@ -1151,19 +1152,23 @@ function AnnouncementImageGrid({ urls }: { urls: string[] }) {
 
 	if (count === 1) {
 		return (
-			<Image
-				source={{ uri: urls[0] }}
-				style={{ width: '100%', aspectRatio: 16 / 9 }}
-				contentFit='cover'
-				cachePolicy='memory-disk'
-			/>
+			<Pressable onPress={() => onImagePress(0)}>
+				<Image
+					source={{ uri: urls[0] }}
+					style={{ width: '100%', aspectRatio: 16 / 9 }}
+					contentFit='contain'
+					cachePolicy='memory-disk'
+				/>
+			</Pressable>
 		);
 	}
 	if (count === 2) {
 		return (
 			<View style={{ flexDirection: 'row', gap }}>
 				{urls.map((u, i) => (
-					<Image key={i} source={{ uri: u }} style={{ width: halfW, aspectRatio: 1 }} contentFit='cover' cachePolicy='memory-disk' />
+					<Pressable key={i} onPress={() => onImagePress(i)} style={{ flex: 1 }}>
+						<Image source={{ uri: u }} style={{ width: '100%', aspectRatio: 1 }} contentFit='contain' cachePolicy='memory-disk' />
+					</Pressable>
 				))}
 			</View>
 		);
@@ -1171,10 +1176,14 @@ function AnnouncementImageGrid({ urls }: { urls: string[] }) {
 	if (count === 3) {
 		return (
 			<View>
-				<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='cover' cachePolicy='memory-disk' />
+				<Pressable onPress={() => onImagePress(0)}>
+					<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='contain' cachePolicy='memory-disk' />
+				</Pressable>
 				<View style={{ flexDirection: 'row', gap, marginTop: gap }}>
 					{urls.slice(1).map((u, i) => (
-						<Image key={i} source={{ uri: u }} style={{ width: halfW, aspectRatio: 1 }} contentFit='cover' cachePolicy='memory-disk' />
+						<Pressable key={i} onPress={() => onImagePress(i + 1)} style={{ flex: 1 }}>
+							<Image source={{ uri: u }} style={{ width: '100%', aspectRatio: 1 }} contentFit='contain' cachePolicy='memory-disk' />
+						</Pressable>
 					))}
 				</View>
 			</View>
@@ -1184,7 +1193,9 @@ function AnnouncementImageGrid({ urls }: { urls: string[] }) {
 		return (
 			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
 				{urls.map((u, i) => (
-					<Image key={i} source={{ uri: u }} style={{ width: halfW, aspectRatio: 1 }} contentFit='cover' cachePolicy='memory-disk' />
+					<Pressable key={i} onPress={() => onImagePress(i)} style={{ width: halfW }}>
+						<Image source={{ uri: u }} style={{ width: '100%', aspectRatio: 1 }} contentFit='contain' cachePolicy='memory-disk' />
+					</Pressable>
 				))}
 			</View>
 		);
@@ -1193,17 +1204,21 @@ function AnnouncementImageGrid({ urls }: { urls: string[] }) {
 	const extra = count - 5;
 	return (
 		<View>
-			<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='cover' cachePolicy='memory-disk' />
+			<Pressable onPress={() => onImagePress(0)}>
+				<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='contain' cachePolicy='memory-disk' />
+			</Pressable>
 			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap, marginTop: gap }}>
 				{urls.slice(1, 5).map((u, i) => (
-					<View key={i} style={{ width: halfW, aspectRatio: 1 }}>
-						<Image source={{ uri: u }} style={{ width: '100%', height: '100%' }} contentFit='cover' cachePolicy='memory-disk' />
-						{i === 3 && extra > 0 && (
-							<View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
-								<Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>+{extra + 1}</Text>
-							</View>
-						)}
-					</View>
+					<Pressable key={i} onPress={() => onImagePress(i + 1)} style={{ width: halfW }}>
+						<View style={{ width: '100%', aspectRatio: 1 }}>
+							<Image source={{ uri: u }} style={{ width: '100%', height: '100%' }} contentFit='contain' cachePolicy='memory-disk' />
+							{i === 3 && extra > 0 && (
+								<View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+									<Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>+{extra + 1}</Text>
+								</View>
+							)}
+						</View>
+					</Pressable>
 				))}
 			</View>
 		</View>
@@ -1264,6 +1279,8 @@ function FeedPostCardComponent({
 	const [extendMenuVisible, setExtendMenuVisible] = useState(false);
 	const [votersVisible, setVotersVisible] = useState(false);
 	const [votersInitialTab, setVotersInitialTab] = useState<number | null>(null);
+	const [imageViewerVisible, setImageViewerVisible] = useState(false);
+	const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 	const client = useApolloClient();
 
 	function openVoters(tab: number | null = null) {
@@ -2287,7 +2304,13 @@ function FeedPostCardComponent({
 
 			{/* Announcement image grid */}
 			{isAnnouncement && post.imageUrls.length > 0 ? (
-				<AnnouncementImageGrid urls={post.imageUrls} />
+				<AnnouncementImageGrid
+					urls={post.imageUrls}
+					onImagePress={(index) => {
+						setSelectedImageIndex(index);
+						setImageViewerVisible(true);
+					}}
+				/>
 			) : isPoll ? (
 				<View>
 					{post.imageUrls.length > 0 ? (
@@ -3502,6 +3525,14 @@ function FeedVotersPanel({
 				</View>
 			</Pressable>
 		</Modal>
+
+		{/* Image Viewer Modal for Announcement Images */}
+		<ImageViewerModal
+			visible={imageViewerVisible}
+			imageUrls={post.imageUrls}
+			initialIndex={selectedImageIndex}
+			onClose={() => setImageViewerVisible(false)}
+		/>
 	);
 }
 
