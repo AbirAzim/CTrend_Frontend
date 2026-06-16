@@ -2120,13 +2120,18 @@ body.capacitor .ig-bottom-nav {
 .cx-ann-img {
   width: 100%;
   display: block;
-  object-fit: cover;
-  aspect-ratio: 16/9;
+  object-fit: contain;
+  background: #000;
+  aspect-ratio: 1/1;
+  cursor: zoom-in;
 }
-.cx-ann-grid--1 .cx-ann-img { aspect-ratio: 16/9; max-height: 420px; }
-.cx-ann-grid--3 .cx-ann-img--main,
-.cx-ann-grid--5plus .cx-ann-img--main { aspect-ratio: 16/9; }
-.cx-ann-grid-sub .cx-ann-img { aspect-ratio: 1/1; }
+/* Hero (full-width single/lead) images: fill the card width and let height follow
+   the image's own aspect ratio — no cap, so there's never blank/letterboxed space. */
+.cx-ann-img--hero {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16/9; /* fallback until natural size is known; overridden inline once loaded */
+}
 .cx-ann-img-wrap { position: relative; }
 .cx-ann-img-more {
   position: absolute;
@@ -2138,6 +2143,77 @@ body.capacitor .ig-bottom-nav {
   color: #fff;
   font-size: 1.4rem;
   font-weight: 700;
+}
+
+.cx-ann-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.cx-ann-lightbox-img {
+  max-width: min(92vw, 1100px);
+  max-height: 92vh;
+  border-radius: 12px;
+  object-fit: contain;
+  cursor: default;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+}
+.cx-ann-lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.cx-ann-lightbox-close:hover { background: rgba(255, 255, 255, 0.28); }
+.cx-ann-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.cx-ann-lightbox-nav:hover { background: rgba(255, 255, 255, 0.28); }
+.cx-ann-lightbox-nav--prev { left: 20px; }
+.cx-ann-lightbox-nav--next { right: 20px; }
+.cx-ann-lightbox-counter {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
 }
 
 .ig-create-campaign-hint {

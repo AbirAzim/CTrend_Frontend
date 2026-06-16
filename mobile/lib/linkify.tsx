@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 import { Linking, Text, TextProps } from 'react-native';
 
 // Common TLDs we treat as clickable when a link is written bare (no scheme and

@@ -289,36 +289,144 @@ type Props = {
   highlightCommentId?: string | null;
 };
 
+// Sizes itself to the image's own aspect ratio (clamped) instead of a fixed 16:9 box,
+// so portrait/square images neither crop (cover) nor letterbox — mirrors the mobile fix.
+const MIN_ANN_IMG_RATIO = 0.66;
+const MAX_ANN_IMG_RATIO = 1.91;
+
+function AnnouncementImg({
+  src,
+  className = "",
+  hero = false,
+  onClick,
+}: {
+  src: string;
+  className?: string;
+  hero?: boolean;
+  onClick: () => void;
+}) {
+  const [ratio, setRatio] = useState<number | null>(null);
+  return (
+    <img
+      src={src}
+      alt=""
+      className={`cx-ann-img${hero ? " cx-ann-img--hero" : ""} ${className}`}
+      loading="lazy"
+      decoding="async"
+      onClick={onClick}
+      style={ratio ? { aspectRatio: ratio } : undefined}
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        if (img.naturalWidth && img.naturalHeight) {
+          const r = Math.min(
+            Math.max(img.naturalWidth / img.naturalHeight, MIN_ANN_IMG_RATIO),
+            MAX_ANN_IMG_RATIO,
+          );
+          setRatio(r);
+        }
+      }}
+    />
+  );
+}
+
+function AnnouncementLightbox({
+  urls,
+  index,
+  onClose,
+  onNavigate,
+}: {
+  urls: string[];
+  index: number;
+  onClose: () => void;
+  onNavigate: (next: number) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight" && index < urls.length - 1) onNavigate(index + 1);
+      else if (e.key === "ArrowLeft" && index > 0) onNavigate(index - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, urls.length, onClose, onNavigate]);
+
+  return (
+    <div className="cx-ann-lightbox" onClick={onClose}>
+      <button type="button" className="cx-ann-lightbox-close" aria-label="Close" onClick={onClose}>×</button>
+      {urls.length > 1 && index > 0 && (
+        <button
+          type="button"
+          className="cx-ann-lightbox-nav cx-ann-lightbox-nav--prev"
+          aria-label="Previous image"
+          onClick={(e) => { e.stopPropagation(); onNavigate(index - 1); }}
+        >‹</button>
+      )}
+      <img
+        src={urls[index]}
+        alt="Full size"
+        className="cx-ann-lightbox-img"
+        onClick={(e) => e.stopPropagation()}
+      />
+      {urls.length > 1 && index < urls.length - 1 && (
+        <button
+          type="button"
+          className="cx-ann-lightbox-nav cx-ann-lightbox-nav--next"
+          aria-label="Next image"
+          onClick={(e) => { e.stopPropagation(); onNavigate(index + 1); }}
+        >›</button>
+      )}
+      {urls.length > 1 && (
+        <div className="cx-ann-lightbox-counter">{index + 1} / {urls.length}</div>
+      )}
+    </div>
+  );
+}
+
 function AnnouncementImageGrid({ urls }: { urls: string[] }) {
   const count = urls.length;
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const lightbox = openIndex !== null ? (
+    <AnnouncementLightbox
+      urls={urls}
+      index={openIndex}
+      onClose={() => setOpenIndex(null)}
+      onNavigate={setOpenIndex}
+    />
+  ) : null;
+
   if (count === 1) {
     return (
       <div className="cx-ann-grid cx-ann-grid--1">
-        <img src={urls[0]} alt="" className="cx-ann-img" loading="lazy" decoding="async" />
+        <AnnouncementImg src={urls[0]} hero onClick={() => setOpenIndex(0)} />
+        {lightbox}
       </div>
     );
   }
   if (count === 2) {
     return (
       <div className="cx-ann-grid cx-ann-grid--2">
-        {urls.map((u, i) => <img key={i} src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />)}
+        {urls.map((u, i) => <AnnouncementImg key={i} src={u} onClick={() => setOpenIndex(i)} />)}
+        {lightbox}
       </div>
     );
   }
   if (count === 3) {
     return (
       <div className="cx-ann-grid cx-ann-grid--3">
-        <img src={urls[0]} alt="" className="cx-ann-img cx-ann-img--main" loading="lazy" decoding="async" />
+        <AnnouncementImg src={urls[0]} hero className="cx-ann-img--main" onClick={() => setOpenIndex(0)} />
         <div className="cx-ann-grid-sub">
-          {urls.slice(1).map((u, i) => <img key={i} src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />)}
+          {urls.slice(1).map((u, i) => <AnnouncementImg key={i} src={u} onClick={() => setOpenIndex(i + 1)} />)}
         </div>
+        {lightbox}
       </div>
     );
   }
   if (count === 4) {
     return (
       <div className="cx-ann-grid cx-ann-grid--4">
-        {urls.map((u, i) => <img key={i} src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />)}
+        {urls.map((u, i) => <AnnouncementImg key={i} src={u} onClick={() => setOpenIndex(i)} />)}
+        {lightbox}
       </div>
     );
   }
@@ -327,17 +435,18 @@ function AnnouncementImageGrid({ urls }: { urls: string[] }) {
   const extra = count - 5;
   return (
     <div className="cx-ann-grid cx-ann-grid--5plus">
-      <img src={urls[0]} alt="" className="cx-ann-img cx-ann-img--main" loading="lazy" decoding="async" />
+      <AnnouncementImg src={urls[0]} hero className="cx-ann-img--main" onClick={() => setOpenIndex(0)} />
       <div className="cx-ann-grid-sub">
         {shown.slice(1).map((u, i) => (
           <div key={i} className="cx-ann-img-wrap">
-            <img src={u} alt="" className="cx-ann-img" loading="lazy" decoding="async" />
+            <AnnouncementImg src={u} onClick={() => setOpenIndex(i + 1)} />
             {i === 3 && extra > 0 && (
               <div className="cx-ann-img-more">+{extra + 1}</div>
             )}
           </div>
         ))}
       </div>
+      {lightbox}
     </div>
   );
 }

@@ -149,7 +149,7 @@ export function mapGqlPostToFeedView(p: {
       : null;
   const rawFormat = p.format?.toLowerCase();
   const format: PostFormat =
-    rawFormat === "poll" ? "poll" : "compare";
+    rawFormat === "poll" ? "poll" : rawFormat === "announcement" ? "announcement" : "compare";
   return {
     id: p.id,
     postType,
