@@ -5,6 +5,7 @@ import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, type ReactNode } from "react";
 import { AppState, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { apolloClient, onWsConnected } from "../lib/apolloClient";
@@ -498,36 +499,38 @@ function ForceUpdateGate() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <ApolloProvider client={apolloClient}>
-        <AuthProvider>
-          <ThemeProvider>
-            <TabBarProvider>
-              <SoundProvider>
-                <NotificationProvider>
-                  <KeyboardProvider>
-                    <ThemedRoot>
-                      <AppServices />
-                      <AppStatusBar />
-                      <NotificationResponseHandler />
-                      <BadgeSync />
-                      <GlobalNotificationSubscription />
-                      <NotificationResilience />
-                      <GlobalMessageSubscription />
-                      <Stack screenOptions={{ headerShown: false }} />
-                      <OfflineBanner />
-                      <InAppNotificationBanner />
-                      <WorldCupFloating />
-                      <AuthExpiredGate />
-                      <ForceUpdateGate />
-                    </ThemedRoot>
-                  </KeyboardProvider>
-                </NotificationProvider>
-              </SoundProvider>
-            </TabBarProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </ApolloProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ApolloProvider client={apolloClient}>
+          <AuthProvider>
+            <ThemeProvider>
+              <TabBarProvider>
+                <SoundProvider>
+                  <NotificationProvider>
+                    <KeyboardProvider>
+                      <ThemedRoot>
+                        <AppServices />
+                        <AppStatusBar />
+                        <NotificationResponseHandler />
+                        <BadgeSync />
+                        <GlobalNotificationSubscription />
+                        <NotificationResilience />
+                        <GlobalMessageSubscription />
+                        <Stack screenOptions={{ headerShown: false }} />
+                        <OfflineBanner />
+                        <InAppNotificationBanner />
+                        <WorldCupFloating />
+                        <AuthExpiredGate />
+                        <ForceUpdateGate />
+                      </ThemedRoot>
+                    </KeyboardProvider>
+                  </NotificationProvider>
+                </SoundProvider>
+              </TabBarProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </ApolloProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

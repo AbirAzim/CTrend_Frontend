@@ -710,7 +710,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			paddingVertical: 4,
 		},
 		pollVotersChipText: { fontSize: 12, fontWeight: '800' as const },
-		singleImg: { width: '100%' as const, height: 280 },
 		anonRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
@@ -1144,6 +1143,38 @@ function LiveDot() {
 	);
 }
 
+// Sizes its container to the image's own aspect ratio (clamped) instead of a fixed
+// 16:9 box, so portrait/square images neither crop (cover) nor letterbox (contain).
+const MIN_IMG_RATIO = 0.66;
+const MAX_IMG_RATIO = 1.91;
+
+function AdaptiveImage({
+	uri,
+	onPress,
+	fallbackRatio = 16 / 9,
+}: {
+	uri: string;
+	onPress?: () => void;
+	fallbackRatio?: number;
+}) {
+	const [ratio, setRatio] = useState(fallbackRatio);
+	const image = (
+		<Image
+			source={{ uri }}
+			style={{ width: '100%', aspectRatio: ratio }}
+			contentFit='contain'
+			cachePolicy='memory-disk'
+			onLoad={(e) => {
+				const { width, height } = e.source;
+				if (width && height) {
+					setRatio(Math.min(Math.max(width / height, MIN_IMG_RATIO), MAX_IMG_RATIO));
+				}
+			}}
+		/>
+	);
+	return onPress ? <Pressable onPress={onPress}>{image}</Pressable> : image;
+}
+
 function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImagePress: (index: number) => void }) {
 	const count = urls.length;
 	const gap = 2;
@@ -1151,16 +1182,7 @@ function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImage
 	const halfW = (screenWidth - gap) / 2;
 
 	if (count === 1) {
-		return (
-			<Pressable onPress={() => onImagePress(0)}>
-				<Image
-					source={{ uri: urls[0] }}
-					style={{ width: '100%', aspectRatio: 16 / 9 }}
-					contentFit='contain'
-					cachePolicy='memory-disk'
-				/>
-			</Pressable>
-		);
+		return <AdaptiveImage uri={urls[0]} onPress={() => onImagePress(0)} />;
 	}
 	if (count === 2) {
 		return (
@@ -1176,9 +1198,7 @@ function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImage
 	if (count === 3) {
 		return (
 			<View>
-				<Pressable onPress={() => onImagePress(0)}>
-					<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='contain' cachePolicy='memory-disk' />
-				</Pressable>
+				<AdaptiveImage uri={urls[0]} onPress={() => onImagePress(0)} />
 				<View style={{ flexDirection: 'row', gap, marginTop: gap }}>
 					{urls.slice(1).map((u, i) => (
 						<Pressable key={i} onPress={() => onImagePress(i + 1)} style={{ flex: 1 }}>
@@ -1204,9 +1224,7 @@ function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImage
 	const extra = count - 5;
 	return (
 		<View>
-			<Pressable onPress={() => onImagePress(0)}>
-				<Image source={{ uri: urls[0] }} style={{ width: '100%', aspectRatio: 16 / 9 }} contentFit='contain' cachePolicy='memory-disk' />
-			</Pressable>
+			<AdaptiveImage uri={urls[0]} onPress={() => onImagePress(0)} />
 			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap, marginTop: gap }}>
 				{urls.slice(1, 5).map((u, i) => (
 					<Pressable key={i} onPress={() => onImagePress(i + 1)} style={{ width: halfW }}>
@@ -2630,11 +2648,12 @@ function FeedPostCardComponent({
 					</View>
 				</>
 			) : post.imageUrls[0] ? (
-				<Image
-					source={{ uri: post.imageUrls[0] }}
-					style={st.singleImg}
-					contentFit='cover'
-					cachePolicy='memory-disk'
+				<AdaptiveImage
+					uri={post.imageUrls[0]}
+					onPress={() => {
+						setSelectedImageIndex(0);
+						setImageViewerVisible(true);
+					}}
 				/>
 			) : null}
 
@@ -3229,6 +3248,12 @@ function FeedPostCardComponent({
 					</View>
 				</Pressable>
 			</Modal>
+			<ImageViewerModal
+				visible={imageViewerVisible}
+				imageUrls={post.imageUrls}
+				initialIndex={selectedImageIndex}
+				onClose={() => setImageViewerVisible(false)}
+			/>
 		</View>
 	);
 }
@@ -3525,14 +3550,6 @@ function FeedVotersPanel({
 				</View>
 			</Pressable>
 		</Modal>
-
-		{/* Image Viewer Modal for Announcement Images */}
-		<ImageViewerModal
-			visible={imageViewerVisible}
-			imageUrls={post.imageUrls}
-			initialIndex={selectedImageIndex}
-			onClose={() => setImageViewerVisible(false)}
-		/>
 	);
 }
 
