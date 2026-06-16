@@ -1,5 +1,4 @@
 import { useQuery } from '@apollo/client/react';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -13,12 +12,12 @@ type Props = {
 type CampaignRow = { id: string; name: string; isDefault?: boolean | null };
 type ActiveCampaignsData = { activeCampaigns: CampaignRow[] };
 
-/** Gold campaign ribbon + "See other campaigns" sheet on a compare linked to a promotion (Phase 22–23). */
+/** Quiet single-line campaign tag + "See other campaigns" sheet on a compare linked to a promotion (Phase 22–23). */
 function PostCampaignBadgeComponent({ campaign }: Props) {
 	const { colors, isDark } = useTheme();
 	const [listOpen, setListOpen] = useState(false);
-	const bg = isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.14)';
-	const border = isDark ? 'rgba(245,158,11,0.42)' : 'rgba(217,160,23,0.45)';
+	// Gold is reserved for the small "CAMPAIGN" kicker only — everything else in
+	// this tag reads as plain neutral chrome so it never outweighs the caption.
 	const gold = isDark ? '#fbbf24' : '#b45309';
 
 	const { data } = useQuery<ActiveCampaignsData>(ACTIVE_CAMPAIGNS, {
@@ -42,7 +41,7 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 			<Pressable
 				style={({ pressed }) => [
 					styles.ribbon,
-					{ backgroundColor: bg, borderColor: border },
+					{ backgroundColor: colors.section, borderColor: colors.border },
 					pressed && { opacity: 0.85 },
 				]}
 				onPress={() =>
@@ -50,30 +49,21 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 				}
 				accessibilityRole='button'
 				accessibilityLabel={`Campaign: ${campaign.name}`}>
-				{campaign.bannerImageUrl ? (
-					<Image
-						source={{ uri: campaign.bannerImageUrl }}
-						style={styles.thumb}
-						contentFit='cover'
-						cachePolicy='memory-disk'
-					/>
-				) : (
-					<View style={[styles.thumb, styles.thumbFallback]}>
-						<Text style={styles.thumbEmoji}>🎯</Text>
-					</View>
-				)}
-				<View style={styles.body}>
-					<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
-					<Text style={[styles.name, { color: gold }]} numberOfLines={1}>
-						{campaign.name}
+				<Text style={styles.icon}>🎯</Text>
+				<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
+				<Text
+					style={[styles.name, { color: colors.text }]}
+					numberOfLines={1}>
+					{campaign.name}
+				</Text>
+				{campaign.prizePerWinner > 0 ? (
+					<Text
+						style={[styles.prize, { color: colors.subtext }]}
+						numberOfLines={1}>
+						· {campaign.prizePerWinner} BDT
 					</Text>
-					{campaign.prizePerWinner > 0 ? (
-						<Text style={[styles.prize, { color: gold }]} numberOfLines={1}>
-							🎁 {campaign.prizePerWinner} BDT prize draw
-						</Text>
-					) : null}
-				</View>
-				<Text style={[styles.chevron, { color: gold }]}>›</Text>
+				) : null}
+				<Text style={[styles.chevron, { color: colors.subtext }]}>›</Text>
 			</Pressable>
 
 			{others.length > 1 ? (
@@ -81,7 +71,7 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 					style={styles.otherBtn}
 					onPress={() => setListOpen(true)}
 					hitSlop={6}>
-					<Text style={[styles.otherBtnText, { color: gold }]}>
+					<Text style={[styles.otherBtnText, { color: colors.accent }]}>
 						See other campaigns
 					</Text>
 				</Pressable>
@@ -124,14 +114,14 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 }
 
 const styles = StyleSheet.create({
-	wrap: { marginHorizontal: 14, marginBottom: 10 },
+	wrap: { marginHorizontal: 14, marginBottom: 8 },
 	ribbon: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 10,
+		gap: 6,
 		paddingHorizontal: 10,
-		paddingVertical: 8,
-		borderRadius: 12,
+		paddingVertical: 7,
+		borderRadius: 999,
 		borderWidth: 1,
 	},
 	otherBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
@@ -143,22 +133,15 @@ const styles = StyleSheet.create({
 	row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 14, borderBottomWidth: 1 },
 	rowText: { flex: 1, fontSize: 14 },
 	defaultPill: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, borderWidth: 1, overflow: 'hidden' },
-	thumb: { width: 34, height: 34, borderRadius: 8 },
-	thumbFallback: {
-		backgroundColor: 'rgba(245,158,11,0.22)',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	thumbEmoji: { fontSize: 16 },
-	body: { flex: 1 },
+	icon: { fontSize: 12 },
 	kicker: {
 		fontSize: 9,
 		fontWeight: '800',
 		letterSpacing: 0.8,
 	},
-	name: { fontSize: 13, fontWeight: '800', marginTop: 1 },
-	prize: { fontSize: 11, fontWeight: '600', marginTop: 1 },
-	chevron: { fontSize: 22, fontWeight: '700' },
+	name: { flex: 1, fontSize: 12, fontWeight: '600' },
+	prize: { fontSize: 12, fontWeight: '500' },
+	chevron: { fontSize: 16, fontWeight: '700' },
 });
 
 export const PostCampaignBadge = memo(PostCampaignBadgeComponent);

@@ -6,7 +6,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	memo,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	type ReactNode,
+} from 'react';
 import {
 	ActivityIndicator,
 	Alert,
@@ -105,6 +113,15 @@ function getCompareRows(n: number): number[] {
 
 const GREEN = '#22c55e';
 const ORANGE = '#f97316';
+
+// `#rrggbb` → `rgba(r,g,b,alpha)`, for tinting the theme accent at low opacity.
+function withAlpha(hex: string, alpha: number): string {
+	const h = hex.replace('#', '');
+	const r = parseInt(h.slice(0, 2), 16);
+	const g = parseInt(h.slice(2, 4), 16);
+	const b = parseInt(h.slice(4, 6), 16);
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // Per-option live-split bar colors — 10 distinct hues, matching the web
 // `cx-pulse-fill--opt-0..9` palette (lighter gradient stop used as a solid bar).
@@ -351,54 +368,41 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: c.text,
 			letterSpacing: 0.1,
 		},
-		// Dim per-category chip after the post-type badge; tap reveals tooltip.
-		catChip: {
-			position: 'relative' as const,
-			borderRadius: 999,
-			paddingHorizontal: 8,
-			paddingVertical: 1,
+		// Single quiet meta line under the name — replaces the old 4-badge wall
+		// with plain text + "·" separators, e.g. "Platform · Sports · 18h ago".
+		metaRow: {
+			flexDirection: 'row' as const,
+			flexWrap: 'wrap' as const,
+			alignItems: 'center' as const,
+			marginTop: 1,
 		},
-		catChipText: {
-			fontSize: 10,
-			fontWeight: '800' as const,
+		metaText: { fontSize: 12, fontWeight: '500' as const, color: c.subtext },
+		metaSep: { fontSize: 12, color: c.muted },
+		metaCatRow: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 4,
 		},
+		// The category's hashed color survives only as this small dot.
+		metaDot: { width: 6, height: 6, borderRadius: 3 },
 		matchScoreBadge: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 5,
+			alignSelf: 'flex-start' as const,
+			marginTop: 4,
 			borderRadius: 999,
 			borderWidth: 1,
+			borderColor: c.border,
+			backgroundColor: c.section,
 			paddingHorizontal: 8,
-			paddingVertical: 1,
+			paddingVertical: 2,
 		},
 		matchScoreText: {
 			fontSize: 10,
 			fontWeight: '800' as const,
 			letterSpacing: 0.3,
-		},
-		platformBadge: {
-			fontSize: 9,
-			fontWeight: '700' as const,
-			letterSpacing: 0.6,
-			textTransform: 'uppercase' as const,
-			color: c.accent,
-			paddingHorizontal: 7,
-			paddingVertical: 2,
-			borderRadius: 999,
-			borderWidth: 1,
-			borderColor: c.accentLight,
-			overflow: 'hidden' as const,
-		},
-		globalBadge: {
-			fontSize: 9,
-			fontWeight: '700' as const,
-			letterSpacing: 0.6,
-			textTransform: 'uppercase' as const,
-			color: isDark ? '#34d399' : '#15803d',
-			paddingHorizontal: 7,
-			paddingVertical: 2,
-			borderRadius: 999,
-			borderWidth: 1,
-			borderColor: isDark ? 'rgba(52,211,153,0.5)' : 'rgba(22,163,74,0.45)',
-			backgroundColor: isDark ? 'rgba(16,185,129,0.14)' : 'rgba(22,163,74,0.1)',
-			overflow: 'hidden' as const,
+			color: c.subtext,
 		},
 		endingSoonBanner: {
 			flexDirection: 'row' as const,
@@ -418,16 +422,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: isDark ? '#fcd34d' : '#b45309',
 		},
 		endingSoonStrong: { fontWeight: '800' as const },
-		timeLabel: { fontSize: 11, color: c.muted, marginTop: 2 },
 		moreBtn: { padding: 8 },
 		moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
 		caption: {
 			paddingHorizontal: 14,
-			paddingBottom: 10,
-			fontSize: 14,
+			paddingTop: 2,
+			paddingBottom: 12,
+			fontSize: 15,
 			color: c.text,
-			lineHeight: 21,
-			fontWeight: '400' as const,
+			lineHeight: 22,
+			fontWeight: '600' as const,
 		},
 		captionAnnouncement: {
 			fontSize: 15,
@@ -655,32 +659,42 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		// ── Poll format — stacked option rows (per-option colour + voter chip) ──
 		pollBodyMedia: { paddingHorizontal: 14, paddingBottom: 6, gap: 6 },
 		pollBodyImage: { width: '100%' as const, height: 200, borderRadius: 10 },
-		pollOptions: { paddingHorizontal: 14, paddingTop: 4, gap: 8 },
+		pollOptions: { paddingHorizontal: 14, paddingTop: 4, gap: 10 },
+		// Neutral card row with a soft drop shadow for depth — the saturated lead
+		// edge (green once results show, accent for the viewer's pick before then)
+		// and the persistent accent border on the viewer's own pick are the only
+		// color accents, but the row itself now has enough weight to not read flat.
 		pollRow: {
 			position: 'relative' as const,
-			borderWidth: 1.5,
+			borderWidth: 1,
 			borderColor: c.border,
-			borderRadius: 12,
+			borderRadius: 14,
 			backgroundColor: c.section,
 			overflow: 'hidden' as const,
+			shadowColor: '#000',
+			shadowOffset: { width: 0, height: 1 },
+			shadowOpacity: isDark ? 0.3 : 0.06,
+			shadowRadius: 3,
+			elevation: 1,
 		},
-		pollRowWinner: { borderColor: '#f59e0b' },
-		pollRowLoser: { opacity: 0.6 },
+		pollRowPicked: { borderColor: c.accent, borderWidth: 1.5 },
+		pollRowLoser: { opacity: 0.55 },
 		pollFill: {
 			position: 'absolute' as const,
 			left: 0,
 			top: 0,
 			bottom: 0,
+			opacity: 0.2,
 		},
 		pollRowContent: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
 			gap: 10,
 			paddingHorizontal: 12,
-			paddingVertical: 10,
-			minHeight: 46,
+			paddingVertical: 11,
+			minHeight: 50,
 		},
-		pollThumb: { width: 36, height: 36, borderRadius: 8 },
+		pollThumb: { width: 40, height: 40, borderRadius: 10 },
 		pollDot: {
 			width: 18,
 			height: 18,
@@ -690,26 +704,27 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		},
 		pollLabel: {
 			flex: 1,
-			fontSize: 14,
-			fontWeight: '600' as const,
+			fontSize: 14.5,
+			fontWeight: '700' as const,
 			color: c.text,
 		},
 		pollPct: {
-			fontSize: 14,
+			fontSize: 16,
 			fontWeight: '800' as const,
 			color: c.text,
+			minWidth: 38,
+			textAlign: 'right' as const,
 		},
-		pollCheck: { fontSize: 15, fontWeight: '800' as const },
+		pollCheck: { fontSize: 15, fontWeight: '800' as const, color: c.accent },
 		pollVotersChip: {
-			flexDirection: 'row' as const,
-			alignItems: 'center' as const,
-			gap: 3,
+			borderRadius: 999,
+			backgroundColor: c.card,
 			borderWidth: 1,
-			borderRadius: 99,
-			paddingHorizontal: 9,
-			paddingVertical: 4,
+			borderColor: c.border,
+			paddingHorizontal: 7,
+			paddingVertical: 2,
 		},
-		pollVotersChipText: { fontSize: 12, fontWeight: '800' as const },
+		pollVotersText: { fontSize: 11.5, fontWeight: '600' as const, color: c.subtext },
 		anonRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
@@ -754,14 +769,10 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 				: 'rgba(159,23,77,0.1)',
 		},
 		actionChipFlatSaveActive: {
-			backgroundColor: isDark
-				? 'rgba(245,158,11,0.14)'
-				: 'rgba(245,158,11,0.1)',
+			backgroundColor: withAlpha(c.accent, isDark ? 0.16 : 0.1),
 		},
 		actionChipFlatCommentActive: {
-			backgroundColor: isDark
-				? 'rgba(99,102,241,0.18)'
-				: 'rgba(99,102,241,0.12)',
+			backgroundColor: withAlpha(c.accent, isDark ? 0.18 : 0.12),
 		},
 		// Icon + superscript badge wrapper
 		chipIconWrap: {
@@ -773,7 +784,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		},
 		actionChipFlatIcon: { fontSize: 18, lineHeight: 21, color: c.subtext },
 		actionChipFlatIconHype: { color: '#fb7185' },
-		actionChipFlatIconSave: { color: '#f59e0b' },
+		actionChipFlatIconSave: { color: c.accent },
 		// Emoji ignore text color — dim inactive emoji icons so the active state reads clearly
 		actionChipFlatIconDim: { opacity: 0.4 },
 		// Superscript notification badge
@@ -978,9 +989,9 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontSize: 12,
 			fontWeight: '700' as const,
 			letterSpacing: 0.01,
-			color: isDark ? '#818cf8' : '#312e81',
+			color: c.subtext,
 		},
-		actionStatusTextResult: { color: isDark ? '#fcd34d' : '#b45309' },
+		actionStatusTextResult: { color: GREEN },
 		seeDetailsBtn2: {
 			borderRadius: 8,
 			paddingVertical: 4,
@@ -990,7 +1001,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		seeDetailsBtnText2: {
 			fontSize: 12,
 			fontWeight: '800' as const,
-			color: isDark ? '#818cf8' : '#312e81',
+			color: c.accent,
 		},
 		iconDiscussOuter: { width: 20, height: 19 },
 		iconDiscussBubble: {
@@ -2239,58 +2250,79 @@ function FeedPostCardComponent({
 					<View style={st.authorMeta}>
 						<View style={st.authorNameRow}>
 							<Text style={st.authorName}>{authorName}</Text>
-							{isPlatformPost ? (
-								<Text style={st.platformBadge}>Platform</Text>
-							) : isUserGlobal ? (
-								<Text style={st.globalBadge}>🌍 Global</Text>
-							) : null}
-							{categoryName && catColors ? (
-								<Pressable
-									onPress={revealCategoryTip}
-									hitSlop={6}
-									accessibilityLabel={`Category: ${categoryName}`}
-									style={[st.catChip, { backgroundColor: catColors.bg }]}>
-									<Text
-										style={[st.catChipText, { color: catColors.text }]}
-										numberOfLines={1}>
-										{showCatTip ? '🏷 Category' : categoryName}
-									</Text>
-								</Pressable>
-							) : null}
-							{post.matchScore && post.matchScore.status !== 'TIMED' ? (
-								<View style={[st.matchScoreBadge, {
-									backgroundColor: post.matchScore.status === 'IN_PLAY'
-										? '#16a34a22'
-										: post.matchScore.status === 'PAUSED'
-										? '#f59e0b22'
-										: '#6b728022',
-									borderColor: post.matchScore.status === 'IN_PLAY'
-										? '#16a34a'
-										: post.matchScore.status === 'PAUSED'
-										? '#f59e0b'
-										: '#6b7280',
-								}]}>
-									<Text style={[st.matchScoreText, {
-										color: post.matchScore.status === 'IN_PLAY'
-											? '#16a34a'
-											: post.matchScore.status === 'PAUSED'
-											? '#f59e0b'
-											: '#9ca3af',
-									}]}>
-										{(() => {
-												const teamA = post.postOptions?.[0]?.label?.trim() || null;
-												const teamB = post.postOptions?.[1]?.label?.trim() || null;
-												const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
-												const sc = post.matchScore!;
-												if (sc.status === 'IN_PLAY') return `⚽ ${sc.minute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
-												if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
-												return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
-											})()}
-									</Text>
-								</View>
-							) : null}
 						</View>
-						{timeLabel ? <Text style={st.timeLabel}>{timeLabel}</Text> : null}
+						{(() => {
+							const nodes: ReactNode[] = [];
+							const pushSep = () => {
+								if (nodes.length > 0) {
+									nodes.push(
+										<Text key={`sep-${nodes.length}`} style={st.metaSep}>
+											{'  ·  '}
+										</Text>,
+									);
+								}
+							};
+							if (isPlatformPost) {
+								pushSep();
+								nodes.push(
+									<Text key="plat" style={st.metaText}>
+										Platform
+									</Text>,
+								);
+							} else if (isUserGlobal) {
+								pushSep();
+								nodes.push(
+									<Text key="glob" style={st.metaText}>
+										🌍 Global
+									</Text>,
+								);
+							}
+							if (categoryName && catColors) {
+								pushSep();
+								nodes.push(
+									<Pressable
+										key="cat"
+										onPress={revealCategoryTip}
+										hitSlop={6}
+										accessibilityLabel={`Category: ${categoryName}`}
+										style={st.metaCatRow}>
+										<View
+											style={[st.metaDot, { backgroundColor: catColors.text }]}
+										/>
+										<Text style={st.metaText} numberOfLines={1}>
+											{showCatTip ? '🏷 Category' : categoryName}
+										</Text>
+									</Pressable>,
+								);
+							}
+							if (timeLabel) {
+								pushSep();
+								nodes.push(
+									<Text key="time" style={st.metaText}>
+										{timeLabel}
+									</Text>,
+								);
+							}
+							return nodes.length > 0 ? (
+								<View style={st.metaRow}>{nodes}</View>
+							) : null;
+						})()}
+						{post.matchScore && post.matchScore.status !== 'TIMED' ? (
+							<View style={st.matchScoreBadge}>
+								{post.matchScore.status === 'IN_PLAY' ? <LiveDot /> : null}
+								<Text style={st.matchScoreText}>
+									{(() => {
+											const teamA = post.postOptions?.[0]?.label?.trim() || null;
+											const teamB = post.postOptions?.[1]?.label?.trim() || null;
+											const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
+											const sc = post.matchScore!;
+											if (sc.status === 'IN_PLAY') return `${sc.minute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+										})()}
+								</Text>
+							</View>
+						) : null}
 					</View>
 				</Pressable>
 				{isAuthenticated ? (
@@ -2346,34 +2378,36 @@ function FeedPostCardComponent({
 							const count = stat ? Math.round(stat.count) : 0;
 							const label = compareLabel(post, i);
 							const picked = pollPick === i;
-							const color = MULTI_SPLIT_COLORS[i % 10];
 							const thumb = opt?.imageUrl?.trim() || null;
-							const isWinner =
-								isVotingClosed &&
-								(stat?.count ?? 0) > 0 &&
-								stat?.count === pollMaxCount;
-							const isLoser = isVotingClosed && !isWinner;
+							const isLeading =
+								(stat?.count ?? 0) > 0 && stat?.count === pollMaxCount;
+							const isWinner = isVotingClosed && isLeading;
+							const isLoser = pollShowResults && !isLeading && !picked;
+							// Every row that's either the current leader or the viewer's own
+							// pick gets a proportional fill, not just a border — so a picked
+							// underdog still reads as "filled in", just in accent instead of
+							// green, rather than looking empty next to the leading bar.
+							const leadColor = isLeading
+								? GREEN
+								: picked
+									? colors.accent
+									: null;
 							return (
 								<Pressable
 									key={`${post.id}-poll-${i}`}
 									style={[
 										st.pollRow,
-										picked && { borderColor: color },
-										isWinner && st.pollRowWinner,
 										isLoser && st.pollRowLoser,
+										picked && st.pollRowPicked,
 									]}
 									onPress={() => handleCellTap(i)}
 									disabled={isVotingClosed}>
-									{pollShowResults ? (
+									{pollShowResults && leadColor ? (
 										<View
 											pointerEvents='none'
 											style={[
 												st.pollFill,
-												{
-													width: `${pct}%`,
-													backgroundColor: color,
-													opacity: picked ? 0.3 : 0.16,
-												},
+												{ width: `${pct}%`, backgroundColor: leadColor },
 											]}
 										/>
 									) : null}
@@ -2390,33 +2424,24 @@ function FeedPostCardComponent({
 												cachePolicy='memory-disk'
 											/>
 										) : (
-											<View
-												style={[
-													st.pollDot,
-													picked && {
-														borderColor: color,
-														backgroundColor: color,
-													},
-												]}
-											/>
+											<View style={st.pollDot} />
 										)}
 										<Text style={st.pollLabel} numberOfLines={1}>
 											{isWinner ? '🥇 ' : ''}
 											{label}
 										</Text>
+										{picked ? <Text style={st.pollCheck}>✓</Text> : null}
 										{pollShowResults ? (
-											<Text style={st.pollPct}>{pct}%</Text>
-										) : picked ? (
-											<Text style={[st.pollCheck, { color }]}>✓</Text>
+											<Text style={[st.pollPct, leadColor && { color: leadColor }]}>
+												{pct}%
+											</Text>
 										) : null}
 										{pollShowResults ? (
 											<Pressable
-												style={[st.pollVotersChip, { borderColor: color }]}
+												style={st.pollVotersChip}
 												onPress={() => openVoters(i)}
 												hitSlop={6}>
-												<Text style={[st.pollVotersChipText, { color }]}>
-													👥 {count}
-												</Text>
+												<Text style={st.pollVotersText}>👥 {count}</Text>
 											</Pressable>
 										) : null}
 									</View>
@@ -2950,7 +2975,7 @@ function FeedPostCardComponent({
 														isHype && active
 															? '#f43f5e'
 															: isSave && active
-																? '#f59e0b'
+																? colors.accent
 																: colors.subtext
 													}
 												/>
