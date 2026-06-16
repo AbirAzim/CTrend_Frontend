@@ -62,6 +62,7 @@ import {
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 import { categoryChipColors } from '../lib/categoryColor';
+import { LinkifyText } from '../lib/linkify';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Card has marginHorizontal:12 on each side, so its inner content is narrower
@@ -2278,9 +2279,10 @@ function FeedPostCardComponent({
 
 			{/* Caption */}
 			{post.caption ? (
-				<Text style={[st.caption, isAnnouncement && st.captionAnnouncement]}>
-					{post.caption}
-				</Text>
+				<LinkifyText
+					text={post.caption}
+					style={[st.caption, isAnnouncement && st.captionAnnouncement]}
+				/>
 			) : null}
 
 			{/* Announcement image grid */}
