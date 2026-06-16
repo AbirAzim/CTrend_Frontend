@@ -38,6 +38,7 @@ export default function AdminLayout() {
     <Tabs
       screenOptions={{
         headerShown: true,
+        tabBarHideOnKeyboard: true,
         headerStyle: { backgroundColor: colors.topbar },
         headerTitleStyle: { color: colors.text, fontWeight: "800" },
         headerTintColor: colors.accent,

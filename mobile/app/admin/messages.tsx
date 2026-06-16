@@ -8,6 +8,8 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -82,6 +84,23 @@ type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string
 type ThreadsData = { adminModeratorThreads: Thread[] };
 type MessagesData = { adminModeratorThreadMessages: ThreadMessage[] };
 type UsersData = { listUsers: RecipientUser[] };
+
+// Manual keyboard-height tracking — this screen lives inside a Tabs navigator
+// (react-native-screens), where react-native-keyboard-controller's resize/translate
+// doesn't reliably land on the wrapped view. Reading the keyboard height directly
+// and applying it as bottom padding sidesteps that.
+function useKeyboardHeight() {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) => setHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
+}
 
 function Avatar({ name, imageUrl, size = 36 }: { name: string; imageUrl?: string | null; size?: number }) {
   const initial = name[0]?.toUpperCase() ?? "?";
@@ -286,6 +305,7 @@ function ChatView({
 
   const st = chatStyles(colors);
   const isBusy = sending || uploading;
+  const kbHeight = useKeyboardHeight();
 
   return (
     <View style={st.screen}>
@@ -306,11 +326,7 @@ function ChatView({
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 56 : 0}
-      >
+      <View style={{ flex: 1, paddingBottom: kbHeight }}>
         {/* Messages */}
         {loading && messages.length === 0 ? (
           <View style={st.center}><ActivityIndicator color={colors.accent} /></View>
@@ -470,10 +486,10 @@ function ChatView({
 
         {/* Input bar */}
         <View style={[st.inputRow, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 6 }]}>
-          <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={st.attachBtn}>
+          <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={[st.attachBtn, { backgroundColor: colors.section }]}>
             {uploading
               ? <ActivityIndicator size="small" color={colors.accent} />
-              : <Text style={[st.attachIcon, { color: colors.accent }]}>📷</Text>}
+              : <Ionicons name="image-outline" size={19} color={colors.accent} />}
           </Pressable>
           <TextInput
             style={[st.inputField, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
@@ -485,16 +501,16 @@ function ChatView({
             maxLength={2000}
           />
           <Pressable
-            style={[st.sendBtn, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
+            style={[st.sendBtn, { backgroundColor: colors.accent }, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
             onPressIn={() => {
               if (!isBusy && (messageTextRef.current.trim() || pendingImageUrl)) void handleSend();
             }}
             disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
           >
-            {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.sendBtnText}>Send</Text>}
+            {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={16} color="#fff" />}
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
@@ -515,6 +531,7 @@ export default function AdminMessagesScreen() {
   const [messageText, setMessageText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const threadDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recipientDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -537,7 +554,7 @@ export default function AdminMessagesScreen() {
   );
 
   const { data: usersData } = useQuery<UsersData>(LIST_USERS, {
-    variables: { search: debouncedRecipientSearch || undefined, take: 50 },
+    variables: { search: debouncedRecipientSearch || undefined, take: 200 },
     fetchPolicy: "cache-and-network",
   });
 
@@ -622,6 +639,7 @@ export default function AdminMessagesScreen() {
 
   const st = mainStyles(colors);
   const isBusy = sending || uploading;
+  const kbHeight = useKeyboardHeight();
 
   // ── Chat view (full screen) ────────────────────────────────
   if (activeThread) {
@@ -635,211 +653,248 @@ export default function AdminMessagesScreen() {
     );
   }
 
-  // ── Main split view ────────────────────────────────────────
+  const totalUnread = threads.reduce((s, t) => s + t.unreadFromUserCount, 0);
+  const isComposingNew = selectedRecipients.size > 0;
+
+  function closePicker() {
+    setPickerVisible(false);
+  }
+
+  function confirmPicker() {
+    setPickerVisible(false);
+  }
+
+  // ── Main view ──────────────────────────────────────────────
   return (
     <View style={st.screen}>
       <ToastView />
 
       {/* Page header */}
       <View style={[st.pageHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[st.pageTitle, { color: colors.text }]}>Admin Messages</Text>
-        <Text style={[st.pageSub, { color: colors.muted }]}>
-          Chat as <Text style={{ color: colors.accent, fontWeight: "700" }}>{MODERATOR_BRAND_NAME}</Text> — users see the app logo
-        </Text>
-      </View>
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-
-      {/* ── CONVERSATIONS section ── */}
-      <View style={[st.section, { borderBottomColor: colors.border }]}>
-        {/* Section header with total-unread badge */}
-        <View style={st.sectionHeaderRow}>
-          <Text style={[st.sectionLabel, { color: colors.muted }]}>CONVERSATIONS</Text>
-          {(() => {
-            const totalUnread = threads.reduce((s, t) => s + t.unreadFromUserCount, 0);
-            return totalUnread > 0 ? (
-              <View style={[st.newBadge, { backgroundColor: colors.accent }]}>
-                <Text style={st.newBadgeText}>{totalUnread} NEW</Text>
-              </View>
-            ) : null;
-          })()}
+        <View style={{ flex: 1 }}>
+          <Text style={[st.pageTitle, { color: colors.text }]}>Admin Messages</Text>
+          <Text style={[st.pageSub, { color: colors.muted }]}>
+            Chat as <Text style={{ color: colors.accent, fontWeight: "700" }}>{MODERATOR_BRAND_NAME}</Text>
+          </Text>
         </View>
-
-        <View style={[st.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-          <Text style={{ color: colors.muted, fontSize: 13 }}>🔍</Text>
-          <TextInput
-            style={[st.searchInput, { color: colors.text }]}
-            placeholder="Search threads…"
-            placeholderTextColor={colors.muted}
-            value={threadSearch}
-            onChangeText={handleThreadSearch}
-          />
-        </View>
-
-        {threadsLoading && threads.length === 0 ? (
-          <View style={{ height: 60, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator color={colors.accent} />
+        {totalUnread > 0 ? (
+          <View style={[st.newBadge, { backgroundColor: colors.accent }]}>
+            <Text style={st.newBadgeText}>{totalUnread} NEW</Text>
           </View>
-        ) : (
-          <FlatList
-            style={st.threadsList}
-            data={threads}
-            keyExtractor={(t) => t.conversationId}
-            nestedScrollEnabled
-            ListEmptyComponent={<Text style={[st.emptyLabel, { color: colors.muted }]}>No conversations yet</Text>}
-            renderItem={({ item: t }) => {
-              const hasUnread = t.unreadFromUserCount > 0;
-              return (
-                <Pressable
-                  style={[
-                    st.threadRow,
-                    { borderBottomColor: colors.border },
-                    activeThreadId === t.recipientUserId && { backgroundColor: colors.accent + "15" },
-                    hasUnread && { backgroundColor: colors.accent + "08" },
-                  ]}
-                  onPress={() => openThread(t)}
-                >
-                  <Avatar name={t.recipientName} imageUrl={t.recipientProfileImageUrl} size={38} />
-                  <View style={st.threadInfo}>
-                    <View style={st.threadTopRow}>
-                      <Text style={[st.threadName, { color: colors.text, fontWeight: hasUnread ? "800" : "700" }]} numberOfLines={1}>
-                        {t.recipientName}
-                      </Text>
-                      {t.lastMessageAt && (
-                        <Text style={[st.threadTime, { color: colors.muted }]}>{formatRelativeTime(t.lastMessageAt)}</Text>
-                      )}
-                    </View>
-                    <View style={st.threadBottomRow}>
-                      <Text style={[st.threadPreview, { color: hasUnread ? colors.text : colors.muted, flex: 1 }]} numberOfLines={1}>
-                        {t.lastMessageText ?? "—"}
-                      </Text>
-                      {hasUnread && (
-                        <View style={[st.badge, { backgroundColor: colors.accent }]}>
-                          <Text style={st.badgeText}>{t.unreadFromUserCount}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            }}
-          />
-        )}
+        ) : null}
+        <Pressable
+          style={[st.newMsgBtn, { backgroundColor: colors.accent }]}
+          onPress={() => setPickerVisible(true)}
+          hitSlop={6}
+        >
+          <Ionicons name="create-outline" size={18} color="#fff" />
+        </Pressable>
       </View>
 
-      {/* ── ADD RECIPIENTS section ── */}
-      <View style={[st.section, { flex: 1, borderBottomColor: colors.border }]}>
-        <Text style={[st.sectionLabel, { color: colors.muted }]}>ADD RECIPIENTS</Text>
-        <Text style={[st.sectionHint, { color: colors.muted }]}>
-          All accounts with user role — regular users and admin+user dual-role members.
-        </Text>
+      {/* ── CONVERSATIONS + compose bar share one keyboard-aware flex column ── */}
+      <View style={{ flex: 1, paddingBottom: kbHeight }}
+      >
+      <View style={[st.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.border, marginHorizontal: 12, marginTop: 10 }]}>
+        <Ionicons name="search-outline" size={15} color={colors.muted} />
+        <TextInput
+          style={[st.searchInput, { color: colors.text }]}
+          placeholder="Search threads…"
+          placeholderTextColor={colors.muted}
+          value={threadSearch}
+          onChangeText={handleThreadSearch}
+        />
+      </View>
 
-        <View style={[st.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-          <Text style={{ color: colors.muted, fontSize: 13 }}>🔍</Text>
-          <TextInput
-            style={[st.searchInput, { color: colors.text }]}
-            placeholder="Search users…"
-            placeholderTextColor={colors.muted}
-            value={recipientSearch}
-            onChangeText={handleRecipientSearch}
-          />
+      {threadsLoading && threads.length === 0 ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.accent} />
         </View>
-
+      ) : (
         <FlatList
           style={{ flex: 1 }}
-          data={recipientUsers}
-          keyExtractor={(u) => u.id}
-          nestedScrollEnabled
-          ListHeaderComponent={
-            recipientUsers.length > 0 ? (
-              <Pressable
-                style={[st.selectAllBtn, { borderColor: colors.border }]}
-                onPress={toggleSelectAll}
-              >
-                <Text style={[st.selectAllText, { color: colors.accent }]}>
-                  {recipientUsers.every((u) => selectedRecipients.has(u.id))
-                    ? "Deselect all"
-                    : `Select all (${recipientUsers.length})`}
-                </Text>
-              </Pressable>
-            ) : null
+          contentContainerStyle={{ padding: 12, paddingTop: 8, gap: 8 }}
+          data={threads}
+          keyExtractor={(t) => t.conversationId}
+          ListEmptyComponent={
+            <View style={st.emptyConvos}>
+              <Ionicons name="chatbubble-ellipses-outline" size={32} color={colors.muted} />
+              <Text style={[st.emptyLabel, { color: colors.muted }]}>No conversations yet</Text>
+            </View>
           }
-          ListEmptyComponent={<Text style={[st.emptyLabel, { color: colors.muted }]}>No users found</Text>}
-          renderItem={({ item: u }) => {
-            const selected = selectedRecipients.has(u.id);
+          renderItem={({ item: t }) => {
+            const hasUnread = t.unreadFromUserCount > 0;
             return (
               <Pressable
                 style={[
-                  st.recipientRow,
-                  { borderBottomColor: colors.border },
-                  selected && { backgroundColor: colors.accent + "12" },
+                  st.threadCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  activeThreadId === t.recipientUserId && { borderColor: colors.accent },
                 ]}
-                onPress={() => toggleRecipient(u.id)}
+                onPress={() => openThread(t)}
               >
-                <View style={[st.checkbox, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accent : "transparent" }]}>
-                  {selected && <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text>}
-                </View>
-                <Avatar name={u.displayName ?? u.username ?? u.email} imageUrl={u.profileImageUrl} size={34} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[st.recipientName, { color: colors.text }]} numberOfLines={1}>
-                    {u.displayName ?? u.username ?? "—"}
-                  </Text>
-                  <Text style={[st.recipientEmail, { color: colors.muted }]} numberOfLines={1}>{u.email}</Text>
+                {hasUnread ? <View style={[st.threadAccent, { backgroundColor: colors.accent }]} /> : null}
+                <Avatar name={t.recipientName} imageUrl={t.recipientProfileImageUrl} size={42} />
+                <View style={st.threadInfo}>
+                  <View style={st.threadTopRow}>
+                    <Text style={[st.threadName, { color: colors.text, fontWeight: hasUnread ? "800" : "700" }]} numberOfLines={1}>
+                      {t.recipientName}
+                    </Text>
+                    {t.lastMessageAt && (
+                      <Text style={[st.threadTime, { color: colors.muted }]}>{formatRelativeTime(t.lastMessageAt)}</Text>
+                    )}
+                  </View>
+                  <View style={st.threadBottomRow}>
+                    <Text style={[st.threadPreview, { color: hasUnread ? colors.text : colors.muted, flex: 1 }]} numberOfLines={1}>
+                      {t.lastMessageText ?? "—"}
+                    </Text>
+                    {hasUnread && (
+                      <View style={[st.badge, { backgroundColor: colors.accent }]}>
+                        <Text style={st.badgeText}>{t.unreadFromUserCount}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </Pressable>
             );
           }}
         />
-      </View>
+      )}
 
-      {/* ── Compose bar ── */}
-      <View>
-        {pendingImageUrl && (
-          <View style={[st.pendingImg, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
-            <Image source={{ uri: pendingImageUrl }} style={st.pendingImgThumb} resizeMode="cover" />
-            <Pressable onPress={() => setPendingImageUrl(null)} hitSlop={8} style={st.pendingImgRemove}>
-              <Text style={{ color: "#f87171", fontSize: 16, fontWeight: "700" }}>✕</Text>
-            </Pressable>
-          </View>
-        )}
-        <View style={[st.composeBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 10 }]}>
-          {selectedRecipients.size > 0 && (
-            <Text style={[st.composeTo, { color: colors.accent }]}>
-              To: {selectedRecipients.size} recipient{selectedRecipients.size > 1 ? "s" : ""}
-            </Text>
+      {/* ── Compose bar (only while a new broadcast is being assembled) ── */}
+      {isComposingNew ? (
+        <View>
+          {pendingImageUrl && (
+            <View style={[st.pendingImg, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
+              <Image source={{ uri: pendingImageUrl }} style={st.pendingImgThumb} resizeMode="cover" />
+              <Pressable onPress={() => setPendingImageUrl(null)} hitSlop={8} style={st.pendingImgRemove}>
+                <Text style={{ color: "#f87171", fontSize: 16, fontWeight: "700" }}>✕</Text>
+              </Pressable>
+            </View>
           )}
-          <View style={st.composeRow}>
-            <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={st.attachBtn}>
-              {uploading
-                ? <ActivityIndicator size="small" color={colors.accent} />
-                : <Text style={[st.attachIcon, { color: colors.accent }]}>📷</Text>}
-            </Pressable>
-            <TextInput
-              style={[st.composeInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-              placeholder="Type a moderator message…"
-              placeholderTextColor={colors.muted}
-              value={messageText}
-              onChangeText={setMessageText}
-              multiline
-              maxLength={2000}
-            />
-            <Pressable
-              style={[st.sendBtn, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
-              onPressIn={() => {
-                if (!isBusy && (messageText.trim() || pendingImageUrl)) void handleSendNew();
-              }}
-              disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
-            >
-              {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.sendBtnText}>Send</Text>}
-            </Pressable>
+          <View style={[st.composeBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 10 }]}>
+            <View style={st.composeToRow}>
+              <Text style={[st.composeTo, { color: colors.accent }]} numberOfLines={1}>
+                To: {selectedRecipients.size} recipient{selectedRecipients.size > 1 ? "s" : ""}
+              </Text>
+              <Pressable onPress={() => setSelectedRecipients(new Set())} hitSlop={8}>
+                <Text style={[st.composeToClear, { color: colors.muted }]}>Clear</Text>
+              </Pressable>
+            </View>
+            <View style={st.composeRow}>
+              <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={[st.attachBtn, { backgroundColor: colors.section }]}>
+                {uploading
+                  ? <ActivityIndicator size="small" color={colors.accent} />
+                  : <Ionicons name="image-outline" size={19} color={colors.accent} />}
+              </Pressable>
+              <TextInput
+                style={[st.composeInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                placeholder="Type a moderator message…"
+                placeholderTextColor={colors.muted}
+                value={messageText}
+                onChangeText={setMessageText}
+                multiline
+                maxLength={2000}
+              />
+              <Pressable
+                style={[st.sendBtn, { backgroundColor: colors.accent }, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
+                onPressIn={() => {
+                  if (!isBusy && (messageText.trim() || pendingImageUrl)) void handleSendNew();
+                }}
+                disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
+              >
+                {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={16} color="#fff" />}
+              </Pressable>
+            </View>
           </View>
         </View>
+      ) : null}
       </View>
 
-      </KeyboardAvoidingView>
+      {/* ── Recipient picker (full sheet, fully decoupled from the conversations layout) ── */}
+      <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={closePicker}>
+        <View style={st.sheetRoot}>
+          <Pressable style={st.sheetOverlay} onPress={closePicker} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={[st.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={[st.sheetHandle, { backgroundColor: colors.border }]} />
+            <View style={st.sheetHeaderRow}>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>New message</Text>
+              <Pressable onPress={closePicker} hitSlop={8} style={[st.sheetClose, { backgroundColor: colors.section }]}>
+                <Ionicons name="close" size={16} color={colors.text} />
+              </Pressable>
+            </View>
+            <Text style={[st.sectionHint, { color: colors.muted }]}>
+              All accounts with user role — regular users and admin+user dual-role members.
+            </Text>
+
+            <View style={[st.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <Ionicons name="search-outline" size={15} color={colors.muted} />
+              <TextInput
+                style={[st.searchInput, { color: colors.text }]}
+                placeholder="Search users…"
+                placeholderTextColor={colors.muted}
+                value={recipientSearch}
+                onChangeText={handleRecipientSearch}
+                autoFocus
+              />
+            </View>
+
+            <FlatList
+              style={{ flex: 1 }}
+              data={recipientUsers}
+              keyExtractor={(u) => u.id}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={
+                recipientUsers.length > 0 ? (
+                  <Pressable style={[st.selectAllBtn, { borderColor: colors.border }]} onPress={toggleSelectAll}>
+                    <Text style={[st.selectAllText, { color: colors.accent }]}>
+                      {recipientUsers.every((u) => selectedRecipients.has(u.id))
+                        ? "Deselect all"
+                        : `Select all (${recipientUsers.length})`}
+                    </Text>
+                  </Pressable>
+                ) : null
+              }
+              ListEmptyComponent={<Text style={[st.emptyLabel, { color: colors.muted }]}>No users found</Text>}
+              renderItem={({ item: u }) => {
+                const selected = selectedRecipients.has(u.id);
+                return (
+                  <Pressable
+                    style={[
+                      st.recipientRow,
+                      { borderBottomColor: colors.border },
+                      selected && { backgroundColor: colors.accent + "12" },
+                    ]}
+                    onPress={() => toggleRecipient(u.id)}
+                  >
+                    <View style={[st.checkbox, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accent : "transparent" }]}>
+                      {selected && <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text>}
+                    </View>
+                    <Avatar name={u.displayName ?? u.username ?? u.email} imageUrl={u.profileImageUrl} size={34} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.recipientName, { color: colors.text }]} numberOfLines={1}>
+                        {u.displayName ?? u.username ?? "—"}
+                      </Text>
+                      <Text style={[st.recipientEmail, { color: colors.muted }]} numberOfLines={1}>{u.email}</Text>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+
+            <Pressable
+              style={[st.sheetDoneBtn, { backgroundColor: colors.accent, marginBottom: Math.max(insets.bottom, 12) }]}
+              onPress={confirmPicker}
+            >
+              <Text style={st.sheetDoneText}>
+                {selectedRecipients.size > 0 ? `Done · ${selectedRecipients.size} selected` : "Done"}
+              </Text>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -848,45 +903,54 @@ export default function AdminMessagesScreen() {
 function mainStyles(c: ReturnType<typeof useTheme>["colors"]) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.bg },
-    pageHeader: { padding: 12, borderBottomWidth: 1 },
-    pageTitle: { fontSize: 16, fontWeight: "800" },
+    pageHeader: { flexDirection: "row", alignItems: "center", gap: 8, padding: 14, borderBottomWidth: 1 },
+    pageTitle: { fontSize: 17, fontWeight: "800" },
     pageSub: { fontSize: 12, marginTop: 2 },
-    section: { borderBottomWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 },
-    sectionHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
     sectionLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
-    newBadge: { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
+    newBadge: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
     newBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
-    sectionHint: { fontSize: 11, marginBottom: 6 },
-    searchBox: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, gap: 6, marginBottom: 6 },
-    searchInput: { flex: 1, fontSize: 13, paddingVertical: 8 },
-    threadsList: { maxHeight: 190 },
+    newMsgBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.18, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 3 },
+    sectionHint: { fontSize: 11, marginBottom: 8 },
+    searchBox: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, gap: 8, marginBottom: 8 },
+    searchInput: { flex: 1, fontSize: 14, paddingVertical: 10 },
     emptyLabel: { textAlign: "center", padding: 14, fontSize: 13 },
-    threadRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, gap: 9, borderBottomWidth: StyleSheet.hairlineWidth },
-    threadInfo: { flex: 1, gap: 2 },
+    emptyConvos: { alignItems: "center", justifyContent: "center", paddingTop: 60, gap: 10 },
+    threadCard: { flexDirection: "row", alignItems: "center", padding: 12, gap: 10, borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+    threadAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
+    threadInfo: { flex: 1, gap: 3 },
     threadTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     threadBottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-    threadName: { fontSize: 13, fontWeight: "700", flex: 1 },
+    threadName: { fontSize: 14, fontWeight: "700", flex: 1 },
     threadTime: { fontSize: 10 },
     threadPreview: { fontSize: 12 },
     badge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center" },
     badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-    selectAllBtn: { borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 4, alignSelf: "stretch" },
+    selectAllBtn: { borderWidth: 1, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 6, alignSelf: "stretch" },
     selectAllText: { fontSize: 12, fontWeight: "700" },
-    recipientRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, gap: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+    recipientRow: { flexDirection: "row", alignItems: "center", paddingVertical: 9, gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },
     checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
     recipientName: { fontSize: 13, fontWeight: "600" },
     recipientEmail: { fontSize: 11 },
     pendingImg: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, gap: 10 },
     pendingImgThumb: { width: 48, height: 48, borderRadius: 8 },
     pendingImgRemove: { padding: 4 },
-    composeBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 8, gap: 4 },
-    composeTo: { fontSize: 12, fontWeight: "600" },
-    composeRow: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
-    attachBtn: { paddingBottom: 10, paddingRight: 2 },
-    attachIcon: { fontSize: 22 },
-    composeInput: { flex: 1, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, maxHeight: 90 },
-    sendBtn: { backgroundColor: "#f59e0b", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, alignItems: "center", justifyContent: "center", marginBottom: 1 },
-    sendBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+    composeBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 8, gap: 6 },
+    composeToRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    composeTo: { fontSize: 12, fontWeight: "700", flex: 1 },
+    composeToClear: { fontSize: 11, fontWeight: "600" },
+    composeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    attachBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+    composeInput: { flex: 1, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 90 },
+    sendBtn: { borderRadius: 20, width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+    sheetRoot: { flex: 1, justifyContent: "flex-end" },
+    sheetOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.55)" },
+    sheet: { height: "86%", borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
+    sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 10 },
+    sheetHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+    sheetTitle: { fontSize: 16, fontWeight: "800" },
+    sheetClose: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    sheetDoneBtn: { borderRadius: 14, paddingVertical: 13, alignItems: "center", marginTop: 8 },
+    sheetDoneText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   });
 }
 
@@ -947,11 +1011,9 @@ function chatStyles(c: ReturnType<typeof useTheme>["colors"]) {
     pendingImg: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, gap: 10 },
     pendingImgThumb: { width: 48, height: 48, borderRadius: 8 },
     pendingImgRemove: { padding: 4 },
-    inputRow: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 10, paddingTop: 10, gap: 6 },
-    attachBtn: { paddingBottom: 10, paddingRight: 2 },
-    attachIcon: { fontSize: 22 },
+    inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingTop: 10, gap: 6 },
+    attachBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
     inputField: { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
-    sendBtn: { backgroundColor: "#f59e0b", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, minWidth: 64, alignItems: "center" },
-    sendBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+    sendBtn: { borderRadius: 20, width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   });
 }
