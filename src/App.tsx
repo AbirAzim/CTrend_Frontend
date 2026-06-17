@@ -16,6 +16,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ScheduledPostsPage } from "./pages/ScheduledPostsPage";
 import { FriendsPage } from "./pages/FriendsPage";
 import { WorldCupPage } from "./pages/WorldCupPage";
+import { MatchDetailPage } from "./pages/MatchDetailPage";
 import { CampaignDetailPage } from "./pages/CampaignDetailPage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="friends" element={<FriendsPage />} />
         <Route path="profile/:userId" element={<UserProfilePage />} />
         <Route path="world-cup" element={<WorldCupPage />} />
+        <Route path="world-cup/match/:id" element={<MatchDetailPage />} />
         <Route path="campaign/:slug" element={<CampaignDetailPage />} />
         <Route
           path="create"

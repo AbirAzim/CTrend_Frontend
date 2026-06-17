@@ -34,6 +34,8 @@ import {
   MARK_CAMPAIGN_PRIZE_PAID,
   PROCESS_MATCH_RESULT,
   SYNC_WORLD_CUP_FIXTURES,
+  SYNC_FIXTURE_DETAILS,
+  SYNC_ALL_FINISHED_FIXTURES,
   WORLD_CUP_FIXTURES,
 } from "../graphql/worldcup";
 import {
@@ -1217,9 +1219,13 @@ function WorldCupTab() {
   }>(CAMPAIGN_WINNERS, { fetchPolicy: "network-only" });
 
   const [syncFixtures, { loading: syncing }] = useMutation(SYNC_WORLD_CUP_FIXTURES);
+  const [syncAllFinished, { loading: syncingAll }] = useMutation<{ syncAllFinishedFixtures: string }>(SYNC_ALL_FINISHED_FIXTURES);
   const [createPost, { loading: creatingPost }] = useMutation(CREATE_WORLD_CUP_CAMPAIGN_POST);
   const [processResult, { loading: processingResult }] = useMutation(PROCESS_MATCH_RESULT);
   const [markPaid] = useMutation(MARK_CAMPAIGN_PRIZE_PAID);
+  const [syncDetails] = useMutation<{
+    syncFixtureDetails: { events: number; stats: number; lineups: number; error?: string | null };
+  }>(SYNC_FIXTURE_DETAILS);
 
   async function handleSync() {
     setSyncMsg(null);
@@ -1229,6 +1235,17 @@ function WorldCupTab() {
       void refetchFixtures();
     } catch (err: unknown) {
       setSyncMsg("Sync failed: " + getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleSyncAllFinished() {
+    setSyncMsg("Syncing all finished matches… this may take a minute.");
+    try {
+      const res = await syncAllFinished();
+      setSyncMsg(res.data?.syncAllFinishedFixtures ?? "Done.");
+      void refetchFixtures();
+    } catch (err: unknown) {
+      setSyncMsg("Bulk sync failed: " + getApolloErrorMessage(err));
     }
   }
 
@@ -1257,6 +1274,25 @@ function WorldCupTab() {
     }
   }
 
+  async function handleSyncDetails(fixtureId: string) {
+    setActionMsg((prev) => ({ ...prev, [`details-${fixtureId}`]: "Syncing…" }));
+    try {
+      const res = await syncDetails({ variables: { fixtureId } });
+      const r = res.data?.syncFixtureDetails;
+      if (r?.error) {
+        setActionMsg((prev) => ({ ...prev, [`details-${fixtureId}`]: `Error: ${r.error}` }));
+      } else {
+        setActionMsg((prev) => ({
+          ...prev,
+          [`details-${fixtureId}`]: `✓ events:${r?.events ?? 0} stats:${r?.stats ?? 0} lineups:${r?.lineups ?? 0}`,
+        }));
+        void refetchFixtures();
+      }
+    } catch (err: unknown) {
+      setActionMsg((prev) => ({ ...prev, [`details-${fixtureId}`]: getApolloErrorMessage(err) }));
+    }
+  }
+
   async function handleMarkPaid(winnerId: string) {
     try {
       await markPaid({ variables: { winnerId } });
@@ -1277,9 +1313,14 @@ function WorldCupTab() {
         title="World Cup 2026 Fixtures"
         subtitle="Sync fixtures, create campaign posts, and process results"
         action={
-          <AdminCtaButton onClick={() => void handleSync()} disabled={syncing} icon="↻">
-            {syncing ? "Syncing…" : "Sync Fixtures"}
-          </AdminCtaButton>
+          <div style={{ display: "flex", gap: 8 }}>
+            <AdminCtaButton onClick={() => void handleSync()} disabled={syncing} icon="↻">
+              {syncing ? "Syncing…" : "Sync Fixtures"}
+            </AdminCtaButton>
+            <AdminCtaButton onClick={() => void handleSyncAllFinished()} disabled={syncingAll} icon="⚡">
+              {syncingAll ? "Syncing all…" : "Sync All Match Data"}
+            </AdminCtaButton>
+          </div>
         }
       />
 
@@ -1362,6 +1403,20 @@ function WorldCupTab() {
                       </td>
                       <td data-label="Status">
                         <span className={statusChipClass}>{statusLabel}</span>
+                        {(isLive || isFinished) && (
+                          <div className="admin-action-links" style={{ marginTop: 4 }}>
+                            <button
+                              type="button"
+                              className="admin-action-link"
+                              onClick={() => void handleSyncDetails(f.id)}
+                            >
+                              ↻ Sync Events
+                            </button>
+                            {actionMsg[`details-${f.id}`] && (
+                              <span className="muted small">{actionMsg[`details-${f.id}`]}</span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td data-label="Campaign post">
                         {f.campaignPostId ? (

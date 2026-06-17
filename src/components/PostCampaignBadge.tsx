@@ -35,22 +35,15 @@ export function PostCampaignBadge({ campaign }: Props) {
         className="cx-post-campaign-ribbon"
         aria-label={`Campaign: ${campaign.name}`}
       >
-        {campaign.bannerImageUrl ? (
-          <span
-            className="cx-post-campaign-ribbon-bg"
-            style={{ backgroundImage: `url(${campaign.bannerImageUrl})` }}
-            aria-hidden
-          />
+        <span aria-hidden style={{ fontSize: "0.78rem" }}>🎯</span>
+        <span className="cx-post-campaign-ribbon-kicker">Campaign</span>
+        <span className="cx-post-campaign-ribbon-name">{campaign.name}</span>
+        {campaign.prizePerWinner > 0 ? (
+          <span className="cx-post-campaign-ribbon-prize">
+            · {campaign.prizePerWinner} BDT
+          </span>
         ) : null}
-        <span className="cx-post-campaign-ribbon-inner">
-          <span className="cx-post-campaign-ribbon-kicker">Campaign</span>
-          <span className="cx-post-campaign-ribbon-name">{campaign.name}</span>
-          {campaign.prizePerWinner > 0 ? (
-            <span className="cx-post-campaign-ribbon-prize">
-              🎁 {campaign.prizePerWinner} BDT prize draw
-            </span>
-          ) : null}
-        </span>
+        <span aria-hidden className="cx-post-campaign-ribbon-chevron">›</span>
       </Link>
       {campaigns.length > 1 ? (
         <div className="cx-post-campaign-links">

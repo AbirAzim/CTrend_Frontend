@@ -48,6 +48,7 @@ function typeIcon(type: string, referenceType?: string | null): string {
     case "VOTE_ENDED":       return "⏱️";
     case "VOTE_WINNER":      return "🏆";
     case "VOTE_PRIZE_CLAIMED": return "🎁";
+    case "LINEUP_AVAILABLE":  return "⚽";
     default:                 return "🔔";
   }
 }
@@ -191,6 +192,10 @@ export function NotificationBell() {
     // Comment notifications deep-link to the exact comment when possible
     if (n.postId && n.commentId) {
       navigate(`/post/${n.postId}#comment-${n.commentId}`);
+      return;
+    }
+    if (n.type === "LINEUP_AVAILABLE" && n.referenceId) {
+      navigate(`/world-cup/match/${n.referenceId}?tab=lineup`);
       return;
     }
     if (

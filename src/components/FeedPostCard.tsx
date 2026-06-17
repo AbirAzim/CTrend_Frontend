@@ -998,15 +998,29 @@ function FeedPostCardComponent({
   const msTeamLine = msTeamA && msTeamB ? `${msTeamA} vs ${msTeamB}` : null;
   const matchScoreChip =
     ms && ms.status && ms.status !== "TIMED" ? (
-      <span
-        className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"}`}
-      >
-        {ms.status === "IN_PLAY"
-          ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
-          : ms.status === "PAUSED"
-          ? `HT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
-          : `FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
-      </span>
+      post.fixtureId && (ms.status === "FT" || ms.status === "AET" || ms.status === "PEN" || ms.status === "FINISHED" || ms.status === "IN_PLAY" || ms.status === "PAUSED") ? (
+        <button
+          type="button"
+          className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"} cx-match-score-chip--link`}
+          onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
+        >
+          {ms.status === "IN_PLAY"
+            ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
+            : ms.status === "PAUSED"
+            ? `HT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
+            : `FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
+        </button>
+      ) : (
+        <span
+          className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"}`}
+        >
+          {ms.status === "IN_PLAY"
+            ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
+            : ms.status === "PAUSED"
+            ? `HT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
+            : `FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
+        </span>
+      )
     ) : null;
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
@@ -2035,26 +2049,6 @@ function FeedPostCardComponent({
               );
             })}
           </div>
-          {!isVotingClosed ? (
-            <div
-              className={`cx-tap-to-vote-hint${
-                pollHasVoted ? " cx-tap-to-vote-hint--voted" : ""
-              }`}
-              aria-live="polite"
-            >
-              {pollHasVoted ? (
-                <>
-                  <span className="cx-tap-to-vote-icon">✓</span>
-                  <span>Vote recorded — tap to change</span>
-                </>
-              ) : (
-                <>
-                  <span className="cx-tap-to-vote-icon">👆</span>
-                  <span>Tap an option to cast your vote</span>
-                </>
-              )}
-            </div>
-          ) : null}
           {voteMode === "api" && !isVotingClosed ? (
             <div className="cx-anon-toggle-row">
               <label className="cx-anon-toggle">
@@ -2243,25 +2237,6 @@ function FeedPostCardComponent({
                 </div>
               ))}
           </div>
-          {/* Tap-to-vote hint — visible before any vote is cast, hidden once voted or closed */}
-          {!isVotingClosed && (
-            <div
-              className={`cx-tap-to-vote-hint${hasVoted ? " cx-tap-to-vote-hint--voted" : ""}`}
-              aria-live="polite"
-            >
-              {hasVoted ? (
-                <>
-                  <span className="cx-tap-to-vote-icon">✓</span>
-                  <span>Vote recorded — tap to change</span>
-                </>
-              ) : (
-                <>
-                  <span className="cx-tap-to-vote-icon">👆</span>
-                  <span>Tap an image to cast your vote</span>
-                </>
-              )}
-            </div>
-          )}
           {voteMode === "api" && !isVotingClosed && (
             <div className="cx-anon-toggle-row">
               <label className="cx-anon-toggle">
@@ -2329,27 +2304,35 @@ function FeedPostCardComponent({
         </div>
       ) : null}
 
+      {isMatchPost && post.fixtureId && (isMatchFinished || isLiveMatch || post.lineupAvailable) && (
+        <button
+          type="button"
+          className="cx-mdb-row"
+          onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
+        >
+          <span className="cx-mdb-row-icon" aria-hidden>⚽</span>
+          <span className="cx-mdb-row-label">
+            {isLiveMatch ? "Live match stats & lineups" : "Full match report & lineups"}
+          </span>
+          <span className="cx-mdb-row-arrow" aria-hidden>›</span>
+        </button>
+      )}
+
       <div className="cx-post-footer">
         {detailsOpen ? (
           <div className="cx-post-details-panel" id={`post-details-${post.id}`}>
             {compareUrls ? (
-              <p className="cx-vote-hint-chip">
-                {isVotingClosed
-                  ? votingWinnerSummary
-                    ? `Final: ${votingWinnerSummary}`
-                    : "Voting closed for this post."
-                  : voteMode === "api"
-                  ? "Tap a side to vote — switch anytime with another tap"
-                  : "Tap a side to vote — tap again to clear your pick"}
-              </p>
+              isVotingClosed ? (
+                <p className="cx-vote-hint-chip">
+                  {votingWinnerSummary ? `Final: ${votingWinnerSummary}` : "Voting closed for this post."}
+                </p>
+              ) : null
             ) : isPoll ? (
-              <p className="cx-vote-hint-chip">
-                {isVotingClosed
-                  ? votingWinnerSummary
-                    ? `Final: ${votingWinnerSummary}`
-                    : "Voting closed for this poll."
-                  : "Tap an option to vote — switch anytime with another tap"}
-              </p>
+              isVotingClosed ? (
+                <p className="cx-vote-hint-chip">
+                  {votingWinnerSummary ? `Final: ${votingWinnerSummary}` : "Voting closed for this poll."}
+                </p>
+              ) : null
             ) : null}
 
             {votingHasEndDate ? (

@@ -70,7 +70,11 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
   return (
     <div
       id={`wc-fixture-${fixture.id}`}
-      className={`wc-fixture${live ? " wc-fixture--live" : ""}${finished ? " wc-fixture--finished" : ""}`}
+      className={`wc-fixture${live ? " wc-fixture--live" : ""}${finished ? " wc-fixture--finished" : ""}${live || finished ? " wc-fixture--clickable" : ""}`}
+      onClick={live || finished ? () => navigate(`/world-cup/match/${fixture.id}`) : undefined}
+      role={live || finished ? "button" : undefined}
+      tabIndex={live || finished ? 0 : undefined}
+      onKeyDown={live || finished ? (e) => e.key === "Enter" && navigate(`/world-cup/match/${fixture.id}`) : undefined}
     >
       <div className={`wc-team wc-team--home${homeWon ? " wc-team--winner" : ""}`}>
         <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} />
@@ -276,7 +280,10 @@ export function WorldCupPage() {
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [, setTick] = useState(0);
-  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">("fixtures");
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">(
+    tabParam === "results" || tabParam === "standings" ? tabParam : "fixtures"
+  );
 
   const fixtures = data?.worldCupFixtures ?? [];
   const teams = fixtureTeams(fixtures);

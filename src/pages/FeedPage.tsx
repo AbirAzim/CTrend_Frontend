@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import type { FeedPostView } from "../types/feed";
 import { CampaignBanners } from "../components/CampaignBanners";
+import { WorldCupBanner } from "../components/WorldCupBanner";
 import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
 type FriendRow = {
   id: string;
@@ -545,6 +546,7 @@ export function FeedPage() {
       ) : null}
 
       <div className="ig-feed">
+        <WorldCupBanner />
         <CampaignBanners />
         {!useMockFeed && campaignFilters.length > 0 && isCampaignFilterDockVisible ? (
           <div className="cx-campaign-filter-dock">

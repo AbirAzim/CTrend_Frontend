@@ -1116,8 +1116,15 @@ Replicate web animations/interactions audited from `src/index.css`. See **UX/UI 
 | 35 — Friends live animated moves | 🟡 Medium | Large | none (existing mutations + 8s poll) |
 | 36 — User global platform posts | 🔴 High | Large | `platformSettings`, `broadcastGlobally`, `isUserGlobalBroadcast`, `USER_GLOBAL_POST` |
 | 37 — Admin post management scope tabs | 🟢 Low | Small | `scope` on admin posts (needs Phase 36) |
+| 38 — Post card border polish (soft 1px neutral border) | 🟢 Low | Tiny | none (pure UI) |
+| 39 — Campaign ribbon verify matches mobile pill design | 🟢 Low | Tiny | none (pure UI) |
+| 40 — Poll UX: remove hints + border tuning (voted 2px, winner amber) | 🔴 High | Small | none (pure UI) |
+| 41 — Match Details entry points (tappable chip + separator row) | 🔴 High | Medium | `fixtureId`/`lineupAvailable` in shared package |
+| 42 — Match Detail screen (Overview/Lineups/Stats tabs) | 🔴 High | Large | `WORLD_CUP_FIXTURE_DETAILS` query in shared |
+| 43 — WorldCup screen: redesigned rows + tappable fixtures | 🟠 Medium | Medium | none (Phase 42 route needed first) |
+| 44 — WorldCupBanner in feed header | 🟠 Medium | Medium | `worldCupFixtures` lib port |
 
-**Suggested build order:** 32 (smallest, instant win) → 33 → 31 → 34 → 35 → 36 → 37. (35 builds on 34; 37 builds on 36.)
+**Suggested build order:** 38+39 (5-min verify) → 40 (pure UI) → 41 (needs shared update) → 42 (new screen) → 43 (WorldCup rows) → 44 (banner)
 
 ---
 

@@ -94,6 +94,8 @@ export type FeedPostView = {
     minute: number | null;
   } | null;
   fixtureWinnerAt?: string | null;
+  fixtureId?: string | null;
+  lineupAvailable?: boolean;
 };
 
 export type VoteOptionStatView = {

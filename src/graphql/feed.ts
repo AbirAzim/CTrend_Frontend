@@ -53,6 +53,8 @@ export const POST_CAMPAIGN_WINNER_FIELDS = `
     minute
   }
   fixtureWinnerAt
+  fixtureId
+  lineupAvailable
 `;
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */

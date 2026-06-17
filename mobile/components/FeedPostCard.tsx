@@ -677,7 +677,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			shadowRadius: 3,
 			elevation: 1,
 		},
-		pollRowPicked: { borderColor: c.accent, borderWidth: 1.5 },
+		pollRowPicked: { borderColor: c.accent, borderWidth: 2 },
+		pollRowWinner: { borderColor: 'rgba(245,158,11,0.35)', borderWidth: 1.5 },
 		pollRowLoser: { opacity: 0.55 },
 		pollFill: {
 			position: 'absolute' as const,
@@ -2398,6 +2399,7 @@ function FeedPostCardComponent({
 									style={[
 										st.pollRow,
 										isLoser && st.pollRowLoser,
+										isWinner && !picked && st.pollRowWinner,
 										picked && st.pollRowPicked,
 									]}
 									onPress={() => handleCellTap(i)}
@@ -2407,7 +2409,9 @@ function FeedPostCardComponent({
 											pointerEvents='none'
 											style={[
 												st.pollFill,
-												{ width: `${pct}%`, backgroundColor: leadColor },
+												isWinner
+													? { width: `${pct}%`, backgroundColor: 'rgba(245,158,11,0.10)' }
+													: { width: `${pct}%`, backgroundColor: leadColor, opacity: 0.2 },
 											]}
 										/>
 									) : null}

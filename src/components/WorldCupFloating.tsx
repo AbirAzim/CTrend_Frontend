@@ -59,7 +59,7 @@ function defaultPosY(): number {
 export function WorldCupFloating() {
   const navigate = useNavigate();
   const followed = useFollowedTeam();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [, setTick] = useState(0);
   const [posY, setPosY] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -252,10 +252,16 @@ export function WorldCupFloating() {
         <div className="wc-float-head">
           <button type="button" className="wc-float-title" onClick={() => { setOpen(false); navigate("/world-cup"); }}>
             <img src="/worldcup-trophy.png" className="wc-float-head-trophy" alt="" />
-            <span className="wc-float-title-text">
-              {wcCampaign?.name || "World Cup"}
-              {followed ? ` · ${followed}` : ""}
-            </span>
+            <div className="wc-float-title-stack">
+              <span className="wc-float-title-text">
+                {wcCampaign?.name || "World Cup"}
+                {followed ? ` · ${followed}` : ""}
+              </span>
+              <span className="wc-float-title-hint">
+                Tap to open full schedule
+                <i className="wc-float-title-hint-arrow" aria-hidden>→</i>
+              </span>
+            </div>
           </button>
           <button type="button" className="wc-float-icon-btn" aria-label="Close" onClick={() => setOpen(false)}>
             ✕
@@ -267,13 +273,16 @@ export function WorldCupFloating() {
             <div className="wc-float-live">
               {live.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row wc-float-row--live" onClick={() => openMatch(f)}>
-                  <span className="wc-float-live-badge">{liveBadgeLabel(f)}</span>
-                  <div className="wc-float-row-teams">
-                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
-                    <span className="wc-float-teams">
-                      {f.homeTeam.shortName} {f.score?.home ?? 0}–{f.score?.away ?? 0} {f.awayTeam.shortName}
-                    </span>
-                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
+                  <div className="wc-fr-teams">
+                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-fr-flag" alt="" />}
+                    <span className="wc-fr-name">{f.homeTeam.shortName}</span>
+                    <span className="wc-fr-vs">v</span>
+                    <span className="wc-fr-name">{f.awayTeam.shortName}</span>
+                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-fr-flag" alt="" />}
+                  </div>
+                  <div className="wc-fr-time-block">
+                    <span className="wc-float-live-badge">{liveBadgeLabel(f)}</span>
+                    <span className="wc-fr-score">{f.score?.home ?? 0}–{f.score?.away ?? 0}</span>
                   </div>
                 </button>
               ))}
@@ -284,17 +293,17 @@ export function WorldCupFloating() {
               <p className="wc-float-day-label">{g.label}</p>
               {g.fixtures.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row" onClick={() => openMatch(f)}>
-                  <div className="wc-float-row-teams">
-                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
-                    <span className="wc-float-teams wc-float-teams--wrap">
-                      {f.homeTeam.shortName} <span className="wc-float-v">v</span> {f.awayTeam.shortName}
-                    </span>
-                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
+                  <div className="wc-fr-teams">
+                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-fr-flag" alt="" />}
+                    <span className="wc-fr-name">{f.homeTeam.shortName}</span>
+                    <span className="wc-fr-vs">v</span>
+                    <span className="wc-fr-name">{f.awayTeam.shortName}</span>
+                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-fr-flag" alt="" />}
                   </div>
-                  <span className="wc-float-time">
-                    {formatTime(f.kickoff)}
-                    <span className="wc-float-countdown">{countdownToKickoff(f.kickoff)}</span>
-                  </span>
+                  <div className="wc-fr-time-block">
+                    <span className="wc-fr-time">{formatTime(f.kickoff)}</span>
+                    <span className="wc-fr-cd">{countdownToKickoff(f.kickoff)}</span>
+                  </div>
                   {canVoteOnFixture(f) && <span className="wc-float-vote">Vote</span>}
                 </button>
               ))}
@@ -305,20 +314,22 @@ export function WorldCupFloating() {
               <p className="wc-float-day-label wc-float-day-label--results">Results</p>
               {recent.map((f) => (
                 <button key={f.id} type="button" className="wc-float-row wc-float-row--result" onClick={() => openMatch(f)}>
-                  <div className="wc-float-row-teams">
-                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-float-crest" alt="" />}
-                    <span className={`wc-float-teams${f.score?.winner === "HOME_TEAM" ? " wc-float-teams--winner" : ""}`}>
+                  <div className="wc-fr-home">
+                    {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-fr-flag" alt="" />}
+                    <span className={`wc-fr-name${f.score?.winner === "HOME_TEAM" ? " wc-fr-name--win" : " wc-fr-name--loss"}`}>
                       {f.homeTeam.shortName}
                     </span>
-                    <span className="wc-float-result-score">
-                      {f.score?.home ?? "–"}–{f.score?.away ?? "–"}
-                    </span>
-                    <span className={`wc-float-teams${f.score?.winner === "AWAY_TEAM" ? " wc-float-teams--winner" : ""}`}>
+                  </div>
+                  <div className="wc-fr-score-block">
+                    <span className="wc-fr-score">{f.score?.home ?? "–"} – {f.score?.away ?? "–"}</span>
+                    <span className="wc-fr-ft">FT</span>
+                  </div>
+                  <div className="wc-fr-away">
+                    <span className={`wc-fr-name${f.score?.winner === "AWAY_TEAM" ? " wc-fr-name--win" : " wc-fr-name--loss"}`}>
                       {f.awayTeam.shortName}
                     </span>
-                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-float-crest" alt="" />}
+                    {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-fr-flag" alt="" />}
                   </div>
-                  <span className="wc-float-ft">FT</span>
                 </button>
               ))}
             </div>
