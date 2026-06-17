@@ -1080,8 +1080,8 @@ a:hover {
   z-index: 50;
   box-sizing: border-box;
   transition:
-    opacity 2s var(--cx-ease-out),
-    transform 2s var(--cx-ease-spring),
+    opacity 0.2s var(--cx-ease-out),
+    transform 0.22s var(--cx-ease-spring),
     box-shadow 0.35s var(--cx-ease-out),
     background 0.28s var(--cx-ease-out);
 }
@@ -1107,8 +1107,8 @@ body.capacitor .ig-topbar {
 }
 
 .ig-topbar--hidden {
-  opacity: 0.14;
-  transform: translateY(-10px) scale(0.98);
+  opacity: 0;
+  transform: translateY(-12px) scale(0.97);
   pointer-events: none;
 }
 
@@ -1735,6 +1735,113 @@ body.capacitor .ig-bottom-nav {
   margin: 4px 4px 0;
 }
 
+/* ── Feed filter bar — sticky, always accessible ─────────────────────────────
+   Separate from the navbar. Sits at top: 74px when the navbar is visible.
+   When the navbar hides on scroll (html[data-topbar-hidden="true"]), it slides
+   up to top: 0 so it's always reachable without scrolling back up.             */
+
+.ff-bar-outer {
+  position: sticky;
+  top: 74px;          /* 8px topbar offset + 56px height + 10px margin */
+  z-index: 48;
+  /* Fully opaque — nothing bleeds through from behind */
+  background: var(--ig-bg);
+  padding: 8px 0 7px;
+  border-bottom: 1.5px solid rgb(var(--cx-ink-rgb) / 0.09);
+  transition: top 0.22s ease-out;
+  /* extend to the edges of the feed column */
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+html[data-topbar-hidden="true"] .ff-bar-outer { top: 0; }
+:root[data-theme="dark"] .ff-bar-outer {
+  background: var(--ig-bg);
+  border-bottom-color: rgb(255 255 255 / 0.08);
+}
+
+.ff-bar-inner { display: flex; flex-direction: column; gap: 0; }
+
+/* Tab row — fills full width, no blank space */
+.ff-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.ff-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--ig-muted);
+  border-radius: 10px;
+  padding: 7px 4px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.13s, color 0.13s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ff-tab:hover {
+  background: rgb(var(--cx-ink-rgb) / 0.05);
+  color: var(--ig-ink);
+}
+.ff-tab--active {
+  background: rgb(var(--cx-accent-rgb) / 0.10);
+  color: var(--cx-accent);
+  font-weight: 700;
+}
+:root[data-theme="dark"] .ff-tab--active {
+  background: rgb(var(--cx-accent-rgb) / 0.16);
+}
+.ff-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  line-height: 1;
+}
+.ff-tab--active .ff-tab-icon { opacity: 1; }
+.ff-tab-label { line-height: 1.2; }
+
+/* Campaign sub-filter row */
+.ff-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 7px 0 2px;
+}
+.ff-subtabs::-webkit-scrollbar { display: none; }
+.ff-subtab {
+  flex: 0 0 auto;
+  border: 1.5px solid rgb(var(--cx-ink-rgb) / 0.15);
+  background: transparent;
+  color: var(--ig-muted);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font: inherit;
+  font-size: 0.73rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.13s;
+  white-space: nowrap;
+}
+.ff-subtab:hover { border-color: var(--cx-accent); color: var(--ig-ink); }
+.ff-subtab--active {
+  border-color: var(--cx-accent);
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  color: var(--cx-accent);
+  font-weight: 700;
+}
+
 /* Random vote-draw winner (after voting ends) */
 .cx-post-vote-winner {
   position: relative;
@@ -2036,6 +2143,84 @@ body.capacitor .ig-bottom-nav {
   color: rgb(194 65 12);
   font-size: 0.92rem;
 }
+
+/* ── In-card live match bar ──────────────────────────────────────────────── */
+.cx-live-match-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 10px 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgb(220 38 38 / 0.08);
+  border: 1px solid rgb(220 38 38 / 0.25);
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+  user-select: none;
+}
+.cx-live-match-bar:hover { background: rgb(220 38 38 / 0.13); border-color: rgb(220 38 38 / 0.4); }
+.cx-live-match-bar:active { background: rgb(220 38 38 / 0.18); }
+
+.cx-live-match-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cx-live-match-bar-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #dc2626;
+  background: rgb(220 38 38 / 0.12);
+  border-radius: 4px;
+  padding: 2px 5px;
+  flex-shrink: 0;
+}
+.cx-live-match-bar-teams {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.cx-live-match-bar-team {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ig-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+.cx-live-match-bar-score {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--ig-ink);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.cx-live-match-bar-cta {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #dc2626;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .cx-live-match-bar {
+  background: rgb(239 68 68 / 0.10);
+  border-color: rgb(239 68 68 / 0.25);
+}
+:root[data-theme="dark"] .cx-live-match-bar:hover {
+  background: rgb(239 68 68 / 0.16);
+  border-color: rgb(239 68 68 / 0.38);
+}
+:root[data-theme="dark"] .cx-live-match-bar-badge {
+  color: #f87171;
+  background: rgb(239 68 68 / 0.15);
+}
+:root[data-theme="dark"] .cx-live-match-bar-cta { color: #f87171; }
 
 .cx-match-in-progress-icon {
   font-size: 1.1rem;

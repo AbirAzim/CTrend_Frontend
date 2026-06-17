@@ -31,8 +31,8 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { CampaignBanner } from "../../components/CampaignBanner";
-import { WorldCupBanner } from "../../components/WorldCupBanner";
 import { FeedCampaignFilter } from "../../components/FeedCampaignFilter";
+import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useForceUpdateRequired } from "../../hooks/useForceUpdateRequired";
@@ -55,8 +55,7 @@ function FeedTopBar() {
 
   const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
     skip: !isAuthenticated,
-    fetchPolicy: "cache-and-network",
-    pollInterval: 30000,
+    fetchPolicy: "cache-first",
   });
   const unreadCount: number = notifData?.unreadNotificationCount ?? 0;
 
@@ -141,8 +140,8 @@ export default function FeedScreen() {
   const { needsUpdate } = useForceUpdateRequired();
   const [liveQueue, setLiveQueue] = useState<FeedPostView[]>([]);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
-  const { campaign } = useLocalSearchParams<{ campaign?: string }>();
-  const campaignId = campaign && campaign.length > 0 ? campaign : undefined;
+  const { filter: filterParam } = useLocalSearchParams<{ filter?: string }>();
+  const feedFilter = filterParam && filterParam.length > 0 ? filterParam : "all";
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
@@ -202,24 +201,41 @@ export default function FeedScreen() {
     }
   }
 
+  const feedQueryVars = useMemo(() => {
+    const campaignId = feedFilter.startsWith("campaign:")
+      ? feedFilter.slice("campaign:".length)
+      : null;
+    const rawFilter = feedFilter === "all"
+      ? null
+      : feedFilter.startsWith("campaign:")
+        ? "campaign"
+        : feedFilter;
+    const postFilter = rawFilter ? rawFilter.toUpperCase() : null;
+    return { campaignId, postFilter, skip: 0, take: PAGE_SIZE };
+  }, [feedFilter]);
+
+  type CampaignRow = { id: string; name: string };
+  const { data: campaignsData } = useQuery<{ activeCampaigns: CampaignRow[] }>(ACTIVE_CAMPAIGNS, {
+    fetchPolicy: "cache-and-network",
+  });
+
   const { data, loading, error, refetch, fetchMore, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
     {
-      variables: { campaignId, skip: 0, take: PAGE_SIZE },
+      variables: feedQueryVars,
       fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
-      pollInterval: 20000,
     },
   );
 
-  // Reset live-pushed / locally-removed posts when the campaign filter changes
-  // so the filtered view doesn't show stale cross-campaign posts.
+  // Reset live-pushed / locally-removed posts when the feed filter changes
+  // so the filtered view doesn't show stale cross-filter posts.
   useEffect(() => {
     setLiveQueue([]);
     setRemovedIds(new Set());
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
-  }, [campaignId]);
+  }, [feedFilter]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
   // always feels like it has more — no visible "loading" at the end.
@@ -229,7 +245,7 @@ export default function FeedScreen() {
     if (skip === 0) return; // first page still loading
     loadingMoreRef.current = true;
     try {
-      const res = await fetchMore({ variables: { campaignId, skip, take: PAGE_SIZE } });
+      const res = await fetchMore({ variables: { ...feedQueryVars, skip } });
       const incoming = res.data?.feedPosts ?? [];
       if (incoming.length < PAGE_SIZE) hasMoreRef.current = false; // last page reached
     } catch {
@@ -237,7 +253,7 @@ export default function FeedScreen() {
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [fetchMore, campaignId]);
+  }, [fetchMore, feedQueryVars]);
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
   const { data: meData } = useQuery<{ me: UserRow }>(ME, {
@@ -366,9 +382,19 @@ export default function FeedScreen() {
   );
   const isRefreshing = networkStatus === 4;
 
+  const filterBar = (
+    <FeedCampaignFilter
+      activeFilter={feedFilter}
+      onFilterChange={(f) => router.setParams({ filter: f === "all" ? "" : f })}
+      campaignOptions={campaignsData?.activeCampaigns}
+    />
+  );
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.bg }]}>
       <FeedTopBar />
+      {/* Filter bar is outside the FlatList — always sticky at the top */}
+      {filterBar}
       {loading && posts.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -394,8 +420,6 @@ export default function FeedScreen() {
           maxToRenderPerBatch={4}
           windowSize={7}
           onEndReached={() => void loadMore()}
-          // ~2 screens of runway so the next page lands well before the bottom
-          // (around the 15th of 20 posts), keeping the feed seamless.
           onEndReachedThreshold={2}
           refreshControl={
             <RefreshControl
@@ -405,16 +429,7 @@ export default function FeedScreen() {
               tintColor={colors.accent}
             />
           }
-          ListHeaderComponent={
-            <>
-              <FeedCampaignFilter
-                selectedId={campaignId}
-                onSelect={(id) => router.setParams({ campaign: id ?? "" })}
-              />
-              <WorldCupBanner />
-              <CampaignBanner />
-            </>
-          }
+          ListHeaderComponent={<CampaignBanner />}
           ListEmptyComponent={
             !loading ? (
               <View style={styles.empty}>

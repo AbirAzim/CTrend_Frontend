@@ -22,20 +22,15 @@ import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import type { FeedPostView } from "../types/feed";
 import { CampaignBanners } from "../components/CampaignBanners";
-import { WorldCupBanner } from "../components/WorldCupBanner";
 import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
+
+type CampaignRow = { id: string; name: string; isDefault?: boolean | null };
 type FriendRow = {
   id: string;
   username?: string | null;
   displayName?: string | null;
   email?: string | null;
   profileImageUrl?: string | null;
-};
-type CampaignFilterRow = {
-  id: string;
-  name: string;
-  isDefault?: boolean | null;
-  fixturesEnabled?: boolean | null;
 };
 
 function friendName(f: FriendRow): string {
@@ -91,9 +86,11 @@ function rotateSlice<T>(items: T[], offset: number, limit: number): T[] {
   return out;
 }
 
+type FeedFilter = "all" | "campaign" | `campaign:${string}` | "platform" | "community" | "friend";
+
 export function FeedPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeCampaignId = searchParams.get("campaign")?.trim() || "";
+  const feedFilter = (searchParams.get("filter") as FeedFilter) || "all";
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
   const { isAuthenticated } = useAuth();
   const { onlineUserIds } = useMessenger();
@@ -107,8 +104,6 @@ export function FeedPage() {
   >(null);
   const [modalSearch, setModalSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(8);
-  const [isCampaignFilterOpen, setIsCampaignFilterOpen] = useState(false);
-  const [isCampaignFilterDockVisible, setIsCampaignFilterDockVisible] = useState(true);
   const lastScrollYRef = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
@@ -119,24 +114,32 @@ export function FeedPage() {
       : window.matchMedia("(min-width: 980px)").matches,
   );
 
+  // Map frontend filter enum → backend query variables.
+  // "campaign:{id}" uses campaignId param + postFilter=campaign for DB-level filtering.
+  const feedQueryVars = useMemo(() => {
+    const campaignId = feedFilter.startsWith("campaign:")
+      ? feedFilter.slice("campaign:".length)
+      : null;
+    // GraphQL enums are uppercase; "all" means no filter arg
+    const rawFilter = feedFilter === "all"
+      ? null
+      : feedFilter.startsWith("campaign:")
+        ? "campaign"
+        : feedFilter;
+    const postFilter = rawFilter ? rawFilter.toUpperCase() : null;
+    return { campaignId, postFilter, skip: 0, take: PAGE_SIZE };
+  }, [feedFilter]);
+
   const { data, loading, error, refetch: refetchFeed, fetchMore: fetchMoreFeed } = useQuery(FEED_POSTS, {
-    variables: { campaignId: activeCampaignId || null, skip: 0, take: PAGE_SIZE },
+    variables: feedQueryVars,
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
     notifyOnNetworkStatusChange: true,
-    // 20-second poll fallback so feed stays fresh even when the WS subscription
-    // is suppressed (Safari background tab, network glitch, etc.). Cheap because
-    // Apollo dedupes the network response into the same cache the subscription
-    // updates write to.
-    pollInterval: 20_000,
   });
-  const { data: campaignsData } = useQuery<{ activeCampaigns: CampaignFilterRow[] }>(
-    ACTIVE_CAMPAIGNS,
-    {
-      skip: useMockFeed,
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const { data: campaignsData } = useQuery<{ activeCampaigns: CampaignRow[] }>(ACTIVE_CAMPAIGNS, {
+    skip: useMockFeed,
+    fetchPolicy: "cache-and-network",
+  });
   const {
     data: friendsData,
     loading: friendsLoading,
@@ -216,12 +219,18 @@ export function FeedPage() {
 
   // Fetch the next server page. Called well before the user hits the bottom so
   // the feed always has more ready — no visible "loading" at the end.
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setHasMore(true);
+    setVisibleCount(8);
+  }, [feedFilter]);
+
   const loadMoreFromServer = useCallback(async () => {
     if (useMockFeed || loadingMoreRef.current || !hasMore || serverCount === 0) return;
     loadingMoreRef.current = true;
     try {
       const res = await fetchMoreFeed({
-        variables: { campaignId: activeCampaignId || null, skip: serverCount, take: PAGE_SIZE },
+        variables: { ...feedQueryVars, skip: serverCount },
       });
       const incoming = (res.data?.feedPosts as unknown[] | undefined) ?? [];
       if (incoming.length < PAGE_SIZE) setHasMore(false); // last page reached
@@ -230,7 +239,7 @@ export function FeedPage() {
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [useMockFeed, hasMore, serverCount, fetchMoreFeed, activeCampaignId]);
+  }, [useMockFeed, hasMore, serverCount, fetchMoreFeed]);
 
   const basePostsRaw: FeedPostView[] = useMockFeed
     ? mockPostsAsFeed()
@@ -300,15 +309,8 @@ export function FeedPage() {
       };
     });
   }, [me, friends, suggestions, requestedMe, requestedByMe, postsRaw]);
-  const campaignFilters = useMemo(() => {
-    const items = campaignsData?.activeCampaigns ?? [];
-    return [...items].sort((a, b) => {
-      if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-  }, [campaignsData?.activeCampaigns]);
-  const activeCampaign = campaignFilters.find((c) => c.id === activeCampaignId) ?? null;
 
+  // Backend now handles all filtering — posts is already the correct subset.
   const visiblePosts = useMemo(
     () => posts.slice(0, visibleCount),
     [posts, visibleCount],
@@ -334,7 +336,7 @@ export function FeedPage() {
           const gqlPost = postData?.getPostById;
           if (!gqlPost) return;
           const postCampaignId = gqlPost.campaign?.id ?? "";
-          if (activeCampaignId && postCampaignId !== activeCampaignId) return;
+          void postCampaignId; // no campaign-based live-queue filtering with client-side filter
           setLiveQueue((prev) => {
             if (prev.some((p) => p.id === postId)) return prev;
             return [mapGqlPostToFeedView(gqlPost), ...prev];
@@ -397,19 +399,12 @@ export function FeedPage() {
     setVisibleCount(8);
     setHasMore(true);
     loadingMoreRef.current = false;
-  }, [activeCampaignId]);
+  }, [feedFilter]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     function handleScroll() {
-      const currentY = window.scrollY;
-      const scrollingDown = currentY > lastScrollYRef.current + 6;
-      if (scrollingDown) {
-        setIsCampaignFilterOpen(false);
-      }
-      // Keep filter dock only near top; hide it once user scrolls down.
-      setIsCampaignFilterDockVisible(currentY < 96);
-      lastScrollYRef.current = currentY;
+      lastScrollYRef.current = window.scrollY;
     }
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
@@ -487,12 +482,67 @@ export function FeedPage() {
     }
   }
 
-  function setCampaignFilter(campaignId: string) {
+  function setFeedFilter(f: FeedFilter) {
     const next = new URLSearchParams(searchParams);
-    if (campaignId) next.set("campaign", campaignId);
-    else next.delete("campaign");
+    if (f === "all") next.delete("filter");
+    else next.set("filter", f);
+    next.delete("campaign");
     setSearchParams(next, { replace: true });
   }
+
+  const campaigns = campaignsData?.activeCampaigns ?? [];
+  const isCampaignActive = feedFilter === "campaign" || feedFilter.startsWith("campaign:");
+
+  const filterTabs = [
+    {
+      id: "all" as FeedFilter,
+      label: "All",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      ),
+    },
+    {
+      id: "campaign" as FeedFilter,
+      label: "Campaign",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M22 3 L22 16 L4 12 L4 7 Z"/><path d="M4 9.5 L4 18 C4 19.1 4.9 20 6 20 L8 20 C9.1 20 10 19.1 10 18 L10 14"/>
+        </svg>
+      ),
+    },
+    {
+      id: "platform" as FeedFilter,
+      label: "Platform",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9"/><path d="M12 3 C10 7 10 17 12 21"/><path d="M12 3 C14 7 14 17 12 21"/>
+          <path d="M3 12 L21 12"/>
+        </svg>
+      ),
+    },
+    {
+      id: "community" as FeedFilter,
+      label: "Community",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="9" cy="7" r="3"/><path d="M3 20 C3 16.7 5.7 14 9 14"/><circle cx="17" cy="9" r="2.5"/>
+          <path d="M12 20 C12 17 14.2 14.8 17 14.8 C19.8 14.8 22 17 22 20"/>
+        </svg>
+      ),
+    },
+    {
+      id: "friend" as FeedFilter,
+      label: "Friends",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M20.8 4.6 C19.6 3.4 18 2.7 16.2 2.7 C14.5 2.7 12.9 3.4 11.8 4.6 L12 4.8 L12.2 4.6 C11 3.4 9.5 2.7 7.8 2.7 C6 2.7 4.4 3.4 3.2 4.6 C0.8 7 0.8 10.9 3.2 13.3 L12 21.3 L20.8 13.3 C23.2 10.9 23.2 7 20.8 4.6 Z"/>
+        </svg>
+      ),
+    },
+  ] as const;
 
   return (
     <div className="cx-feed-layout">
@@ -546,71 +596,48 @@ export function FeedPage() {
       ) : null}
 
       <div className="ig-feed">
-        <WorldCupBanner />
-        <CampaignBanners />
-        {!useMockFeed && campaignFilters.length > 0 && isCampaignFilterDockVisible ? (
-          <div className="cx-campaign-filter-dock">
-            <button
-              type="button"
-              className={`cx-campaign-filter-toggle${isCampaignFilterOpen ? " cx-campaign-filter-toggle--active" : ""}`}
-              aria-expanded={isCampaignFilterOpen}
-              onClick={() => setIsCampaignFilterOpen((prev) => !prev)}
-            >
-              <span className="cx-campaign-filter-toggle-kicker">Filter feed</span>
-              <span className="cx-campaign-filter-toggle-value">
-                {activeCampaign ? activeCampaign.name : "All compares"}
-              </span>
-            </button>
-            {isCampaignFilterOpen ? (
-              <div className="cx-campaign-filter-shell">
-                <div className="cx-campaign-filter-head">
-                  <p className="cx-campaign-filter-title">Filter feed</p>
-                  {activeCampaign ? (
-                    <button
-                      type="button"
-                      className="cx-campaign-filter-clear"
-                      onClick={() => setCampaignFilter("")}
-                    >
-                      Clear
-                    </button>
-                  ) : null}
-                </div>
-                <div className="cx-campaign-filter-bar" aria-label="Filter posts by campaign">
+        {/* Sticky filter bar — lives outside the navbar so it's always accessible */}
+        <div className="ff-bar-outer" role="navigation" aria-label="Feed filter">
+          <div className="ff-bar-inner">
+            <div className="ff-tabs" role="tablist" aria-label="Feed filter">
+              {filterTabs.map(({ id, label, icon }) => {
+                const active = id === "campaign" ? isCampaignActive : feedFilter === id;
+                return (
                   <button
+                    key={id}
+                    role="tab"
                     type="button"
-                    className={`cx-campaign-filter-chip${!activeCampaignId ? " cx-campaign-filter-chip--active" : ""}`}
-                    onClick={() => setCampaignFilter("")}
+                    aria-selected={active}
+                    className={`ff-tab${active ? " ff-tab--active" : ""}`}
+                    onClick={() => setFeedFilter(id === feedFilter ? "all" : id)}
                   >
-                    All compares
+                    <span className="ff-tab-icon">{icon}</span>
+                    <span className="ff-tab-label">{label}</span>
                   </button>
-                  {campaignFilters.map((campaign) => (
-                    <button
-                      key={campaign.id}
-                      type="button"
-                      className={`cx-campaign-filter-chip${activeCampaignId === campaign.id ? " cx-campaign-filter-chip--active" : ""}${campaign.isDefault ? " cx-campaign-filter-chip--default" : ""}`}
-                      onClick={() => setCampaignFilter(campaign.id)}
-                    >
-                      {campaign.name}
-                    </button>
-                  ))}
-                </div>
-                <p className="cx-campaign-filter-help muted small">
-                  Pick one campaign to focus the feed instantly.
-                </p>
-                {activeCampaign ? (
-                  <p className="cx-campaign-filter-note muted small">
-                    Showing <strong>{activeCampaign.name}</strong> posts now.
-                  </p>
-                ) : null}
+                );
+              })}
+            </div>
+            {isCampaignActive && campaigns.length > 0 && (
+              <div className="ff-subtabs">
+                <button
+                  type="button"
+                  className={`ff-subtab${feedFilter === "campaign" ? " ff-subtab--active" : ""}`}
+                  onClick={() => setFeedFilter("campaign")}
+                >All campaigns</button>
+                {campaigns.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`ff-subtab${feedFilter === `campaign:${c.id}` ? " ff-subtab--active" : ""}`}
+                    onClick={() => setFeedFilter(`campaign:${c.id}` as FeedFilter)}
+                  >{c.name}</button>
+                ))}
               </div>
-            ) : null}
-            {activeCampaign ? (
-              <p className="cx-campaign-filter-current muted small">
-                Active: <strong>{activeCampaign.name}</strong>
-              </p>
-            ) : null}
+            )}
           </div>
-        ) : null}
+        </div>
+
+        <CampaignBanners />
 
         {loading && !data && !useMockFeed && (
           <p className="ig-feed-status">Loading feed…</p>

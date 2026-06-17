@@ -1,198 +1,200 @@
-import { useQuery } from '@apollo/client/react';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ACTIVE_CAMPAIGNS } from '@ctrend/shared/graphql/campaigns';
+import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
-type CampaignRow = {
-	id: string;
-	name: string;
-	isDefault?: boolean | null;
-};
-type ActiveCampaignsData = { activeCampaigns: CampaignRow[] };
-
 type Props = {
-	selectedId?: string;
-	onSelect: (id?: string) => void;
+	activeFilter: string; // "all" | "campaign" | "campaign:{id}" | "platform" | "community" | "friend"
+	onFilterChange: (filter: string) => void;
+	campaignOptions?: { id: string; name: string }[];
 };
 
-/** Collapsible "Filter feed" dock — All compares + each active campaign (default first). Phase 23. */
-export function FeedCampaignFilter({ selectedId, onSelect }: Props) {
-	const { colors, isDark } = useTheme();
-	const [open, setOpen] = useState(false);
-	const { data } = useQuery<ActiveCampaignsData>(ACTIVE_CAMPAIGNS, {
-		fetchPolicy: 'cache-and-network',
-	});
+type TabDef = {
+	key: string;
+	label: string;
+	icon: keyof typeof Ionicons.glyphMap;
+};
 
-	const campaigns = useMemo(() => {
-		const items = data?.activeCampaigns ?? [];
-		return [...items].sort((a, b) => {
-			if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
-			return a.name.localeCompare(b.name);
-		});
-	}, [data?.activeCampaigns]);
+const TABS: TabDef[] = [
+	{ key: 'all', label: 'All', icon: 'apps-outline' },
+	{ key: 'campaign', label: 'Campaign', icon: 'megaphone-outline' },
+	{ key: 'platform', label: 'Platform', icon: 'globe-outline' },
+	{ key: 'community', label: 'Community', icon: 'people-outline' },
+	{ key: 'friend', label: 'Friends', icon: 'heart-outline' },
+];
 
-	if (campaigns.length === 0) return null;
+/** Full-width 5-tab feed filter bar. Always visible — not collapsible. */
+export function FeedCampaignFilter({ activeFilter, onFilterChange, campaignOptions }: Props) {
+	const { colors } = useTheme();
 
-	const selected = campaigns.find((c) => c.id === selectedId);
-	const activeValue = selected?.name ?? 'All compares';
+	// The active "base" tab — campaign:{id} maps to "campaign"
+	const activeTab = activeFilter.startsWith('campaign:') ? 'campaign' : activeFilter;
+	// Active campaign id for sub-filter
+	const activeCampaignId = activeFilter.startsWith('campaign:')
+		? activeFilter.slice('campaign:'.length)
+		: null;
 
-	function pick(id?: string) {
-		onSelect(id);
-		setOpen(false);
+	const isCampaignMode = activeTab === 'campaign';
+	const hasCampaignPills = isCampaignMode && campaignOptions && campaignOptions.length > 0;
+
+	function handleTabPress(key: string) {
+		if (key === 'campaign') {
+			// Default to "campaign" (all campaigns) when tapping the Campaign tab
+			onFilterChange('campaign');
+		} else {
+			onFilterChange(key);
+		}
 	}
 
-	const chipBg = isDark ? 'rgba(124,114,245,0.16)' : 'rgba(99,102,241,0.1)';
-	const chipActiveBg = colors.accent;
+	function handleCampaignPill(id: string | null) {
+		if (id === null) {
+			onFilterChange('campaign');
+		} else {
+			onFilterChange(`campaign:${id}`);
+		}
+	}
 
 	return (
-		<View style={[styles.wrap, { borderBottomColor: colors.border }]}>
-			<Pressable
-				style={[styles.trigger, { backgroundColor: colors.section, borderColor: colors.border }]}
-				onPress={() => setOpen((p) => !p)}
-				accessibilityRole='button'
-				accessibilityLabel='Filter feed by campaign'>
-				<Text style={styles.triggerIcon}>🎯</Text>
-				<View style={styles.triggerBody}>
-					<Text style={[styles.triggerKicker, { color: colors.muted }]}>FILTER FEED</Text>
-					<Text style={[styles.triggerValue, { color: colors.text }]} numberOfLines={1}>
-						{activeValue}
-					</Text>
-				</View>
-				<Text style={[styles.chevron, { color: colors.muted }]}>{open ? '▲' : '▼'}</Text>
-			</Pressable>
+		<View style={[styles.container, { backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
+			{/* Tab row */}
+			<View style={styles.tabRow}>
+				{TABS.map((tab) => {
+					const isActive = activeTab === tab.key;
+					return (
+						<TouchableOpacity
+							key={tab.key}
+							style={[
+								styles.tab,
+								isActive && { backgroundColor: colors.accent + '22' },
+							]}
+							onPress={() => handleTabPress(tab.key)}
+							activeOpacity={0.7}
+							accessibilityRole="tab"
+							accessibilityState={{ selected: isActive }}
+						>
+							<Ionicons
+								name={tab.icon}
+								size={18}
+								color={isActive ? colors.accent : colors.muted}
+							/>
+							<Text
+								style={[
+									styles.tabLabel,
+									{ color: isActive ? colors.accent : colors.muted },
+									isActive && styles.tabLabelActive,
+								]}
+								numberOfLines={1}
+							>
+								{tab.label}
+							</Text>
+						</TouchableOpacity>
+					);
+				})}
+			</View>
 
-			{open ? (
-				<View style={styles.chips}>
-					<Text style={[styles.helper, { color: colors.muted }]}>
-						Show compares from a specific campaign, or all.
-					</Text>
-					<FilterChip
-						label='All compares'
-						active={!selectedId}
-						onPress={() => pick(undefined)}
-						bg={!selectedId ? chipActiveBg : chipBg}
-						activeColor={chipActiveBg}
-						colors={colors}
-					/>
-					{campaigns.map((c) => (
-						<FilterChip
-							key={c.id}
-							label={c.name}
-							badge={c.isDefault ? 'default' : undefined}
-							active={c.id === selectedId}
-							onPress={() => pick(c.id)}
-							bg={c.id === selectedId ? chipActiveBg : chipBg}
-							activeColor={chipActiveBg}
-							colors={colors}
-						/>
-					))}
-				</View>
+			{/* Campaign sub-filter pills */}
+			{hasCampaignPills ? (
+				<ScrollView
+					horizontal
+					showsHorizontalScrollIndicator={false}
+					style={styles.pillScroll}
+					contentContainerStyle={styles.pillContainer}
+				>
+					{/* "All campaigns" pill */}
+					<TouchableOpacity
+						style={[
+							styles.pill,
+							{ borderColor: colors.accent },
+							activeCampaignId === null && { backgroundColor: colors.accent },
+						]}
+						onPress={() => handleCampaignPill(null)}
+						activeOpacity={0.75}
+					>
+						<Text
+							style={[
+								styles.pillText,
+								{ color: activeCampaignId === null ? '#fff' : colors.accent },
+							]}
+						>
+							All campaigns
+						</Text>
+					</TouchableOpacity>
+
+					{campaignOptions!.map((c) => {
+						const isSelected = activeCampaignId === c.id;
+						return (
+							<TouchableOpacity
+								key={c.id}
+								style={[
+									styles.pill,
+									{ borderColor: colors.accent },
+									isSelected && { backgroundColor: colors.accent },
+								]}
+								onPress={() => handleCampaignPill(c.id)}
+								activeOpacity={0.75}
+							>
+								<Text
+									style={[
+										styles.pillText,
+										{ color: isSelected ? '#fff' : colors.accent },
+									]}
+									numberOfLines={1}
+								>
+									{c.name}
+								</Text>
+							</TouchableOpacity>
+						);
+					})}
+				</ScrollView>
 			) : null}
 		</View>
 	);
 }
 
-function FilterChip({
-	label,
-	badge,
-	active,
-	onPress,
-	bg,
-	activeColor,
-	colors,
-}: {
-	label: string;
-	badge?: string;
-	active: boolean;
-	onPress: () => void;
-	bg: string;
-	activeColor: string;
-	colors: ReturnType<typeof useTheme>['colors'];
-}) {
-	return (
-		<Pressable
-			style={({ pressed }) => [
-				styles.chip,
-				{ backgroundColor: bg },
-				pressed && { opacity: 0.8 },
-			]}
-			onPress={onPress}>
-			<Text
-				style={[
-					styles.chipText,
-					{ color: active ? '#fff' : colors.text },
-					active && { fontWeight: '800' },
-				]}
-				numberOfLines={1}>
-				{label}
-			</Text>
-			{badge ? (
-				<Text
-					style={[
-						styles.chipBadge,
-						{ color: active ? '#fff' : activeColor, borderColor: active ? '#fff' : activeColor },
-					]}>
-					{badge}
-				</Text>
-			) : null}
-		</Pressable>
-	);
-}
-
 const styles = StyleSheet.create({
-	wrap: {
-		paddingHorizontal: 12,
-		paddingTop: 10,
-		paddingBottom: 8,
-		borderBottomWidth: 1,
+	container: {
+		borderBottomWidth: StyleSheet.hairlineWidth,
 	},
-	trigger: {
+	tabRow: {
 		flexDirection: 'row',
+	},
+	tab: {
+		flex: 1,
 		alignItems: 'center',
-		gap: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 9,
-		borderRadius: 12,
-		borderWidth: 1,
+		justifyContent: 'center',
+		paddingVertical: 8,
+		paddingHorizontal: 2,
+		gap: 3,
+		borderRadius: 8,
+		marginHorizontal: 2,
+		marginVertical: 4,
 	},
-	triggerIcon: { fontSize: 15 },
-	triggerBody: { flex: 1 },
-	triggerKicker: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-	triggerValue: { fontSize: 13, fontWeight: '700', marginTop: 1 },
-	chevron: { fontSize: 11 },
-	chips: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-		marginTop: 10,
-	},
-	helper: {
-		width: '100%',
-		fontSize: 11,
+	tabLabel: {
+		fontSize: 10,
 		fontWeight: '600',
-		marginBottom: 2,
+		letterSpacing: 0.1,
 	},
-	chip: {
+	tabLabelActive: {
+		fontWeight: '800',
+	},
+	pillScroll: {
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: 'rgba(128,128,128,0.15)',
+	},
+	pillContainer: {
 		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
 		paddingHorizontal: 12,
 		paddingVertical: 7,
-		borderRadius: 999,
-		maxWidth: '100%',
+		gap: 8,
 	},
-	chipText: { fontSize: 12.5, fontWeight: '600' },
-	chipBadge: {
-		fontSize: 8.5,
-		fontWeight: '800',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-		paddingHorizontal: 5,
-		paddingVertical: 1,
+	pill: {
+		paddingHorizontal: 12,
+		paddingVertical: 5,
 		borderRadius: 999,
 		borderWidth: 1,
-		overflow: 'hidden',
+	},
+	pillText: {
+		fontSize: 12,
+		fontWeight: '600',
 	},
 });
 

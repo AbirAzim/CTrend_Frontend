@@ -21,6 +21,7 @@ import { useFollowedTeam } from "../lib/wcTeam";
 type Campaign = { id: string; name: string; slug: string; fixturesEnabled?: boolean };
 
 const STORAGE_KEY_Y = "ctrend_wc_tab_pos_y";
+const STORAGE_KEY_OPEN = "ctrend_wc_open";
 const TAB_H = 68;
 const CARD_APPROX_H = 430;
 const TAB_OVERHANG = 0; // fully visible on web (unlike mobile which clips at the edge)
@@ -59,7 +60,9 @@ function defaultPosY(): number {
 export function WorldCupFloating() {
   const navigate = useNavigate();
   const followed = useFollowedTeam();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEY_OPEN) !== "0"; } catch { return true; }
+  });
   const [, setTick] = useState(0);
   const [posY, setPosY] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -162,6 +165,11 @@ export function WorldCupFloating() {
     if (!dragRef.current.moved) openCard(next); // tap without drag → open
   }
 
+  function persistOpen(value: boolean) {
+    try { localStorage.setItem(STORAGE_KEY_OPEN, value ? "1" : "0"); } catch { /* ignore */ }
+    setOpen(value);
+  }
+
   // ── Card open / drag handlers ─────────────────────────────────────────────
   function openCard(tabPosY?: number) {
     const baseY = tabPosY ?? posY ?? defaultPosY();
@@ -170,7 +178,7 @@ export function WorldCupFloating() {
       : clampCardY(baseY - 40);
     lastCardY.current = initial;
     setCardY(initial);
-    setOpen(true);
+    persistOpen(true);
   }
 
   function onCardHandleDown(e: React.PointerEvent) {
@@ -263,7 +271,7 @@ export function WorldCupFloating() {
               </span>
             </div>
           </button>
-          <button type="button" className="wc-float-icon-btn" aria-label="Close" onClick={() => setOpen(false)}>
+          <button type="button" className="wc-float-icon-btn" aria-label="Close" onClick={() => persistOpen(false)}>
             ✕
           </button>
         </div>

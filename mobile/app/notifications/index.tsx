@@ -495,7 +495,6 @@ export default function NotificationsScreen() {
   const { loading, refetch } = useQuery<NotifData>(MY_NOTIFICATIONS, {
     variables: { skip: 0, take: PAGE_SIZE },
     fetchPolicy: "network-only",
-    pollInterval: 25000,
     onCompleted: (data) => {
       const fetched = data.myNotifications.items.filter((n) => !n.archived);
       setItems(fetched);

@@ -86,6 +86,7 @@ export function mapGqlPostToFeedView(p: {
     id: string;
     name: string;
     slug: string;
+    isDefault?: boolean | null;
     bannerText?: string | null;
     bannerImageUrl?: string | null;
     prizePerWinner: number;
@@ -212,6 +213,7 @@ export function mapGqlPostToFeedView(p: {
           id: p.campaign.id,
           name: p.campaign.name,
           slug: p.campaign.slug,
+          isDefault: p.campaign.isDefault ?? null,
           bannerText: p.campaign.bannerText ?? null,
           bannerImageUrl: p.campaign.bannerImageUrl ?? null,
           prizePerWinner: p.campaign.prizePerWinner,

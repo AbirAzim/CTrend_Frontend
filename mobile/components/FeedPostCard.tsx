@@ -1521,6 +1521,17 @@ function FeedPostCardComponent({
 		return () => loop.stop();
 	}, [isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
+	// Live seconds ticker — counts up within the current minute for IN_PLAY matches
+	const liveMinute = post.matchScore?.status === 'IN_PLAY' ? (post.matchScore.minute ?? null) : null;
+	const liveMinuteRef = useRef<number | null>(null);
+	const [liveSeconds, setLiveSeconds] = useState(0);
+	useEffect(() => {
+		if (liveMinute === null) { setLiveSeconds(0); liveMinuteRef.current = null; return; }
+		if (liveMinute !== liveMinuteRef.current) { liveMinuteRef.current = liveMinute; setLiveSeconds(0); }
+		const t = setInterval(() => setLiveSeconds((s) => Math.min(s + 1, 59)), 1000);
+		return () => clearInterval(t);
+	}, [liveMinute]);
+
 	useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
 		variables: { postId: post.id },
 		skip: isDetail,
@@ -2308,7 +2319,7 @@ function FeedPostCardComponent({
 								<View style={st.metaRow}>{nodes}</View>
 							) : null;
 						})()}
-						{post.matchScore && post.matchScore.status !== 'TIMED' ? (() => {
+						{post.matchScore && post.matchScore.status !== 'TIMED' && post.matchScore.status !== 'IN_PLAY' && post.matchScore.status !== 'PAUSED' ? (() => {
 							const canOpenMatch = Boolean(post.fixtureId) && (isMatchFinished || isLiveMatch || Boolean(post.lineupAvailable));
 							const scoreContent = (
 								<>
@@ -2319,7 +2330,7 @@ function FeedPostCardComponent({
 											const teamB = post.postOptions?.[1]?.label?.trim() || null;
 											const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
 											const sc = post.matchScore!;
-											if (sc.status === 'IN_PLAY') return `${sc.minute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											if (sc.status === 'IN_PLAY') return `${sc.minute ?? 0}'${String(liveSeconds).padStart(2, '0')}  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 										})()}
@@ -2836,11 +2847,6 @@ function FeedPostCardComponent({
 					campaign={campaign}
 					winningOptionLabel={campaignWinnerOptionLabel}
 				/>
-			) : showMatchLive ? (
-				<View style={[matchInProgressStyles.container, matchInProgressStyles.containerLive]}>
-					<LiveDot />
-					<Text style={matchInProgressStyles.textLive}>Match is live</Text>
-				</View>
 			) : showMatchStartsSoon ? (
 				<View style={matchInProgressStyles.container}>
 					<Text style={matchInProgressStyles.icon}>⏰</Text>
@@ -2860,7 +2866,12 @@ function FeedPostCardComponent({
 			{isMatchPost && post.fixtureId && (isMatchFinished || isLiveMatch || post.lineupAvailable) ? (
 				<MatchDetailRow
 					fixtureId={post.fixtureId}
-					live={isLiveMatch}
+					matchScore={post.matchScore ?? null}
+					teams={[
+						post.postOptions?.[0]?.label?.trim() ?? null,
+						post.postOptions?.[1]?.label?.trim() ?? null,
+					]}
+					liveSeconds={liveSeconds}
 				/>
 			) : null}
 
@@ -3754,45 +3765,106 @@ const matchInProgressStyles = StyleSheet.create({
 	},
 });
 
-function MatchDetailRow({ fixtureId, live }: { fixtureId: string; live: boolean }) {
-	const pulse = useRef(new Animated.Value(1)).current;
-	useEffect(() => {
-		const anim = Animated.loop(
-			Animated.sequence([
-				Animated.timing(pulse, { toValue: 0.4, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-				Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-			]),
-		);
-		anim.start();
-		return () => anim.stop();
-	}, [pulse]);
+type MatchScore = { status: string | null; home: number | null; away: number | null; minute?: number | null } | null;
+
+function MatchDetailRow({
+	fixtureId,
+	matchScore,
+	teams,
+	liveSeconds,
+}: {
+	fixtureId: string;
+	matchScore: MatchScore;
+	teams: [string | null, string | null];
+	liveSeconds: number;
+}) {
+	const isLive = matchScore?.status === 'IN_PLAY';
+	const isPaused = matchScore?.status === 'PAUSED';
+	const isFinished = matchScore?.status === 'FT' || matchScore?.status === 'AET' || matchScore?.status === 'PEN' || matchScore?.status === 'FINISHED';
+
+	const statusLabel = isLive
+		? `${matchScore?.minute ?? 0}'${String(Math.min(liveSeconds, 59)).padStart(2, '0')}`
+		: isPaused ? 'HT'
+		: isFinished ? 'FT'
+		: null;
+
+	const scoreText = matchScore && matchScore.home != null && matchScore.away != null
+		? `${matchScore.home}–${matchScore.away}`
+		: null;
+
+	const teamA = teams[0];
+	const teamB = teams[1];
+
+	const dotColor = isLive ? '#ef4444' : isPaused ? '#f59e0b' : '#64748b';
+	const barBg = isLive ? 'rgba(239,68,68,0.07)' : isPaused ? 'rgba(245,158,11,0.07)' : 'rgba(100,116,139,0.07)';
+	const barBorder = isLive ? 'rgba(239,68,68,0.2)' : isPaused ? 'rgba(245,158,11,0.2)' : 'rgba(100,116,139,0.18)';
 
 	return (
 		<Pressable
-			style={({ pressed }) => [matchRowStyles.row, pressed && matchRowStyles.pressed]}
+			style={({ pressed }) => [mdrStyles.row, { backgroundColor: pressed ? 'rgba(100,116,139,0.1)' : barBg, borderColor: barBorder }]}
 			onPress={() => router.push(`/world-cup/match/${fixtureId}` as `/${string}`)}
 		>
-			<Animated.Text style={[matchRowStyles.icon, { opacity: pulse }]}>⚽</Animated.Text>
-			<Text style={matchRowStyles.label}>
-				{live ? 'Live match stats & lineups' : 'Full match report & lineups'}
+			{/* Live/status dot */}
+			<View style={[mdrStyles.dot, { backgroundColor: dotColor }]} />
+
+			{/* Status badge */}
+			{statusLabel ? (
+				<View style={[mdrStyles.badge, { backgroundColor: dotColor + '22' }]}>
+					<Text style={[mdrStyles.badgeText, { color: dotColor }]}>{statusLabel}</Text>
+				</View>
+			) : null}
+
+			{/* Score + teams */}
+			<Text style={mdrStyles.scoreText} numberOfLines={1}>
+				{teamA ?? 'Home'}{scoreText ? ` ${scoreText} ` : '  '}{teamB ?? 'Away'}
 			</Text>
-			<Text style={matchRowStyles.arrow}>›</Text>
+
+			{/* CTA */}
+			<Text style={mdrStyles.cta}>See Match Details →</Text>
 		</Pressable>
 	);
 }
 
-const matchRowStyles = StyleSheet.create({
+const mdrStyles = StyleSheet.create({
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 10,
-		paddingHorizontal: 16,
-		paddingVertical: 13,
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: 'rgba(100,116,139,0.25)',
+		gap: 7,
+		marginHorizontal: 14,
+		marginTop: 4,
+		marginBottom: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		borderRadius: 10,
+		borderWidth: 1,
 	},
-	pressed: { backgroundColor: 'rgba(100,116,139,0.08)' },
-	icon: { fontSize: 16 },
-	label: { flex: 1, fontSize: 13, fontWeight: '600', color: '#94a3b8' },
-	arrow: { fontSize: 18, fontWeight: '700', color: 'rgba(148,163,184,0.5)' },
+	dot: {
+		width: 7,
+		height: 7,
+		borderRadius: 4,
+		flexShrink: 0,
+	},
+	badge: {
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 5,
+		flexShrink: 0,
+	},
+	badgeText: {
+		fontSize: 10,
+		fontWeight: '800',
+		letterSpacing: 0.3,
+	},
+	scoreText: {
+		flex: 1,
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#cbd5e1',
+	},
+	cta: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#6366f1',
+		flexShrink: 0,
+	},
 });

@@ -510,6 +510,8 @@ function FeedPostCardComponent({
   const voteGuardUntilRef = useRef(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [liveSeconds, setLiveSeconds] = useState(0);
+  const liveMinuteRef = useRef<number | null>(null);
   const [shareHint, setShareHint] = useState<string | null>(null);
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const votersModalCardRef = useRef<HTMLElement | null>(null);
@@ -627,6 +629,22 @@ function FeedPostCardComponent({
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
   }, [hasActiveCountdown]);
+
+  // Seconds ticker for the live match bar — resets whenever the API minute changes
+  const liveMinute = post.matchScore?.status === "IN_PLAY" ? (post.matchScore.minute ?? null) : null;
+  useEffect(() => {
+    if (liveMinute === null) {
+      setLiveSeconds(0);
+      liveMinuteRef.current = null;
+      return;
+    }
+    if (liveMinute !== liveMinuteRef.current) {
+      liveMinuteRef.current = liveMinute;
+      setLiveSeconds(0);
+    }
+    const t = setInterval(() => setLiveSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [liveMinute]);
 
   useEffect(() => {
     if (!showVoters) {
@@ -997,28 +1015,18 @@ function FeedPostCardComponent({
   const msTeamB = post.postOptions?.[1]?.label?.trim() || post.compareOptionLabels?.[1]?.trim() || null;
   const msTeamLine = msTeamA && msTeamB ? `${msTeamA} vs ${msTeamB}` : null;
   const matchScoreChip =
-    ms && ms.status && ms.status !== "TIMED" ? (
-      post.fixtureId && (ms.status === "FT" || ms.status === "AET" || ms.status === "PEN" || ms.status === "FINISHED" || ms.status === "IN_PLAY" || ms.status === "PAUSED") ? (
+    ms && ms.status && ms.status !== "TIMED" && ms.status !== "IN_PLAY" && ms.status !== "PAUSED" ? (
+      post.fixtureId ? (
         <button
           type="button"
-          className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"} cx-match-score-chip--link`}
+          className="cx-match-score-chip cx-match-score-chip--ft cx-match-score-chip--link"
           onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
         >
-          {ms.status === "IN_PLAY"
-            ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
-            : ms.status === "PAUSED"
-            ? `HT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
-            : `FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
+          {`FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
         </button>
       ) : (
-        <span
-          className={`cx-match-score-chip cx-match-score-chip--${ms.status === "IN_PLAY" ? "live" : ms.status === "PAUSED" ? "ht" : "ft"}`}
-        >
-          {ms.status === "IN_PLAY"
-            ? `⚽ ${ms.minute ?? 0}'  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
-            : ms.status === "PAUSED"
-            ? `HT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`
-            : `FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
+        <span className="cx-match-score-chip cx-match-score-chip--ft">
+          {`FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
         </span>
       )
     ) : null;
@@ -2284,9 +2292,30 @@ function FeedPostCardComponent({
           winningOptionLabel={campaignWinnerOptionLabel}
         />
       ) : showMatchLive ? (
-        <div className="cx-match-in-progress cx-match-in-progress--live" role="status" aria-live="polite">
-          <span className="cx-live-dot" aria-hidden />
-          <span>Match is live</span>
+        <div
+          className="cx-live-match-bar"
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); } }}
+          aria-label="Watch live match"
+        >
+          <div className="cx-live-match-bar-left">
+            <span className="cx-live-dot" aria-hidden />
+            <span className="cx-live-match-bar-badge">
+              {ms?.status === "PAUSED"
+                ? "HT"
+                : ms?.minute != null
+                ? `${ms.minute}'${String(Math.min(liveSeconds, 59)).padStart(2, "0")}`
+                : "LIVE"}
+            </span>
+            <div className="cx-live-match-bar-teams">
+              <span className="cx-live-match-bar-team">{msTeamA ?? "Home"}</span>
+              <span className="cx-live-match-bar-score">{ms?.home ?? 0}–{ms?.away ?? 0}</span>
+              <span className="cx-live-match-bar-team">{msTeamB ?? "Away"}</span>
+            </div>
+          </div>
+          <span className="cx-live-match-bar-cta">See Match Details →</span>
         </div>
       ) : showMatchStartsSoon ? (
         <div className="cx-match-in-progress" role="status" aria-live="polite">
@@ -2304,16 +2333,14 @@ function FeedPostCardComponent({
         </div>
       ) : null}
 
-      {isMatchPost && post.fixtureId && (isMatchFinished || isLiveMatch || post.lineupAvailable) && (
+      {isMatchPost && post.fixtureId && !isLiveMatch && (isMatchFinished || post.lineupAvailable) && (
         <button
           type="button"
           className="cx-mdb-row"
           onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
         >
           <span className="cx-mdb-row-icon" aria-hidden>⚽</span>
-          <span className="cx-mdb-row-label">
-            {isLiveMatch ? "Live match stats & lineups" : "Full match report & lineups"}
-          </span>
+          <span className="cx-mdb-row-label">Full match report & lineups</span>
           <span className="cx-mdb-row-arrow" aria-hidden>›</span>
         </button>
       )}

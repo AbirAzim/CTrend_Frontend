@@ -100,7 +100,7 @@ export const apolloClient = new ApolloClient({
       Query: {
         fields: {
           feedPosts: {
-            keyArgs: ["campaignId", "scope", "sort"],
+            keyArgs: ["campaignId", "postFilter", "scope", "sort"],
             merge(
               existing: readonly unknown[] = [],
               incoming: readonly unknown[],

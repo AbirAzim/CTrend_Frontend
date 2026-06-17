@@ -109,6 +109,7 @@ export type FeedPostCampaignView = {
   id: string;
   name: string;
   slug: string;
+  isDefault?: boolean | null;
   bannerText?: string | null;
   bannerImageUrl?: string | null;
   prizePerWinner: number;

@@ -68,6 +68,9 @@ export function AppShell() {
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
+  useEffect(() => {
+    document.documentElement.dataset.topbarHidden = topbarHidden ? "true" : "false";
+  }, [topbarHidden]);
   const mobileShell = useMobileShell();
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -82,6 +85,7 @@ export function AppShell() {
   });
   const lastYRef = useRef(0);
   const scrollRafRef = useRef<number | null>(null);
+
   const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
     skip: !isAuthenticated,
     fetchPolicy: "cache-and-network",
@@ -215,6 +219,7 @@ export function AppShell() {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("ctrend_theme", theme);
   }, [theme]);
+
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);

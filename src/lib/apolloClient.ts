@@ -99,7 +99,7 @@ export const cache = new InMemoryCache({
         // 20s poll refresh the head in place, instead of each (skip/take) combo
         // becoming a separate list or the poll overwriting the appended pages.
         feedPosts: {
-          keyArgs: ["campaignId", "scope", "sort"],
+          keyArgs: ["campaignId", "postFilter", "scope", "sort"],
           merge(
             existing: readonly unknown[] = [],
             incoming: readonly unknown[],

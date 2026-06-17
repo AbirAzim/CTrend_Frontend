@@ -53,8 +53,8 @@ export const POST_VOTE_WINNER_FIELDS = `
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
 export const FEED_POSTS = gql`
-  query FeedPosts($campaignId: ID, $skip: Int, $take: Int) {
-    feedPosts(campaignId: $campaignId, skip: $skip, take: $take) {
+  query FeedPosts($campaignId: ID, $postFilter: FeedPostFilter, $skip: Int, $take: Int) {
+    feedPosts(campaignId: $campaignId, postFilter: $postFilter, skip: $skip, take: $take) {
       id
       type
       category {

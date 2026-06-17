@@ -33,7 +33,7 @@ export function BottomNav({ active }: { active?: TabName }) {
 
   const { data: convData } = useQuery<{ myConversations: Array<{ unreadCount: number }> }>(
     MY_CONVERSATIONS,
-    { fetchPolicy: "cache-and-network", skip: !isAuthenticated, pollInterval: 15000 },
+    { fetchPolicy: "cache-first", skip: !isAuthenticated },
   );
   const totalUnread = (convData?.myConversations ?? []).reduce((s, c) => s + (c.unreadCount > 0 ? 1 : 0), 0);
 

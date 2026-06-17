@@ -44,6 +44,7 @@ type CampaignsData = { activeCampaigns: Campaign[] };
 const CARD_W = 285;
 const CARD_APPROX_H = 400;
 const STORAGE_KEY = "ctrend_wc_card_y";
+const STORAGE_KEY_OPEN = "ctrend_wc_open";
 
 // ─── Mini helpers ─────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ export function WorldCupFloating() {
   const chevronBounce = useRef(new Animated.Value(0)).current;
 
   function animateOpen() {
+    void AsyncStorage.setItem(STORAGE_KEY_OPEN, "1");
     setVisible(true);
     slideAnim.setValue(0);
     Animated.spring(slideAnim, {
@@ -165,6 +167,7 @@ export function WorldCupFloating() {
   }
 
   function animateClose() {
+    void AsyncStorage.setItem(STORAGE_KEY_OPEN, "0");
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 200,
@@ -221,16 +224,20 @@ export function WorldCupFloating() {
     const hasData = live.length > 0 || nextDays.length > 0 || recent.length > 0;
     if (!wcCampaign || !hasData) return;
     hasAutoOpened.current = true;
-    AsyncStorage.getItem(STORAGE_KEY).then((v) => {
-      if (v) {
-        const parsed = parseFloat(v);
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY),
+      AsyncStorage.getItem(STORAGE_KEY_OPEN),
+    ]).then(([posVal, openVal]) => {
+      if (posVal) {
+        const parsed = parseFloat(posVal);
         if (!Number.isNaN(parsed)) {
           const clamped = Math.max(cardMinY, Math.min(cardMaxY, parsed));
           lastY.current = clamped;
           dragY.setValue(clamped);
         }
       }
-      animateOpen();
+      // Respect saved preference — only skip auto-open if user explicitly closed it
+      if (openVal !== "0") animateOpen();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wcCampaign?.id, live.length, nextDays.length, recent.length]);
