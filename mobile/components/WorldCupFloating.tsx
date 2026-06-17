@@ -606,9 +606,9 @@ function makeStyles(isDark: boolean) {
       gap: 0,
     },
     miniChevronWrap: {
-      width: 22,
+      width: 16,
       height: 46,
-      alignItems: "center",
+      alignItems: "flex-end",
       justifyContent: "flex-start",
       paddingTop: 6,
     },
