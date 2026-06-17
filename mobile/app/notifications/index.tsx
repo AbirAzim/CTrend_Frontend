@@ -148,7 +148,9 @@ function navigateFromNotif(notif: GqlNotification) {
     return;
   }
   if (!notif.referenceId) return;
-  if (notif.referenceType === "Post" || notif.referenceType === "POST") {
+  if (notif.referenceType === "Fixture" || notif.referenceType === "FIXTURE") {
+    router.push(`/world-cup/match/${notif.referenceId}` as `/${string}`);
+  } else if (notif.referenceType === "Post" || notif.referenceType === "POST") {
     const suffix = notif.commentId ? `?commentId=${notif.commentId}` : "";
     router.push(`/post/${notif.referenceId}${suffix}` as `/${string}`);
   } else if (notif.referenceType === "User" || notif.referenceType === "USER") {

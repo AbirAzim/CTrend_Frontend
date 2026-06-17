@@ -265,6 +265,8 @@ const PROFILE_NOTIF_TYPES = new Set([
 const ANNOUNCEMENT_NOTIF_TYPES = new Set([
   "ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM",
 ]);
+// World Cup fixture notifications → open match detail screen.
+const FIXTURE_NOTIF_TYPES = new Set(["LINEUP_AVAILABLE", "MATCH_START", "MATCH_END"]);
 
 export function isAndroidUpdateNotification(data: NotifNavData): boolean {
   return (data.referenceType ?? "").toLowerCase() === "android_update_required";
@@ -304,6 +306,14 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
   const refType = (data.referenceType ?? "").toUpperCase();
   const postTarget = data.postId || (refType === "POST" ? data.referenceId : undefined) || null;
   const postRoute = (base: string) => (data.commentId ? `${base}?commentId=${data.commentId}` : base);
+
+  // World Cup fixture → match detail screen
+  if (FIXTURE_NOTIF_TYPES.has(nt) && data.referenceId) {
+    return `/world-cup/match/${data.referenceId}`;
+  }
+  if (refType === "FIXTURE" && data.referenceId) {
+    return `/world-cup/match/${data.referenceId}`;
+  }
 
   if (COMMENT_NOTIF_TYPES.has(nt) && postTarget) {
     return postRoute(`/comments/${postTarget}`);
