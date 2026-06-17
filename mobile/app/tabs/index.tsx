@@ -31,6 +31,7 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { CampaignBanner } from "../../components/CampaignBanner";
+import { WorldCupBanner } from "../../components/WorldCupBanner";
 import { FeedCampaignFilter } from "../../components/FeedCampaignFilter";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -410,6 +411,7 @@ export default function FeedScreen() {
                 selectedId={campaignId}
                 onSelect={(id) => router.setParams({ campaign: id ?? "" })}
               />
+              <WorldCupBanner />
               <CampaignBanner />
             </>
           }
