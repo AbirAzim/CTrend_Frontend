@@ -35,6 +35,46 @@ export const WORLD_CUP_FIXTURES = gql`
   }
 `;
 
+export const WORLD_CUP_FIXTURE_DETAILS = gql`
+  query WorldCupFixtureDetails($id: ID!) {
+    worldCupFixture(id: $id) {
+      id
+      externalId
+      homeTeam { name shortName crest }
+      awayTeam { name shortName crest }
+      kickoff
+      status
+      minute
+      stage
+      group
+      score { home away winner }
+      venue { name city }
+      campaignPostId
+      hasDrawOption
+      matchEndedAt
+      events {
+        time
+        timeExtra
+        team
+        type
+        detail
+        player { id name }
+        assist { id name }
+      }
+      lineups {
+        team
+        formation
+        startXI { id name number pos grid photo }
+        substitutes { id name number pos grid photo }
+        coach { id name photo }
+      }
+      stats { type home away }
+      playerRatings { playerId name team rating photo }
+      detailsSyncedAt
+    }
+  }
+`;
+
 export const SYNC_WORLD_CUP_FIXTURES = gql`
   mutation SyncWorldCupFixtures {
     syncWorldCupFixtures

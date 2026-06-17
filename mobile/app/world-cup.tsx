@@ -154,14 +154,18 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
   const awayWon = fixture.score.winner === "AWAY_TEAM";
   const canVote = canVoteOnFixture(fixture);
 
+  function handlePress() {
+    if (live || finished) {
+      router.push(`/world-cup/match/${fixture.id}` as `/${string}`);
+    } else if (fixture.campaignPostId) {
+      router.push(`/post/${fixture.campaignPostId}` as `/${string}`);
+    }
+  }
+
   return (
     <Pressable
-      style={[st.fixture, live && st.fixtureLive]}
-      onPress={() =>
-        fixture.campaignPostId
-          ? router.push(`/post/${fixture.campaignPostId}` as `/${string}`)
-          : undefined
-      }
+      style={[st.fixture, live && st.fixtureLive, (live || finished) && st.fixtureTappable]}
+      onPress={handlePress}
     >
       <View style={st.teamHome}>
         <Text style={[st.teamName, homeWon && st.teamWinner]} numberOfLines={1}>
@@ -463,6 +467,7 @@ function makeStyles(c: Palette) {
       marginBottom: 6,
     },
     fixtureLive: { borderColor: "rgba(239,68,68,0.5)" },
+    fixtureTappable: { opacity: 1 },
     teamHome: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8 },
     teamAway: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 8 },
     teamName: { fontSize: 13.5, fontWeight: "700", color: c.text, maxWidth: 90 },
