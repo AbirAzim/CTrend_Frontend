@@ -2329,7 +2329,7 @@ function FeedPostCardComponent({
 							return canOpenMatch ? (
 								<Pressable
 									style={({ pressed }) => [st.matchScoreBadge, pressed && { opacity: 0.7 }]}
-									onPress={(e) => { e.stopPropagation?.(); router.push(`/world-cup/match/${post.fixtureId}` as any); }}
+									onPress={(e) => { e.stopPropagation?.(); router.push(`/world-cup/match/${post.fixtureId}` as `/${string}`); }}
 									hitSlop={8}
 								>
 									{scoreContent}
@@ -3770,7 +3770,7 @@ function MatchDetailRow({ fixtureId, live }: { fixtureId: string; live: boolean 
 	return (
 		<Pressable
 			style={({ pressed }) => [matchRowStyles.row, pressed && matchRowStyles.pressed]}
-			onPress={() => router.push(`/world-cup/match/${fixtureId}` as any)}
+			onPress={() => router.push(`/world-cup/match/${fixtureId}` as `/${string}`)}
 		>
 			<Animated.Text style={[matchRowStyles.icon, { opacity: pulse }]}>⚽</Animated.Text>
 			<Text style={matchRowStyles.label}>

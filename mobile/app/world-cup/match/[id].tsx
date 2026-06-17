@@ -86,8 +86,8 @@ function deriveHalfScore(events: MatchEvent[]) {
 	let home = 0, away = 0;
 	for (const e of events) {
 		if (e.type !== 'Goal' || e.detail.toLowerCase().includes('disallow') || e.time > 45) continue;
-		if (e.detail.includes('Own Goal')) { e.team === 'home' ? away++ : home++; }
-		else { e.team === 'home' ? home++ : away++; }
+		if (e.detail.includes('Own Goal')) { if (e.team === 'home') { away++; } else { home++; } }
+		else { if (e.team === 'home') { home++; } else { away++; } }
 	}
 	return { home, away };
 }
@@ -96,7 +96,7 @@ function parseNum(v?: string | null) { return v ? parseFloat(v.replace('%', ''))
 // ─── Match header ─────────────────────────────────────────────────────────────
 
 function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
-	const { status, minute, score, events, homeTeam, awayTeam, venue, playerRatings } = fixture;
+	const { status, minute, score, events, homeTeam, awayTeam, playerRatings } = fixture;
 	const live = isLive(status);
 	const finished = isFinished(status);
 	const hasScore = live || finished;
@@ -392,7 +392,7 @@ const ov = StyleSheet.create({
 // ─── Lineup tab ───────────────────────────────────────────────────────────────
 
 function PitchPlayer({
-	player, ratingMap, isDark,
+	player, ratingMap,
 }: { player: LineupPlayer; ratingMap: Map<number, string>; isDark: boolean }) {
 	const [imgFailed, setImgFailed] = useState(false);
 	const rating = player.id != null ? ratingMap.get(player.id) : undefined;
@@ -606,7 +606,7 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 								<Text style={[lu2.mgmtTitle, { color: textSub }]}>MANAGEMENT</Text>
 							</View>
 							<View style={lu2.benchRow}>
-								{[{ l: homeL, team: homeTeam }, { l: awayL, team: awayTeam }].map(({ l, team }, idx) => {
+								{[{ l: homeL }, { l: awayL }].map(({ l }, idx) => {
 									if (!l?.coach) return <View key={idx} style={{ flex: 1 }} />;
 									return (
 										<View key={idx} style={[lu2.benchPlayer, idx === 1 && { flexDirection: 'row-reverse' }]}>
