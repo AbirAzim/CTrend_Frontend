@@ -150,6 +150,9 @@ export function WorldCupFloating() {
   // ── Title button glow animation (non-native — color interpolation) ────────
   const glowAnim = useRef(new Animated.Value(0)).current;
 
+  // ── Chevron bounce animation (mini tab hint) ──────────────────────────────
+  const chevronBounce = useRef(new Animated.Value(0)).current;
+
   function animateOpen() {
     setVisible(true);
     slideAnim.setValue(0);
@@ -245,6 +248,22 @@ export function WorldCupFloating() {
     return () => loop.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveFixture?.id]);
+
+  // Chevron bounce while mini tab is visible — hints "tap to open"
+  useEffect(() => {
+    chevronBounce.setValue(0);
+    if (visible) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1200),
+        Animated.timing(chevronBounce, { toValue: -6, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(chevronBounce, { toValue: 0, duration: 280, easing: Easing.out(Easing.bounce), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   // Glow the "open full schedule" button while card is visible
   useEffect(() => {
@@ -430,7 +449,9 @@ export function WorldCupFloating() {
           {...miniPan.panHandlers}
         >
           <Pressable style={st.miniTab} onPress={animateOpen} hitSlop={10}>
-            <Text style={st.miniChevron}>‹</Text>
+            <Animated.View style={[st.miniChevronWrap, { transform: [{ translateX: chevronBounce }] }]}>
+              <Text style={st.miniChevron}>‹</Text>
+            </Animated.View>
             <Image source={trophyAsset} style={st.miniTrophyImg} contentFit="contain" />
             {live.length > 0 && <View style={st.miniDot} />}
           </Pressable>
@@ -573,8 +594,8 @@ function makeStyles(isDark: boolean) {
     // Mini tab (closed state)
     miniTabOuter: {
       position: "absolute",
-      width: 60,
-      height: 44,
+      width: 70,
+      height: 46,
       zIndex: 1001,
     },
     miniTab: {
@@ -582,16 +603,23 @@ function makeStyles(isDark: boolean) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "flex-end",
-      gap: 2,
+      gap: 0,
+    },
+    miniChevronWrap: {
+      width: 22,
+      height: 46,
+      alignItems: "center",
+      justifyContent: "flex-start",
+      paddingTop: 6,
     },
     miniChevron: {
       fontSize: 22,
       fontWeight: "900",
       color: isDark ? "#93c5fd" : "#3b82f6",
       includeFontPadding: false,
-      textAlignVertical: "center",
+      lineHeight: 22,
     },
-    miniTrophyImg: { width: 38, height: 38 },
+    miniTrophyImg: { width: 46, height: 46 },
     miniDot: {
       position: "absolute",
       top: 4,
