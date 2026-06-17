@@ -2308,11 +2308,13 @@ function FeedPostCardComponent({
 								<View style={st.metaRow}>{nodes}</View>
 							) : null;
 						})()}
-						{post.matchScore && post.matchScore.status !== 'TIMED' ? (
-							<View style={st.matchScoreBadge}>
-								{post.matchScore.status === 'IN_PLAY' ? <LiveDot /> : null}
-								<Text style={st.matchScoreText}>
-									{(() => {
+						{post.matchScore && post.matchScore.status !== 'TIMED' ? (() => {
+							const canOpenMatch = Boolean(post.fixtureId) && (isMatchFinished || isLiveMatch || Boolean(post.lineupAvailable));
+							const scoreContent = (
+								<>
+									{post.matchScore.status === 'IN_PLAY' ? <LiveDot /> : null}
+									<Text style={st.matchScoreText}>
+										{(() => {
 											const teamA = post.postOptions?.[0]?.label?.trim() || null;
 											const teamB = post.postOptions?.[1]?.label?.trim() || null;
 											const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
@@ -2321,9 +2323,21 @@ function FeedPostCardComponent({
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 										})()}
-								</Text>
-							</View>
-						) : null}
+									</Text>
+								</>
+							);
+							return canOpenMatch ? (
+								<Pressable
+									style={({ pressed }) => [st.matchScoreBadge, pressed && { opacity: 0.7 }]}
+									onPress={(e) => { e.stopPropagation?.(); router.push(`/world-cup/match/${post.fixtureId}` as any); }}
+									hitSlop={8}
+								>
+									{scoreContent}
+								</Pressable>
+							) : (
+								<View style={st.matchScoreBadge}>{scoreContent}</View>
+							);
+						})() : null}
 					</View>
 				</Pressable>
 				{isAuthenticated ? (
@@ -2841,6 +2855,13 @@ function FeedPostCardComponent({
 							: '🏆 Revealing winner…'}
 					</Text>
 				</View>
+			) : null}
+
+			{isMatchPost && post.fixtureId && (isMatchFinished || isLiveMatch || post.lineupAvailable) ? (
+				<MatchDetailRow
+					fixtureId={post.fixtureId}
+					live={isLiveMatch}
+				/>
 			) : null}
 
 			{(() => {
@@ -3731,4 +3752,47 @@ const matchInProgressStyles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#f97316',
 	},
+});
+
+function MatchDetailRow({ fixtureId, live }: { fixtureId: string; live: boolean }) {
+	const pulse = useRef(new Animated.Value(1)).current;
+	useEffect(() => {
+		const anim = Animated.loop(
+			Animated.sequence([
+				Animated.timing(pulse, { toValue: 0.4, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+				Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+			]),
+		);
+		anim.start();
+		return () => anim.stop();
+	}, [pulse]);
+
+	return (
+		<Pressable
+			style={({ pressed }) => [matchRowStyles.row, pressed && matchRowStyles.pressed]}
+			onPress={() => router.push(`/world-cup/match/${fixtureId}` as any)}
+		>
+			<Animated.Text style={[matchRowStyles.icon, { opacity: pulse }]}>⚽</Animated.Text>
+			<Text style={matchRowStyles.label}>
+				{live ? 'Live match stats & lineups' : 'Full match report & lineups'}
+			</Text>
+			<Text style={matchRowStyles.arrow}>›</Text>
+		</Pressable>
+	);
+}
+
+const matchRowStyles = StyleSheet.create({
+	row: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		paddingHorizontal: 16,
+		paddingVertical: 13,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: 'rgba(100,116,139,0.25)',
+	},
+	pressed: { backgroundColor: 'rgba(100,116,139,0.08)' },
+	icon: { fontSize: 16 },
+	label: { flex: 1, fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+	arrow: { fontSize: 18, fontWeight: '700', color: 'rgba(148,163,184,0.5)' },
 });

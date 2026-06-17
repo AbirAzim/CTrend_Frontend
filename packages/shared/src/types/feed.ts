@@ -99,6 +99,10 @@ export type FeedPostView = {
   } | null;
   /** ISO timestamp when the campaign winner will be revealed after match ends. */
   fixtureWinnerAt?: string | null;
+  /** World Cup fixture ID — present on match posts. Used to navigate to MatchDetailPage. */
+  fixtureId?: string | null;
+  /** True once lineups have been published for this fixture. */
+  lineupAvailable?: boolean | null;
 };
 
 export type FeedPostCampaignView = {

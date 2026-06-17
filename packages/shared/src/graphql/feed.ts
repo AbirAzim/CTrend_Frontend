@@ -46,6 +46,8 @@ export const POST_VOTE_WINNER_FIELDS = `
     status
     minute
   }
+  fixtureId
+  lineupAvailable
   fixtureWinnerAt
 `;
 

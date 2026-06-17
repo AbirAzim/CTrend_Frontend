@@ -21632,6 +21632,11 @@ a.cx-profile-btn-accent {
 .wcb-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
 /* ── Match Details row (.cx-mdb-row) ────────────────────────────────────── */
+@keyframes cx-mdb-icon-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.88); }
+}
+
 .cx-mdb-row {
   display: flex;
   align-items: center;
@@ -21650,7 +21655,13 @@ a.cx-profile-btn-accent {
 .cx-mdb-row:hover .cx-mdb-row-arrow { transform: translateX(3px); }
 .cx-mdb-row:active { background: rgb(var(--cx-ink-rgb) / 0.08); }
 
-.cx-mdb-row-icon { font-size: 1rem; flex-shrink: 0; line-height: 1; }
+.cx-mdb-row-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  line-height: 1;
+  animation: cx-mdb-icon-pulse 2.2s ease-in-out infinite;
+}
+.cx-mdb-row:hover .cx-mdb-row-icon { animation-play-state: paused; opacity: 1; transform: scale(1); }
 .cx-mdb-row-label {
   flex: 1;
   font-size: 0.82rem;
