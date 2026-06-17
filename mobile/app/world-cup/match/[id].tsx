@@ -136,7 +136,7 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 			{/* Teams + score */}
 			<View style={mh.teamsRow}>
 				{/* Home */}
-				<View style={[mh.teamBlock, { opacity: hasScore && awayWon ? 0.5 : 1 }]}>
+				<View style={mh.teamBlock}>
 					{homeTeam.crest
 						? <Image source={{ uri: homeTeam.crest }} style={mh.flag} contentFit='contain' />
 						: <View style={[mh.flagPh, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}><Text style={{ fontSize: 9, color: textMuted }}>{homeTeam.shortName?.slice(0,3)}</Text></View>
@@ -161,7 +161,7 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 				</View>
 
 				{/* Away */}
-				<View style={[mh.teamBlock, { opacity: hasScore && homeWon ? 0.5 : 1 }]}>
+				<View style={mh.teamBlock}>
 					{awayTeam.crest
 						? <Image source={{ uri: awayTeam.crest }} style={mh.flag} contentFit='contain' />
 						: <View style={[mh.flagPh, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}><Text style={{ fontSize: 9, color: textMuted }}>{awayTeam.shortName?.slice(0,3)}</Text></View>
@@ -304,16 +304,20 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 				// Sub: player = coming on, assist = going off
 				const subOut = isSub && assistName ? shortName(assistName) : null;
 
-				// Goal icon
+				// Icon emoji + optional text badge
 				let icon = '·';
+				let badge: { label: string; bg: string } | null = null;
 				if (isGoal) {
-					icon = e.detail.includes('Own Goal') ? '⚽ OG' : e.detail.includes('Penalty') ? '⚽ P' : '⚽';
+					icon = '⚽';
+					if (e.detail.includes('Own Goal')) badge = { label: 'OG', bg: '#f97316' };
+					else if (e.detail.includes('Penalty')) badge = { label: 'P', bg: '#f59e0b' };
 				} else if (isSub) {
 					icon = '↕';
 				} else if (e.type === 'Card') {
 					icon = e.detail.toLowerCase().includes('red') || e.detail.includes('Second Yellow') ? '🟥' : '🟨';
 				} else if (e.type === 'Var') {
-					icon = 'VAR';
+					icon = '';
+					badge = { label: 'VAR', bg: '#3b82f6' };
 				}
 
 				return (
@@ -337,7 +341,14 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 									<Text style={ov.subOut}>▼</Text>
 								</View>
 							) : (
-								<Text style={ov.evIcon}>{icon}</Text>
+								<View style={ov.evIconWrap}>
+									{icon ? <Text style={ov.evIcon}>{icon}</Text> : null}
+									{badge ? (
+										<View style={[ov.evBadge, { backgroundColor: badge.bg }]}>
+											<Text style={ov.evBadgeTxt}>{badge.label}</Text>
+										</View>
+									) : null}
+								</View>
 							)}
 							<Text style={[ov.evMin, { color: textSub }]}>{minuteLabel(e)}</Text>
 						</View>
@@ -368,7 +379,10 @@ const ov = StyleSheet.create({
 	evName: { fontSize: 13, fontWeight: '700' },
 	evSubText: { fontSize: 11.5 },
 	evCenter: { width: 62, alignItems: 'center', gap: 3 },
+	evIconWrap: { alignItems: 'center', gap: 2 },
 	evIcon: { fontSize: 14 },
+	evBadge: { borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+	evBadgeTxt: { fontSize: 9.5, fontWeight: '800', color: '#fff' },
 	evMin: { fontSize: 11, fontWeight: '700' },
 	subIconWrap: { alignItems: 'center' },
 	subIn: { fontSize: 11, color: '#22c55e', fontWeight: '700', lineHeight: 14 },

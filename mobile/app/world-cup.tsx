@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
@@ -146,10 +146,9 @@ function TeamCrest({ crest, name, size = 26 }: { crest: string; name: string; si
   );
 }
 
-function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof makeStyles> }) {
+function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnType<typeof makeStyles>; isDark: boolean }) {
   const live = isLive(fixture);
   const finished = isFinished(fixture);
-  const hasScore = live || finished;
   const homeWon = fixture.score.winner === "HOME_TEAM";
   const awayWon = fixture.score.winner === "AWAY_TEAM";
   const canVote = canVoteOnFixture(fixture);
@@ -162,46 +161,100 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
     }
   }
 
+  const dimColor = isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.28)";
+  const winColor = isDark ? "#f1f5f9" : "#0f172a";
+  const normalColor = isDark ? "#cbd5e1" : "#334155";
+  const accentBlue = isDark ? "#60a5fa" : "#3b82f6";
+
+  // ── Results row: centered score, home left, away right ──
+  if (finished) {
+    return (
+      <Pressable style={[st.fixture, st.fixtureResult]} onPress={handlePress}>
+        {/* Home */}
+        <View style={st.frHome}>
+          <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} size={20} />
+          <Text style={[st.frTeamName, { color: homeWon ? winColor : dimColor, fontWeight: homeWon ? "800" : "500" }]} numberOfLines={1}>
+            {fixture.homeTeam.shortName}
+          </Text>
+        </View>
+        {/* Score */}
+        <View style={st.frScoreBlock}>
+          <Text style={st.frScore}>
+            <Text style={{ color: homeWon ? accentBlue : normalColor }}>{fixture.score.home ?? "–"}</Text>
+            <Text style={{ color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)" }}> – </Text>
+            <Text style={{ color: awayWon ? accentBlue : normalColor }}>{fixture.score.away ?? "–"}</Text>
+          </Text>
+          <Text style={st.frFT}>FT</Text>
+        </View>
+        {/* Away */}
+        <View style={st.frAway}>
+          <Text style={[st.frTeamName, { color: awayWon ? winColor : dimColor, fontWeight: awayWon ? "800" : "500", textAlign: "right" }]} numberOfLines={1}>
+            {fixture.awayTeam.shortName}
+          </Text>
+          <TeamCrest crest={fixture.awayTeam.crest} name={fixture.awayTeam.name} size={20} />
+        </View>
+      </Pressable>
+    );
+  }
+
+  // ── Live row ──
+  if (live) {
+    return (
+      <Pressable style={[st.fixture, st.fixtureLive]} onPress={handlePress}>
+        <View style={st.frHome}>
+          <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} size={20} />
+          <Text style={[st.frTeamName, { color: normalColor }]} numberOfLines={1}>
+            {fixture.homeTeam.shortName}
+          </Text>
+        </View>
+        <View style={st.frScoreBlock}>
+          <View style={st.livePillRow}>
+            <View style={st.liveDotSmall} />
+            <Text style={st.livePillText}>{liveBadgeLabel(fixture)}</Text>
+          </View>
+          <Text style={st.frScore}>
+            <Text style={{ color: winColor }}>{fixture.score.home ?? 0}</Text>
+            <Text style={{ color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)" }}> – </Text>
+            <Text style={{ color: winColor }}>{fixture.score.away ?? 0}</Text>
+          </Text>
+        </View>
+        <View style={st.frAway}>
+          <Text style={[st.frTeamName, { color: normalColor, textAlign: "right" }]} numberOfLines={1}>
+            {fixture.awayTeam.shortName}
+          </Text>
+          <TeamCrest crest={fixture.awayTeam.crest} name={fixture.awayTeam.name} size={20} />
+        </View>
+      </Pressable>
+    );
+  }
+
+  // ── Upcoming row: teams left, time+countdown right ──
   return (
     <Pressable
-      style={[st.fixture, live && st.fixtureLive, (live || finished) && st.fixtureTappable]}
-      onPress={handlePress}
+      style={st.fixture}
+      onPress={fixture.campaignPostId ? handlePress : undefined}
     >
-      <View style={st.teamHome}>
-        <Text style={[st.teamName, homeWon && st.teamWinner]} numberOfLines={1}>
+      {/* Teams side */}
+      <View style={st.frTeams}>
+        <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} size={20} />
+        <Text style={[st.frTeamName, { color: normalColor }]} numberOfLines={1}>
           {fixture.homeTeam.shortName}
         </Text>
-        <TeamCrest crest={fixture.homeTeam.crest} name={fixture.homeTeam.name} />
+        <Text style={st.frVs}>v</Text>
+        <Text style={[st.frTeamName, { color: normalColor }]} numberOfLines={1}>
+          {fixture.awayTeam.shortName}
+        </Text>
+        <TeamCrest crest={fixture.awayTeam.crest} name={fixture.awayTeam.name} size={20} />
       </View>
-
-      <View style={st.center}>
-        {live ? (
-          <Text style={st.liveBadge}>{liveBadgeLabel(fixture)}</Text>
-        ) : finished ? (
-          <Text style={st.ftBadge}>FT</Text>
-        ) : null}
-        {hasScore ? (
-          <Text style={st.score}>
-            {fixture.score.home ?? "–"} : {fixture.score.away ?? "–"}
-          </Text>
-        ) : (
-          <>
-            <Text style={st.kickoffTime}>{formatTime(fixture.kickoff)}</Text>
-            <Text style={st.kickoffCountdown}>{countdownToKickoff(fixture.kickoff)}</Text>
-          </>
-        )}
+      {/* Time side */}
+      <View style={st.frTimeBlock}>
+        <Text style={st.kickoffTime}>{formatTime(fixture.kickoff)}</Text>
+        <Text style={st.kickoffCountdown}>{countdownToKickoff(fixture.kickoff)}</Text>
         {canVote ? (
           <View style={st.voteChip}>
             <Text style={st.voteChipText}>Vote</Text>
           </View>
         ) : null}
-      </View>
-
-      <View style={st.teamAway}>
-        <TeamCrest crest={fixture.awayTeam.crest} name={fixture.awayTeam.name} />
-        <Text style={[st.teamName, awayWon && st.teamWinner]} numberOfLines={1}>
-          {fixture.awayTeam.shortName}
-        </Text>
       </View>
     </Pressable>
   );
@@ -210,12 +263,14 @@ function FixtureRow({ fixture, st }: { fixture: WcFixture; st: ReturnType<typeof
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function WorldCupScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const followed = useFollowedTeam();
   const st = makeStyles(colors);
   const [, setTick] = useState(0);
-  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">("fixtures");
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initTab = params.tab === "results" || params.tab === "standings" ? params.tab : "fixtures";
+  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">(initTab);
 
   const { data, loading, error } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
     fetchPolicy: "cache-and-network",
@@ -330,7 +385,7 @@ export default function WorldCupScreen() {
               <View>
                 <Text style={st.sectionTitle}>🔴 Live now</Text>
                 {live.map((f) => (
-                  <FixtureRow key={f.id} fixture={f} st={st} />
+                  <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />
                 ))}
               </View>
             )}
@@ -342,7 +397,7 @@ export default function WorldCupScreen() {
                   <View key={g.key}>
                     <Text style={st.dayTitle}>{g.label}</Text>
                     {g.fixtures.map((f) => (
-                      <FixtureRow key={f.id} fixture={f} st={st} />
+                      <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />
                     ))}
                   </View>
                 ))}
@@ -360,7 +415,7 @@ export default function WorldCupScreen() {
                     <View key={stage} style={{ marginBottom: 10 }}>
                       <Text style={st.stageTitle}>{WC_STAGE_LABELS[stage] ?? stage}</Text>
                       {stageFixtures.map((f) => (
-                        <FixtureRow key={f.id} fixture={f} st={st} />
+                        <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />
                       ))}
                     </View>
                   );
@@ -379,7 +434,7 @@ export default function WorldCupScreen() {
             {recent.length === 0 ? (
               <Text style={st.statusMsg}>No results yet.</Text>
             ) : (
-              recent.map((f) => <FixtureRow key={f.id} fixture={f} st={st} />)
+              recent.map((f) => <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />)
             )}
           </>
         )}
@@ -466,8 +521,23 @@ function makeStyles(c: Palette) {
       paddingHorizontal: 10,
       marginBottom: 6,
     },
-    fixtureLive: { borderColor: "rgba(239,68,68,0.5)" },
+    fixtureLive: { borderColor: "rgba(239,68,68,0.45)", borderWidth: 1.5 },
+    fixtureResult: {},
     fixtureTappable: { opacity: 1 },
+    // New row layouts
+    frTeams: { flex: 1, flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "nowrap" },
+    frTeamName: { fontSize: 13, fontWeight: "700", flexShrink: 1 },
+    frVs: { fontSize: 10.5, color: c.muted, fontWeight: "600", marginHorizontal: 2 },
+    frTimeBlock: { alignItems: "flex-end", gap: 2, minWidth: 70 },
+    frHome: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+    frAway: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 6 },
+    frScoreBlock: { alignItems: "center", paddingHorizontal: 10, gap: 1 },
+    frScore: { fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+    frFT: { fontSize: 9.5, fontWeight: "700", color: c.muted, letterSpacing: 0.3 },
+    livePillRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+    liveDotSmall: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#ef4444" },
+    livePillText: { fontSize: 10, fontWeight: "800", color: "#ef4444" },
+    // Legacy — kept for standings etc
     teamHome: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8 },
     teamAway: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 8 },
     teamName: { fontSize: 13.5, fontWeight: "700", color: c.text, maxWidth: 90 },
@@ -477,8 +547,8 @@ function makeStyles(c: Palette) {
     ftBadge: { fontSize: 9, fontWeight: "800", color: c.muted },
     score: { fontSize: 17, fontWeight: "800", color: c.text },
     kickoffTime: { fontSize: 13, fontWeight: "800", color: c.text },
-    kickoffCountdown: { fontSize: 10, fontWeight: "600", color: c.muted },
-    voteChip: { backgroundColor: c.accent, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, marginTop: 3 },
+    kickoffCountdown: { fontSize: 10.5, fontWeight: "600", color: c.muted },
+    voteChip: { backgroundColor: c.accent, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, marginTop: 2 },
     voteChipText: { color: "#fff", fontSize: 10.5, fontWeight: "800" },
     // ── Standings ──────────────────────────────────────────────────────────────
     standingsLegend: { flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 4 },
