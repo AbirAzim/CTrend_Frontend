@@ -2200,7 +2200,6 @@ function FeedPostCardComponent({
 	const matchStatus = post.matchScore?.status ?? null;
 	const isMatchFinished = matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN' || matchStatus === 'AWARDED' || matchStatus === 'FINISHED';
 	const isMatchNotStarted = !isLiveMatch && !isMatchFinished; // NS, TIMED, null, etc.
-	const showMatchLive = isMatchPost && isLiveMatch;
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
 	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
