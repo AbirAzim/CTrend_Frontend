@@ -485,15 +485,7 @@ export function FeedPage() {
     setSearchParams(next, { replace: true });
   }
 
-  function getActiveTab(f: FeedFilter) {
-    if (f === "campaign" || f.startsWith("campaign:") || f === "platform") return "spotlight";
-    if (f === "community" || f === "friend") return "social";
-    return "all";
-  }
-  const activeTab = getActiveTab(feedFilter);
-  const isSpotlightActive = activeTab === "spotlight";
-  const isSocialActive = activeTab === "social";
-  const isCampaignSub = isSpotlightActive && feedFilter !== "platform";
+  const activeTab = feedFilter === "community" ? "community" : "all";
 
   const filterTabs = [
     {
@@ -508,19 +500,9 @@ export function FeedPage() {
       ),
     },
     {
-      id: "spotlight",
-      label: "Spotlight",
-      tabKey: "spotlight",
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-        </svg>
-      ),
-    },
-    {
-      id: "social",
-      label: "Social",
-      tabKey: "social",
+      id: "community",
+      label: "Community",
+      tabKey: "community",
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="9" cy="7" r="3"/><path d="M3 20 C3 16.7 5.7 14 9 14"/><circle cx="17" cy="9" r="2.5"/>
@@ -596,8 +578,7 @@ export function FeedPage() {
                     aria-selected={active}
                     className={`ff-tab${active ? " ff-tab--active" : ""}`}
                     onClick={() => {
-                      if (id === "spotlight") setFeedFilter("campaign");
-                      else if (id === "social") setFeedFilter("community");
+                      if (id === "community") setFeedFilter("community");
                       else setFeedFilter("all");
                     }}
                   >
@@ -607,59 +588,6 @@ export function FeedPage() {
                 );
               })}
             </div>
-            {/* Full-width sub-row — slides in below tabs when Spotlight or Social is active */}
-            {isSpotlightActive && (
-              <div className="ff-subrow" key="spotlight-sub">
-                <button
-                  type="button"
-                  className={`ff-sub-btn${feedFilter === "platform" ? " ff-sub-btn--on" : ""}`}
-                  onClick={() => setFeedFilter("platform")}
-                >
-                  <svg className="ff-sub-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M12 3l1.5 4.5H18l-3.75 2.75L15.75 15 12 12.25 8.25 15l1.5-4.75L6 7.5h4.5L12 3z"/>
-                  </svg>
-                  <span>Curated</span>
-                  {feedFilter === "platform" && <span className="ff-sub-indicator" />}
-                </button>
-                <button
-                  type="button"
-                  className={`ff-sub-btn${isCampaignSub ? " ff-sub-btn--on" : ""}`}
-                  onClick={() => setFeedFilter("campaign")}
-                >
-                  <svg className="ff-sub-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M22 3L22 16L4 12L4 7Z"/><path d="M4 9.5L4 18C4 19.1 4.9 20 6 20L8 20C9.1 20 10 19.1 10 18L10 14"/>
-                  </svg>
-                  <span>Campaigns</span>
-                  {isCampaignSub && <span className="ff-sub-indicator" />}
-                </button>
-              </div>
-            )}
-            {isSocialActive && (
-              <div className="ff-subrow" key="social-sub">
-                <button
-                  type="button"
-                  className={`ff-sub-btn${feedFilter === "community" ? " ff-sub-btn--on" : ""}`}
-                  onClick={() => setFeedFilter("community")}
-                >
-                  <svg className="ff-sub-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <circle cx="9" cy="7" r="3"/><path d="M3 20C3 16.7 5.7 14 9 14"/><circle cx="17" cy="9" r="2.5"/><path d="M12 20C12 17 14.2 14.8 17 14.8C19.8 14.8 22 17 22 20"/>
-                  </svg>
-                  <span>Community</span>
-                  {feedFilter === "community" && <span className="ff-sub-indicator" />}
-                </button>
-                <button
-                  type="button"
-                  className={`ff-sub-btn${feedFilter === "friend" ? " ff-sub-btn--on" : ""}`}
-                  onClick={() => setFeedFilter("friend")}
-                >
-                  <svg className="ff-sub-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M20.8 4.6C19.6 3.4 18 2.7 16.2 2.7C14.5 2.7 12.9 3.4 11.8 4.6L12 4.8L12.2 4.6C11 3.4 9.5 2.7 7.8 2.7C6 2.7 4.4 3.4 3.2 4.6C0.8 7 0.8 10.9 3.2 13.3L12 21.3L20.8 13.3C23.2 10.9 23.2 7 20.8 4.6Z"/>
-                  </svg>
-                  <span>Friends</span>
-                  {feedFilter === "friend" && <span className="ff-sub-indicator" />}
-                </button>
-              </div>
-            )}
           </div>
         </div>
 

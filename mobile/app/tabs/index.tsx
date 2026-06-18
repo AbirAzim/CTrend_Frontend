@@ -143,19 +143,15 @@ export default function FeedScreen() {
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
+  const filterVisible = useRef(true);
   const [filterBarHeight, setFilterBarHeight] = useState(50);
+  const filterBarHeightRef = useRef(50);
 
   // Stable animated nodes — created once, never recreated (native driver requirement).
   const scrollY = useRef(new Animated.Value(0)).current;
-  // Direct interpolation: filter slides up as user scrolls away from top,
-  // returns when scrolling back. Simple, reliable, fully native-driver compatible.
-  const filterTranslateY = useRef(
-    scrollY.interpolate({
-      inputRange: [0, 100],
-      outputRange: [0, -100],
-      extrapolate: 'clamp',
-    })
-  ).current;
+  // Direction-based filter animation — same mechanism as bottom nav but inverted:
+  // scroll DOWN → filter shows, scroll UP → filter hides.
+  const filterTranslateY = useRef(new Animated.Value(0)).current;
   // Infinite scroll: guard against overlapping/needless page fetches.
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -195,19 +191,34 @@ export default function FeedScreen() {
     lastScrollY.current = y;
 
     if (y < 60) {
+      // At top: restore both bars
       if (!tabBarVisible.current) {
         tabBarVisible.current = true;
         Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
       }
+      if (!filterVisible.current) {
+        filterVisible.current = true;
+        Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      }
       return;
     }
 
+    // Bottom nav: hides on scroll down, shows on scroll up
     if (diff > 4 && tabBarVisible.current) {
       tabBarVisible.current = false;
       Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start();
     } else if (diff < -4 && !tabBarVisible.current) {
       tabBarVisible.current = true;
       Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    }
+
+    // Filter bar: inverted — shows on scroll down, hides on scroll up
+    if (diff > 4 && !filterVisible.current) {
+      filterVisible.current = true;
+      Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    } else if (diff < -4 && filterVisible.current) {
+      filterVisible.current = false;
+      Animated.timing(filterTranslateY, { toValue: -filterBarHeightRef.current, duration: 200, useNativeDriver: true }).start();
     }
   }
 
@@ -246,7 +257,9 @@ export default function FeedScreen() {
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
     scrollY.setValue(0);
-  }, [feedFilter, scrollY]);
+    filterTranslateY.setValue(0);
+    filterVisible.current = true;
+  }, [feedFilter, scrollY, filterTranslateY]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
   // always feels like it has more — no visible "loading" at the end.
@@ -404,7 +417,11 @@ export default function FeedScreen() {
             styles.filterBarAbsolute,
             { transform: [{ translateY: filterTranslateY }], backgroundColor: colors.topbar },
           ]}
-          onLayout={(e) => setFilterBarHeight(e.nativeEvent.layout.height)}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            setFilterBarHeight(h);
+            filterBarHeightRef.current = h;
+          }}
         >
           <FeedCampaignFilter
             activeFilter={feedFilter}
