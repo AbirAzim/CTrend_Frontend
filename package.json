@@ -4,8 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "mobile"
+    "packages/*"
   ],
   "scripts": {
     "postinstall": "node mobile/scripts/setup-secrets.js",
@@ -27,9 +26,7 @@
     "graphql-ws": "^6.0.8",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.14.0",
-    "expo": "~56.0.6",
-    "react-native": "0.85.3"
+    "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
