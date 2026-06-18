@@ -469,7 +469,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			paddingTop: 16,
 			paddingBottom: 9,
 			paddingHorizontal: 8,
-			backgroundColor: 'rgba(15,23,42,0.6)',
 			alignItems: 'center' as const,
 		},
 		// Percentage shown inside a glassy rounded pill (web `ig-compare-pct-main`).

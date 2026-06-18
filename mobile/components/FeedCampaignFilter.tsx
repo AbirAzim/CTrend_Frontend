@@ -1,71 +1,95 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 type Props = {
-	activeFilter: string; // "all" | "campaign" | "campaign:{id}" | "platform" | "community" | "friend"
+	activeFilter: string;
 	onFilterChange: (filter: string) => void;
 	campaignOptions?: { id: string; name: string }[];
 };
 
-type TabDef = {
+type SubItem = {
 	key: string;
 	label: string;
 	icon: keyof typeof Ionicons.glyphMap;
+	filter: string;
 };
 
-const TABS: TabDef[] = [
-	{ key: 'all', label: 'All', icon: 'apps-outline' },
-	{ key: 'campaign', label: 'Campaign', icon: 'megaphone-outline' },
-	{ key: 'platform', label: 'Platform', icon: 'globe-outline' },
-	{ key: 'community', label: 'Community', icon: 'people-outline' },
-	{ key: 'friend', label: 'Friends', icon: 'heart-outline' },
+const SUB_ITEMS: Record<string, SubItem[]> = {
+	spotlight: [
+		{ key: 'curated', label: 'Curated', icon: 'sparkles-outline', filter: 'platform' },
+		{ key: 'campaigns', label: 'Campaigns', icon: 'megaphone-outline', filter: 'campaign' },
+	],
+	social: [
+		{ key: 'community', label: 'Community', icon: 'people-circle-outline', filter: 'community' },
+		{ key: 'friends', label: 'Friends', icon: 'heart-outline', filter: 'friend' },
+	],
+};
+
+const TABS = [
+	{ key: 'all', label: 'All', icon: 'apps-outline' as keyof typeof Ionicons.glyphMap },
+	{ key: 'spotlight', label: 'Spotlight', icon: 'star-outline' as keyof typeof Ionicons.glyphMap },
+	{ key: 'social', label: 'Social', icon: 'people-outline' as keyof typeof Ionicons.glyphMap },
 ];
 
-/** Full-width 5-tab feed filter bar. Always visible — not collapsible. */
-export function FeedCampaignFilter({ activeFilter, onFilterChange, campaignOptions }: Props) {
-	const { colors } = useTheme();
+function getActiveTab(filter: string): string {
+	if (filter === 'campaign' || filter.startsWith('campaign:') || filter === 'platform') return 'spotlight';
+	if (filter === 'community' || filter === 'friend') return 'social';
+	return 'all';
+}
 
-	// The active "base" tab — campaign:{id} maps to "campaign"
-	const activeTab = activeFilter.startsWith('campaign:') ? 'campaign' : activeFilter;
-	// Active campaign id for sub-filter
-	const activeCampaignId = activeFilter.startsWith('campaign:')
-		? activeFilter.slice('campaign:'.length)
-		: null;
+function isSubActive(item: SubItem, activeFilter: string): boolean {
+	if (item.filter === 'campaign') return activeFilter === 'campaign' || activeFilter.startsWith('campaign:');
+	return activeFilter === item.filter;
+}
 
-	const isCampaignMode = activeTab === 'campaign';
-	const hasCampaignPills = isCampaignMode && campaignOptions && campaignOptions.length > 0;
+export function FeedCampaignFilter({ activeFilter, onFilterChange }: Props) {
+	const { colors, isDark } = useTheme();
+	const activeTab = getActiveTab(activeFilter);
+	const subItems = SUB_ITEMS[activeTab] ?? null;
+
+	// Animate sub-row in/out
+	const subAnim = useRef(new Animated.Value(subItems ? 1 : 0)).current;
+	const prevTab = useRef(activeTab);
+
+	useEffect(() => {
+		if (prevTab.current !== activeTab) {
+			prevTab.current = activeTab;
+			if (subItems) {
+				subAnim.setValue(0);
+				Animated.spring(subAnim, {
+					toValue: 1,
+					useNativeDriver: true,
+					damping: 18,
+					stiffness: 260,
+				}).start();
+			} else {
+				Animated.timing(subAnim, {
+					toValue: 0,
+					duration: 140,
+					useNativeDriver: true,
+				}).start();
+			}
+		}
+	}, [activeTab, subItems, subAnim]);
 
 	function handleTabPress(key: string) {
-		if (key === 'campaign') {
-			// Default to "campaign" (all campaigns) when tapping the Campaign tab
-			onFilterChange('campaign');
-		} else {
-			onFilterChange(key);
-		}
-	}
-
-	function handleCampaignPill(id: string | null) {
-		if (id === null) {
-			onFilterChange('campaign');
-		} else {
-			onFilterChange(`campaign:${id}`);
-		}
+		if (key === 'spotlight') onFilterChange('campaign');
+		else if (key === 'social') onFilterChange('community');
+		else onFilterChange('all');
 	}
 
 	return (
 		<View style={[styles.container, { backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
-			{/* Tab row */}
+			{/* Main tab row */}
 			<View style={styles.tabRow}>
-				{TABS.map((tab) => {
+				{TABS.flatMap((tab, index) => {
 					const isActive = activeTab === tab.key;
-					return (
+					const items = [
 						<TouchableOpacity
 							key={tab.key}
-							style={[
-								styles.tab,
-								isActive && { backgroundColor: colors.accent + '22' },
-							]}
+							style={styles.tab}
 							onPress={() => handleTabPress(tab.key)}
 							activeOpacity={0.7}
 							accessibilityRole="tab"
@@ -73,78 +97,85 @@ export function FeedCampaignFilter({ activeFilter, onFilterChange, campaignOptio
 						>
 							<Ionicons
 								name={tab.icon}
-								size={18}
-								color={isActive ? colors.accent : colors.muted}
+								size={17}
+								color={isActive ? (isDark ? '#ffffff' : colors.text) : (isDark ? '#71717a' : colors.muted)}
 							/>
 							<Text
 								style={[
 									styles.tabLabel,
-									{ color: isActive ? colors.accent : colors.muted },
+									{ color: isActive ? (isDark ? '#ffffff' : colors.text) : (isDark ? '#71717a' : colors.muted) },
 									isActive && styles.tabLabelActive,
 								]}
 								numberOfLines={1}
 							>
 								{tab.label}
 							</Text>
-						</TouchableOpacity>
-					);
+							{isActive && (
+								<View style={[styles.tabIndicator, { backgroundColor: colors.accent }]} />
+							)}
+						</TouchableOpacity>,
+					];
+					if (index < TABS.length - 1) {
+						items.push(
+							<View key={`div-${tab.key}`} style={[styles.tabDivider, { backgroundColor: colors.border }]} />
+						);
+					}
+					return items;
 				})}
 			</View>
 
-			{/* Campaign sub-filter pills */}
-			{hasCampaignPills ? (
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					style={styles.pillScroll}
-					contentContainerStyle={styles.pillContainer}
+			{/* Sub-row — full width, slides in below when a grouped tab is active */}
+			{subItems ? (
+				<Animated.View
+					style={[
+						styles.subRow,
+						{ borderTopColor: colors.border },
+						{
+							opacity: subAnim,
+							transform: [{ translateY: subAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+						},
+					]}
 				>
-					{/* "All campaigns" pill */}
-					<TouchableOpacity
-						style={[
-							styles.pill,
-							{ borderColor: colors.accent },
-							activeCampaignId === null && { backgroundColor: colors.accent },
-						]}
-						onPress={() => handleCampaignPill(null)}
-						activeOpacity={0.75}
-					>
-						<Text
-							style={[
-								styles.pillText,
-								{ color: activeCampaignId === null ? '#fff' : colors.accent },
-							]}
-						>
-							All campaigns
-						</Text>
-					</TouchableOpacity>
-
-					{campaignOptions!.map((c) => {
-						const isSelected = activeCampaignId === c.id;
-						return (
-							<TouchableOpacity
-								key={c.id}
-								style={[
-									styles.pill,
-									{ borderColor: colors.accent },
-									isSelected && { backgroundColor: colors.accent },
+					{subItems.flatMap((item, index) => {
+						const active = isSubActive(item, activeFilter);
+						const items = [
+							<Pressable
+								key={item.key}
+								style={({ pressed }) => [
+									styles.subBtn,
+									pressed && !active && { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
 								]}
-								onPress={() => handleCampaignPill(c.id)}
-								activeOpacity={0.75}
+								onPress={() => onFilterChange(item.filter)}
+								accessibilityRole="button"
+								accessibilityState={{ selected: active }}
 							>
+								<Ionicons
+									name={item.icon}
+									size={18}
+									color={active ? (isDark ? '#ffffff' : colors.text) : (isDark ? '#71717a' : colors.muted)}
+								/>
 								<Text
 									style={[
-										styles.pillText,
-										{ color: isSelected ? '#fff' : colors.accent },
+										styles.subLabel,
+										{ color: active ? (isDark ? '#ffffff' : colors.text) : (isDark ? '#71717a' : colors.muted) },
+										active && styles.subLabelActive,
 									]}
-									numberOfLines={1}
 								>
-									{c.name}
+									{item.label}
 								</Text>
-							</TouchableOpacity>
-						);
+								{active && (
+									<View style={[styles.subIndicator, { backgroundColor: colors.accent }]} />
+								)}
+							</Pressable>,
+						];
+						if (index < subItems.length - 1) {
+							items.push(
+								<View key={`sdiv-${item.key}`} style={[styles.tabDivider, { backgroundColor: colors.border }]} />
+							);
+						}
+						return items;
 					})}
-				</ScrollView>
+				</Animated.View>
 			) : null}
 		</View>
 	);
@@ -156,6 +187,14 @@ const styles = StyleSheet.create({
 	},
 	tabRow: {
 		flexDirection: 'row',
+		paddingVertical: 4,
+		paddingHorizontal: 8,
+		alignItems: 'center',
+	},
+	tabDivider: {
+		width: StyleSheet.hairlineWidth,
+		alignSelf: 'stretch',
+		marginVertical: 8,
 	},
 	tab: {
 		flex: 1,
@@ -164,9 +203,15 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 		paddingHorizontal: 2,
 		gap: 3,
-		borderRadius: 8,
-		marginHorizontal: 2,
-		marginVertical: 4,
+		position: 'relative',
+	},
+	tabIndicator: {
+		position: 'absolute',
+		bottom: 0,
+		left: '20%',
+		right: '20%',
+		height: 2,
+		borderRadius: 999,
 	},
 	tabLabel: {
 		fontSize: 10,
@@ -176,25 +221,37 @@ const styles = StyleSheet.create({
 	tabLabelActive: {
 		fontWeight: '800',
 	},
-	pillScroll: {
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: 'rgba(128,128,128,0.15)',
-	},
-	pillContainer: {
+	subRow: {
 		flexDirection: 'row',
-		paddingHorizontal: 12,
-		paddingVertical: 7,
-		gap: 8,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		paddingVertical: 2,
+		paddingHorizontal: 8,
+		alignItems: 'center',
 	},
-	pill: {
-		paddingHorizontal: 12,
-		paddingVertical: 5,
-		borderRadius: 999,
-		borderWidth: 1,
+	subBtn: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 9,
+		gap: 4,
+		borderRadius: 0,
+		position: 'relative',
 	},
-	pillText: {
-		fontSize: 12,
+	subLabel: {
+		fontSize: 10,
 		fontWeight: '600',
+		letterSpacing: 0.1,
+	},
+	subLabelActive: {
+		fontWeight: '800',
+	},
+	subIndicator: {
+		position: 'absolute',
+		bottom: 0,
+		left: '20%',
+		right: '20%',
+		height: 2,
+		borderRadius: 999,
 	},
 });
 

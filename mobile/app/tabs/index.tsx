@@ -8,9 +8,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-
   Animated,
-  FlatList,
   ListRenderItem,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -145,6 +143,19 @@ export default function FeedScreen() {
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
+  const [filterBarHeight, setFilterBarHeight] = useState(50);
+
+  // Stable animated nodes — created once, never recreated (native driver requirement).
+  const scrollY = useRef(new Animated.Value(0)).current;
+  // Direct interpolation: filter slides up as user scrolls away from top,
+  // returns when scrolling back. Simple, reliable, fully native-driver compatible.
+  const filterTranslateY = useRef(
+    scrollY.interpolate({
+      inputRange: [0, 100],
+      outputRange: [0, -100],
+      extrapolate: 'clamp',
+    })
+  ).current;
   // Infinite scroll: guard against overlapping/needless page fetches.
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -184,7 +195,6 @@ export default function FeedScreen() {
     lastScrollY.current = y;
 
     if (y < 60) {
-      // Always show near the top
       if (!tabBarVisible.current) {
         tabBarVisible.current = true;
         Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
@@ -235,7 +245,8 @@ export default function FeedScreen() {
     setRemovedIds(new Set());
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
-  }, [feedFilter]);
+    scrollY.setValue(0);
+  }, [feedFilter, scrollY]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
   // always feels like it has more — no visible "loading" at the end.
@@ -382,19 +393,25 @@ export default function FeedScreen() {
   );
   const isRefreshing = networkStatus === 4;
 
-  const filterBar = (
-    <FeedCampaignFilter
-      activeFilter={feedFilter}
-      onFilterChange={(f) => router.setParams({ filter: f === "all" ? "" : f })}
-      campaignOptions={campaignsData?.activeCampaigns}
-    />
-  );
-
   return (
     <View style={[styles.flex, { backgroundColor: colors.bg }]}>
       <FeedTopBar />
-      {/* Filter bar is outside the FlatList — always sticky at the top */}
-      {filterBar}
+      <View style={styles.feedArea}>
+        {/* Filter bar is absolutely positioned so native-driver animation
+            doesn't cause layout shifts in the FlatList below */}
+        <Animated.View
+          style={[
+            styles.filterBarAbsolute,
+            { transform: [{ translateY: filterTranslateY }], backgroundColor: colors.topbar },
+          ]}
+          onLayout={(e) => setFilterBarHeight(e.nativeEvent.layout.height)}
+        >
+          <FeedCampaignFilter
+            activeFilter={feedFilter}
+            onFilterChange={(f) => router.setParams({ filter: f === "all" ? "" : f })}
+            campaignOptions={campaignsData?.activeCampaigns}
+          />
+        </Animated.View>
       {loading && posts.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -407,15 +424,18 @@ export default function FeedScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <Animated.FlatList
           data={posts}
           extraData={coachPostId}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           style={[styles.list, { backgroundColor: colors.bg }]}
-          contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingTop: filterBarHeight, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true, listener: handleScroll }
+          )}
+          scrollEventThrottle={1}
           initialNumToRender={4}
           maxToRenderPerBatch={4}
           windowSize={7}
@@ -440,12 +460,21 @@ export default function FeedScreen() {
           }
         />
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  feedArea: { flex: 1, position: 'relative', overflow: 'hidden' },
+  filterBarAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
