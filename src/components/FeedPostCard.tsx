@@ -257,6 +257,13 @@ type PostVoteUpdatedData = {
     myVoteAnonymous?: boolean | null;
     isVotingOpen?: boolean | null;
     votingEndsAt?: string | null;
+    matchScore?: {
+      status: string | null;
+      home: number | null;
+      away: number | null;
+      winner: string | null;
+      minute: number | null;
+    } | null;
     optionStats?: Array<{
       index: number;
       label: string;
@@ -618,7 +625,8 @@ function FeedPostCardComponent({
   }, []);
 
   const hasActiveCountdown = Boolean(
-    post.votingEndsAt && (post.isVotingOpen ?? true),
+    (post.votingEndsAt && (post.isVotingOpen ?? true)) ||
+    (post.fixtureWinnerAt && new Date(post.fixtureWinnerAt).getTime() > Date.now()),
   );
   useEffect(() => {
     if (!hasActiveCountdown) {
