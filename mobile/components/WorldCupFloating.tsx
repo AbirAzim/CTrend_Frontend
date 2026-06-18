@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import {
   type WcFixture,
   canVoteOnFixture,
@@ -79,6 +80,7 @@ const ds = StyleSheet.create({
 
 export function WorldCupFloating() {
   const { isDark } = useTheme();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const followed = useFollowedTeam();
   const { height: H } = useWindowDimensions();
@@ -241,6 +243,11 @@ export function WorldCupFloating() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wcCampaign?.id, live.length, nextDays.length, recent.length]);
+
+  // Close when user logs out
+  useEffect(() => {
+    if (!user) setVisible(false);
+  }, [user]);
 
   // Blink when live
   useEffect(() => {
