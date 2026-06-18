@@ -202,42 +202,18 @@ function compareLabel(post: FeedPostView, idx: number): string {
 	return post.postOptions?.[idx]?.label?.trim() ?? `Side ${idx + 1}`;
 }
 
-/**
- * A poll context/body photo shown in FULL — never cropped. Keeps the image's
- * natural aspect ratio (measured on load) and only caps very tall photos at a
- * max height. We compute the exact display box from the natural ratio and
- * **center it** — so portrait photos sit in the middle instead of hugging the
- * left edge with dead space (the old width:100% + maxHeight letterboxing bug).
- */
 function PollBodyImage({ uri, radius }: { uri: string; radius: number }) {
-	const [ar, setAr] = useState<number | null>(null);
-	const maxHeight = Math.round(Dimensions.get('window').height * 0.5);
-	// pollBodyMedia adds paddingHorizontal: 14 on each side.
+	// Fixed-height container: layout never changes so there is no jump/shake.
+	// contentFit='contain' shows the full image inside the box (letterboxed if needed).
 	const availW = CARD_CONTENT_W - 28;
-	const a = ar ?? 1.4;
-	let w = availW;
-	let h = w / a;
-	if (h > maxHeight) {
-		h = maxHeight;
-		w = Math.round(h * a); // portrait → narrower than full width, so we center it
-	}
+	const fixedH = Math.round(availW * 1.0); // square container fits portrait and landscape
 	return (
-		<View style={{ alignItems: 'center' }}>
+		<View style={{ width: availW, height: fixedH, borderRadius: radius, overflow: 'hidden', backgroundColor: '#111', alignSelf: 'center' }}>
 			<Image
 				source={{ uri }}
-				style={{
-					width: w,
-					height: h,
-					borderRadius: radius,
-					backgroundColor: '#000',
-				}}
-				contentFit='cover'
+				style={{ width: '100%', height: '100%' }}
+				contentFit='contain'
 				cachePolicy='memory-disk'
-				onLoad={(e) => {
-					const iw = e?.source?.width;
-					const ih = e?.source?.height;
-					if (iw && ih) setAr(iw / ih);
-				}}
 			/>
 		</View>
 	);

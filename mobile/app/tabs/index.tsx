@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  FlatList,
   ListRenderItem,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -144,11 +145,10 @@ export default function FeedScreen() {
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
   const filterVisible = useRef(true);
+  const filterAnimating = useRef(false);
   const [filterBarHeight, setFilterBarHeight] = useState(50);
   const filterBarHeightRef = useRef(50);
 
-  // Stable animated nodes — created once, never recreated (native driver requirement).
-  const scrollY = useRef(new Animated.Value(0)).current;
   // Direction-based filter animation — same mechanism as bottom nav but inverted:
   // scroll DOWN → filter shows, scroll UP → filter hides.
   const filterTranslateY = useRef(new Animated.Value(0)).current;
@@ -198,6 +198,7 @@ export default function FeedScreen() {
       }
       if (!filterVisible.current) {
         filterVisible.current = true;
+        filterAnimating.current = false;
         Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
       }
       return;
@@ -212,13 +213,20 @@ export default function FeedScreen() {
       Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     }
 
-    // Filter bar: inverted — shows on scroll down, hides on scroll up
-    if (diff > 4 && !filterVisible.current) {
+    // Filter bar: inverted — shows on scroll down, hides on scroll up.
+    // Guard with filterAnimating to prevent rapid oscillation on short lists.
+    if (diff > 4 && !filterVisible.current && !filterAnimating.current) {
       filterVisible.current = true;
-      Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    } else if (diff < -4 && filterVisible.current) {
+      filterAnimating.current = true;
+      Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        filterAnimating.current = false;
+      });
+    } else if (diff < -4 && filterVisible.current && !filterAnimating.current) {
       filterVisible.current = false;
-      Animated.timing(filterTranslateY, { toValue: -filterBarHeightRef.current, duration: 200, useNativeDriver: true }).start();
+      filterAnimating.current = true;
+      Animated.timing(filterTranslateY, { toValue: -filterBarHeightRef.current, duration: 200, useNativeDriver: true }).start(() => {
+        filterAnimating.current = false;
+      });
     }
   }
 
@@ -256,10 +264,12 @@ export default function FeedScreen() {
     setRemovedIds(new Set());
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
-    scrollY.setValue(0);
     filterTranslateY.setValue(0);
     filterVisible.current = true;
-  }, [feedFilter, scrollY, filterTranslateY]);
+    filterAnimating.current = false;
+    lastScrollY.current = 0;
+    tabBarVisible.current = true;
+  }, [feedFilter, filterTranslateY]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
   // always feels like it has more — no visible "loading" at the end.
@@ -397,13 +407,13 @@ export default function FeedScreen() {
     void AsyncStorage.setItem(VOTE_COACH_SHOWN_KEY, String(coachStore.shown + 1));
   }, [coachPostId, coachStore]);
 
-  const renderItem: ListRenderItem<FeedPostView> = ({ item }) => (
+  const renderItem: ListRenderItem<FeedPostView> = useCallback(({ item }) => (
     <FeedPostCard
       post={item}
       showVoteCoachmark={item.id === coachPostId}
       onCoachmarkDismiss={dismissVoteCoach}
     />
-  );
+  ), [coachPostId, dismissVoteCoach]);
   const isRefreshing = networkStatus === 4;
 
   return (
@@ -419,8 +429,10 @@ export default function FeedScreen() {
           ]}
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
-            setFilterBarHeight(h);
-            filterBarHeightRef.current = h;
+            if (Math.abs(h - filterBarHeightRef.current) > 2) {
+              filterBarHeightRef.current = h;
+              setFilterBarHeight(h);
+            }
           }}
         >
           <FeedCampaignFilter
@@ -441,18 +453,15 @@ export default function FeedScreen() {
           </Text>
         </View>
       ) : (
-        <Animated.FlatList
+        <FlatList
           data={posts}
           extraData={coachPostId}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           style={[styles.list, { backgroundColor: colors.bg }]}
           contentContainerStyle={{ paddingTop: filterBarHeight, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true, listener: handleScroll }
-          )}
-          scrollEventThrottle={1}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           initialNumToRender={4}
           maxToRenderPerBatch={4}
           windowSize={7}
