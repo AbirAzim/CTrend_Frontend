@@ -64,8 +64,8 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
   const hasScore = finished || live;
   const canVote = canVoteOnFixture(fixture);
 
-  const homeWon = fixture.score?.winner === "HOME_TEAM";
-  const awayWon = fixture.score?.winner === "AWAY_TEAM";
+  const homeWon = fixture.score?.winner === "home";
+  const awayWon = fixture.score?.winner === "away";
 
   return (
     <div
@@ -447,16 +447,32 @@ export function WorldCupPage() {
 
       {activeTab === "results" && (
         <>
-          {recent.length === 0 ? (
+          {live.length === 0 && recent.length === 0 ? (
             <p className="wc-status-msg">No results yet.</p>
           ) : (
-            <section className="wc-stage wc-stage--results">
-              <div className="wc-fixture-list wc-fixture-list--knockout">
-                {recent.map((f) => (
-                  <FixtureRow key={f.id} fixture={f} />
-                ))}
-              </div>
-            </section>
+            <>
+              {live.length > 0 && (
+                <section className="wc-stage wc-stage--live">
+                  <h2 className="wc-stage-title">
+                    <span className="wc-live-dot" /> Live now
+                  </h2>
+                  <div className="wc-fixture-list wc-fixture-list--knockout">
+                    {live.map((f) => (
+                      <FixtureRow key={f.id} fixture={f} />
+                    ))}
+                  </div>
+                </section>
+              )}
+              {recent.length > 0 && (
+                <section className="wc-stage wc-stage--results">
+                  <div className="wc-fixture-list wc-fixture-list--knockout">
+                    {recent.map((f) => (
+                      <FixtureRow key={f.id} fixture={f} />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
           )}
         </>
       )}

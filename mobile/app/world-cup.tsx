@@ -60,8 +60,8 @@ function computeGroupTables(fixtures: WcFixture[]) {
     home.played++; away.played++;
     home.gf += f.score.home; home.ga += f.score.away;
     away.gf += f.score.away; away.ga += f.score.home;
-    if (f.score.winner === "HOME_TEAM") { home.won++; home.pts += 3; away.lost++; }
-    else if (f.score.winner === "AWAY_TEAM") { away.won++; away.pts += 3; home.lost++; }
+    if (f.score.winner === "home") { home.won++; home.pts += 3; away.lost++; }
+    else if (f.score.winner === "away") { away.won++; away.pts += 3; home.lost++; }
     else { home.drawn++; home.pts++; away.drawn++; away.pts++; }
     home.gd = home.gf - home.ga;
     away.gd = away.gf - away.ga;
@@ -149,8 +149,8 @@ function TeamCrest({ crest, name, size = 26 }: { crest: string; name: string; si
 function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnType<typeof makeStyles>; isDark: boolean }) {
   const live = isLive(fixture);
   const finished = isFinished(fixture);
-  const homeWon = fixture.score.winner === "HOME_TEAM";
-  const awayWon = fixture.score.winner === "AWAY_TEAM";
+  const homeWon = fixture.score.winner === "home";
+  const awayWon = fixture.score.winner === "away";
   const canVote = canVoteOnFixture(fixture);
 
   function handlePress() {
@@ -431,10 +431,26 @@ export default function WorldCupScreen() {
 
         {activeTab === "results" && (
           <>
-            {recent.length === 0 ? (
+            {live.length === 0 && recent.length === 0 ? (
               <Text style={st.statusMsg}>No results yet.</Text>
             ) : (
-              recent.map((f) => <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />)
+              <>
+                {live.length > 0 && (
+                  <View>
+                    <Text style={st.sectionTitle}>🔴 Live now</Text>
+                    {live.map((f) => (
+                      <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />
+                    ))}
+                  </View>
+                )}
+                {recent.length > 0 && (
+                  <View>
+                    {recent.map((f) => (
+                      <FixtureRow key={f.id} fixture={f} st={st} isDark={isDark} />
+                    ))}
+                  </View>
+                )}
+              </>
             )}
           </>
         )}

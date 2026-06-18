@@ -173,7 +173,7 @@ type PostVoteUpdatedData = {
 		mySelectedOptionIndex?: number | null;
 		isVotingOpen?: boolean | null;
 		votingEndsAt?: string | null;
-		matchScore?: { status: string | null; home: number | null; away: number | null; winner: string | null } | null;
+		matchScore?: { status: string | null; home: number | null; away: number | null; winner: string | null; minute?: number | null } | null;
 		optionStats?: Array<{
 			index: number;
 			label: string;
@@ -1521,16 +1521,7 @@ function FeedPostCardComponent({
 		return () => loop.stop();
 	}, [isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// Live seconds ticker — counts up within the current minute for IN_PLAY matches
-	const liveMinute = post.matchScore?.status === 'IN_PLAY' ? (post.matchScore.minute ?? null) : null;
-	const liveMinuteRef = useRef<number | null>(null);
-	const [liveSeconds, setLiveSeconds] = useState(0);
-	useEffect(() => {
-		if (liveMinute === null) { setLiveSeconds(0); liveMinuteRef.current = null; return; }
-		if (liveMinute !== liveMinuteRef.current) { liveMinuteRef.current = liveMinute; setLiveSeconds(0); }
-		const t = setInterval(() => setLiveSeconds((s) => Math.min(s + 1, 59)), 1000);
-		return () => clearInterval(t);
-	}, [liveMinute]);
+	const liveMinute = post.matchScore?.status === 'IN_PLAY' ? (post.matchScore?.minute ?? null) : null;
 
 	useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
 		variables: { postId: post.id },
@@ -2329,7 +2320,7 @@ function FeedPostCardComponent({
 											const teamB = post.postOptions?.[1]?.label?.trim() || null;
 											const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
 											const sc = post.matchScore!;
-											if (sc.status === 'IN_PLAY') return `${sc.minute ?? 0}'${String(liveSeconds).padStart(2, '0')}  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											if (sc.status === 'IN_PLAY') return `${liveMinute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 										})()}
@@ -2870,7 +2861,7 @@ function FeedPostCardComponent({
 						post.postOptions?.[0]?.label?.trim() ?? null,
 						post.postOptions?.[1]?.label?.trim() ?? null,
 					]}
-					liveSeconds={liveSeconds}
+					effectiveMinute={liveMinute}
 				/>
 			) : null}
 
@@ -3770,19 +3761,20 @@ function MatchDetailRow({
 	fixtureId,
 	matchScore,
 	teams,
-	liveSeconds,
+	effectiveMinute,
 }: {
 	fixtureId: string;
 	matchScore: MatchScore;
 	teams: [string | null, string | null];
-	liveSeconds: number;
+	effectiveMinute: number | null;
 }) {
 	const isLive = matchScore?.status === 'IN_PLAY';
 	const isPaused = matchScore?.status === 'PAUSED';
 	const isFinished = matchScore?.status === 'FT' || matchScore?.status === 'AET' || matchScore?.status === 'PEN' || matchScore?.status === 'FINISHED';
 
+	const displayMin = effectiveMinute ?? matchScore?.minute ?? 0;
 	const statusLabel = isLive
-		? `${matchScore?.minute ?? 0}'${String(Math.min(liveSeconds, 59)).padStart(2, '0')}`
+		? `${displayMin}'`
 		: isPaused ? 'HT'
 		: isFinished ? 'FT'
 		: null;

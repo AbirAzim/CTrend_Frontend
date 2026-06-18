@@ -36,6 +36,7 @@ import {
   SYNC_WORLD_CUP_FIXTURES,
   SYNC_FIXTURE_DETAILS,
   SYNC_ALL_FINISHED_FIXTURES,
+  SYNC_LIVE_NOW,
   WORLD_CUP_FIXTURES,
 } from "../graphql/worldcup";
 import {
@@ -1220,6 +1221,7 @@ function WorldCupTab() {
 
   const [syncFixtures, { loading: syncing }] = useMutation(SYNC_WORLD_CUP_FIXTURES);
   const [syncAllFinished, { loading: syncingAll }] = useMutation<{ syncAllFinishedFixtures: string }>(SYNC_ALL_FINISHED_FIXTURES);
+  const [syncLiveNow, { loading: syncingLive }] = useMutation<{ syncLiveNow: string }>(SYNC_LIVE_NOW);
   const [createPost, { loading: creatingPost }] = useMutation(CREATE_WORLD_CUP_CAMPAIGN_POST);
   const [processResult, { loading: processingResult }] = useMutation(PROCESS_MATCH_RESULT);
   const [markPaid] = useMutation(MARK_CAMPAIGN_PRIZE_PAID);
@@ -1246,6 +1248,17 @@ function WorldCupTab() {
       void refetchFixtures();
     } catch (err: unknown) {
       setSyncMsg("Bulk sync failed: " + getApolloErrorMessage(err));
+    }
+  }
+
+  async function handleSyncLiveNow() {
+    setSyncMsg("Syncing live scores now…");
+    try {
+      const res = await syncLiveNow();
+      setSyncMsg(res.data?.syncLiveNow ?? "Done.");
+      void refetchFixtures();
+    } catch (err: unknown) {
+      setSyncMsg("Live sync failed: " + getApolloErrorMessage(err));
     }
   }
 
@@ -1316,6 +1329,9 @@ function WorldCupTab() {
           <div style={{ display: "flex", gap: 8 }}>
             <AdminCtaButton onClick={() => void handleSync()} disabled={syncing} icon="↻">
               {syncing ? "Syncing…" : "Sync Fixtures"}
+            </AdminCtaButton>
+            <AdminCtaButton onClick={() => void handleSyncLiveNow()} disabled={syncingLive} icon="🔴">
+              {syncingLive ? "Syncing…" : "Sync Live Now"}
             </AdminCtaButton>
             <AdminCtaButton onClick={() => void handleSyncAllFinished()} disabled={syncingAll} icon="⚡">
               {syncingAll ? "Syncing all…" : "Sync All Match Data"}

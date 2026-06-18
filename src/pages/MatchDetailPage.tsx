@@ -33,7 +33,7 @@ type MatchLineup = {
   formation: string;
   startXI: LineupPlayer[];
   substitutes: LineupPlayer[];
-  coach: LineupCoach;
+  coach: LineupCoach | null;
 };
 
 type MatchStat = { type: string; home?: string | null; away?: string | null };
@@ -663,13 +663,21 @@ function StatsTab({ fixture }: { fixture: FixtureDetails }) {
 
 // ─── Match header ─────────────────────────────────────────────────────────────
 
+function clientMinute(kickoff: string): number {
+  const elapsed = Math.floor((Date.now() - new Date(kickoff).getTime()) / 60000);
+  return Math.max(1, Math.min(elapsed, 130));
+}
+
+
 function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
-  const { status, minute, score, events, homeTeam, awayTeam, venue, playerRatings } = fixture;
+  const { status, minute, score, events, homeTeam, awayTeam, venue, playerRatings, kickoff } = fixture;
   const live = isLive(status);
   const finished = isFinished(status);
   const hasScore = live || finished;
-  const homeWon = score.winner === "HOME_TEAM";
-  const awayWon = score.winner === "AWAY_TEAM";
+  const homeWon = score.winner === "home";
+  const awayWon = score.winner === "away";
+
+  const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
 
   const homeScorers = hasScore ? goalScorers(events, "home") : [];
   const awayScorers = hasScore ? goalScorers(events, "away") : [];
@@ -683,7 +691,7 @@ function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
         {live && (
           <span className="md-hdr-live">
             <span className="md-live-dot" />
-            {minute != null ? `${minute}'` : "LIVE"}
+            {displayMinute != null ? `${displayMinute}'` : "LIVE"}
           </span>
         )}
         {finished && <span className="md-hdr-ft">Full Time</span>}
@@ -799,6 +807,9 @@ export function MatchDetailPage() {
 
       {loading && !fixture && <div className="md-loading">Loading…</div>}
       {error && <div className="md-error">Failed to load match details.</div>}
+      {!loading && !error && !fixture && (
+        <div className="md-empty">Match details not available.</div>
+      )}
 
       {fixture && (
         <>

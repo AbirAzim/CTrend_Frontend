@@ -324,7 +324,7 @@ export function WorldCupFloating() {
                 <button key={f.id} type="button" className="wc-float-row wc-float-row--result" onClick={() => openMatch(f)}>
                   <div className="wc-fr-home">
                     {f.homeTeam.crest && <img src={f.homeTeam.crest} className="wc-fr-flag" alt="" />}
-                    <span className={`wc-fr-name${f.score?.winner === "HOME_TEAM" ? " wc-fr-name--win" : " wc-fr-name--loss"}`}>
+                    <span className={`wc-fr-name${f.score?.winner === "home" ? " wc-fr-name--win" : " wc-fr-name--loss"}`}>
                       {f.homeTeam.shortName}
                     </span>
                   </div>
@@ -333,7 +333,7 @@ export function WorldCupFloating() {
                     <span className="wc-fr-ft">FT</span>
                   </div>
                   <div className="wc-fr-away">
-                    <span className={`wc-fr-name${f.score?.winner === "AWAY_TEAM" ? " wc-fr-name--win" : " wc-fr-name--loss"}`}>
+                    <span className={`wc-fr-name${f.score?.winner === "away" ? " wc-fr-name--win" : " wc-fr-name--loss"}`}>
                       {f.awayTeam.shortName}
                     </span>
                     {f.awayTeam.crest && <img src={f.awayTeam.crest} className="wc-fr-flag" alt="" />}

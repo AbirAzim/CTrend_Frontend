@@ -108,6 +108,12 @@ export const SYNC_ALL_FINISHED_FIXTURES = gql`
   }
 `;
 
+export const SYNC_LIVE_NOW = gql`
+  mutation SyncLiveNow {
+    syncLiveNow
+  }
+`;
+
 export const CREATE_WORLD_CUP_CAMPAIGN_POST = gql`
   mutation CreateWorldCupCampaignPost($fixtureId: ID!) {
     createWorldCupCampaignPost(fixtureId: $fixtureId) {

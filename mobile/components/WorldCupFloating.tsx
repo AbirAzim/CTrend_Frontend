@@ -417,7 +417,7 @@ export function WorldCupFloating() {
                       <View style={st.rrHome}>
                         <MiniCrest uri={f.homeTeam.crest} />
                         <Text
-                          style={[st.teamTxt, f.score.winner === "HOME_TEAM" && st.teamWin]}
+                          style={[st.teamTxt, f.score.winner === "home" && st.teamWin]}
                           numberOfLines={1}
                         >
                           {f.homeTeam.shortName}
@@ -431,7 +431,7 @@ export function WorldCupFloating() {
                       </View>
                       <View style={st.rrAway}>
                         <Text
-                          style={[st.teamTxt, f.score.winner === "AWAY_TEAM" && st.teamWin, { textAlign: "right" }]}
+                          style={[st.teamTxt, f.score.winner === "away" && st.teamWin, { textAlign: "right" }]}
                           numberOfLines={1}
                         >
                           {f.awayTeam.shortName}

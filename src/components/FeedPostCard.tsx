@@ -510,8 +510,6 @@ function FeedPostCardComponent({
   const voteGuardUntilRef = useRef(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [liveSeconds, setLiveSeconds] = useState(0);
-  const liveMinuteRef = useRef<number | null>(null);
   const [shareHint, setShareHint] = useState<string | null>(null);
   const shareHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const votersModalCardRef = useRef<HTMLElement | null>(null);
@@ -630,21 +628,8 @@ function FeedPostCardComponent({
     return () => clearInterval(t);
   }, [hasActiveCountdown]);
 
-  // Seconds ticker for the live match bar — resets whenever the API minute changes
-  const liveMinute = post.matchScore?.status === "IN_PLAY" ? (post.matchScore.minute ?? null) : null;
-  useEffect(() => {
-    if (liveMinute === null) {
-      setLiveSeconds(0);
-      liveMinuteRef.current = null;
-      return;
-    }
-    if (liveMinute !== liveMinuteRef.current) {
-      liveMinuteRef.current = liveMinute;
-      setLiveSeconds(0);
-    }
-    const t = setInterval(() => setLiveSeconds((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [liveMinute]);
+  const isMatchInPlay = post.matchScore?.status === "IN_PLAY";
+  const liveMinute = isMatchInPlay ? (post.matchScore?.minute ?? null) : null;
 
   useEffect(() => {
     if (!showVoters) {
@@ -2305,8 +2290,8 @@ function FeedPostCardComponent({
             <span className="cx-live-match-bar-badge">
               {ms?.status === "PAUSED"
                 ? "HT"
-                : ms?.minute != null
-                ? `${ms.minute}'${String(Math.min(liveSeconds, 59)).padStart(2, "0")}`
+                : liveMinute != null
+                ? `${liveMinute}'`
                 : "LIVE"}
             </span>
             <div className="cx-live-match-bar-teams">

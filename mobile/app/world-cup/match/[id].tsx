@@ -28,7 +28,7 @@ type LineupPlayer = {
 type LineupCoach = { id?: number | null; name: string; photo?: string | null };
 type MatchLineup = {
 	team: 'home' | 'away'; formation: string;
-	startXI: LineupPlayer[]; substitutes: LineupPlayer[]; coach: LineupCoach;
+	startXI: LineupPlayer[]; substitutes: LineupPlayer[]; coach: LineupCoach | null;
 };
 type MatchStat = { type: string; home?: string | null; away?: string | null };
 type PlayerRating = {
@@ -53,6 +53,11 @@ type FixtureDetails = {
 
 function isLive(s: string) { return s === 'IN_PLAY' || s === 'PAUSED'; }
 function isFinished(s: string) { return ['FINISHED','FT','AET','PEN','AWARDED'].includes(s); }
+
+function clientMinute(kickoff: string): number {
+  const elapsed = Math.floor((Date.now() - new Date(kickoff).getTime()) / 60000);
+  return Math.max(1, Math.min(elapsed, 130));
+}
 
 function minuteLabel(e: MatchEvent) {
 	return e.timeExtra != null && e.timeExtra > 0 ? `${e.time}+${e.timeExtra}'` : `${e.time}'`;
@@ -96,12 +101,13 @@ function parseNum(v?: string | null) { return v ? parseFloat(v.replace('%', ''))
 // ─── Match header ─────────────────────────────────────────────────────────────
 
 function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
-	const { status, minute, score, events, homeTeam, awayTeam, playerRatings } = fixture;
+	const { status, minute, score, events, homeTeam, awayTeam, playerRatings, kickoff } = fixture;
 	const live = isLive(status);
 	const finished = isFinished(status);
 	const hasScore = live || finished;
-	const homeWon = score.winner === 'HOME_TEAM';
-	const awayWon = score.winner === 'AWAY_TEAM';
+	const homeWon = score.winner === 'home';
+	const awayWon = score.winner === 'away';
+	const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
 	const homeScorers = hasScore ? goalScorers(events, 'home') : [];
 	const awayScorers = hasScore ? goalScorers(events, 'away') : [];
 	const star = (finished || live) ? motmPlayer(playerRatings) : null;
@@ -120,7 +126,7 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 				{live ? (
 					<View style={mh.livePill}>
 						<View style={mh.liveDot} />
-						<Text style={mh.liveText}>{minute != null ? `${minute}'` : 'LIVE'}</Text>
+						<Text style={mh.liveText}>{`${displayMinute}'`}</Text>
 					</View>
 				) : finished ? (
 					<View style={[mh.ftPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9' }]}>
