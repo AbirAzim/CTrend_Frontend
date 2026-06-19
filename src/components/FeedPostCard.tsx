@@ -261,7 +261,6 @@ type PostVoteUpdatedData = {
       status: string | null;
       home: number | null;
       away: number | null;
-      winner: string | null;
       minute: number | null;
     } | null;
     optionStats?: Array<{
