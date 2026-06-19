@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@ctrend/shared": "*",
+    "@ctrend/shared": "file:../packages/shared",
     "@expo/vector-icons": "^15.1.1",
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "2.2.0",

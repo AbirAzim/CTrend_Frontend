@@ -4,8 +4,7 @@
   "version": "0.0.2",
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "mobile"
+    "packages/*"
   ],
   "scripts": {
     "postinstall": "node mobile/scripts/setup-secrets.js",
