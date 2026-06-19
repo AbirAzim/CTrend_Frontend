@@ -368,7 +368,6 @@ export const POST_VOTE_UPDATED = gql`
         status
         home
         away
-        winner
         minute
       }
       optionStats {

@@ -2820,7 +2820,11 @@ function areFeedPostCardPropsEqual(prev: Props, next: Props): boolean {
     prev.post.mySelectedOptionIndex === next.post.mySelectedOptionIndex &&
     prev.post.isVotingOpen === next.post.isVotingOpen &&
     prev.post.votingEndsAt === next.post.votingEndsAt &&
-    prev.post.endingSoonLeadMinutes === next.post.endingSoonLeadMinutes
+    prev.post.endingSoonLeadMinutes === next.post.endingSoonLeadMinutes &&
+    prev.post.matchScore?.status === next.post.matchScore?.status &&
+    prev.post.matchScore?.home === next.post.matchScore?.home &&
+    prev.post.matchScore?.away === next.post.matchScore?.away &&
+    prev.post.matchScore?.minute === next.post.matchScore?.minute
   );
 }
 
