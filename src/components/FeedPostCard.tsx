@@ -2285,7 +2285,7 @@ function FeedPostCardComponent({
         />
       ) : showMatchLive ? (
         <div
-          className="cx-live-match-bar"
+          className={`cx-live-match-bar${ms?.status === "PAUSED" ? " cx-live-match-bar--ht" : ""}`}
           role="button"
           tabIndex={0}
           onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
