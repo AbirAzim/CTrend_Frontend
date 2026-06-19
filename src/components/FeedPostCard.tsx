@@ -1720,9 +1720,9 @@ function FeedPostCardComponent({
   const isMatchNotStarted = !isLiveMatch && !isMatchFinished;
 
   const showMatchLive = isMatchPost && isLiveMatch;
-  const showMatchStartsSoon = isMatchPost && isMatchNotStarted && post.isVotingOpen === false && !showCampaignWinner;
+  const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
   const showMatchCalculating =
-    isMatchPost && isMatchFinished && post.isVotingOpen === false && !showCampaignWinner;
+    isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)

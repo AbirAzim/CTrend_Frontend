@@ -85,6 +85,18 @@ export function AppShell() {
   });
   const lastYRef = useRef(0);
   const scrollRafRef = useRef<number | null>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      document.documentElement.style.setProperty("--topbar-h", `${el.offsetHeight}px`);
+    });
+    ro.observe(el);
+    document.documentElement.style.setProperty("--topbar-h", `${el.offsetHeight}px`);
+    return () => ro.disconnect();
+  }, []);
 
   const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
     skip: !isAuthenticated,
@@ -240,7 +252,7 @@ export function AppShell() {
           <span>You're offline — check your connection</span>
         </div>
       )}
-      <header className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
+      <header ref={topbarRef} className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
         <div className="ig-brand-block">
           <NavLink to="/" className="ig-logo" end>
             Ke Jitbe

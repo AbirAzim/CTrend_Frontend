@@ -1067,7 +1067,7 @@ a:hover {
   transform: none;
   width: calc(100% - 24px);
   max-width: 1200px;
-  margin: 0 auto 10px;
+  margin: 0 auto;
   min-height: 56px;
   display: flex;
   align-items: center;
@@ -1082,8 +1082,8 @@ a:hover {
   z-index: 50;
   box-sizing: border-box;
   transition:
-    opacity 0.2s var(--cx-ease-out),
-    transform 0.22s var(--cx-ease-spring),
+    opacity 0.28s var(--cx-ease-out),
+    transform 0.35s var(--cx-ease-spring),
     box-shadow 0.35s var(--cx-ease-out),
     background 0.28s var(--cx-ease-out);
 }
@@ -1110,7 +1110,7 @@ body.capacitor .ig-topbar {
 
 .ig-topbar--hidden {
   opacity: 0;
-  transform: translateY(-12px) scale(0.97);
+  transform: translateY(calc(-100% - 16px));
   pointer-events: none;
 }
 
@@ -1721,7 +1721,7 @@ body.capacitor .ig-bottom-nav {
 
 .ff-bar-outer {
   position: sticky;
-  top: 74px;
+  top: calc(max(8px, env(safe-area-inset-top)) + var(--topbar-h, 60px));
   z-index: 48;
   background: var(--ig-bg);
   padding: 6px 0 5px;
@@ -1735,13 +1735,10 @@ body.capacitor .ig-bottom-nav {
 }
 html[data-topbar-hidden="true"] .ff-bar-outer {
   top: 0;
-  max-height: 0;
-  opacity: 0;
-  padding: 0;
-  pointer-events: none;
+  border-radius: 0;
 }
 :root[data-theme="dark"] .ff-bar-outer {
-  background: #18181b;
+  background: #1c1c1f;
   border-bottom-color: rgba(255,255,255,0.07);
 }
 :root[data-theme="dark"] .ff-subrow {
@@ -9356,7 +9353,7 @@ a.cx-action-chip {
 /* ── Dark mode premium overrides ── */
 
 :root[data-theme="dark"] .ig-topbar {
-  background: rgba(17,17,17,0.82);
+  background: rgba(28,28,31,0.92);
   border-color: rgba(255,255,255,0.1);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
