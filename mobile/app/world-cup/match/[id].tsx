@@ -2,6 +2,7 @@ import { useQuery } from '@apollo/client/react';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { BottomNav } from '../../../components/BottomNav';
 import { useTabBar } from '../../../context/TabBarContext';
@@ -1008,9 +1009,12 @@ export default function MatchDetailScreen() {
 	const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 	const { isDark, colors } = useTheme();
 	const { translateY } = useTabBar();
+	const insets = useSafeAreaInsets();
 	const lastScrollY = useRef(0);
 	const tabBarVisible = useRef(true);
-	const TAB_BAR_H = 60;
+	// Always show footer when entering this screen
+	useState(() => { translateY.setValue(0); });
+	const TAB_BAR_H = 60 + insets.bottom + 6;
 
 	function handleScroll(e: { nativeEvent: { contentOffset: { y: number } } }) {
 		const y = e.nativeEvent.contentOffset.y;

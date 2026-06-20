@@ -309,16 +309,14 @@ export function WorldCupFloating() {
   });
 
   function openMatch(f: WcFixture) {
+    const dest =
+      isLive(f) || isFinished(f)
+        ? `/world-cup/match/${f.id}`
+        : f.campaignPostId
+          ? `/post/${f.campaignPostId}`
+          : "/world-cup";
+    router.push(dest as `/${string}`);
     animateClose();
-    setTimeout(() => {
-      const dest =
-        isLive(f) || isFinished(f)
-          ? `/world-cup/match/${f.id}`
-          : f.campaignPostId
-            ? `/post/${f.campaignPostId}`
-            : "/world-cup";
-      router.push(dest as `/${string}`);
-    }, 160);
   }
 
   return (
@@ -347,7 +345,7 @@ export function WorldCupFloating() {
               <Animated.View style={[st.titleBtn, { borderColor: glowBorderC, backgroundColor: glowBgC }]}>
                 <Pressable
                   style={({ pressed }) => [st.titleBtnInner, pressed && { opacity: 0.82 }]}
-                  onPress={() => { animateClose(); setTimeout(() => router.push("/world-cup" as `/${string}`), 160); }}
+                  onPress={() => { router.push("/world-cup" as `/${string}`); animateClose(); }}
                 >
                   <Image source={trophyAsset} style={st.headTrophy} contentFit="contain" />
                   <View style={st.headTextCol}>
