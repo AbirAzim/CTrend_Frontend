@@ -2305,7 +2305,7 @@ function FeedPostCardComponent({
 							return canOpenMatch ? (
 								<Pressable
 									style={({ pressed }) => [st.matchScoreBadge, pressed && { opacity: 0.7 }]}
-									onPress={(e) => { e.stopPropagation?.(); router.push(`/world-cup/match/${post.fixtureId}` as `/${string}`); }}
+									onPress={(e) => { e.stopPropagation?.(); router.push(`/world-cup/match/${post.fixtureId}${post.lineupAvailable && !isMatchFinished && !isLiveMatch ? '?tab=lineup' : ''}` as `/${string}`); }}
 									hitSlop={8}
 								>
 									{scoreContent}
@@ -3768,7 +3768,7 @@ function MatchDetailRow({
 	return (
 		<Pressable
 			style={({ pressed }) => [mdrStyles.row, { backgroundColor: pressed ? 'rgba(100,116,139,0.1)' : barBg, borderColor: barBorder }]}
-			onPress={() => router.push(`/world-cup/match/${fixtureId}` as `/${string}`)}
+			onPress={() => router.push(`/world-cup/match/${fixtureId}${!isLive && !isFinished ? '?tab=lineup' : ''}` as `/${string}`)}
 		>
 			{/* Live/status dot */}
 			<View style={[mdrStyles.dot, { backgroundColor: dotColor }]} />

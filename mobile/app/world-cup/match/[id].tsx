@@ -1,8 +1,12 @@
 import { useQuery } from '@apollo/client/react';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import { BottomNav } from '../../../components/BottomNav';
+import { useTabBar } from '../../../context/TabBarContext';
 import {
+	Animated,
 	ActivityIndicator,
 	Pressable,
 	ScrollView,
@@ -97,6 +101,126 @@ function deriveHalfScore(events: MatchEvent[]) {
 	return { home, away };
 }
 function parseNum(v?: string | null) { return v ? parseFloat(v.replace('%', '')) || 0 : 0; }
+
+// ─── Player event map ─────────────────────────────────────────────────────────
+
+type PEvt = { goals: number; assists: number; card: 'yellow' | 'red' | null; subOff: boolean; subOn: boolean };
+
+function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
+	const map = new Map<string, PEvt>();
+	const ensure = (p: EventPlayer): PEvt => {
+		const idKey = p.id != null ? `id:${p.id}` : null;
+		const nmKey = p.name ? `nm:${p.name.toLowerCase().trim()}` : null;
+		const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
+		const pev: PEvt = existing ?? { goals: 0, assists: 0, card: null, subOff: false, subOn: false };
+		if (idKey) map.set(idKey, pev);
+		if (nmKey) map.set(nmKey, pev);
+		return pev;
+	};
+	for (const e of events) {
+		if (!e.player.name && e.player.id == null) continue;
+		const pev = ensure(e.player);
+		if (e.type === 'Goal' && !e.detail.toLowerCase().includes('disallow') && !e.detail.includes('Own Goal')) {
+			pev.goals++;
+			if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
+		} else if (e.type === 'Card') {
+			const isRed = e.detail.toLowerCase().includes('red') || e.detail.includes('Second Yellow');
+			pev.card = isRed ? 'red' : 'yellow';
+		} else if (e.type === 'subst') {
+			pev.subOn = true;
+			if (e.assist?.name || e.assist?.id != null) {
+				const apev = ensure(e.assist);
+				apev.subOn = true;
+				apev.subOff = true;
+			}
+		}
+	}
+	return map;
+}
+
+function pEvtKey(p: LineupPlayer): string {
+	return p.id != null ? `id:${p.id}` : `nm:${p.name.toLowerCase().trim()}`;
+}
+
+// ─── Goal bar ─────────────────────────────────────────────────────────────────
+
+function GoalBar({ events, homeTeam, awayTeam, isDark }: {
+	events: MatchEvent[];
+	homeTeam: { shortName: string };
+	awayTeam: { shortName: string };
+	isDark: boolean;
+}) {
+	const goals = events
+		.filter(e => e.type === 'Goal' && !e.detail.toLowerCase().includes('disallow'))
+		.sort((a, b) => a.time - b.time);
+	if (!goals.length) return null;
+
+	const maxTime = Math.max(90, ...goals.map(e => e.time));
+	const homeGoals = goals.filter(g => g.team === 'home');
+	const awayGoals = goals.filter(g => g.team === 'away');
+	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
+	const textSub = isDark ? '#94a3b8' : '#94a3b8';
+	const borderC = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
+	const trackBg = isDark ? 'rgba(255,255,255,0.12)' : '#e2e8f0';
+	const bg = isDark ? '#111827' : '#fff';
+
+	const scorerLabel = (g: MatchEvent) => {
+		const suffix = g.detail.includes('Own Goal') ? ' (OG)' : g.detail.includes('Penalty') ? ' (P)' : '';
+		return `⚽ ${shortName(g.player.name)} ${minuteLabel(g)}${suffix}`;
+	};
+
+	return (
+		<View style={[gb.container, { backgroundColor: bg, borderBottomColor: borderC }]}>
+			{homeGoals.length > 0 && (
+				<View style={gb.scorersRow}>
+					{homeGoals.map((g, i) => (
+						<Text key={i} style={[gb.scorer, { color: textPrimary }]}>{scorerLabel(g)}</Text>
+					))}
+				</View>
+			)}
+			<View style={gb.trackWrap}>
+				<Text style={[gb.teamLabel, { color: textSub }]}>{homeTeam.shortName}</Text>
+				<View style={[gb.track, { backgroundColor: trackBg }]}>
+					{goals.map((g, i) => (
+						<View
+							key={i}
+							style={[
+								gb.tick,
+								{ left: `${(g.time / maxTime) * 100}%` as unknown as number,
+								  backgroundColor: g.team === 'home' ? '#22c55e' : '#f97316',
+								  borderColor: bg },
+							]}
+						/>
+					))}
+				</View>
+				<Text style={[gb.teamLabel, gb.teamLabelR, { color: textSub }]}>{awayTeam.shortName}</Text>
+			</View>
+			{awayGoals.length > 0 && (
+				<View style={[gb.scorersRow, gb.scorersRowR]}>
+					{awayGoals.map((g, i) => (
+						<Text key={i} style={[gb.scorer, gb.scorerR, { color: textPrimary }]}>{scorerLabel(g)}</Text>
+					))}
+				</View>
+			)}
+		</View>
+	);
+}
+
+const gb = StyleSheet.create({
+	container: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
+	scorersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingBottom: 8 },
+	scorersRowR: { justifyContent: 'flex-end', paddingBottom: 0, paddingTop: 8 },
+	scorer: { fontSize: 12, fontWeight: '700' },
+	scorerR: { textAlign: 'right' },
+	trackWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	teamLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, minWidth: 28 },
+	teamLabelR: { textAlign: 'right' },
+	track: { flex: 1, height: 4, borderRadius: 4, position: 'relative' },
+	tick: {
+		position: 'absolute', top: -4, width: 12, height: 12, borderRadius: 6,
+		borderWidth: 2, marginLeft: -6,
+	},
+});
 
 // ─── Match header ─────────────────────────────────────────────────────────────
 
@@ -398,14 +522,20 @@ const ov = StyleSheet.create({
 // ─── Lineup tab ───────────────────────────────────────────────────────────────
 
 function PitchPlayer({
-	player, ratingMap,
-}: { player: LineupPlayer; ratingMap: Map<number, string>; isDark: boolean }) {
+	player, ratingMap, evMap,
+}: { player: LineupPlayer; ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean }) {
 	const [imgFailed, setImgFailed] = useState(false);
 	const rating = player.id != null ? ratingMap.get(player.id) : undefined;
 	const rNum = rating ? parseFloat(rating) : null;
+	const pev = evMap.get(pEvtKey(player));
 
 	return (
 		<View style={pitch.playerWrap}>
+			{/* Swap icon above the avatar */}
+			{(pev?.subOff || pev?.subOn)
+				? <View style={pitch.subIco}><Text style={pitch.subArrUp}>▲</Text><Text style={pitch.subArrDn}>▼</Text></View>
+				: <View style={pitch.subIcoSpacer} />
+			}
 			<View style={pitch.avatarWrap}>
 				{player.photo && !imgFailed
 					? <Image source={{ uri: player.photo }} style={pitch.avatar} contentFit='cover' borderRadius={22} onError={() => setImgFailed(true)} />
@@ -421,28 +551,47 @@ function PitchPlayer({
 						<Text style={pitch.ratingText}>{rNum.toFixed(1)}</Text>
 					</View>
 				)}
+				{/* Card badge — outside avatar image, bottom-right */}
+				{pev?.card && (
+					<View style={[pitch.cardBadge, { backgroundColor: pev.card === 'red' ? '#ef4444' : '#facc15' }]} />
+				)}
 			</View>
-			<Text style={pitch.playerName} numberOfLines={1}>{shortName(player.name)}</Text>
+			{/* Goals + assists */}
+			{pev && (pev.goals > 0 || pev.assists > 0) && (
+				<View style={pitch.eventsRow}>
+					{pev.goals > 0 && <Text style={pitch.goalText}>{'⚽'.repeat(Math.min(pev.goals, 3))}{pev.goals > 3 ? `×${pev.goals}` : ''}</Text>}
+					{pev.assists > 0 && <Text style={pitch.assistText}>{'👟'.repeat(Math.min(pev.assists, 2))}{pev.assists > 2 ? `×${pev.assists}` : ''}</Text>}
+				</View>
+			)}
+			<Text style={pitch.playerName} numberOfLines={2}>{player.name}</Text>
 		</View>
 	);
 }
 
 const pitch = StyleSheet.create({
-	playerWrap: { alignItems: 'center', width: 60 },
-	avatarWrap: { position: 'relative', marginBottom: 12 },
+	playerWrap: { alignItems: 'center', width: 64 },
+	subIco: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(15,23,42,0.85)', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4 },
+	subArrUp: { fontSize: 11, fontWeight: '900', color: '#22c55e', lineHeight: 14 },
+	subArrDn: { fontSize: 11, fontWeight: '900', color: '#ef4444', lineHeight: 14 },
+	subIcoSpacer: { height: 24, marginBottom: 4 },
+	avatarWrap: { position: 'relative', width: 44, height: 44, marginBottom: 14 },
 	avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
 	avatarFallback: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
 	avatarNum: { fontSize: 14, fontWeight: '800', color: '#fff' },
-	numBadge: { position: 'absolute', bottom: -6, left: -2, backgroundColor: '#1e3a5f', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, minWidth: 18, alignItems: 'center' },
+	numBadge: { position: 'absolute', bottom: -7, left: -3, backgroundColor: '#1e3a5f', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, minWidth: 18, alignItems: 'center' },
 	numBadgeText: { fontSize: 8, fontWeight: '800', color: '#fff' },
-	ratingBadge: { position: 'absolute', bottom: -6, right: -2, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+	ratingBadge: { position: 'absolute', bottom: -7, right: -3, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
 	ratingText: { fontSize: 8, fontWeight: '800', color: '#fff' },
+	cardBadge: { position: 'absolute', top: 1, right: -5, width: 13, height: 18, borderRadius: 2, borderWidth: 2, borderColor: 'rgba(255,255,255,0.95)', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 2 },
+	eventsRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 1 },
+	goalText: { fontSize: 10, lineHeight: 12 },
+	assistText: { fontSize: 10, lineHeight: 12 },
 	playerName: { fontSize: 9.5, fontWeight: '600', color: '#fff', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
 
-function FormationRows({ players, reverse, ratingMap, isDark }: {
+function FormationRows({ players, reverse, ratingMap, evMap, isDark }: {
 	players: LineupPlayer[]; reverse: boolean;
-	ratingMap: Map<number, string>; isDark: boolean;
+	ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean;
 }) {
 	const byRow = new Map<number, LineupPlayer[]>();
 	for (const p of players) {
@@ -468,7 +617,7 @@ function FormationRows({ players, reverse, ratingMap, isDark }: {
 				return (
 					<View key={row} style={fo.row}>
 						{sorted.map(p => (
-							<PitchPlayer key={p.id ?? p.name} player={p} ratingMap={ratingMap} isDark={isDark} />
+							<PitchPlayer key={p.id ?? p.name} player={p} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 						))}
 					</View>
 				);
@@ -482,7 +631,7 @@ const fo = StyleSheet.create({
 });
 
 function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
-	const { lineups, playerRatings, homeTeam, awayTeam } = fixture;
+	const { lineups, playerRatings, homeTeam, awayTeam, events } = fixture;
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
 	const textSub = isDark ? '#cbd5e1' : '#475569';
 	const surface = isDark ? '#111827' : '#fff';
@@ -501,44 +650,65 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 	const ratingMap = new Map(
 		playerRatings.filter(r => r.rating != null).map(r => [r.playerId, r.rating as string])
 	);
+	const evMap = buildPlayerEventMap(events);
 
-	const maxSubs = Math.max(homeL?.substitutes.length ?? 0, awayL?.substitutes.length ?? 0);
+	const sortSubs = (subs: LineupPlayer[]) =>
+		[...subs].sort((a, b) => {
+			const aOn = evMap.get(pEvtKey(a))?.subOn ? 1 : 0;
+			const bOn = evMap.get(pEvtKey(b))?.subOn ? 1 : 0;
+			return bOn - aOn;
+		});
+	const homeSubs = sortSubs(homeL?.substitutes ?? []);
+	const awaySubs = sortSubs(awayL?.substitutes ?? []);
+	const maxSubs = Math.max(homeSubs.length, awaySubs.length);
 
 	return (
 		<View style={{ paddingBottom: 24 }}>
+			{/* Goal bar */}
+			<GoalBar events={events} homeTeam={homeTeam} awayTeam={awayTeam} isDark={isDark} />
+
+			{/* Team badges outside the pitch */}
+			<View style={[lu2.pitchHeader, { backgroundColor: surface, borderBottomColor: rowBorder }]}>
+				<View style={lu2.pitchTeamBadge}>
+					{homeTeam.crest ? <Image source={{ uri: homeTeam.crest }} style={lu2.pitchCrest} contentFit='contain' /> : null}
+					<Text style={lu2.pitchTeamName}>{homeTeam.shortName}</Text>
+					{homeL && <Text style={lu2.pitchFormation}>{homeL.formation}</Text>}
+				</View>
+				<View style={lu2.pitchTeamBadge}>
+					{awayTeam.crest ? <Image source={{ uri: awayTeam.crest }} style={lu2.pitchCrest} contentFit='contain' /> : null}
+					<Text style={lu2.pitchTeamName}>{awayTeam.shortName}</Text>
+					{awayL && <Text style={lu2.pitchFormation}>{awayL.formation}</Text>}
+				</View>
+			</View>
+
 			{/* Green pitch */}
 			<View style={lu2.pitch}>
-				{/* Home half */}
+				<Svg style={lu2.pitchSvg} viewBox="0 0 100 160" preserveAspectRatio="none">
+					<Rect width="100" height="160" fill="#2d7a3a" />
+					<Rect x="4" y="6" width="92" height="148" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
+					<Rect x="45" y="2" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
+					<Rect x="45" y="153.5" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
+						<Rect x="23" y="6" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+					<Rect x="23" y="131" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+					<Circle cx="50" cy="21.5" r="0.7" fill="rgba(255,255,255,0.5)" />
+					<Circle cx="50" cy="138.5" r="0.7" fill="rgba(255,255,255,0.5)" />
+					<Path d="M 39.75 29 A 13 13 0 0 0 60.25 29" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+					<Path d="M 39.75 131 A 13 13 0 0 1 60.25 131" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+					<Line x1="4" y1="80" x2="96" y2="80" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+					<Path d="M 4 8.5 A 2.5 2.5 0 0 0 6.5 6" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+					<Path d="M 93.5 6 A 2.5 2.5 0 0 0 96 8.5" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+					<Path d="M 96 151.5 A 2.5 2.5 0 0 0 93.5 154" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+					<Path d="M 6.5 154 A 2.5 2.5 0 0 0 4 151.5" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+				</Svg>
+
 				{homeL && (
 					<View style={lu2.pitchHalf}>
-						<View style={lu2.pitchTeamBadge}>
-							{homeTeam.crest
-								? <Image source={{ uri: homeTeam.crest }} style={lu2.pitchCrest} contentFit='contain' />
-								: null}
-							<Text style={lu2.pitchTeamName}>{homeTeam.shortName}</Text>
-							<Text style={lu2.pitchFormation}>{homeL.formation}</Text>
-						</View>
-						<FormationRows players={homeL.startXI} reverse={false} ratingMap={ratingMap} isDark={isDark} />
+						<FormationRows players={homeL.startXI} reverse={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 					</View>
 				)}
-
-				{/* Center line */}
-				<View style={lu2.centerLine}>
-					<View style={lu2.centerLineBar} />
-					<View style={lu2.centerCircle} />
-				</View>
-
-				{/* Away half */}
 				{awayL && (
 					<View style={lu2.pitchHalf}>
-						<FormationRows players={awayL.startXI} reverse={true} ratingMap={ratingMap} isDark={isDark} />
-						<View style={[lu2.pitchTeamBadge, lu2.pitchTeamBadgeBottom]}>
-							{awayTeam.crest
-								? <Image source={{ uri: awayTeam.crest }} style={lu2.pitchCrest} contentFit='contain' />
-								: null}
-							<Text style={lu2.pitchTeamName}>{awayTeam.shortName}</Text>
-							<Text style={lu2.pitchFormation}>{awayL.formation}</Text>
-						</View>
+						<FormationRows players={awayL.startXI} reverse={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 					</View>
 				)}
 			</View>
@@ -561,24 +731,32 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 
 					{/* Player rows */}
 					{Array.from({ length: maxSubs }).map((_, i) => {
-						const hp = homeL?.substitutes[i];
-						const ap = awayL?.substitutes[i];
+						const hp = homeSubs[i];
+						const ap = awaySubs[i];
 						const hr = hp?.id != null ? ratingMap.get(hp.id) : undefined;
 						const ar = ap?.id != null ? ratingMap.get(ap.id) : undefined;
+						const hpev = hp ? evMap.get(pEvtKey(hp)) : undefined;
+						const apev = ap ? evMap.get(pEvtKey(ap)) : undefined;
 						return (
 							<View key={i} style={[lu2.benchRow, { borderBottomColor: rowBorder }]}>
 								{/* Home sub */}
 								{hp ? (
 									<View style={lu2.benchPlayer}>
-										{hp.photo
-											? <Image source={{ uri: hp.photo }} style={lu2.benchAvatar} contentFit='cover' borderRadius={20} />
-											: <View style={[lu2.benchAvatar, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 20 }]} />
-										}
+										<View style={lu2.benchAvWrap}>
+											{hp.photo
+												? <Image source={{ uri: hp.photo }} style={lu2.benchAvatar} contentFit='cover' borderRadius={20} />
+												: <View style={[lu2.benchAvatar, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 20 }]} />
+											}
+											{hpev?.subOn && <View style={lu2.subOnBadge}><View style={lu2.subOnBadgeInner}><Text style={lu2.subOnTextUp}>▲</Text><Text style={lu2.subOnTextDn}>▼</Text></View></View>}
+											{hpev?.card && <View style={[lu2.cardBadge, { backgroundColor: hpev.card === 'red' ? '#ef4444' : '#facc15' }]} />}
+										</View>
 										<View style={{ flex: 1 }}>
 											<Text style={[lu2.benchName, { color: textPrimary }]} numberOfLines={1}>{hp.name}</Text>
 											<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
 												<Text style={[lu2.benchPos, { color: textSub }]}>{hp.pos ?? ''}</Text>
 												{hr ? <View style={[lu2.benchRating, { backgroundColor: ratingColor(parseFloat(hr)) }]}><Text style={lu2.benchRatingText}>{parseFloat(hr).toFixed(1)}</Text></View> : null}
+												{hpev && hpev.goals > 0 ? <Text style={lu2.benchGoal}>{'⚽'.repeat(Math.min(hpev.goals, 2))}</Text> : null}
+												{hpev && hpev.assists > 0 ? <Text style={lu2.benchAssist}>{'👟'.repeat(Math.min(hpev.assists, 2))}</Text> : null}
 											</View>
 										</View>
 									</View>
@@ -588,14 +766,20 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 								{/* Away sub */}
 								{ap ? (
 									<View style={[lu2.benchPlayer, { flexDirection: 'row-reverse' }]}>
-										{ap.photo
-											? <Image source={{ uri: ap.photo }} style={lu2.benchAvatar} contentFit='cover' borderRadius={20} />
-											: <View style={[lu2.benchAvatar, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 20 }]} />
-										}
+										<View style={lu2.benchAvWrap}>
+											{ap.photo
+												? <Image source={{ uri: ap.photo }} style={lu2.benchAvatar} contentFit='cover' borderRadius={20} />
+												: <View style={[lu2.benchAvatar, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 20 }]} />
+											}
+											{apev?.subOn && <View style={lu2.subOnBadge}><View style={lu2.subOnBadgeInner}><Text style={lu2.subOnTextUp}>▲</Text><Text style={lu2.subOnTextDn}>▼</Text></View></View>}
+											{apev?.card && <View style={[lu2.cardBadge, { backgroundColor: apev.card === 'red' ? '#ef4444' : '#facc15' }]} />}
+										</View>
 										<View style={{ flex: 1, alignItems: 'flex-end' }}>
 											<Text style={[lu2.benchName, { color: textPrimary }]} numberOfLines={1}>{ap.name}</Text>
 											<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
 												{ar ? <View style={[lu2.benchRating, { backgroundColor: ratingColor(parseFloat(ar)) }]}><Text style={lu2.benchRatingText}>{parseFloat(ar).toFixed(1)}</Text></View> : null}
+												{apev && apev.goals > 0 ? <Text style={lu2.benchGoal}>{'⚽'.repeat(Math.min(apev.goals, 2))}</Text> : null}
+												{apev && apev.assists > 0 ? <Text style={lu2.benchAssist}>{'👟'.repeat(Math.min(apev.assists, 2))}</Text> : null}
 												<Text style={[lu2.benchPos, { color: textSub }]}>{ap.pos ?? ''}</Text>
 											</View>
 										</View>
@@ -637,16 +821,15 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 }
 
 const lu2 = StyleSheet.create({
-	pitch: { backgroundColor: '#2d7a3a', paddingVertical: 8, paddingHorizontal: 8, gap: 0 },
-	pitchHalf: { paddingVertical: 12, gap: 8 },
+	pitchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1 },
+	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column' },
+	pitchSvg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+	pitchHalf: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, gap: 8 },
 	pitchTeamBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
 	pitchTeamBadgeBottom: {},
 	pitchCrest: { width: 18, height: 18 },
 	pitchTeamName: { fontSize: 11, fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 },
 	pitchFormation: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
-	centerLine: { alignItems: 'center', justifyContent: 'center', height: 24 },
-	centerLineBar: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.25)' },
-	centerCircle: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', backgroundColor: '#2d7a3a' },
 	bench: { marginTop: 8 },
 	benchHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1 },
 	benchHeaderTeam: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -656,11 +839,19 @@ const lu2 = StyleSheet.create({
 	benchRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, gap: 0 },
 	benchPlayer: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
 	benchDivider: { width: 1, height: 36, marginHorizontal: 8 },
+	benchAvWrap: { position: 'relative', flexShrink: 0, marginTop: 10 },
 	benchAvatar: { width: 38, height: 38, flexShrink: 0 },
 	benchName: { fontSize: 12, fontWeight: '600' },
 	benchPos: { fontSize: 10, fontWeight: '600' },
 	benchRating: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 99 },
 	benchRatingText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+	benchGoal: { fontSize: 11 },
+	benchAssist: { fontSize: 11 },
+	subOnBadge: { position: 'absolute', top: -9, left: -4, right: -4, alignItems: 'center' },
+	subOnBadgeInner: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(15,23,42,0.85)', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 3 },
+	subOnTextUp: { fontSize: 10, fontWeight: '900', color: '#22c55e', lineHeight: 13 },
+	subOnTextDn: { fontSize: 10, fontWeight: '900', color: '#ef4444', lineHeight: 13 },
+	cardBadge: { position: 'absolute', top: 1, right: -5, width: 13, height: 18, borderRadius: 2, borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 2 },
 	mgmtHeader: { paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, marginTop: 4 },
 	mgmtTitle: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
 });
@@ -816,6 +1007,30 @@ export default function MatchDetailScreen() {
 	const initialTab: Tab = params.tab === 'lineup' ? 'lineup' : params.tab === 'stats' ? 'stats' : 'overview';
 	const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 	const { isDark, colors } = useTheme();
+	const { translateY } = useTabBar();
+	const lastScrollY = useRef(0);
+	const tabBarVisible = useRef(true);
+	const TAB_BAR_H = 60;
+
+	function handleScroll(e: { nativeEvent: { contentOffset: { y: number } } }) {
+		const y = e.nativeEvent.contentOffset.y;
+		const diff = y - lastScrollY.current;
+		lastScrollY.current = y;
+		if (y < 60) {
+			if (!tabBarVisible.current) {
+				tabBarVisible.current = true;
+				Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+			}
+			return;
+		}
+		if (diff > 4 && tabBarVisible.current) {
+			tabBarVisible.current = false;
+			Animated.timing(translateY, { toValue: TAB_BAR_H, duration: 200, useNativeDriver: true }).start();
+		} else if (diff < -4 && !tabBarVisible.current) {
+			tabBarVisible.current = true;
+			Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+		}
+	}
 
 	const { data, loading, error } = useQuery<{ worldCupFixture: FixtureDetails }>(
 		WORLD_CUP_FIXTURE_DETAILS,
@@ -848,7 +1063,7 @@ export default function MatchDetailScreen() {
 					<Text style={{ color: '#ef4444', fontSize: 14 }}>Failed to load match details.</Text>
 				</View>
 			) : fixture ? (
-				<ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+				<ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 					<MatchHeader fixture={fixture} isDark={isDark} />
 
 					{/* Tab bar */}
@@ -877,6 +1092,7 @@ export default function MatchDetailScreen() {
 					</View>
 				</ScrollView>
 			) : null}
+			<BottomNav />
 		</View>
 	);
 }

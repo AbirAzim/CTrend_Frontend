@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@apollo/client/react";
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
@@ -28,7 +28,7 @@ export function BottomNav({ active }: { active?: TabName }) {
   const { colors, isDark } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { savedCount, setSavedCount } = useTabBar();
+  const { savedCount, setSavedCount, translateY } = useTabBar();
   const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const { data: convData } = useQuery<{ myConversations: Array<{ unreadCount: number }> }>(
@@ -93,13 +93,14 @@ export function BottomNav({ active }: { active?: TabName }) {
   }
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.bar,
         {
           backgroundColor: colors.tabBg,
           borderTopColor: colors.border,
           paddingBottom: insets.bottom + 6,
+          transform: [{ translateY }],
         },
       ]}
     >
@@ -130,7 +131,7 @@ export function BottomNav({ active }: { active?: TabName }) {
           </Pressable>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

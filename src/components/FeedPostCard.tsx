@@ -2329,7 +2329,11 @@ function FeedPostCardComponent({
         <button
           type="button"
           className="cx-mdb-row"
-          onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const tab = post.lineupAvailable && !isMatchFinished ? '?tab=lineup' : '';
+            navigate(`/world-cup/match/${post.fixtureId}${tab}`);
+          }}
         >
           <span className="cx-mdb-row-icon" aria-hidden>⚽</span>
           <span className="cx-mdb-row-label">Full match report & lineups</span>

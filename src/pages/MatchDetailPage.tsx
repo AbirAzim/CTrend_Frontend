@@ -141,6 +141,97 @@ function deriveHalfScore(events: MatchEvent[]) {
   return { home, away };
 }
 
+// ─── Player event map (goals / cards / subs per player) ──────────────────────
+
+type PEvt = { goals: number; assists: number; card: "yellow" | "red" | null; subOff: boolean; subOn: boolean };
+
+function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
+  const map = new Map<string, PEvt>();
+  const ensure = (p: EventPlayer): PEvt => {
+    const idKey = p.id != null ? `id:${p.id}` : null;
+    const nmKey = p.name ? `nm:${p.name.toLowerCase().trim()}` : null;
+    const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
+    const pev: PEvt = existing ?? { goals: 0, assists: 0, card: null, subOff: false, subOn: false };
+    if (idKey) map.set(idKey, pev);
+    if (nmKey) map.set(nmKey, pev);
+    return pev;
+  };
+  for (const e of events) {
+    if (!e.player.name && e.player.id == null) continue;
+    const pev = ensure(e.player);
+    if (e.type === "Goal" && !e.detail.toLowerCase().includes("disallow") && !e.detail.includes("Own Goal")) {
+      pev.goals++;
+      if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
+    } else if (e.type === "Card") {
+      const isRed = e.detail.toLowerCase().includes("red") || e.detail.includes("Second Yellow");
+      pev.card = isRed ? "red" : "yellow";
+    } else if (e.type === "subst") {
+      pev.subOn = true;
+      if (e.assist?.name || e.assist?.id != null) {
+        const apev = ensure(e.assist);
+        apev.subOn = true;
+        apev.subOff = true;
+      }
+    }
+  }
+  return map;
+}
+
+function pEvtKey(p: LineupPlayer): string {
+  return p.id != null ? `id:${p.id}` : `nm:${p.name.toLowerCase().trim()}`;
+}
+
+// ─── Goal bar ─────────────────────────────────────────────────────────────────
+
+function GoalBar({ events, homeTeam, awayTeam }: {
+  events: MatchEvent[];
+  homeTeam: { shortName: string };
+  awayTeam: { shortName: string };
+}) {
+  const goals = events
+    .filter(e => e.type === "Goal" && !e.detail.toLowerCase().includes("disallow"))
+    .sort((a, b) => a.time - b.time);
+  if (!goals.length) return null;
+
+  const maxTime = Math.max(90, ...goals.map(e => e.time));
+  const homeGoals = goals.filter(g => g.team === "home");
+  const awayGoals = goals.filter(g => g.team === "away");
+
+  const scorerLabel = (g: MatchEvent) => {
+    const suffix = g.detail.includes("Own Goal") ? " (OG)" : g.detail.includes("Penalty") ? " (P)" : "";
+    return `⚽ ${shortName(g.player.name)} ${minuteLabel(g)}${suffix}`;
+  };
+
+  return (
+    <div className="md-goal-bar">
+      {homeGoals.length > 0 && (
+        <div className="md-gbar-scorers md-gbar-scorers--home">
+          {homeGoals.map((g, i) => <span key={i} className="md-gbar-scorer">{scorerLabel(g)}</span>)}
+        </div>
+      )}
+      <div className="md-gbar-track-wrap">
+        <span className="md-gbar-team">{homeTeam.shortName}</span>
+        <div className="md-gbar-track">
+          {goals.map((g, i) => (
+            <span
+              key={i}
+              className={`md-gbar-tick md-gbar-tick--${g.team}`}
+              style={{ left: `${(g.time / maxTime) * 100}%` }}
+              title={`${g.player.name} ${minuteLabel(g)}`}
+            />
+          ))}
+        </div>
+        <span className="md-gbar-team md-gbar-team--r">{awayTeam.shortName}</span>
+      </div>
+      {awayGoals.length > 0 && (
+        <div className="md-gbar-scorers md-gbar-scorers--away">
+          {awayGoals.map((g, i) => <span key={i} className="md-gbar-scorer md-gbar-scorer--r">{scorerLabel(g)}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Event icon ───────────────────────────────────────────────────────────────
 
 function EvIcon({ type, detail }: { type: string; detail: string }) {
@@ -284,38 +375,58 @@ function PitchAvatar({
   player,
   photoMap,
   ratingMap,
+  evMap,
 }: {
   player: LineupPlayer;
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
+  evMap: Map<string, PEvt>;
 }) {
   const photo = playerPhoto(player, photoMap);
   const [imgFailed, setImgFailed] = useState(false);
   const rating = player.id != null ? ratingMap.get(player.id) : undefined;
+  const pev = evMap.get(pEvtKey(player));
 
   return (
     <div className="md-pa">
-      <div className="md-pa-circle">
-        {photo && !imgFailed ? (
-          <img
-            src={photo}
-            alt={player.name}
-            className="md-pa-img"
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <span className="md-pa-num">{player.number}</span>
+      <div className="md-pa-av-wrap">
+        {/* Sub icon sits above the circle, centered */}
+        {(pev?.subOff || pev?.subOn) && (
+          <span className="md-pa-sub-ico">
+            <span className="md-sub-arr-up">▲</span>
+            <span className="md-sub-arr-dn">▼</span>
+          </span>
         )}
-        {photo && !imgFailed && (
-          <span className="md-pa-num-badge">{player.number}</span>
-        )}
+        <div className="md-pa-circle">
+          {photo && !imgFailed ? (
+            <img
+              src={photo}
+              alt={player.name}
+              className="md-pa-img"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <span className="md-pa-num">{player.number}</span>
+          )}
+          {photo && !imgFailed && (
+            <span className="md-pa-num-badge">{player.number}</span>
+          )}
+        </div>
+        {/* Card outside overflow:hidden circle */}
+        {pev?.card && <span className={`md-pa-card md-pa-card--${pev.card}`} />}
       </div>
       {rating && (
         <span className="md-pa-rating" style={{ background: ratingColor(parseFloat(rating)) }}>
           {rating}
         </span>
       )}
-      <span className="md-pa-label">{shortName(player.name)}</span>
+      {pev && (pev.goals > 0 || pev.assists > 0) && (
+        <span className="md-pa-events">
+          {pev.goals > 0 && <span className="md-pa-ev-goal">{"⚽".repeat(Math.min(pev.goals, 3))}{pev.goals > 3 ? `×${pev.goals}` : ""}</span>}
+          {pev.assists > 0 && <span className="md-pa-ev-assist">{"👟".repeat(Math.min(pev.assists, 2))}{pev.assists > 2 ? `×${pev.assists}` : ""}</span>}
+        </span>
+      )}
+      <span className="md-pa-label">{player.name}</span>
     </div>
   );
 }
@@ -325,11 +436,13 @@ function FormationRows({
   reverse,
   photoMap,
   ratingMap,
+  evMap,
 }: {
   players: LineupPlayer[];
   reverse: boolean;
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
+  evMap: Map<string, PEvt>;
 }) {
   const byRow = new Map<number, LineupPlayer[]>();
   for (const p of players) {
@@ -355,7 +468,7 @@ function FormationRows({
         return (
           <div key={row} className="md-frow">
             {sorted.map((p) => (
-              <PitchAvatar key={p.id ?? p.name} player={p} photoMap={photoMap} ratingMap={ratingMap} />
+              <PitchAvatar key={p.id ?? p.name} player={p} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
             ))}
           </div>
         );
@@ -368,49 +481,56 @@ function BenchCell({
   player,
   photoMap,
   ratingMap,
+  evMap,
 }: {
   player: LineupPlayer;
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
+  evMap: Map<string, PEvt>;
 }) {
   const photo = playerPhoto(player, photoMap);
   const [imgFailed, setImgFailed] = useState(false);
   const showPhoto = photo && !imgFailed;
   const rating = player.id != null ? ratingMap.get(player.id) : undefined;
-
-  const avatar = (
-    <div className="md-bc-avatar">
-      {showPhoto ? (
-        <img src={photo} alt={player.name} className="md-bc-img" onError={() => setImgFailed(true)} />
-      ) : (
-        <span className="md-bc-num">{player.number}</span>
-      )}
-    </div>
-  );
-
-  const info = (
-    <div className="md-bc-info">
-      <span className="md-bc-name">{shortName(player.name)}</span>
-      <div className="md-bc-meta">
-        <span className="md-bc-pos">{player.pos ?? ""}</span>
-        {rating && (
-          <span className="md-bc-rating" style={{ background: ratingColor(parseFloat(rating)) }}>
-            {rating}
-          </span>
-        )}
-      </div>
-    </div>
-  );
+  const pev = evMap.get(pEvtKey(player));
 
   return (
     <div className="md-bc">
-      {avatar}{info}
+      <div className="md-bc-av-wrap">
+        <div className="md-bc-avatar">
+          {showPhoto ? (
+            <img src={photo} alt={player.name} className="md-bc-img" onError={() => setImgFailed(true)} />
+          ) : (
+            <span className="md-bc-num">{player.number}</span>
+          )}
+        </div>
+        {pev?.subOn && (
+          <span className="md-bc-sub-on">
+            <span className="md-sub-arr-up">▲</span>
+            <span className="md-sub-arr-dn">▼</span>
+          </span>
+        )}
+        {pev?.card && <span className={`md-bc-card-ico md-bc-card-ico--${pev.card}`} />}
+      </div>
+      <div className="md-bc-info">
+        <span className="md-bc-name">{player.name}</span>
+        <div className="md-bc-meta">
+          <span className="md-bc-pos">{player.pos ?? ""}</span>
+          {rating && (
+            <span className="md-bc-rating" style={{ background: ratingColor(parseFloat(rating)) }}>
+              {rating}
+            </span>
+          )}
+          {pev && pev.goals > 0 && <span className="md-bc-goal-ico">{"⚽".repeat(Math.min(pev.goals, 2))}</span>}
+          {pev && pev.assists > 0 && <span className="md-bc-assist-ico">{"👟".repeat(Math.min(pev.assists, 2))}</span>}
+        </div>
+      </div>
     </div>
   );
 }
 
 function LineupTab({ fixture }: { fixture: FixtureDetails }) {
-  const { lineups } = fixture;
+  const { lineups, events } = fixture;
   if (lineups.length === 0) {
     return <div className="md-empty">Lineups will appear closer to kickoff.</div>;
   }
@@ -423,42 +543,63 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
       .filter((r) => r.rating != null)
       .map((r) => [r.playerId, r.rating as string])
   );
+  const evMap = buildPlayerEventMap(events);
+  const sortSubs = (subs: LineupPlayer[]) =>
+    [...subs].sort((a, b) => (evMap.get(pEvtKey(b))?.subOn ? 1 : 0) - (evMap.get(pEvtKey(a))?.subOn ? 1 : 0));
+  const homeSubs = sortSubs(homeL?.substitutes ?? []);
+  const awaySubs = sortSubs(awayL?.substitutes ?? []);
 
   return (
     <div className="md-lineup">
-      {/* ── Pitch ── */}
-      <div className="md-pitch">
-        {/* Top half: Home (GK at top, FW toward center) */}
+      {/* ── Goal bar ── */}
+      <GoalBar events={events} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />
+
+      {/* ── Team badges above/below pitch ── */}
+      <div className="md-pitch-header">
         {homeL && (
-          <div className="md-pitch-half">
-            <div className="md-pitch-team-badge">
-              {fixture.homeTeam.crest && (
-                <img src={fixture.homeTeam.crest} alt={fixture.homeTeam.name} className="md-pitch-team-crest" />
-              )}
-              <span>{fixture.homeTeam.shortName}</span>
-              <span className="md-pitch-formation">{homeL.formation}</span>
-            </div>
-            <FormationRows players={homeL.startXI} reverse={false} photoMap={photoMap} ratingMap={ratingMap} />
+          <div className="md-pitch-team-badge">
+            {fixture.homeTeam.crest && <img src={fixture.homeTeam.crest} alt={fixture.homeTeam.name} className="md-pitch-team-crest" />}
+            <span>{fixture.homeTeam.shortName}</span>
+            <span className="md-pitch-formation">{homeL.formation}</span>
           </div>
         )}
+        {awayL && (
+          <div className="md-pitch-team-badge">
+            {fixture.awayTeam.crest && <img src={fixture.awayTeam.crest} alt={fixture.awayTeam.name} className="md-pitch-team-crest" />}
+            <span>{fixture.awayTeam.shortName}</span>
+            <span className="md-pitch-formation">{awayL.formation}</span>
+          </div>
+        )}
+      </div>
 
-        {/* Center line */}
-        <div className="md-pitch-center">
-          <div className="md-pitch-center-line" />
-          <div className="md-pitch-center-circle" />
-        </div>
+      {/* ── Pitch ── */}
+      <div className="md-pitch">
+        <svg className="md-pitch-svg" viewBox="0 0 100 160" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="160" fill="#2d7a3a" />
+          <rect x="4" y="6" width="92" height="148" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
+          <rect x="45" y="2" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
+          <rect x="45" y="153.5" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
+          <rect x="23" y="6" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+          <rect x="23" y="131" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+          <circle cx="50" cy="21.5" r="0.7" fill="rgba(255,255,255,0.5)" />
+          <circle cx="50" cy="138.5" r="0.7" fill="rgba(255,255,255,0.5)" />
+          <path d="M 39.75 29 A 13 13 0 0 0 60.25 29" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+          <path d="M 39.75 131 A 13 13 0 0 1 60.25 131" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+          <line x1="4" y1="80" x2="96" y2="80" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+          <path d="M 4 8.5 A 2.5 2.5 0 0 0 6.5 6" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+          <path d="M 93.5 6 A 2.5 2.5 0 0 0 96 8.5" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+          <path d="M 96 151.5 A 2.5 2.5 0 0 0 93.5 154" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+          <path d="M 6.5 154 A 2.5 2.5 0 0 0 4 151.5" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.25" />
+        </svg>
 
-        {/* Bottom half: Away (FW toward center, GK at bottom) */}
+        {homeL && (
+          <div className="md-pitch-half">
+            <FormationRows players={homeL.startXI} reverse={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
+          </div>
+        )}
         {awayL && (
           <div className="md-pitch-half">
-            <FormationRows players={awayL.startXI} reverse={true} photoMap={photoMap} ratingMap={ratingMap} />
-            <div className="md-pitch-team-badge md-pitch-team-badge--bottom">
-              {fixture.awayTeam.crest && (
-                <img src={fixture.awayTeam.crest} alt={fixture.awayTeam.name} className="md-pitch-team-crest" />
-              )}
-              <span>{fixture.awayTeam.shortName}</span>
-              <span className="md-pitch-formation">{awayL.formation}</span>
-            </div>
+            <FormationRows players={awayL.startXI} reverse={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
           </div>
         )}
       </div>
@@ -480,16 +621,14 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
           </div>
 
           {/* Player rows */}
-          {Array.from({
-            length: Math.max(homeL?.substitutes.length ?? 0, awayL?.substitutes.length ?? 0),
-          }).map((_, i) => {
-            const hp = homeL?.substitutes[i];
-            const ap = awayL?.substitutes[i];
+          {Array.from({ length: Math.max(homeSubs.length, awaySubs.length) }).map((_, i) => {
+            const hp = homeSubs[i];
+            const ap = awaySubs[i];
             return (
               <div key={i} className="md-bench-pair">
-                {hp ? <BenchCell player={hp} photoMap={photoMap} ratingMap={ratingMap} /> : <div className="md-bc md-bc--empty" />}
+                {hp ? <BenchCell player={hp} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} /> : <div className="md-bc md-bc--empty" />}
                 <div className="md-bench-pair-div" />
-                {ap ? <BenchCell player={ap} photoMap={photoMap} ratingMap={ratingMap} /> : <div className="md-bc md-bc--empty" />}
+                {ap ? <BenchCell player={ap} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} /> : <div className="md-bc md-bc--empty" />}
               </div>
             );
           })}

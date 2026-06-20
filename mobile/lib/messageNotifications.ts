@@ -309,7 +309,8 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
 
   // World Cup fixture → match detail screen
   if (FIXTURE_NOTIF_TYPES.has(nt) && data.referenceId) {
-    return `/world-cup/match/${data.referenceId}`;
+    const tab = nt === "LINEUP_AVAILABLE" ? "?tab=lineup" : "";
+    return `/world-cup/match/${data.referenceId}${tab}`;
   }
   if (refType === "FIXTURE" && data.referenceId) {
     return `/world-cup/match/${data.referenceId}`;

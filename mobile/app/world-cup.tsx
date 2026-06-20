@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomNav } from "../components/BottomNav";
 import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "@ctrend/shared/graphql/worldcup";
 import { useTheme } from "../context/ThemeContext";
 import {
@@ -531,6 +532,7 @@ export default function WorldCupScreen() {
               />
         )}
       </ScrollView>
+      <BottomNav />
     </View>
   );
 }
@@ -681,10 +683,10 @@ function makeStyles(c: Palette) {
     stCrestPh: { width: 16, height: 16, borderRadius: 8, backgroundColor: c.section },
     stName: { flex: 1, fontSize: 12, fontWeight: "700", color: c.text },
     // ── Stats (top scorers / assists) ──────────────────────────────────────────
-    statsGrid: { gap: 16 },
-    statsCol: { gap: 4 },
+    statsGrid: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+    statsCol: { flex: 1, gap: 4 },
     statsColTitle: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: "800",
       color: c.text,
       marginBottom: 6,
@@ -695,26 +697,26 @@ function makeStyles(c: Palette) {
     playerRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 10,
+      gap: 6,
+      paddingVertical: 7,
+      paddingHorizontal: 8,
       backgroundColor: c.card,
-      borderRadius: 10,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: c.border,
-      marginBottom: 5,
+      marginBottom: 4,
     },
-    playerRank: { fontSize: 11, fontWeight: "800", color: c.muted, width: 18, textAlign: "center" },
+    playerRank: { fontSize: 10, fontWeight: "800", color: c.muted, width: 14, textAlign: "center" },
     playerInfo: { flex: 1, gap: 2, minWidth: 0 },
-    playerName: { fontSize: 13, fontWeight: "700", color: c.text },
-    playerTeamRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-    playerCrest: { width: 13, height: 13 },
-    playerTeam: { fontSize: 11, color: c.muted, flexShrink: 1 },
+    playerName: { fontSize: 11, fontWeight: "700", color: c.text },
+    playerTeamRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+    playerCrest: { width: 11, height: 11 },
+    playerTeam: { fontSize: 10, color: c.muted, flexShrink: 1 },
     playerStat: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: "900",
       color: c.accent,
-      minWidth: 28,
+      minWidth: 22,
       textAlign: "center",
     },
   });

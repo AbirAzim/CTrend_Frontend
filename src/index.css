@@ -21585,32 +21585,44 @@ a.cx-profile-btn-accent {
    ───────────────────────────── */
 .md-lineup { padding-bottom: 24px; }
 
+/* Team badges sit outside the green pitch, above it */
+.md-pitch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--ig-surface);
+  border-bottom: 1px solid var(--ig-border);
+}
+
 .md-pitch {
-  background: linear-gradient(180deg, #276645 0%, #2d7a51 49%, #276645 100%);
+  background: #2d7a3a;
   padding: 0;
   position: relative;
   overflow: hidden;
-  /* Pitch lines */
-  border-left: 3px solid rgba(255,255,255,0.12);
-  border-right: 3px solid rgba(255,255,255,0.12);
+  display: flex;
+  flex-direction: column;
 }
-/* Outer pitch border via ::before */
-.md-pitch::before {
-  content: "";
+
+/* SVG field drawn as absolute background */
+.md-pitch-svg {
   position: absolute;
-  inset: 8px;
-  border: 1.5px solid rgba(255,255,255,0.2);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 .md-pitch-half {
+  flex: 1;
   padding: 12px 8px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   position: relative;
+  z-index: 1;
 }
 
 /* Team badge in pitch half */
@@ -21623,20 +21635,17 @@ a.cx-profile-btn-accent {
 .md-pitch-team-badge--bottom { order: 1; }
 .md-pitch-team-crest { width: 20px; height: 20px; object-fit: contain; border-radius: 2px; }
 .md-pitch-formation {
-  font-size: 0.72rem; font-weight: 900;
-  color: #fff;
-  background: rgba(0,0,0,0.35);
-  padding: 2px 8px; border-radius: 10px;
+  font-size: 0.72rem; font-weight: 600;
+  color: rgba(255,255,255,0.7);
   letter-spacing: 0.04em;
   margin-left: 4px;
 }
 
-/* Center line + circle */
-.md-pitch-center { position: relative; z-index: 2; }
-.md-pitch-center-line {
-  height: 1.5px; background: rgba(255,255,255,0.35); margin: 0 8px;
-}
+/* (kept for reference — no longer used, SVG handles field markings) */
+.md-pitch-center { position: relative; z-index: 2; display: none; }
+.md-pitch-center-line { display: none; }
 .md-pitch-center-circle {
+  display: none;
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   width: 60px; height: 60px; border-radius: 50%;
@@ -21677,9 +21686,10 @@ a.cx-profile-btn-accent {
   border: 1.5px solid rgba(255,255,255,0.6);
 }
 .md-pa-label {
-  font-size: 0.74rem; font-weight: 700; color: #fff;
-  text-align: center; max-width: 52px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.68rem; font-weight: 700; color: #fff;
+  text-align: center; max-width: 56px;
+  white-space: normal; word-break: break-word;
+  line-height: 1.2;
   text-shadow: 0 1px 4px rgba(0,0,0,0.6);
 }
 
@@ -21885,6 +21895,110 @@ a.cx-profile-btn-accent {
   line-height: 1.2;
 }
 
+/* ── Goals + assists row below name (pitch) ── */
+.md-pa-events { display: flex; align-items: center; gap: 3px; line-height: 1; margin-top: -1px; }
+.md-pa-ev-goal { font-size: 0.72rem; }
+.md-pa-ev-assist { font-size: 0.72rem; }
+
+/* ── Avatar wrapper — holds circle + card badge + sub icon ── */
+.md-pa-av-wrap {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+}
+
+/* ── Goal net at top/bottom of pitch ── */
+.md-goal-net {
+  display: flex; justify-content: center; align-items: flex-end;
+  padding: 0 20%;
+  position: relative; z-index: 2;
+}
+.md-goal-net--top {
+  padding-top: 8px;
+  border-top: 3px solid rgba(255,255,255,0.6);
+}
+.md-goal-net--bottom {
+  padding-bottom: 8px;
+  border-bottom: 3px solid rgba(255,255,255,0.6);
+}
+.md-goal-net-bar {
+  width: 100%;
+  height: 22px;
+  border: 2.5px solid rgba(255,255,255,0.7);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255,255,255,0.07) 0px,
+    rgba(255,255,255,0.07) 1px,
+    transparent 1px,
+    transparent 10px
+  ),
+  repeating-linear-gradient(
+    180deg,
+    rgba(255,255,255,0.07) 0px,
+    rgba(255,255,255,0.07) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+.md-goal-net--top .md-goal-net-bar  { border-bottom: none; border-radius: 0; }
+.md-goal-net--bottom .md-goal-net-bar { border-top: none; border-radius: 0; }
+
+/* ── Substitution swap icon above the circle ── */
+.md-pa-sub-ico {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(15,23,42,0.82);
+  border-radius: 99px;
+  padding: 3px 8px;
+  margin-bottom: 4px;
+  border: 2px solid rgba(255,255,255,0.55);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  z-index: 2;
+}
+.md-sub-arr-up { font-size: 0.72rem; font-weight: 900; color: #22c55e; line-height: 1; }
+.md-sub-arr-dn { font-size: 0.72rem; font-weight: 900; color: #ef4444; line-height: 1; }
+
+/* ── Card badge — top-right of av-wrap, does not protrude above wrap ── */
+.md-pa-card {
+  position: absolute; top: 2px; right: -4px;
+  width: 12px; height: 17px; border-radius: 2px;
+  border: 2px solid rgba(255,255,255,0.9);
+  pointer-events: none; z-index: 3;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.md-pa-card--yellow { background: #facc15; }
+.md-pa-card--red { background: #ef4444; }
+
+/* ── Goal bar ── */
+.md-goal-bar {
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--ig-border);
+  background: var(--ig-bg);
+}
+.md-gbar-scorers {
+  display: flex; flex-wrap: wrap; gap: 2px 14px; padding-bottom: 8px;
+}
+.md-gbar-scorers--away { justify-content: flex-end; padding-bottom: 0; padding-top: 8px; }
+.md-gbar-scorer { font-size: 0.78rem; font-weight: 700; color: var(--cx-ink); }
+.md-gbar-scorer--r { text-align: right; }
+.md-gbar-track-wrap {
+  display: flex; align-items: center; gap: 8px;
+}
+.md-gbar-team {
+  font-size: 0.68rem; font-weight: 800; color: var(--ig-muted);
+  text-transform: uppercase; letter-spacing: 0.05em; min-width: 28px;
+}
+.md-gbar-team--r { text-align: right; }
+.md-gbar-track {
+  flex: 1; height: 4px; background: var(--ig-border);
+  border-radius: 4px; position: relative;
+}
+.md-gbar-tick {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--ig-bg);
+}
+.md-gbar-tick--home { background: #22c55e; }
+.md-gbar-tick--away { background: #f97316; }
+
 /* ── Rating in bench cell ── */
 .md-bc-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
 .md-bc-rating {
@@ -21893,6 +22007,28 @@ a.cx-profile-btn-accent {
   border: 1px solid rgba(0,0,0,0.15);
   line-height: 1.2;
 }
+
+/* ── Bench cell avatar wrapper (for event badges) ── */
+.md-bc-av-wrap { position: relative; flex-shrink: 0; margin-top: 10px; }
+.md-bc-sub-on {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(15,23,42,0.82); border-radius: 99px;
+  padding: 3px 7px;
+  border: 2px solid rgba(255,255,255,0.55);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+  white-space: nowrap;
+}
+.md-bc-card-ico {
+  position: absolute; top: -3px; right: -5px;
+  width: 13px; height: 18px; border-radius: 3px;
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.md-bc-card-ico--yellow { background: #facc15; }
+.md-bc-card-ico--red { background: #ef4444; }
+.md-bc-goal-ico { font-size: 0.78rem; }
+.md-bc-assist-ico { font-size: 0.78rem; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    World Cup Feed Banner  (.wcb-*)
