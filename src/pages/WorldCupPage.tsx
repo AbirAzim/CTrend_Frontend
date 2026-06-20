@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
+import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "../graphql/worldcup";
 import {
   type WcFixture,
   WC_STAGE_LABELS,
@@ -114,6 +114,61 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
         <span className="wc-team-name">{fixture.awayTeam.shortName ?? "TBD"}</span>
         <TeamCrest crest={fixture.awayTeam.crest} name={fixture.awayTeam.name} />
       </div>
+    </div>
+  );
+}
+
+// ─── Top scorers / assists ────────────────────────────────────────────────────
+
+type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number };
+type TopAssistant = { playerId: number | null; name: string; team: string; teamCrest: string | null; assists: number };
+
+function PlayerRow({ rank, name, team, teamCrest, stat, statLabel }: {
+  rank: number; name: string; team: string; teamCrest: string | null; stat: number; statLabel: string;
+}) {
+  return (
+    <div className="wc-player-row">
+      <span className="wc-player-rank">{rank}</span>
+      <div className="wc-player-info">
+        <span className="wc-player-name">{name}</span>
+        <span className="wc-player-team">
+          {teamCrest && (
+            <img src={teamCrest} alt={team} className="wc-player-crest" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          )}
+          {team}
+        </span>
+      </div>
+      <span className="wc-player-stat" title={statLabel}>{stat}</span>
+    </div>
+  );
+}
+
+function TopStatsSection({ scorers, assistants, loading }: {
+  scorers: TopScorer[]; assistants: TopAssistant[]; loading: boolean;
+}) {
+  if (loading) return <p className="wc-status-msg">Loading stats…</p>;
+  const noData = scorers.length === 0 && assistants.length === 0;
+  if (noData) return <p className="wc-status-msg">No stats yet — available once matches have been played.</p>;
+  return (
+    <div className="wc-stats-grid">
+      <section className="wc-stats-col">
+        <h2 className="wc-stats-col-title">⚽ Top Scorers</h2>
+        {scorers.length === 0
+          ? <p className="wc-stats-empty">No goals recorded yet.</p>
+          : scorers.map((s, i) => (
+            <PlayerRow key={`${s.name}-${s.team}`} rank={i + 1} name={s.name} team={s.team} teamCrest={s.teamCrest} stat={s.goals} statLabel="Goals" />
+          ))
+        }
+      </section>
+      <section className="wc-stats-col">
+        <h2 className="wc-stats-col-title">🎯 Top Assists</h2>
+        {assistants.length === 0
+          ? <p className="wc-stats-empty">No assists recorded yet.</p>
+          : assistants.map((a, i) => (
+            <PlayerRow key={`${a.name}-${a.team}`} rank={i + 1} name={a.name} team={a.team} teamCrest={a.teamCrest} stat={a.assists} statLabel="Assists" />
+          ))
+        }
+      </section>
     </div>
   );
 }
@@ -276,13 +331,18 @@ export function WorldCupPage() {
     WORLD_CUP_FIXTURES,
     { fetchPolicy: "cache-and-network", pollInterval: 60_000 },
   );
+  const { data: statsData, loading: statsLoading, error: statsError } = useQuery<{
+    worldCupTopScorers: TopScorer[];
+    worldCupTopAssistants: TopAssistant[];
+  }>(WORLD_CUP_TOP_STATS, { fetchPolicy: "cache-and-network", pollInterval: 120_000 });
+
   const followed = useFollowedTeam();
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [, setTick] = useState(0);
   const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">(
-    tabParam === "results" || tabParam === "standings" ? tabParam : "fixtures"
+  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings" | "stats">(
+    tabParam === "results" || tabParam === "standings" || tabParam === "stats" ? tabParam : "fixtures"
   );
 
   const fixtures = data?.worldCupFixtures ?? [];
@@ -371,7 +431,7 @@ export function WorldCupPage() {
 
       {/* Tab bar */}
       <div className="wc-tab-bar" role="tablist">
-        {(["fixtures", "results", "standings"] as const).map((tab) => (
+        {(["fixtures", "results", "standings", "stats"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -380,7 +440,7 @@ export function WorldCupPage() {
             className={`wc-tab-btn${activeTab === tab ? " wc-tab-btn--active" : ""}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "fixtures" ? "Fixtures" : tab === "results" ? "Results" : "Standings"}
+            {tab === "fixtures" ? "Fixtures" : tab === "results" ? "Results" : tab === "standings" ? "Standings" : "Stats"}
           </button>
         ))}
       </div>
@@ -479,6 +539,16 @@ export function WorldCupPage() {
 
       {activeTab === "standings" && (
         <GroupStandings fixtures={filtered} />
+      )}
+
+      {activeTab === "stats" && (
+        statsError
+          ? <p className="wc-status-msg wc-status-msg--error">Failed to load stats. {statsError.message}</p>
+          : <TopStatsSection
+              scorers={statsData?.worldCupTopScorers ?? []}
+              assistants={statsData?.worldCupTopAssistants ?? []}
+              loading={statsLoading && !statsData}
+            />
       )}
     </div>
   );

@@ -21330,6 +21330,84 @@ a.cx-profile-btn-accent {
   border-bottom-color: var(--cx-accent, #6366f1);
 }
 
+/* ── World Cup stats (top scorers / assists) ────────────────────────────────── */
+.wc-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px 12px;
+}
+@media (max-width: 600px) {
+  .wc-stats-grid { grid-template-columns: 1fr; }
+}
+.wc-stats-col-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cx-ink);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--cx-accent, #6366f1);
+}
+.wc-stats-empty {
+  font-size: 0.85rem;
+  color: var(--ig-muted);
+  text-align: center;
+  padding: 24px 0;
+}
+.wc-player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+.wc-player-row:hover { background: var(--ig-hover, rgba(0,0,0,0.04)); }
+.wc-player-rank {
+  min-width: 22px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+  text-align: center;
+}
+.wc-player-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wc-player-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cx-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wc-player-team {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--ig-muted);
+}
+.wc-player-crest {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+.wc-player-stat {
+  min-width: 28px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--cx-accent, #6366f1);
+  background: color-mix(in srgb, var(--cx-accent, #6366f1) 10%, transparent);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Match Detail Page  (.md-*)
    ═══════════════════════════════════════════════════════════════════════ */

@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
+import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "@ctrend/shared/graphql/worldcup";
 import { useTheme } from "../context/ThemeContext";
 import {
   type WcFixture,
@@ -27,6 +27,9 @@ import {
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
 
 type FixturesData = { worldCupFixtures: WcFixture[] };
+type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number };
+type TopAssistant = { playerId: number | null; name: string; team: string; teamCrest: string | null; assists: number };
+type TopStatsData = { worldCupTopScorers: TopScorer[]; worldCupTopAssistants: TopAssistant[] };
 type Palette = ReturnType<typeof useTheme>["colors"];
 
 // ─── Group standings ──────────────────────────────────────────────────────────
@@ -126,6 +129,59 @@ function GroupStandings({ fixtures, st }: { fixtures: WcFixture[]; st: ReturnTyp
             ))}
           </View>
         ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Top scorers / assists ────────────────────────────────────────────────────
+
+function PlayerRow({ rank, name, team, teamCrest, stat, st }: {
+  rank: number; name: string; team: string; teamCrest: string | null; stat: number;
+  st: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <View style={st.playerRow}>
+      <Text style={st.playerRank}>{rank}</Text>
+      <View style={st.playerInfo}>
+        <Text style={st.playerName} numberOfLines={1}>{name}</Text>
+        <View style={st.playerTeamRow}>
+          {teamCrest ? (
+            <Image source={{ uri: teamCrest }} style={st.playerCrest} contentFit="contain" />
+          ) : null}
+          <Text style={st.playerTeam} numberOfLines={1}>{team}</Text>
+        </View>
+      </View>
+      <Text style={st.playerStat}>{stat}</Text>
+    </View>
+  );
+}
+
+function TopStatsSection({ scorers, assistants, loading, st }: {
+  scorers: TopScorer[]; assistants: TopAssistant[]; loading: boolean;
+  st: ReturnType<typeof makeStyles>;
+}) {
+  if (loading) return <ActivityIndicator style={{ marginTop: 32 }} />;
+  if (scorers.length === 0 && assistants.length === 0) {
+    return <Text style={st.statusMsg}>No stats yet — available once matches have been played.</Text>;
+  }
+  return (
+    <View style={st.statsGrid}>
+      <View style={st.statsCol}>
+        <Text style={st.statsColTitle}>⚽ Top Scorers</Text>
+        {scorers.length === 0
+          ? <Text style={st.statusMsg}>No goals yet.</Text>
+          : scorers.map((s, i) => (
+            <PlayerRow key={`${s.name}-${s.team}`} rank={i + 1} name={s.name} team={s.team} teamCrest={s.teamCrest} stat={s.goals} st={st} />
+          ))}
+      </View>
+      <View style={st.statsCol}>
+        <Text style={st.statsColTitle}>🎯 Top Assists</Text>
+        {assistants.length === 0
+          ? <Text style={st.statusMsg}>No assists yet.</Text>
+          : assistants.map((a, i) => (
+            <PlayerRow key={`${a.name}-${a.team}`} rank={i + 1} name={a.name} team={a.team} teamCrest={a.teamCrest} stat={a.assists} st={st} />
+          ))}
       </View>
     </View>
   );
@@ -269,13 +325,17 @@ export default function WorldCupScreen() {
   const st = makeStyles(colors);
   const [, setTick] = useState(0);
   const params = useLocalSearchParams<{ tab?: string }>();
-  const initTab = params.tab === "results" || params.tab === "standings" ? params.tab : "fixtures";
-  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings">(initTab);
+  const initTab = params.tab === "results" || params.tab === "standings" || params.tab === "stats" ? params.tab : "fixtures";
+  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings" | "stats">(initTab);
 
   const { data, loading, error } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
     fetchPolicy: "cache-and-network",
     pollInterval: 60_000,
   });
+  const { data: statsData, loading: statsLoading, error: statsError } = useQuery<TopStatsData>(
+    WORLD_CUP_TOP_STATS,
+    { fetchPolicy: "cache-and-network", pollInterval: 120_000 },
+  );
 
   const fixtures = data?.worldCupFixtures ?? [];
 
@@ -306,6 +366,7 @@ export default function WorldCupScreen() {
     fixtures: "Fixtures",
     results: "Results",
     standings: "Standings",
+    stats: "Stats",
   };
 
   return (
@@ -321,7 +382,7 @@ export default function WorldCupScreen() {
 
       {/* Sticky tab bar */}
       <View style={st.tabBar}>
-        {(["fixtures", "results", "standings"] as const).map((tab) => (
+        {(["fixtures", "results", "standings", "stats"] as const).map((tab) => (
           <Pressable
             key={tab}
             style={[st.tabBtn, activeTab === tab && st.tabBtnActive]}
@@ -457,6 +518,17 @@ export default function WorldCupScreen() {
 
         {activeTab === "standings" && (
           <GroupStandings fixtures={filtered} st={st} />
+        )}
+
+        {activeTab === "stats" && (
+          statsError
+            ? <Text style={st.statusMsg}>Failed to load stats. {statsError.message}</Text>
+            : <TopStatsSection
+                scorers={statsData?.worldCupTopScorers ?? []}
+                assistants={statsData?.worldCupTopAssistants ?? []}
+                loading={statsLoading && !statsData}
+                st={st}
+              />
         )}
       </ScrollView>
     </View>
@@ -608,5 +680,42 @@ function makeStyles(c: Palette) {
     stCrest: { width: 16, height: 16, borderRadius: 8 },
     stCrestPh: { width: 16, height: 16, borderRadius: 8, backgroundColor: c.section },
     stName: { flex: 1, fontSize: 12, fontWeight: "700", color: c.text },
+    // ── Stats (top scorers / assists) ──────────────────────────────────────────
+    statsGrid: { gap: 16 },
+    statsCol: { gap: 4 },
+    statsColTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: c.text,
+      marginBottom: 6,
+      paddingBottom: 6,
+      borderBottomWidth: 2,
+      borderBottomColor: c.accent,
+    },
+    playerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      backgroundColor: c.card,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: 5,
+    },
+    playerRank: { fontSize: 11, fontWeight: "800", color: c.muted, width: 18, textAlign: "center" },
+    playerInfo: { flex: 1, gap: 2, minWidth: 0 },
+    playerName: { fontSize: 13, fontWeight: "700", color: c.text },
+    playerTeamRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+    playerCrest: { width: 13, height: 13 },
+    playerTeam: { fontSize: 11, color: c.muted, flexShrink: 1 },
+    playerStat: {
+      fontSize: 16,
+      fontWeight: "900",
+      color: c.accent,
+      minWidth: 28,
+      textAlign: "center",
+    },
   });
 }

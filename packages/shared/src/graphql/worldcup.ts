@@ -140,3 +140,22 @@ export const MARK_CAMPAIGN_PRIZE_PAID = gql`
     }
   }
 `;
+
+export const WORLD_CUP_TOP_STATS = gql`
+  query WorldCupTopStats {
+    worldCupTopScorers {
+      playerId
+      name
+      team
+      teamCrest
+      goals
+    }
+    worldCupTopAssistants {
+      playerId
+      name
+      team
+      teamCrest
+      assists
+    }
+  }
+`;
