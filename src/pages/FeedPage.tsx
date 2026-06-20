@@ -384,16 +384,17 @@ export function FeedPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        // Reveal more already-loaded posts...
-        setVisibleCount((prev) => Math.min(prev + 6, posts.length));
-        // ...and prefetch the next server page as we near the end of what's loaded,
-        // so the feed always feels like it has more (no visible loader).
-        if (posts.length - visibleCount <= PAGE_SIZE) {
+        // Reveal already-loaded posts in full-page chunks so the rendered list
+        // stays ahead of the scroll position — no visible "reveal" lag.
+        setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, posts.length));
+        // Prefetch the next server page ~2 pages before the end of what's loaded,
+        // so the data is in the cache well before the user scrolls to it.
+        if (posts.length - visibleCount <= PAGE_SIZE * 2) {
           void loadMoreFromServer();
         }
       },
-      // 600px runway → the next page lands before the sentinel reaches the viewport.
-      { rootMargin: "600px 0px" },
+      // ~2 screens of runway → the next page lands long before the sentinel is in view.
+      { rootMargin: "1500px 0px" },
     );
     observer.observe(target);
     return () => observer.disconnect();

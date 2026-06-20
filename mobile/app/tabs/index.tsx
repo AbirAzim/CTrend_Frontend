@@ -477,11 +477,13 @@ export default function FeedScreen() {
           contentContainerStyle={{ paddingTop: filterBarHeight, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          initialNumToRender={4}
-          maxToRenderPerBatch={4}
-          windowSize={7}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={10}
           onEndReached={() => void loadMore()}
-          onEndReachedThreshold={2}
+          // Prefetch ~3.5 screens before the end so the next page is already in
+          // the cache by the time the user scrolls down to it.
+          onEndReachedThreshold={3.5}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
