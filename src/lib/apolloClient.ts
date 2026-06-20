@@ -129,4 +129,17 @@ export async function initApolloCache(): Promise<void> {
     storage: new LocalStorageWrapper(window.localStorage),
     maxSize: 5_242_880, // 5 MB cap — bumped from 1 MB so drops/saved posts don't get evicted
   });
+
+  // The infinite-scroll `feedPosts` list grows unbounded as pages are appended.
+  // When the persisted cache nears `maxSize`, apollo3-cache-persist evicts
+  // individual normalized `PostGql` objects while the `feedPosts` field keeps its
+  // (now dangling) references. Apollo silently drops dangling refs on read, so a
+  // long persisted list reads back as only a handful of posts — and pagination
+  // stalls because the stored offset no longer matches the visible count.
+  //
+  // The feed is live data and is always re-fetched on mount (cache-and-network),
+  // so there's nothing to gain from restoring its accumulated pages. Evict the
+  // field on startup so every session begins from a clean page 1.
+  cache.evict({ id: "ROOT_QUERY", fieldName: "feedPosts" });
+  cache.gc();
 }

@@ -224,17 +224,32 @@ export function FeedPage() {
     if (useMockFeed || loadingMoreRef.current || !hasMore || serverCount === 0) return;
     loadingMoreRef.current = true;
     try {
-      const res = await fetchMoreFeed({
+      await fetchMoreFeed({
         variables: { ...feedQueryVars, skip: serverCount },
       });
-      const incoming = (res.data?.feedPosts as unknown[] | undefined) ?? [];
-      if (incoming.length < PAGE_SIZE) setHasMore(false); // last page reached
+      // `fetchMore`'s return value is ambiguous (incremental page vs. merged
+      // list), so read the merged length straight from the cache. If it didn't
+      // grow past what we already had, we've reached the last page. Fail open:
+      // when the read is unavailable, keep paginating rather than stopping early.
+      let mergedLen: number | undefined;
+      try {
+        const cached = client.readQuery<{ feedPosts?: unknown[] }>({
+          query: FEED_POSTS,
+          variables: feedQueryVars,
+        });
+        mergedLen = cached?.feedPosts?.length;
+      } catch {
+        mergedLen = undefined;
+      }
+      if (typeof mergedLen === "number" && mergedLen <= serverCount) {
+        setHasMore(false);
+      }
     } catch {
       // transient failure — allow a later retry
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [useMockFeed, hasMore, serverCount, fetchMoreFeed]);
+  }, [useMockFeed, hasMore, serverCount, fetchMoreFeed, feedQueryVars, client]);
 
   const basePostsRaw: FeedPostView[] = useMockFeed
     ? mockPostsAsFeed()

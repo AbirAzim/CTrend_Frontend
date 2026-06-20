@@ -279,15 +279,30 @@ export default function FeedScreen() {
     if (skip === 0) return; // first page still loading
     loadingMoreRef.current = true;
     try {
-      const res = await fetchMore({ variables: { ...feedQueryVars, skip } });
-      const incoming = res.data?.feedPosts ?? [];
-      if (incoming.length < PAGE_SIZE) hasMoreRef.current = false; // last page reached
+      await fetchMore({ variables: { ...feedQueryVars, skip } });
+      // `fetchMore`'s return value is ambiguous (incremental page vs. merged
+      // list), so read the merged length straight from the cache and stop only
+      // when it didn't grow past `skip` (the pre-fetch length). Fail open: if the
+      // read is unavailable, keep paginating rather than stopping early.
+      let mergedLen: number | undefined;
+      try {
+        const cached = client.readQuery<FeedData>({
+          query: FEED_POSTS,
+          variables: feedQueryVars,
+        });
+        mergedLen = cached?.feedPosts?.length;
+      } catch {
+        mergedLen = undefined;
+      }
+      if (typeof mergedLen === "number" && mergedLen <= skip) {
+        hasMoreRef.current = false; // didn't grow → last page
+      }
     } catch {
       // transient failure — allow a later retry
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [fetchMore, feedQueryVars]);
+  }, [fetchMore, feedQueryVars, client]);
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
   const { data: meData } = useQuery<{ me: UserRow }>(ME, {
