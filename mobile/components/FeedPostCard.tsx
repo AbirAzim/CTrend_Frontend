@@ -1482,8 +1482,20 @@ function FeedPostCardComponent({
 		return () => clearInterval(timer);
 	}, [post.fixtureWinnerAt]);
 
+	// Live match score is pushed via POST_VOTE_UPDATED (same payload as the vote
+	// counts). FlatList doesn't reliably re-render rows on deep cache changes, so
+	// — exactly like votes — we mirror the score into local state and render from
+	// it. Re-sync only when the score VALUES change (or the row is recycled), not
+	// on every new prop object, so a fresh subscription push isn't overwritten.
+	const [liveMatchScore, setLiveMatchScore] = useState(post.matchScore ?? null);
+	useEffect(() => {
+		setLiveMatchScore(post.matchScore ?? null);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [post.id, post.matchScore?.status, post.matchScore?.home, post.matchScore?.away, post.matchScore?.minute]);
+	const matchScore = liveMatchScore ?? post.matchScore;
+
 	// Pulse animation for live matches
-	const isLiveMatch = post.matchScore?.status === 'IN_PLAY' || post.matchScore?.status === 'PAUSED';
+	const isLiveMatch = matchScore?.status === 'IN_PLAY' || matchScore?.status === 'PAUSED';
 	useEffect(() => {
 		if (!isLiveMatch) { livePulse.setValue(1); return; }
 		const loop = Animated.loop(
@@ -1496,7 +1508,7 @@ function FeedPostCardComponent({
 		return () => loop.stop();
 	}, [isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const liveMinute = post.matchScore?.status === 'IN_PLAY' ? (post.matchScore?.minute ?? null) : null;
+	const liveMinute = matchScore?.status === 'IN_PLAY' ? (matchScore?.minute ?? null) : null;
 
 	useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
 		variables: { postId: post.id },
@@ -1518,6 +1530,16 @@ function FeedPostCardComponent({
 				isVotingOpen: next.isVotingOpen ?? null,
 				votingEndsAt: next.votingEndsAt ?? null,
 			});
+			// Live match score rides on the same broadcast — mirror it so the
+			// score/minute badge updates in real time (merge to keep fields the
+			// subscription doesn't send, e.g. `winner`).
+			if (next.matchScore) {
+				const incoming = next.matchScore;
+				setLiveMatchScore((prev) => {
+					const base = prev ?? post.matchScore;
+					return base ? { ...base, ...incoming } : incoming;
+				});
+			}
 		},
 	});
 
@@ -2163,7 +2185,7 @@ function FeedPostCardComponent({
 			: null;
 	// Show "match in progress" only for fixture-linked posts where voting has
 	// closed (kickoff passed) but the real match result isn't in yet.
-	const matchStatus = post.matchScore?.status ?? null;
+	const matchStatus = matchScore?.status ?? null;
 	const isMatchFinished = matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN' || matchStatus === 'AWARDED' || matchStatus === 'FINISHED';
 	const isMatchNotStarted = !isLiveMatch && !isMatchFinished; // NS, TIMED, null, etc.
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
@@ -2284,17 +2306,17 @@ function FeedPostCardComponent({
 								<View style={st.metaRow}>{nodes}</View>
 							) : null;
 						})()}
-						{post.matchScore && post.matchScore.status !== 'TIMED' && post.matchScore.status !== 'IN_PLAY' && post.matchScore.status !== 'PAUSED' ? (() => {
+						{matchScore && matchScore.status !== 'TIMED' && matchScore.status !== 'IN_PLAY' && matchScore.status !== 'PAUSED' ? (() => {
 							const canOpenMatch = Boolean(post.fixtureId) && (isMatchFinished || isLiveMatch || Boolean(post.lineupAvailable));
 							const scoreContent = (
 								<>
-									{post.matchScore.status === 'IN_PLAY' ? <LiveDot /> : null}
+									{matchScore.status === 'IN_PLAY' ? <LiveDot /> : null}
 									<Text style={st.matchScoreText}>
 										{(() => {
 											const teamA = post.postOptions?.[0]?.label?.trim() || null;
 											const teamB = post.postOptions?.[1]?.label?.trim() || null;
 											const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
-											const sc = post.matchScore!;
+											const sc = matchScore!;
 											if (sc.status === 'IN_PLAY') return `${liveMinute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
@@ -2831,7 +2853,7 @@ function FeedPostCardComponent({
 			{isMatchPost && post.fixtureId && (isMatchFinished || isLiveMatch || post.lineupAvailable) ? (
 				<MatchDetailRow
 					fixtureId={post.fixtureId}
-					matchScore={post.matchScore ?? null}
+					matchScore={matchScore ?? null}
 					teams={[
 						post.postOptions?.[0]?.label?.trim() ?? null,
 						post.postOptions?.[1]?.label?.trim() ?? null,
