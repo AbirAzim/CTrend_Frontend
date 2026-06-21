@@ -23,7 +23,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS, GET_POST_BY_ID, UPDATE_POST } from "@ctrend/shared/graphql/feed";
-import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
+import { PUBLIC_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
@@ -42,7 +42,7 @@ const { width: SW } = Dimensions.get("window");
 type Category = { id: string; name?: string | null };
 type CategoriesData = { categories: Category[] };
 type CampaignOption = { id: string; name: string; isActive?: boolean | null; isDefault?: boolean | null };
-type ActiveCampaignsData = { activeCampaigns: CampaignOption[] };
+type PublicCampaignsData = { publicCampaigns: CampaignOption[] };
 type AdminCampaignsData = { campaigns: CampaignOption[] };
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 
@@ -301,15 +301,16 @@ export default function CreateScreen() {
   const categories = catData?.categories ?? [];
   const selectedCat = categories.find((c) => c.id === categoryId);
 
-  // Campaigns — admin sees all (with inactive flagged), users see active only.
-  const { data: activeCampData } = useQuery<ActiveCampaignsData>(ACTIVE_CAMPAIGNS, {
+  // Campaigns — admin sees all (with inactive flagged); users see only
+  // campaigns admins enabled for users (isPublic).
+  const { data: publicCampData } = useQuery<PublicCampaignsData>(PUBLIC_CAMPAIGNS, {
     fetchPolicy: "cache-first", skip: !isAuthenticated || isAdmin,
   });
   const { data: adminCampData } = useQuery<AdminCampaignsData>(CAMPAIGNS_ADMIN, {
     fetchPolicy: "cache-first", skip: !isAuthenticated || !isAdmin,
   });
   const campaigns: CampaignOption[] = [
-    ...(isAdmin ? adminCampData?.campaigns ?? [] : activeCampData?.activeCampaigns ?? []),
+    ...(isAdmin ? adminCampData?.campaigns ?? [] : publicCampData?.publicCampaigns ?? []),
   ].sort((a, b) => {
     if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
     return (a.name ?? "").localeCompare(b.name ?? "");

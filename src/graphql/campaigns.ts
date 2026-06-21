@@ -17,6 +17,19 @@ export const ACTIVE_CAMPAIGNS = gql`
   }
 `;
 
+/** Campaigns a normal user may attach to a post (active + user-enabled). */
+export const PUBLIC_CAMPAIGNS = gql`
+  query PublicCampaigns {
+    publicCampaigns {
+      id
+      name
+      slug
+      isActive
+      isDefault
+    }
+  }
+`;
+
 export const CAMPAIGN_BY_SLUG = gql`
   query CampaignBySlug($slug: String!) {
     campaign(slug: $slug) {
@@ -52,6 +65,7 @@ export const CAMPAIGNS_ADMIN = gql`
       ctaLabel
       ctaUrl
       isActive
+      isPublic
       prizePerWinner
       startDate
       endDate
@@ -67,6 +81,7 @@ export const CREATE_CAMPAIGN = gql`
       name
       slug
       isActive
+      isPublic
     }
   }
 `;
@@ -90,6 +105,7 @@ export const UPDATE_CAMPAIGN = gql`
       ctaUrl
       isActive
       isDefault
+      isPublic
     }
   }
 `;

@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "../graphql/admin";
-import { ACTIVE_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
+import { PUBLIC_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
@@ -199,9 +199,11 @@ export function CreatePostPage() {
       errorPolicy: "all",
     });
 
-  const { data: activeCampaignsData } = useQuery<{ activeCampaigns: Array<{ id: string; name: string; slug: string; isActive?: boolean; isDefault?: boolean | null }> }>(
-    ACTIVE_CAMPAIGNS,
-    { fetchPolicy: "cache-first", errorPolicy: "all" },
+  // Normal users only see campaigns admins have enabled for users (isPublic);
+  // admins see every campaign.
+  const { data: publicCampaignsData } = useQuery<{ publicCampaigns: Array<{ id: string; name: string; slug: string; isActive?: boolean; isDefault?: boolean | null }> }>(
+    PUBLIC_CAMPAIGNS,
+    { skip: isAdmin, fetchPolicy: "cache-first", errorPolicy: "all" },
   );
   const { data: adminCampaignsData } = useQuery<{ campaigns: Array<{ id: string; name: string; slug: string; isActive: boolean; isDefault?: boolean | null }> }>(
     CAMPAIGNS_ADMIN,
@@ -211,13 +213,13 @@ export function CreatePostPage() {
   const campaignOptions = useMemo(() => {
     const raw = isAdmin
       ? (adminCampaignsData?.campaigns ?? [])
-      : (activeCampaignsData?.activeCampaigns ?? []);
+      : (publicCampaignsData?.publicCampaigns ?? []);
     return [...raw].sort((a, b) => {
       if (!!a.isDefault !== !!b.isDefault) return a.isDefault ? -1 : 1;
       if (isAdmin && !!a.isActive !== !!b.isActive) return a.isActive ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-  }, [isAdmin, adminCampaignsData?.campaigns, activeCampaignsData?.activeCampaigns]);
+  }, [isAdmin, adminCampaignsData?.campaigns, publicCampaignsData?.publicCampaigns]);
 
   const [showPreview, setShowPreview] = useState(false);
 

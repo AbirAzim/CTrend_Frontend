@@ -32,6 +32,7 @@ type Campaign = {
   ctaUrl?: string | null;
   isActive: boolean;
   isDefault?: boolean | null;
+  isPublic?: boolean | null;
   prizePerWinner?: number | null;
   startDate?: string | null;
   endDate?: string | null;
@@ -59,6 +60,7 @@ export default function CampaignsScreen() {
   const [editTarget, setEditTarget] = useState<Campaign | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [isDefaultForm, setIsDefaultForm] = useState(false);
+  const [isPublicForm, setIsPublicForm] = useState(false);
 
   const { data, loading, refetch } = useQuery<CampaignsData>(CAMPAIGNS_ADMIN, {
     fetchPolicy: "cache-and-network",
@@ -77,9 +79,19 @@ export default function CampaignsScreen() {
     } catch { showToast("Failed to toggle campaign", "error"); }
   }
 
+  // Toggle whether normal users can attach this campaign to their posts.
+  async function handleTogglePublic(c: Campaign) {
+    try {
+      await updateMut({ variables: { id: c.id, input: { isPublic: !c.isPublic } } });
+      showToast(!c.isPublic ? "Enabled for users" : "Now admin-only", "success");
+      void refetch();
+    } catch { showToast("Failed to update", "error"); }
+  }
+
   function openCreate() {
     setForm(EMPTY_FORM);
     setIsDefaultForm(false);
+    setIsPublicForm(false);
     setEditTarget(null);
     setCreateModal(true);
   }
@@ -95,6 +107,7 @@ export default function CampaignsScreen() {
       prizePerWinner: c.prizePerWinner != null ? String(c.prizePerWinner) : "",
     });
     setIsDefaultForm(!!c.isDefault);
+    setIsPublicForm(!!c.isPublic);
     setEditTarget(c);
     setCreateModal(true);
   }
@@ -113,6 +126,7 @@ export default function CampaignsScreen() {
       ctaUrl: form.ctaUrl.trim() || undefined,
       prizePerWinner: form.prizePerWinner ? Number(form.prizePerWinner) : undefined,
       isDefault: isDefaultForm,
+      isPublic: isPublicForm,
     };
     try {
       if (editTarget) {
@@ -186,11 +200,23 @@ export default function CampaignsScreen() {
                     <Text style={[st.pillText, { color: "#d97706" }]}>DEFAULT</Text>
                   </View>
                 )}
+                <View style={[st.pill, { backgroundColor: c.isPublic ? "rgba(99,102,241,0.12)" : colors.section }]}>
+                  <Text style={[st.pillText, { color: c.isPublic ? colors.accent : colors.muted }]}>
+                    {c.isPublic ? "USER-ENABLED" : "ADMIN-ONLY"}
+                  </Text>
+                </View>
               </View>
 
-              <Pressable style={[st.editBtn, { borderColor: colors.border }]} onPress={() => openEdit(c)}>
-                <Text style={[st.editBtnText, { color: colors.accent }]}>Edit</Text>
-              </Pressable>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Pressable style={[st.editBtn, { borderColor: colors.border, flex: 1 }]} onPress={() => openEdit(c)}>
+                  <Text style={[st.editBtnText, { color: colors.accent }]}>Edit</Text>
+                </Pressable>
+                <Pressable style={[st.editBtn, { borderColor: colors.border, flex: 1 }]} onPress={() => void handleTogglePublic(c)}>
+                  <Text style={[st.editBtnText, { color: c.isPublic ? "#ef4444" : "#22c55e" }]}>
+                    {c.isPublic ? "Make admin-only" : "Enable for users"}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           )}
         />
@@ -240,6 +266,18 @@ export default function CampaignsScreen() {
                   onValueChange={setIsDefaultForm}
                   trackColor={{ false: colors.border, true: colors.accent }}
                   thumbColor={isDefaultForm ? colors.accent : colors.muted}
+                />
+              </View>
+              <View style={st.defaultRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.fieldLabel, { color: colors.text, marginBottom: 2 }]}>Available to users</Text>
+                  <Text style={[st.defaultHint, { color: colors.muted }]}>Let normal users attach this campaign to their posts. Off = admin-only. (Public campaigns can’t award monetary prizes.)</Text>
+                </View>
+                <Switch
+                  value={isPublicForm}
+                  onValueChange={setIsPublicForm}
+                  trackColor={{ false: colors.border, true: colors.accent }}
+                  thumbColor={isPublicForm ? colors.accent : colors.muted}
                 />
               </View>
             </ScrollView>

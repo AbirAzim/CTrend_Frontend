@@ -970,6 +970,7 @@ type CampaignRow = {
   ctaUrl: string;
   isActive: boolean;
   isDefault?: boolean | null;
+  isPublic?: boolean | null;
   prizePerWinner: number;
   startDate: string | null;
   endDate: string | null;
@@ -985,6 +986,7 @@ function CampaignsTab() {
     ctaLabel: "",
     ctaUrl: "",
     prizePerWinner: 100,
+    isPublic: false,
   });
   const [createError, setCreateError] = useState("");
 
@@ -1010,7 +1012,7 @@ function CampaignsTab() {
         },
       });
       setShowCreate(false);
-      setForm({ name: "", slug: "", bannerText: "", ctaLabel: "", ctaUrl: "", prizePerWinner: 100 });
+      setForm({ name: "", slug: "", bannerText: "", ctaLabel: "", ctaUrl: "", prizePerWinner: 100, isPublic: false });
       void refetch();
     } catch (err: unknown) {
       setCreateError(getApolloErrorMessage(err));
@@ -1029,6 +1031,16 @@ function CampaignsTab() {
   async function handleMakeDefault(id: string) {
     try {
       await updateCampaign({ variables: { id, input: { isDefault: true } } });
+      void refetch();
+    } catch {
+      // silent
+    }
+  }
+
+  // Toggle whether normal users can attach this campaign to their posts.
+  async function handleTogglePublic(id: string, current: boolean) {
+    try {
+      await updateCampaign({ variables: { id, input: { isPublic: !current } } });
       void refetch();
     } catch {
       // silent
@@ -1107,6 +1119,19 @@ function CampaignsTab() {
               />
             </label>
           </div>
+          <label className="field" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <input
+              type="checkbox"
+              checked={form.isPublic}
+              onChange={(e) => setForm((f) => ({ ...f, isPublic: e.target.checked }))}
+              style={{ width: "auto" }}
+            />
+            <span style={{ margin: 0 }}>
+              Available to users — let normal users attach this campaign to their posts
+              <br />
+              <span className="muted small">Leave off for admin-only campaigns. (Public campaigns can’t award monetary prizes.)</span>
+            </span>
+          </label>
           {createError && <p className="error" role="alert">{createError}</p>}
           <div className="admin-form-actions">
             <button type="submit" className="admin-btn-cta" disabled={creating}>
@@ -1130,6 +1155,7 @@ function CampaignsTab() {
                 <th>Prize</th>
                 <th>Status</th>
                 <th>Default</th>
+                <th>Users</th>
                 <th className="admin-table-actions">Actions</th>
               </tr>
             </thead>
@@ -1152,7 +1178,21 @@ function CampaignsTab() {
                       <span className="muted small">—</span>
                     )}
                   </td>
+                  <td data-label="Users">
+                    <span className={`admin-stat-chip${c.isPublic ? " admin-stat-chip--active" : ""}`}>
+                      {c.isPublic ? "User-enabled" : "Admin-only"}
+                    </span>
+                  </td>
                   <AdminActionsCell>
+                    <button
+                      type="button"
+                      className={`admin-action-link${c.isPublic ? " admin-action-link--danger" : " admin-action-link--success"}`}
+                      onClick={() => void handleTogglePublic(c.id, !!c.isPublic)}
+                      disabled={updatingCampaign}
+                      title={c.isPublic ? "Make admin-only (hide from users' post composer)" : "Allow users to attach this campaign to posts"}
+                    >
+                      {c.isPublic ? "Make admin-only" : "Enable for users"}
+                    </button>
                     {!c.isDefault ? (
                       <button
                         type="button"
