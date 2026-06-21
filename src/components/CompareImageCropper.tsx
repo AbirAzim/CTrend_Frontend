@@ -99,13 +99,15 @@ export function CompareImageCropper({ src, aspect = 1, onCancel, onDone }: Props
 
       // Background fill
       if (bg === "blur") {
-        ctx.filter = `blur(${Math.round(26 * k)}px)`;
-        const cover = Math.max(cW / nat.w, cH / nat.h);
+        // Heavy blur + extra zoom → an abstract color wash, not a recognizable
+        // copy of the same image.
+        ctx.filter = `blur(${Math.round(70 * k)}px)`;
+        const cover = Math.max(cW / nat.w, cH / nat.h) * 1.4;
         const bw = nat.w * cover;
         const bh = nat.h * cover;
         ctx.drawImage(img, (cW - bw) / 2, (cH - bh) / 2, bw, bh);
         ctx.filter = "none";
-        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
         ctx.fillRect(0, 0, cW, cH);
       } else {
         ctx.fillStyle = bg === "white" ? "#ffffff" : "#000000";

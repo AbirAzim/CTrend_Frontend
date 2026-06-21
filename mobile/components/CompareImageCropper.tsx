@@ -207,8 +207,9 @@ export function CompareImageCropper({ visible, uri, aspect = 1.55, onDone, onCan
           <View ref={shotRef} collapsable={false} style={{ width: fW, height: fH, backgroundColor: bg === "white" ? "#fff" : "#000" }}>
             {nat && bg === "blur" ? (
               <>
-                <ExpoImage source={{ uri: uri ?? "" }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={28} />
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.25)" }]} />
+                {/* Heavy blur → an abstract wash, not a recognizable copy of the image. */}
+                <ExpoImage source={{ uri: uri ?? "" }} style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.4 }] }]} contentFit="cover" blurRadius={60} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.3)" }]} />
               </>
             ) : null}
             {nat ? <ExpoImage source={{ uri: uri ?? "" }} style={imgStyle} contentFit="fill" /> : null}
