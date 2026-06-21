@@ -45,6 +45,7 @@ import {
 	EXTEND_POST_VOTING,
 	FEED_POSTS,
 	VOTERS_BY_POST,
+	HYPERS_BY_POST,
 } from '@ctrend/shared/graphql/feed';
 import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
 import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
@@ -1284,6 +1285,7 @@ function FeedPostCardComponent({
 	const [extendMenuVisible, setExtendMenuVisible] = useState(false);
 	const [votersVisible, setVotersVisible] = useState(false);
 	const [votersInitialTab, setVotersInitialTab] = useState<number | null>(null);
+	const [hypersVisible, setHypersVisible] = useState(false);
 	const [imageViewerVisible, setImageViewerVisible] = useState(false);
 	const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 	const client = useApolloClient();
@@ -2888,6 +2890,7 @@ function FeedPostCardComponent({
 					icon: string;
 					accessLabel: string;
 					onPress: () => void;
+					onLongPress?: () => void;
 					count?: number;
 					isHype?: boolean;
 					isSave?: boolean;
@@ -2927,6 +2930,9 @@ function FeedPostCardComponent({
 						icon: 'heart-outline',
 						accessLabel: 'Hype',
 						onPress: () => void handleHype(),
+						onLongPress: hypeCount > 0
+							? () => { Vibration.vibrate(30); setHypersVisible(true); }
+							: undefined,
 						count: hypeCount,
 						isHype: true,
 						active: liked,
@@ -2964,6 +2970,7 @@ function FeedPostCardComponent({
 									icon,
 									accessLabel,
 									onPress,
+									onLongPress,
 									count,
 									isHype,
 									isSave,
@@ -2984,6 +2991,8 @@ function FeedPostCardComponent({
 											onPressIn={() => chipPressIn(i)}
 											onPressOut={() => chipPressOut(i)}
 											onPress={onPress}
+											onLongPress={onLongPress}
+											delayLongPress={300}
 											accessibilityLabel={accessLabel}
 											hitSlop={4}>
 											<View style={st.chipIconWrap}>
@@ -3101,6 +3110,15 @@ function FeedPostCardComponent({
 				postId={post.id}
 				optionLabels={optionLabels}
 				initialTab={votersInitialTab}
+				colors={colors}
+				st={st}
+				client={client}
+			/>
+
+			<FeedHypersPanel
+				visible={hypersVisible}
+				onClose={() => setHypersVisible(false)}
+				postId={post.id}
 				colors={colors}
 				st={st}
 				client={client}
@@ -3309,6 +3327,7 @@ function FeedPostCardComponent({
 // ── Voters panel (modal sheet) ────────────────────────────────────────────────
 
 const VOTERS_PAGE = 10;
+const HYPERS_PAGE = 20;
 const VOTER_TAG_COLORS = ['#6366f1', '#f97316', '#22c55e', '#a855f7'];
 
 type FeedGqlVoter = {
@@ -3591,6 +3610,150 @@ function FeedVotersPanel({
 											</Text>
 										</View>
 									) : null}
+								</Pressable>
+							);
+						}}
+					/>
+				</View>
+			</Pressable>
+		</Modal>
+	);
+}
+
+type FeedGqlHyper = {
+	id: string;
+	username?: string | null;
+	displayName?: string | null;
+	profileImageUrl?: string | null;
+};
+
+type FeedHypersPanelProps = {
+	visible: boolean;
+	onClose: () => void;
+	postId: string;
+	colors: ColorPalette;
+	st: ReturnType<typeof makeStyles>;
+	client: ReturnType<typeof useApolloClient>;
+};
+
+// "Hyped by" list — Instagram-style sheet of users who hyped a post.
+function FeedHypersPanel({ visible, onClose, postId, colors, st, client }: FeedHypersPanelProps) {
+	const [search, setSearch] = useState('');
+	const [debouncedSearch, setDebouncedSearch] = useState('');
+	const [hypers, setHypers] = useState<FeedGqlHyper[]>([]);
+	const [hasMore, setHasMore] = useState(true);
+	const [loadingInitial, setLoadingInitial] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const reqIdRef = useRef(0);
+	const hypersRef = useRef<FeedGqlHyper[]>([]);
+
+	useEffect(() => {
+		const t = setTimeout(() => setDebouncedSearch(search), 300);
+		return () => clearTimeout(t);
+	}, [search]);
+
+	const fetchHypers = useCallback(
+		async (append: boolean) => {
+			const reqId = ++reqIdRef.current;
+			if (append) setLoadingMore(true);
+			else { setLoadingInitial(true); hypersRef.current = []; }
+			try {
+				const base = append ? hypersRef.current : [];
+				const { data } = await client.query<{ hypersByPost: FeedGqlHyper[] }>({
+					query: HYPERS_BY_POST,
+					variables: { postId, search: debouncedSearch || null, skip: base.length, take: HYPERS_PAGE },
+					fetchPolicy: 'network-only',
+				});
+				if (reqIdRef.current !== reqId) return;
+				const rows = data?.hypersByPost ?? [];
+				const next = [...base, ...rows];
+				hypersRef.current = next;
+				setHypers(next);
+				setHasMore(rows.length === HYPERS_PAGE);
+			} catch {
+				/* silent */
+			} finally {
+				if (reqIdRef.current === reqId) { setLoadingInitial(false); setLoadingMore(false); }
+			}
+		},
+		[client, postId, debouncedSearch],
+	);
+
+	useEffect(() => {
+		if (!visible) return;
+		void fetchHypers(false);
+	}, [visible, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+	function handleClose() {
+		setHypers([]);
+		setSearch('');
+		setHasMore(true);
+		reqIdRef.current++;
+		onClose();
+	}
+
+	return (
+		<Modal visible={visible} transparent animationType='slide' onRequestClose={handleClose}>
+			<Pressable style={st.votersOverlay} onPress={handleClose}>
+				<View style={st.votersSheet} onStartShouldSetResponder={() => true}>
+					<View style={st.votersHandle} />
+					<View style={st.votersHeader}>
+						<Text style={st.votersTitle}>Hyped by {hypers.length}{hasMore ? '+' : ''}</Text>
+						<Pressable onPress={handleClose} hitSlop={8} style={st.votersCloseBtn}>
+							<Text style={st.votersCloseText}>✕</Text>
+						</Pressable>
+					</View>
+					<View style={st.votersSearch}>
+						<TextInput
+							value={search}
+							onChangeText={setSearch}
+							placeholder='Search…'
+							placeholderTextColor={colors.muted}
+							style={st.votersSearchInput}
+							autoCapitalize='none'
+						/>
+						{search ? (
+							<Pressable onPress={() => setSearch('')} hitSlop={8}>
+								<Text style={{ color: colors.muted, fontSize: 16 }}>✕</Text>
+							</Pressable>
+						) : null}
+					</View>
+					<FlatList
+						data={hypers}
+						keyExtractor={(h) => h.id}
+						onEndReached={() => { if (hasMore && !loadingMore && !loadingInitial) void fetchHypers(true); }}
+						onEndReachedThreshold={0.3}
+						style={{ height: 340 }}
+						ListEmptyComponent={
+							loadingInitial
+								? <ActivityIndicator style={{ margin: 24 }} color={colors.accent} />
+								: <Text style={st.voterEmpty}>{debouncedSearch ? 'No matches' : 'No hypes yet'}</Text>
+						}
+						ListFooterComponent={
+							loadingMore
+								? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.accent} />
+								: !hasMore && hypers.length > 0
+									? <Text style={[st.voterEmpty, { fontSize: 11, paddingVertical: 10 }]}>That's everyone</Text>
+									: null
+						}
+						renderItem={({ item: h }) => {
+							const name = h.displayName?.trim() || (h.username ? `@${h.username}` : 'User');
+							const initial = name.replace(/^@/, '').slice(0, 1).toUpperCase();
+							const img = normalizeProfileImageUrl(h.profileImageUrl);
+							return (
+								<Pressable
+									style={st.voterRow}
+									onPress={() => { handleClose(); router.push(`/profile/${h.id}` as `/${string}`); }}>
+									<View style={st.voterAvatar}>
+										{img ? (
+											<Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit='cover' cachePolicy='memory-disk' />
+										) : (
+											<Text style={st.voterAvatarText}>{initial}</Text>
+										)}
+									</View>
+									<View style={{ flex: 1 }}>
+										<Text style={st.voterName}>{name}</Text>
+									</View>
 								</Pressable>
 							);
 						}}

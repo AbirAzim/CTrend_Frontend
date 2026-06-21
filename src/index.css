@@ -4934,6 +4934,8 @@ a.cx-friend-avatar:hover {
 /* Count badge — a small pill so the number reads as a counter, not part of the
    label. Inherits each chip's accent (indigo default, rose for hype, amber for
    keep) via the variant overrides below. */
+.cx-action-chip-count--tappable { cursor: pointer; }
+.cx-action-chip-count--tappable:hover { text-decoration: underline; }
 .cx-action-chip-count {
   display: inline-flex;
   align-items: center;

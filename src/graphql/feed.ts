@@ -295,6 +295,18 @@ export const VOTERS_BY_POST = gql`
   }
 `;
 
+/** Users who hyped a post — Instagram-style "hyped by" list. */
+export const HYPERS_BY_POST = gql`
+  query HypersByPost($postId: ID!, $search: String, $skip: Int, $take: Int) {
+    hypersByPost(postId: $postId, search: $search, skip: $skip, take: $take) {
+      id
+      username
+      displayName
+      profileImageUrl
+    }
+  }
+`;
+
 /** Match backend `CreatePostInput` — `imageUrls` optional on API; send 1 or 2+ URLs from create UI. */
 export const CREATE_POST = gql`
   mutation CreatePost($input: CreatePostInput!) {

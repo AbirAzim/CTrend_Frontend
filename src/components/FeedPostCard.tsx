@@ -30,6 +30,7 @@ import {
   POST_UPDATED,
   POST_VOTE_UPDATED,
   REMOVE_VOTE,
+  HYPERS_BY_POST,
   SET_POST_HYPE,
   SET_POST_KEEP,
   VOTERS_BY_POST,
@@ -219,6 +220,17 @@ type VotersByPostData = {
 };
 
 type VoterRow = VotersByPostData["votersByPost"][number];
+
+type HyperRow = {
+  id: string;
+  username?: string | null;
+  displayName?: string | null;
+  profileImageUrl?: string | null;
+};
+
+function hyperDisplayName(h: HyperRow): string {
+  return h.displayName?.trim() || (h.username ? `@${h.username.trim()}` : "User");
+}
 
 const VOTERS_PAGE_SIZE = 10;
 
@@ -544,6 +556,29 @@ function FeedPostCardComponent({
   const [fetchVoters] = useLazyQuery<VotersByPostData>(VOTERS_BY_POST, {
     fetchPolicy: "network-only",
   });
+
+  // ── "Hyped by" list (Instagram-style) ──
+  const [showHypers, setShowHypers] = useState(false);
+  const [hypers, setHypers] = useState<HyperRow[]>([]);
+  const [hypersLoading, setHypersLoading] = useState(false);
+  const [hypersError, setHypersError] = useState<string | null>(null);
+  const [fetchHypers] = useLazyQuery<{ hypersByPost: HyperRow[] }>(HYPERS_BY_POST, {
+    fetchPolicy: "network-only",
+  });
+  async function openHypers() {
+    if (voteMode !== "api" || hypeCountLive <= 0) return;
+    setShowHypers(true);
+    setHypersLoading(true);
+    setHypersError(null);
+    try {
+      const { data } = await fetchHypers({ variables: { postId: post.id, take: 200 } });
+      setHypers(data?.hypersByPost ?? []);
+    } catch (err: unknown) {
+      setHypersError(getApolloErrorMessage(err));
+    } finally {
+      setHypersLoading(false);
+    }
+  }
   // Paginated voter list (infinite scroll). We accumulate rows ourselves rather
   // than reading the lazy-query cache so we can append pages.
   const [voters, setVoters] = useState<VoterRow[]>([]);
@@ -2586,7 +2621,17 @@ function FeedPostCardComponent({
           >
             <IconHeart filled={liked} />
             {hypeCount > 0 ? (
-              <span className="cx-action-chip-count">{hypeCount}</span>
+              <span
+                className="cx-action-chip-count cx-action-chip-count--tappable"
+                role="button"
+                tabIndex={0}
+                title="See who hyped"
+                aria-label="See who hyped this post"
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); void openHypers(); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); void openHypers(); } }}
+              >
+                {hypeCount}
+              </span>
             ) : null}
           </button>
           <button
@@ -2785,6 +2830,76 @@ function FeedPostCardComponent({
                 {!votersHasMore && loadedVotersCount > VOTERS_PAGE_SIZE ? (
                   <p className="cx-voters-end">That’s everyone</p>
                 ) : null}
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {showHypers ? (
+        <div
+          className="ig-modal-overlay cx-voters-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Hyped by list"
+          onClick={() => setShowHypers(false)}
+        >
+          <section className="ig-modal-card cx-voters-card">
+            <div className="ig-post-comments-head cx-voters-head">
+              <div className="cx-voters-head-titles">
+                <h3 className="ig-post-comments-title">Hyped by</h3>
+                {!hypersLoading && !hypersError ? (
+                  <span className="cx-voters-total">
+                    {hypers.length} {hypers.length === 1 ? "person" : "people"}
+                  </span>
+                ) : null}
+              </div>
+              <button type="button" className="cx-modal-close" onClick={() => setShowHypers(false)}>
+                Close
+              </button>
+            </div>
+            {hypersLoading ? (
+              <div className="cx-voters-loading">
+                <span className="cx-voters-spinner" aria-hidden />
+                <span className="muted small">Loading…</span>
+              </div>
+            ) : null}
+            {hypersError ? (
+              <p className="ig-post-comments-error" role="alert">{hypersError}</p>
+            ) : null}
+            {!hypersLoading && !hypersError && hypers.length === 0 ? (
+              <p className="cx-voters-empty muted small">No hypes yet.</p>
+            ) : null}
+            {!hypersLoading && hypers.length > 0 ? (
+              <div className="cx-voters-scroll">
+                <ul className="cx-voter-list">
+                  {hypers.map((h) => {
+                    const src = normalizeProfileImageUrl(h.profileImageUrl);
+                    const name = hyperDisplayName(h);
+                    return (
+                      <li key={h.id} className="cx-voter-row">
+                        <NavLink
+                          to={`/profile/${h.id}`}
+                          className="cx-voter-rowlink"
+                          onClick={() => setShowHypers(false)}
+                        >
+                          <span className="cx-voter-avatar">
+                            {src ? (
+                              <img src={src} alt="" referrerPolicy="no-referrer" loading="lazy" />
+                            ) : (
+                              <span className="cx-voter-avatar-initial">
+                                {name.replace(/^@/, "").slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                          </span>
+                          <span className="cx-voter-meta">
+                            <span className="cx-voter-name">{name}</span>
+                          </span>
+                        </NavLink>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ) : null}
           </section>
