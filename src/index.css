@@ -83,8 +83,8 @@
   /* Text */
   --cx-ink: #fafafa;
   --cx-slate-muted: #71717a;
-  /* Backgrounds — near-black neutral base (mobile-aligned, no navy tint) */
-  --cx-canvas: #0a0a0c;
+  /* Backgrounds — Facebook-style charcoal base (not near-black, no navy tint) */
+  --cx-canvas: #18191a;
   /* Accent — brand indigo */
   --cx-accent-deep: #6366f1;
   --cx-accent: #818cf8;
@@ -97,18 +97,18 @@
   --cx-accent-rgb: 129 140 248;
   --cx-ink-rgb: 250 250 250;
   --cx-rose-rgb: 248 113 113;
-  /* Surfaces — neutral elevated cards on the near-black canvas (like mobile) */
-  --ig-border: rgba(255,255,255,0.08);
-  --ig-text: #f5f5f7;
-  --ig-muted: #9a9aa3;
-  --ig-bg: #0a0a0c;
-  --ig-white: #161619;
-  --ig-card: #161619;
-  --ig-surface: #202024;
-  --ig-text-secondary: #c4c4c4;
-  /* Shadows — deep & soft so neutral cards lift off the near-black base */
-  --cx-shadow-soft: 0 2px 14px rgba(0,0,0,0.55);
-  --cx-shadow-lift: 0 10px 34px rgba(0,0,0,0.6);
+  /* Surfaces — Facebook-style: charcoal base with lighter elevated cards */
+  --ig-border: rgba(255,255,255,0.10);
+  --ig-text: #e4e6eb;
+  --ig-muted: #b0b3b8;
+  --ig-bg: #18191a;
+  --ig-white: #242526;
+  --ig-card: #242526;
+  --ig-surface: #3a3b3c;
+  --ig-text-secondary: #b0b3b8;
+  /* Shadows — subtle, like Facebook's flat cards */
+  --cx-shadow-soft: 0 1px 2px rgba(0,0,0,0.2);
+  --cx-shadow-lift: 0 4px 16px rgba(0,0,0,0.35);
   --cx-shadow-accent: 0 6px 20px rgba(129,140,248,0.22);
   --cx-shadow-accent-lg: 0 10px 28px rgba(129,140,248,0.3);
 }
@@ -1010,13 +1010,9 @@ a:hover {
 }
 
 :root[data-theme="dark"] .ig-app::before {
-  /* Near-black neutral canvas with a soft indigo halo at the top and a faint
-     cyan whisper — cohesive with the neutral elevated cards (no navy wash). */
-  background:
-    radial-gradient(ellipse 120% 60% at 50% -18%, rgb(var(--cx-accent-rgb) / 0.12), transparent 60%),
-    radial-gradient(ellipse 80% 50% at 92% 6%, rgb(34 211 238 / 0.05), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 50% 118%, rgb(var(--cx-accent-rgb) / 0.05), transparent 50%),
-    #08080a;
+  /* Facebook-style flat charcoal canvas (no gradient wash). */
+  background: #18191a;
+  animation: none;
 }
 
 /* ── Global offline banner ─────────────────────────────────────────── */
@@ -9383,43 +9379,37 @@ a.cx-action-chip {
 /* ── Dark mode premium overrides ── */
 
 :root[data-theme="dark"] .ig-topbar {
-  background: rgba(28,28,31,0.92);
+  background: rgba(36,37,38,0.92);
   border-color: rgba(255,255,255,0.1);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 20px rgba(0,0,0,0.5);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 2px 8px rgba(0,0,0,0.3);
 }
 
-/* Feed post card — neutral elevated surface that lifts off the near-black
-   canvas via real black shadows + a hairline top highlight (mobile-aligned). */
+/* Feed post card — Facebook-style elevated charcoal surface with a subtle
+   border + soft shadow. */
 :root[data-theme="dark"] .ig-post {
-  background: #17171a;
-  border-color: rgba(255,255,255,0.07);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.04),
-    0 2px 10px rgba(0,0,0,0.5),
-    0 14px 34px rgba(0,0,0,0.42);
+  background: #242526;
+  border-color: rgba(255,255,255,0.09);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
 }
 :root[data-theme="dark"] .ig-post:hover {
-  border-color: rgba(255,255,255,0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.05),
-    0 10px 30px rgba(0,0,0,0.55),
-    0 26px 60px rgba(0,0,0,0.5);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
 }
 
 /* Neutralise the navy media backdrops so nothing flashes blue behind images. */
-:root[data-theme="dark"] .ig-post-media-wrap { background: #0f0f12; }
+:root[data-theme="dark"] .ig-post-media-wrap { background: #18191a; }
 :root[data-theme="dark"] .ig-post-media-placeholder-wrap {
-  background: linear-gradient(160deg, #1a1a1f, #101013);
+  background: #18191a;
 }
 
 :root[data-theme="dark"] .ig-bottom-nav {
-  background: #1c1c1f;
+  background: #242526;
   border-color: rgba(255,255,255,0.08);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 -1px 8px rgba(0,0,0,0.3);
 }
 
 :root[data-theme="dark"] .ig-nav-item {
