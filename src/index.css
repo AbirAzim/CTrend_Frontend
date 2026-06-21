@@ -2339,7 +2339,8 @@ html[data-topbar-hidden="true"] .ff-bar-outer {
   width: 100%;
   display: block;
   object-fit: contain;
-  background: #000;
+  /* Letterbox bars follow the theme (card surface) instead of hard black. */
+  background: var(--ig-card);
   aspect-ratio: 1/1;
   cursor: zoom-in;
 }
@@ -3460,6 +3461,8 @@ a.cx-friend-avatar:hover {
   gap: 0;
   padding: 0;
   box-sizing: border-box;
+  /* Gaps / empty area beside a centered short row follow the theme. */
+  background: var(--ig-card);
 }
 /* 2-image compare only: each half-width cell renders ~4:5 portrait. Multi-image
    (--compare-rows) must NOT get this fixed ratio, or its extra rows get clipped
@@ -3555,7 +3558,8 @@ a.cx-friend-avatar:hover {
   margin: 0;
   padding: 0;
   border: none;
-  background: #0c0a18;
+  /* Letterbox area behind contained images follows the theme (card surface). */
+  background: var(--ig-card);
   cursor: pointer;
   display: block;
   overflow: hidden;
@@ -20339,7 +20343,8 @@ a.cx-profile-btn-accent {
   object-fit: contain;
   height: auto;
   max-height: 55vh;
-  background: #000;
+  /* Letterbox bars follow the theme (card surface) instead of hard black. */
+  background: var(--ig-card);
 }
 .cx-poll-options {
   display: flex;

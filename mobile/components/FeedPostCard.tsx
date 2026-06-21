@@ -203,13 +203,14 @@ function compareLabel(post: FeedPostView, idx: number): string {
 	return post.postOptions?.[idx]?.label?.trim() ?? `Side ${idx + 1}`;
 }
 
-function PollBodyImage({ uri, radius }: { uri: string; radius: number }) {
+function PollBodyImage({ uri, radius, bg }: { uri: string; radius: number; bg: string }) {
 	// Fixed-height container: layout never changes so there is no jump/shake.
 	// contentFit='contain' shows the full image inside the box (letterboxed if needed).
+	// Letterbox bars use the card surface so they follow the active theme.
 	const availW = CARD_CONTENT_W - 28;
 	const fixedH = Math.round(availW * 1.0); // square container fits portrait and landscape
 	return (
-		<View style={{ width: availW, height: fixedH, borderRadius: radius, overflow: 'hidden', backgroundColor: '#111', alignSelf: 'center' }}>
+		<View style={{ width: availW, height: fixedH, borderRadius: radius, overflow: 'hidden', backgroundColor: bg, alignSelf: 'center' }}>
 			<Image
 				source={{ uri }}
 				style={{ width: '100%', height: '100%' }}
@@ -2381,7 +2382,7 @@ function FeedPostCardComponent({
 					{post.imageUrls.length > 0 ? (
 						<View style={st.pollBodyMedia}>
 							{post.imageUrls.map((url, bi) => (
-								<PollBodyImage key={`${post.id}-pbody-${bi}`} uri={url} radius={10} />
+								<PollBodyImage key={`${post.id}-pbody-${bi}`} uri={url} radius={10} bg={colors.card} />
 							))}
 						</View>
 					) : null}
