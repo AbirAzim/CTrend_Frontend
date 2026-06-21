@@ -21507,6 +21507,12 @@ a.cx-profile-btn-accent {
 }
 .md-hdr-scorer-home { text-align: left; flex: 1; }
 .md-hdr-scorer-away { text-align: right; flex: 1; }
+.md-hdr-scorers-toggle {
+  display: block; margin: 8px auto 0; padding: 4px 12px;
+  background: none; border: none; cursor: pointer;
+  font-size: 0.74rem; font-weight: 700; color: var(--cx-accent, #6366f1);
+}
+.md-hdr-scorers-toggle:active { opacity: 0.7; }
 .md-hdr-venue { margin-top: 6px; font-size: 0.72rem; color: var(--ig-muted); }
 
 /* ── Tab bar ── */

@@ -583,8 +583,6 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
         <svg className="md-pitch-svg" viewBox="0 0 100 160" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
           <rect width="100" height="160" fill="#2d7a3a" />
           <rect x="4" y="6" width="92" height="148" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
-          <rect x="45" y="2" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
-          <rect x="45" y="153.5" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
           <rect x="23" y="6" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
           <rect x="23" y="131" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
           <circle cx="50" cy="21.5" r="0.7" fill="rgba(255,255,255,0.5)" />
@@ -827,6 +825,11 @@ function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
   const homeScorers = hasScore ? goalScorers(events, "home") : [];
   const awayScorers = hasScore ? goalScorers(events, "away") : [];
   const [motmImgFailed, setMotmImgFailed] = useState(false);
+  const [scorersExpanded, setScorersExpanded] = useState(false);
+  const SCORER_LIMIT = 4;
+  const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
+  const shownHome = scorersExpanded ? homeScorers : homeScorers.slice(0, SCORER_LIMIT);
+  const shownAway = scorersExpanded ? awayScorers : awayScorers.slice(0, SCORER_LIMIT);
   const star = (finished || live) ? motm(playerRatings) : null;
 
   return (
@@ -884,9 +887,18 @@ function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
       {/* Goal scorers */}
       {(homeScorers.length > 0 || awayScorers.length > 0) && (
         <div className="md-hdr-scorers">
-          <span className="md-hdr-scorer-home">{homeScorers.join(", ")}</span>
-          <span className="md-hdr-scorer-away">{awayScorers.join(", ")}</span>
+          <span className="md-hdr-scorer-home">{shownHome.join(", ")}</span>
+          <span className="md-hdr-scorer-away">{shownAway.join(", ")}</span>
         </div>
+      )}
+      {hasMoreScorers && (
+        <button
+          type="button"
+          className="md-hdr-scorers-toggle"
+          onClick={() => setScorersExpanded((v) => !v)}
+        >
+          {scorersExpanded ? "Show less ▲" : "Show all goals ▼"}
+        </button>
       )}
 
       {/* Man of the Match */}

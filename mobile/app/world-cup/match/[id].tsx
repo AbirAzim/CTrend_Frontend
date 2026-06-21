@@ -241,6 +241,11 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 	const homeScorers = hasScore ? goalScorers(events, 'home') : [];
 	const awayScorers = hasScore ? goalScorers(events, 'away') : [];
 	const star = (finished || live) ? motmPlayer(playerRatings) : null;
+	const [scorersExpanded, setScorersExpanded] = useState(false);
+	const SCORER_LIMIT = 4;
+	const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
+	const shownHome = scorersExpanded ? homeScorers : homeScorers.slice(0, SCORER_LIMIT);
+	const shownAway = scorersExpanded ? awayScorers : awayScorers.slice(0, SCORER_LIMIT);
 
 	const bg = isDark ? '#111827' : '#fff';
 	const borderC = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
@@ -279,7 +284,7 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 					}
 					<Text style={[mh.teamName, { color: homeWon ? winColor : textPrimary }]} numberOfLines={1}>{homeTeam.name}</Text>
 					{homeScorers.length > 0 && (
-						<Text style={[mh.scorers, { color: textSub }]} numberOfLines={4}>{homeScorers.join('\n')}</Text>
+						<Text style={[mh.scorers, { color: textSub }]}>{shownHome.join('\n')}</Text>
 					)}
 				</View>
 
@@ -304,10 +309,23 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 					}
 					<Text style={[mh.teamName, { color: awayWon ? winColor : textPrimary }]} numberOfLines={1}>{awayTeam.name}</Text>
 					{awayScorers.length > 0 && (
-						<Text style={[mh.scorers, { color: textSub }]} numberOfLines={4}>{awayScorers.join('\n')}</Text>
+						<Text style={[mh.scorers, { color: textSub }]}>{shownAway.join('\n')}</Text>
 					)}
 				</View>
 			</View>
+
+			{/* Show all / less goals toggle (only when a team has more than the limit) */}
+			{hasMoreScorers && (
+				<Pressable
+					onPress={() => setScorersExpanded(v => !v)}
+					hitSlop={8}
+					style={({ pressed }) => [mh.scorersToggle, { opacity: pressed ? 0.6 : 1 }]}
+				>
+					<Text style={[mh.scorersToggleText, { color: winColor }]}>
+						{scorersExpanded ? 'Show less ▲' : 'Show all goals ▼'}
+					</Text>
+				</Pressable>
+			)}
 
 			{/* MoTM */}
 			{star && star.rating && parseFloat(star.rating) >= 6.5 ? (
@@ -354,6 +372,8 @@ const mh = StyleSheet.create({
 	flagPh: { width: 60, height: 42, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
 	teamName: { fontSize: 14, fontWeight: '700', textAlign: 'center' },
 	scorers: { fontSize: 12, textAlign: 'center', lineHeight: 19 },
+	scorersToggle: { alignSelf: 'center', marginTop: 8, paddingVertical: 4, paddingHorizontal: 12 },
+	scorersToggleText: { fontSize: 12, fontWeight: '700' },
 	scoreBlock: { width: 84, alignItems: 'center', justifyContent: 'center', paddingTop: 8 },
 	score: { fontSize: 38, fontWeight: '900', letterSpacing: -1 },
 	scoreDash: { fontSize: 30, fontWeight: '300' },
@@ -695,9 +715,7 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 				<Svg style={lu2.pitchSvg} viewBox="0 0 100 160" preserveAspectRatio="none">
 					<Rect width="100" height="160" fill="#2d7a3a" />
 					<Rect x="4" y="6" width="92" height="148" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
-					<Rect x="45" y="2" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
-					<Rect x="45" y="153.5" width="10" height="4.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
-						<Rect x="23" y="6" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
+					<Rect x="23" y="6" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
 					<Rect x="23" y="131" width="54" height="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3" />
 					<Circle cx="50" cy="21.5" r="0.7" fill="rgba(255,255,255,0.5)" />
 					<Circle cx="50" cy="138.5" r="0.7" fill="rgba(255,255,255,0.5)" />
