@@ -83,8 +83,8 @@
   /* Text */
   --cx-ink: #fafafa;
   --cx-slate-muted: #71717a;
-  /* Backgrounds */
-  --cx-canvas: #18181b;
+  /* Backgrounds — near-black neutral base (mobile-aligned, no navy tint) */
+  --cx-canvas: #0a0a0c;
   /* Accent — brand indigo */
   --cx-accent-deep: #6366f1;
   --cx-accent: #818cf8;
@@ -97,20 +97,20 @@
   --cx-accent-rgb: 129 140 248;
   --cx-ink-rgb: 250 250 250;
   --cx-rose-rgb: 248 113 113;
-  /* Surfaces */
+  /* Surfaces — neutral elevated cards on the near-black canvas (like mobile) */
   --ig-border: rgba(255,255,255,0.08);
-  --ig-text: #ffffff;
-  --ig-muted: #a1a1aa;
-  --ig-bg: #18181b;
-  --ig-white: #242428;
-  --ig-card: #242428;
-  --ig-surface: #2e2e33;
+  --ig-text: #f5f5f7;
+  --ig-muted: #9a9aa3;
+  --ig-bg: #0a0a0c;
+  --ig-white: #161619;
+  --ig-card: #161619;
+  --ig-surface: #202024;
   --ig-text-secondary: #c4c4c4;
-  /* Shadows */
-  --cx-shadow-soft: 0 2px 12px rgba(0,0,0,0.4);
-  --cx-shadow-lift: 0 8px 28px rgba(0,0,0,0.5);
-  --cx-shadow-accent: 0 6px 20px rgba(129,140,248,0.2);
-  --cx-shadow-accent-lg: 0 10px 28px rgba(129,140,248,0.28);
+  /* Shadows — deep & soft so neutral cards lift off the near-black base */
+  --cx-shadow-soft: 0 2px 14px rgba(0,0,0,0.55);
+  --cx-shadow-lift: 0 10px 34px rgba(0,0,0,0.6);
+  --cx-shadow-accent: 0 6px 20px rgba(129,140,248,0.22);
+  --cx-shadow-accent-lg: 0 10px 28px rgba(129,140,248,0.3);
 }
 
 html {
@@ -1010,11 +1010,13 @@ a:hover {
 }
 
 :root[data-theme="dark"] .ig-app::before {
+  /* Near-black neutral canvas with a soft indigo halo at the top and a faint
+     cyan whisper — cohesive with the neutral elevated cards (no navy wash). */
   background:
-    radial-gradient(ellipse 90% 55% at 8% -8%, rgb(var(--cx-accent-rgb) / 0.22), transparent 52%),
-    radial-gradient(ellipse 72% 48% at 96% 4%, rgb(34 211 238 / 0.14), transparent 48%),
-    radial-gradient(ellipse 58% 42% at 48% 108%, rgb(71 85 105 / 0.2), transparent 42%),
-    linear-gradient(165deg, #090f1d 0%, #0b1324 42%, #0b172d 100%);
+    radial-gradient(ellipse 120% 60% at 50% -18%, rgb(var(--cx-accent-rgb) / 0.12), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 92% 6%, rgb(34 211 238 / 0.05), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 50% 118%, rgb(var(--cx-accent-rgb) / 0.05), transparent 50%),
+    #08080a;
 }
 
 /* ── Global offline banner ─────────────────────────────────────────── */
@@ -9388,15 +9390,28 @@ a.cx-action-chip {
   box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 20px rgba(0,0,0,0.5);
 }
 
-/* Feed post card */
+/* Feed post card — neutral elevated surface that lifts off the near-black
+   canvas via real black shadows + a hairline top highlight (mobile-aligned). */
 :root[data-theme="dark"] .ig-post {
-  background: #1c1c1c;
+  background: #17171a;
   border-color: rgba(255,255,255,0.07);
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 2px 10px rgba(0,0,0,0.5),
+    0 14px 34px rgba(0,0,0,0.42);
 }
 :root[data-theme="dark"] .ig-post:hover {
-  border-color: rgba(255,255,255,0.15);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 10px 30px rgba(0,0,0,0.55),
+    0 26px 60px rgba(0,0,0,0.5);
+}
+
+/* Neutralise the navy media backdrops so nothing flashes blue behind images. */
+:root[data-theme="dark"] .ig-post-media-wrap { background: #0f0f12; }
+:root[data-theme="dark"] .ig-post-media-placeholder-wrap {
+  background: linear-gradient(160deg, #1a1a1f, #101013);
 }
 
 :root[data-theme="dark"] .ig-bottom-nav {
