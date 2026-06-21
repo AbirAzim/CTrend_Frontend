@@ -1,6 +1,6 @@
 import { useQuery } from "@apollo/client";
 import { useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { WORLD_CUP_FIXTURE_DETAILS } from "../graphql/worldcup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -921,13 +921,19 @@ export function MatchDetailPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
-  const { data, loading, error } = useQuery<{ worldCupFixture: FixtureDetails }>(
+  const { data, loading, error, refetch } = useQuery<{ worldCupFixture: FixtureDetails }>(
     WORLD_CUP_FIXTURE_DETAILS,
     { variables: { id }, fetchPolicy: "cache-and-network", pollInterval: 30_000, skip: !id },
   );
 
   const fixture = data?.worldCupFixture;
   const matchIsLive = fixture ? isLive(fixture.status) : false;
+  const [refreshing, setRefreshing] = useState(false);
+  const onReload = useCallback(() => {
+    if (refreshing) return;
+    setRefreshing(true);
+    void refetch().finally(() => setRefreshing(false));
+  }, [refreshing, refetch]);
 
   return (
     <div className="md-page">
@@ -937,6 +943,20 @@ export function MatchDetailPage() {
           ←
         </button>
         <span className="md-topbar-title">Match Details</span>
+        <button
+          type="button"
+          className={`md-reload${refreshing ? " md-reload--spinning" : ""}`}
+          onClick={onReload}
+          disabled={refreshing}
+          aria-label="Reload match details"
+          title="Reload"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 4v6h-6" />
+            <path d="M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </button>
         {matchIsLive && fixture?.campaignPostId && (
           <button type="button" className="md-vote-btn" onClick={() => navigate(`/post/${fixture.campaignPostId}`)}>
             Vote
@@ -945,7 +965,19 @@ export function MatchDetailPage() {
       </div>
 
       {loading && !fixture && <div className="md-loading">Loading…</div>}
-      {error && <div className="md-error">Failed to load match details.</div>}
+      {error && !fixture && (
+        <div className="md-error">
+          <span>Failed to load match details.</span>
+          <button type="button" className="md-retry" onClick={onReload} disabled={refreshing}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M23 4v6h-6" />
+              <path d="M1 20v-6h6" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            Try again
+          </button>
+        </div>
+      )}
       {!loading && !error && !fixture && (
         <div className="md-empty">Match details not available.</div>
       )}

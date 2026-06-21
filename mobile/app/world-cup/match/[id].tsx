@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client/react';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { BottomNav } from '../../../components/BottomNav';
@@ -9,6 +9,7 @@ import { useTabBar } from '../../../context/TabBarContext';
 import {
 	Animated,
 	ActivityIndicator,
+	Easing,
 	Pressable,
 	ScrollView,
 	StyleSheet,
@@ -1002,6 +1003,53 @@ const TABS: { id: Tab; label: string }[] = [
 	{ id: 'stats', label: 'Stats' },
 ];
 
+// Circular reload button — spins its refresh icon while a refetch is in flight.
+function ReloadButton({
+	onPress,
+	refreshing,
+	isDark,
+}: { onPress: () => void; refreshing: boolean; isDark: boolean }) {
+	const spin = useRef(new Animated.Value(0)).current;
+	useEffect(() => {
+		if (!refreshing) {
+			spin.stopAnimation(() => spin.setValue(0));
+			return;
+		}
+		spin.setValue(0);
+		const loop = Animated.loop(
+			Animated.timing(spin, { toValue: 1, duration: 800, easing: Easing.linear, useNativeDriver: true }),
+		);
+		loop.start();
+		return () => loop.stop();
+	}, [refreshing, spin]);
+	const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+	const color = isDark ? '#93c5fd' : '#2563eb';
+	return (
+		<Pressable
+			onPress={onPress}
+			disabled={refreshing}
+			hitSlop={12}
+			accessibilityRole="button"
+			accessibilityLabel="Reload match details"
+			style={({ pressed }) => [
+				scr.reloadBtn,
+				{
+					backgroundColor: isDark ? 'rgba(59,130,246,0.16)' : 'rgba(37,99,235,0.10)',
+					opacity: pressed ? 0.6 : 1,
+				},
+			]}
+		>
+			<Animated.View style={{ transform: [{ rotate }] }}>
+				<Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+					<Path d="M23 4v6h-6" />
+					<Path d="M1 20v-6h6" />
+					<Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+				</Svg>
+			</Animated.View>
+		</Pressable>
+	);
+}
+
 export default function MatchDetailScreen() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const params = useLocalSearchParams<{ tab?: string }>();
@@ -1036,11 +1084,17 @@ export default function MatchDetailScreen() {
 		}
 	}
 
-	const { data, loading, error } = useQuery<{ worldCupFixture: FixtureDetails }>(
+	const { data, loading, error, refetch } = useQuery<{ worldCupFixture: FixtureDetails }>(
 		WORLD_CUP_FIXTURE_DETAILS,
-		{ variables: { id }, fetchPolicy: 'cache-and-network', errorPolicy: 'all' },
+		{ variables: { id }, fetchPolicy: 'cache-and-network', errorPolicy: 'all', pollInterval: 30_000 },
 	);
 	const fixture = data?.worldCupFixture;
+	const [refreshing, setRefreshing] = useState(false);
+	const onReload = useCallback(() => {
+		if (refreshing) return;
+		setRefreshing(true);
+		void refetch().finally(() => setRefreshing(false));
+	}, [refreshing, refetch]);
 	const bg = isDark ? '#0f172a' : '#f8fafc';
 	const surface = isDark ? '#111827' : '#fff';
 	const borderC = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
@@ -1055,7 +1109,7 @@ export default function MatchDetailScreen() {
 					<Text style={[scr.backIcon, { color: isDark ? '#94a3b8' : '#64748b' }]}>←</Text>
 				</Pressable>
 				<Text style={[scr.navTitle, { color: isDark ? '#f1f5f9' : '#0f172a' }]} numberOfLines={1}>Match Details</Text>
-				<View style={{ width: 36 }} />
+				<ReloadButton onPress={onReload} refreshing={refreshing} isDark={isDark} />
 			</View>
 
 			{loading && !fixture ? (
@@ -1064,7 +1118,18 @@ export default function MatchDetailScreen() {
 				</View>
 			) : error && !fixture ? (
 				<View style={scr.loader}>
-					<Text style={{ color: '#ef4444', fontSize: 14 }}>Failed to load match details.</Text>
+					<Text style={{ color: '#ef4444', fontSize: 14, marginBottom: 16 }}>Failed to load match details.</Text>
+					<Pressable
+						onPress={onReload}
+						style={({ pressed }) => [scr.retryBtn, { opacity: pressed ? 0.7 : 1 }]}
+					>
+						<Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+							<Path d="M23 4v6h-6" />
+							<Path d="M1 20v-6h6" />
+							<Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+						</Svg>
+						<Text style={scr.retryText}>Try again</Text>
+					</Pressable>
 				</View>
 			) : fixture ? (
 				<ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
@@ -1108,6 +1173,12 @@ const scr = StyleSheet.create({
 		borderBottomWidth: 1,
 	},
 	backBtn: { width: 36 },
+	reloadBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+	retryBtn: {
+		flexDirection: 'row', alignItems: 'center', gap: 8,
+		backgroundColor: '#2563eb', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 22,
+	},
+	retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 	backIcon: { fontSize: 22, fontWeight: '400' },
 	navTitle: { flex: 1, fontSize: 16, fontWeight: '700', textAlign: 'center' },
 	loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },

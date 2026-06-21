@@ -49,6 +49,7 @@ class CtrendMessagingService : FirebaseMessagingService() {
       "FRIEND_REQUEST", "FRIEND_REQUEST_ACCEPTED", "NEW_FOLLOWER"
     )
     private val ANNOUNCEMENT_TYPES = setOf("ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM")
+    private val FIXTURE_TYPES = setOf("LINEUP_AVAILABLE", "MATCH_START", "MATCH_END")
     private const val PLAY_CLOSED_TESTING_URL =
       "https://play.google.com/apps/testing/com.ctrend.app"
   }
@@ -174,6 +175,15 @@ class CtrendMessagingService : FirebaseMessagingService() {
       else -> ""
     }
     if (chatId.isNotEmpty()) return "/chat/$chatId"
+
+    // World Cup fixture → match detail screen. Lineup notifications open straight
+    // to the Line-up tab. Checked before the post/comment branches (mirrors JS)
+    // since lineup notifications also carry a postId fallback.
+    if (FIXTURE_TYPES.contains(notifType) && refId.isNotEmpty()) {
+      val tab = if (notifType == "LINEUP_AVAILABLE") "?tab=lineup" else ""
+      return "/world-cup/match/$refId$tab"
+    }
+    if (refType == "FIXTURE" && refId.isNotEmpty()) return "/world-cup/match/$refId"
 
     val postTarget = when {
       postId.isNotEmpty() -> postId

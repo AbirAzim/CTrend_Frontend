@@ -149,7 +149,9 @@ function navigateFromNotif(notif: GqlNotification) {
   }
   if (!notif.referenceId) return;
   if (notif.referenceType === "Fixture" || notif.referenceType === "FIXTURE") {
-    router.push(`/world-cup/match/${notif.referenceId}` as `/${string}`);
+    // Lineup notifications open straight to the Line-up tab; others to Overview.
+    const tab = notif.type === "LINEUP_AVAILABLE" ? "?tab=lineup" : "";
+    router.push(`/world-cup/match/${notif.referenceId}${tab}` as `/${string}`);
   } else if (notif.referenceType === "Post" || notif.referenceType === "POST") {
     const suffix = notif.commentId ? `?commentId=${notif.commentId}` : "";
     router.push(`/post/${notif.referenceId}${suffix}` as `/${string}`);
