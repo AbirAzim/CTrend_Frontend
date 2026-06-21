@@ -21623,6 +21623,9 @@ a.cx-profile-btn-accent {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Fixed aspect → both halves are exactly equal, so the SVG midline aligns
+     with the real home/away boundary and players stay within their half. */
+  aspect-ratio: 0.6;
 }
 
 /* SVG field drawn as absolute background */
@@ -21637,13 +21640,13 @@ a.cx-profile-btn-accent {
 
 .md-pitch-half {
   flex: 1;
-  padding: 12px 8px 10px;
+  padding: 4px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
   position: relative;
   z-index: 1;
+  overflow: hidden;
 }
 
 /* Team badge in pitch half */
@@ -21675,7 +21678,7 @@ a.cx-profile-btn-accent {
 }
 
 /* Formation rows */
-.md-frows { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.md-frows { display: flex; flex-direction: column; justify-content: space-evenly; flex: 1; width: 100%; }
 .md-frow  { display: flex; justify-content: space-evenly; align-items: flex-start; flex-wrap: wrap; gap: 4px; }
 
 /* Player avatar on pitch */
@@ -21964,18 +21967,20 @@ a.cx-profile-btn-accent {
 .md-goal-net--bottom .md-goal-net-bar { border-top: none; border-radius: 0; }
 
 /* ── Substitution swap icon above the circle ── */
+/* Compact swap badge — top-left corner of the avatar, so it doesn't cover the face. */
 .md-pa-sub-ico {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: rgba(15,23,42,0.82);
+  position: absolute; top: -6px; left: -6px;
+  display: inline-flex; align-items: center; gap: 1px;
+  background: rgba(15,23,42,0.9);
   border-radius: 99px;
-  padding: 3px 8px;
-  margin-bottom: 4px;
-  border: 2px solid rgba(255,255,255,0.55);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-  z-index: 2;
+  padding: 1px 3px;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  z-index: 4;
 }
-.md-sub-arr-up { font-size: 0.72rem; font-weight: 900; color: #22c55e; line-height: 1; }
-.md-sub-arr-dn { font-size: 0.72rem; font-weight: 900; color: #ef4444; line-height: 1; }
+.md-sub-arr-up { font-size: 0.5rem; font-weight: 900; color: #22c55e; line-height: 1; }
+.md-sub-arr-dn { font-size: 0.5rem; font-weight: 900; color: #ef4444; line-height: 1; }
+.md-pa-ev-og { font-size: 0.6rem; font-weight: 800; color: #f97316; }
 
 /* ── Card badge — top-right of av-wrap, does not protrude above wrap ── */
 .md-pa-card {
@@ -22032,13 +22037,13 @@ a.cx-profile-btn-accent {
 /* ── Bench cell avatar wrapper (for event badges) ── */
 .md-bc-av-wrap { position: relative; flex-shrink: 0; margin-top: 10px; }
 .md-bc-sub-on {
-  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-  display: inline-flex; align-items: center; gap: 3px;
-  background: rgba(15,23,42,0.82); border-radius: 99px;
-  padding: 3px 7px;
-  border: 2px solid rgba(255,255,255,0.55);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-  white-space: nowrap;
+  position: absolute; top: -6px; left: -6px;
+  display: inline-flex; align-items: center; gap: 1px;
+  background: rgba(15,23,42,0.9); border-radius: 99px;
+  padding: 1px 3px;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  white-space: nowrap; z-index: 4;
 }
 .md-bc-card-ico {
   position: absolute; top: -3px; right: -5px;
@@ -22049,6 +22054,7 @@ a.cx-profile-btn-accent {
 .md-bc-card-ico--yellow { background: #facc15; }
 .md-bc-card-ico--red { background: #ef4444; }
 .md-bc-goal-ico { font-size: 0.78rem; }
+.md-bc-og-ico { font-size: 0.62rem; font-weight: 800; color: #f97316; }
 .md-bc-assist-ico { font-size: 0.78rem; }
 
 /* ═══════════════════════════════════════════════════════════════════════

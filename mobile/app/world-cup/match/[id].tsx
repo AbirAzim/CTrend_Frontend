@@ -106,7 +106,7 @@ function parseNum(v?: string | null) { return v ? parseFloat(v.replace('%', ''))
 
 // ─── Player event map ─────────────────────────────────────────────────────────
 
-type PEvt = { goals: number; assists: number; card: 'yellow' | 'red' | null; subOff: boolean; subOn: boolean };
+type PEvt = { goals: number; ownGoals: number; assists: number; card: 'yellow' | 'red' | null; subOff: boolean; subOn: boolean };
 
 function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
 	const map = new Map<string, PEvt>();
@@ -114,7 +114,7 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
 		const idKey = p.id != null ? `id:${p.id}` : null;
 		const nmKey = p.name ? `nm:${p.name.toLowerCase().trim()}` : null;
 		const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
-		const pev: PEvt = existing ?? { goals: 0, assists: 0, card: null, subOff: false, subOn: false };
+		const pev: PEvt = existing ?? { goals: 0, ownGoals: 0, assists: 0, card: null, subOff: false, subOn: false };
 		if (idKey) map.set(idKey, pev);
 		if (nmKey) map.set(nmKey, pev);
 		return pev;
@@ -122,9 +122,13 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
 	for (const e of events) {
 		if (!e.player.name && e.player.id == null) continue;
 		const pev = ensure(e.player);
-		if (e.type === 'Goal' && !e.detail.toLowerCase().includes('disallow') && !e.detail.includes('Own Goal')) {
-			pev.goals++;
-			if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
+		if (e.type === 'Goal' && !e.detail.toLowerCase().includes('disallow')) {
+			if (e.detail.includes('Own Goal')) {
+				pev.ownGoals++;
+			} else {
+				pev.goals++;
+				if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
+			}
 		} else if (e.type === 'Card') {
 			const isRed = e.detail.toLowerCase().includes('red') || e.detail.includes('Second Yellow');
 			pev.card = isRed ? 'red' : 'yellow';
@@ -533,11 +537,6 @@ function PitchPlayer({
 
 	return (
 		<View style={pitch.playerWrap}>
-			{/* Swap icon above the avatar */}
-			{(pev?.subOff || pev?.subOn)
-				? <View style={pitch.subIco}><Text style={pitch.subArrUp}>▲</Text><Text style={pitch.subArrDn}>▼</Text></View>
-				: <View style={pitch.subIcoSpacer} />
-			}
 			<View style={pitch.avatarWrap}>
 				{player.photo && !imgFailed
 					? <Image source={{ uri: player.photo }} style={pitch.avatar} contentFit='cover' borderRadius={22} onError={() => setImgFailed(true)} />
@@ -557,26 +556,33 @@ function PitchPlayer({
 				{pev?.card && (
 					<View style={[pitch.cardBadge, { backgroundColor: pev.card === 'red' ? '#ef4444' : '#facc15' }]} />
 				)}
+				{/* Substitution swap badge — compact, top-left corner so it doesn't cover the face */}
+				{(pev?.subOff || pev?.subOn) && (
+					<View style={pitch.subBadge}>
+						<Text style={pitch.subArrUp}>▲</Text>
+						<Text style={pitch.subArrDn}>▼</Text>
+					</View>
+				)}
 			</View>
-			{/* Goals + assists */}
-			{pev && (pev.goals > 0 || pev.assists > 0) && (
+			{/* Goals + own goals + assists */}
+			{pev && (pev.goals > 0 || pev.ownGoals > 0 || pev.assists > 0) && (
 				<View style={pitch.eventsRow}>
 					{pev.goals > 0 && <Text style={pitch.goalText}>{'⚽'.repeat(Math.min(pev.goals, 3))}{pev.goals > 3 ? `×${pev.goals}` : ''}</Text>}
+					{pev.ownGoals > 0 && <Text style={pitch.ownGoalText}>{'⚽'.repeat(Math.min(pev.ownGoals, 2))}OG</Text>}
 					{pev.assists > 0 && <Text style={pitch.assistText}>{'👟'.repeat(Math.min(pev.assists, 2))}{pev.assists > 2 ? `×${pev.assists}` : ''}</Text>}
 				</View>
 			)}
-			<Text style={pitch.playerName} numberOfLines={2}>{player.name}</Text>
+			<Text style={pitch.playerName} numberOfLines={1}>{shortName(player.name)}</Text>
 		</View>
 	);
 }
 
 const pitch = StyleSheet.create({
 	playerWrap: { alignItems: 'center', width: 64 },
-	subIco: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(15,23,42,0.85)', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4 },
-	subArrUp: { fontSize: 11, fontWeight: '900', color: '#22c55e', lineHeight: 14 },
-	subArrDn: { fontSize: 11, fontWeight: '900', color: '#ef4444', lineHeight: 14 },
-	subIcoSpacer: { height: 24, marginBottom: 4 },
-	avatarWrap: { position: 'relative', width: 44, height: 44, marginBottom: 14 },
+	subBadge: { position: 'absolute', top: -7, left: -7, flexDirection: 'row', alignItems: 'center', gap: 1, backgroundColor: 'rgba(15,23,42,0.9)', borderRadius: 99, paddingHorizontal: 3, paddingVertical: 1.5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.5, shadowRadius: 2, zIndex: 3 },
+	subArrUp: { fontSize: 7, fontWeight: '900', color: '#22c55e', lineHeight: 9 },
+	subArrDn: { fontSize: 7, fontWeight: '900', color: '#ef4444', lineHeight: 9 },
+	avatarWrap: { position: 'relative', width: 44, height: 44, marginBottom: 12 },
 	avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
 	avatarFallback: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
 	avatarNum: { fontSize: 14, fontWeight: '800', color: '#fff' },
@@ -587,6 +593,7 @@ const pitch = StyleSheet.create({
 	cardBadge: { position: 'absolute', top: 1, right: -5, width: 13, height: 18, borderRadius: 2, borderWidth: 2, borderColor: 'rgba(255,255,255,0.95)', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 2 },
 	eventsRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 1 },
 	goalText: { fontSize: 10, lineHeight: 12 },
+	ownGoalText: { fontSize: 8, lineHeight: 12, fontWeight: '800', color: '#f97316' },
 	assistText: { fontSize: 10, lineHeight: 12 },
 	playerName: { fontSize: 9.5, fontWeight: '600', color: '#fff', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
@@ -609,7 +616,7 @@ function FormationRows({ players, reverse, ratingMap, evMap, isDark }: {
 	if (reverse) rows = rows.reverse();
 
 	return (
-		<View style={{ gap: 4 }}>
+		<View style={{ flex: 1, justifyContent: 'space-evenly' }}>
 			{rows.map(([row, rps]) => {
 				const sorted = [...rps].sort((a, b) => {
 					const ac = parseInt((a.grid ?? '0:1').split(':')[1], 10);
@@ -758,6 +765,7 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 												<Text style={[lu2.benchPos, { color: textSub }]}>{hp.pos ?? ''}</Text>
 												{hr ? <View style={[lu2.benchRating, { backgroundColor: ratingColor(parseFloat(hr)) }]}><Text style={lu2.benchRatingText}>{parseFloat(hr).toFixed(1)}</Text></View> : null}
 												{hpev && hpev.goals > 0 ? <Text style={lu2.benchGoal}>{'⚽'.repeat(Math.min(hpev.goals, 2))}</Text> : null}
+												{hpev && hpev.ownGoals > 0 ? <Text style={lu2.benchOwnGoal}>{'⚽'.repeat(Math.min(hpev.ownGoals, 2))}OG</Text> : null}
 												{hpev && hpev.assists > 0 ? <Text style={lu2.benchAssist}>{'👟'.repeat(Math.min(hpev.assists, 2))}</Text> : null}
 											</View>
 										</View>
@@ -781,6 +789,7 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 											<View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
 												{ar ? <View style={[lu2.benchRating, { backgroundColor: ratingColor(parseFloat(ar)) }]}><Text style={lu2.benchRatingText}>{parseFloat(ar).toFixed(1)}</Text></View> : null}
 												{apev && apev.goals > 0 ? <Text style={lu2.benchGoal}>{'⚽'.repeat(Math.min(apev.goals, 2))}</Text> : null}
+												{apev && apev.ownGoals > 0 ? <Text style={lu2.benchOwnGoal}>{'⚽'.repeat(Math.min(apev.ownGoals, 2))}OG</Text> : null}
 												{apev && apev.assists > 0 ? <Text style={lu2.benchAssist}>{'👟'.repeat(Math.min(apev.assists, 2))}</Text> : null}
 												<Text style={[lu2.benchPos, { color: textSub }]}>{ap.pos ?? ''}</Text>
 											</View>
@@ -824,9 +833,11 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 
 const lu2 = StyleSheet.create({
 	pitchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1 },
-	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column' },
+	// Fixed aspect ratio → both halves are exactly equal height, so the SVG
+	// midline aligns with the real home/away boundary and players stay in-half.
+	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column', aspectRatio: 0.56, width: '100%' },
 	pitchSvg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-	pitchHalf: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, gap: 8 },
+	pitchHalf: { flex: 1, paddingHorizontal: 8, overflow: 'hidden' },
 	pitchTeamBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
 	pitchTeamBadgeBottom: {},
 	pitchCrest: { width: 18, height: 18 },
@@ -848,11 +859,13 @@ const lu2 = StyleSheet.create({
 	benchRating: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 99 },
 	benchRatingText: { fontSize: 9, fontWeight: '800', color: '#fff' },
 	benchGoal: { fontSize: 11 },
+	benchOwnGoal: { fontSize: 9, fontWeight: '800', color: '#f97316' },
 	benchAssist: { fontSize: 11 },
-	subOnBadge: { position: 'absolute', top: -9, left: -4, right: -4, alignItems: 'center' },
-	subOnBadgeInner: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(15,23,42,0.85)', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 3 },
-	subOnTextUp: { fontSize: 10, fontWeight: '900', color: '#22c55e', lineHeight: 13 },
-	subOnTextDn: { fontSize: 10, fontWeight: '900', color: '#ef4444', lineHeight: 13 },
+	// Compact corner badge so it overlaps only the avatar corner, not the face.
+	subOnBadge: { position: 'absolute', top: -6, left: -6, zIndex: 3 },
+	subOnBadgeInner: { flexDirection: 'row', alignItems: 'center', gap: 1, backgroundColor: 'rgba(15,23,42,0.9)', borderRadius: 99, paddingHorizontal: 3, paddingVertical: 1.5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 2, elevation: 3 },
+	subOnTextUp: { fontSize: 7, fontWeight: '900', color: '#22c55e', lineHeight: 9 },
+	subOnTextDn: { fontSize: 7, fontWeight: '900', color: '#ef4444', lineHeight: 9 },
 	cardBadge: { position: 'absolute', top: 1, right: -5, width: 13, height: 18, borderRadius: 2, borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 2 },
 	mgmtHeader: { paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, marginTop: 4 },
 	mgmtTitle: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },

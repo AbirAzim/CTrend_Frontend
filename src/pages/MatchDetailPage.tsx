@@ -143,7 +143,7 @@ function deriveHalfScore(events: MatchEvent[]) {
 
 // ─── Player event map (goals / cards / subs per player) ──────────────────────
 
-type PEvt = { goals: number; assists: number; card: "yellow" | "red" | null; subOff: boolean; subOn: boolean };
+type PEvt = { goals: number; ownGoals: number; assists: number; card: "yellow" | "red" | null; subOff: boolean; subOn: boolean };
 
 function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
   const map = new Map<string, PEvt>();
@@ -151,7 +151,7 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
     const idKey = p.id != null ? `id:${p.id}` : null;
     const nmKey = p.name ? `nm:${p.name.toLowerCase().trim()}` : null;
     const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
-    const pev: PEvt = existing ?? { goals: 0, assists: 0, card: null, subOff: false, subOn: false };
+    const pev: PEvt = existing ?? { goals: 0, ownGoals: 0, assists: 0, card: null, subOff: false, subOn: false };
     if (idKey) map.set(idKey, pev);
     if (nmKey) map.set(nmKey, pev);
     return pev;
@@ -159,9 +159,13 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
   for (const e of events) {
     if (!e.player.name && e.player.id == null) continue;
     const pev = ensure(e.player);
-    if (e.type === "Goal" && !e.detail.toLowerCase().includes("disallow") && !e.detail.includes("Own Goal")) {
-      pev.goals++;
-      if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
+    if (e.type === "Goal" && !e.detail.toLowerCase().includes("disallow")) {
+      if (e.detail.includes("Own Goal")) {
+        pev.ownGoals++;
+      } else {
+        pev.goals++;
+        if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
+      }
     } else if (e.type === "Card") {
       const isRed = e.detail.toLowerCase().includes("red") || e.detail.includes("Second Yellow");
       pev.card = isRed ? "red" : "yellow";
@@ -420,9 +424,10 @@ function PitchAvatar({
           {rating}
         </span>
       )}
-      {pev && (pev.goals > 0 || pev.assists > 0) && (
+      {pev && (pev.goals > 0 || pev.ownGoals > 0 || pev.assists > 0) && (
         <span className="md-pa-events">
           {pev.goals > 0 && <span className="md-pa-ev-goal">{"⚽".repeat(Math.min(pev.goals, 3))}{pev.goals > 3 ? `×${pev.goals}` : ""}</span>}
+          {pev.ownGoals > 0 && <span className="md-pa-ev-og">{"⚽".repeat(Math.min(pev.ownGoals, 2))}OG</span>}
           {pev.assists > 0 && <span className="md-pa-ev-assist">{"👟".repeat(Math.min(pev.assists, 2))}{pev.assists > 2 ? `×${pev.assists}` : ""}</span>}
         </span>
       )}
@@ -522,6 +527,7 @@ function BenchCell({
             </span>
           )}
           {pev && pev.goals > 0 && <span className="md-bc-goal-ico">{"⚽".repeat(Math.min(pev.goals, 2))}</span>}
+          {pev && pev.ownGoals > 0 && <span className="md-bc-og-ico">{"⚽".repeat(Math.min(pev.ownGoals, 2))}OG</span>}
           {pev && pev.assists > 0 && <span className="md-bc-assist-ico">{"👟".repeat(Math.min(pev.assists, 2))}</span>}
         </div>
       </div>
