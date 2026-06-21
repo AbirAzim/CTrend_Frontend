@@ -118,7 +118,7 @@ function compareOptionLabel(post: FeedPostView, index: number): string {
 // nothing ever scrolls. Mirrors the mobile FeedPostCard layout.
 const COMPARE_ROW_RECIPES: Record<number, number[]> = {
   2: [2],
-  3: [3],
+  3: [2, 1],
   4: [2, 2],
   5: [3, 2],
   6: [3, 3],

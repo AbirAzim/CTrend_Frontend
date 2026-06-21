@@ -88,7 +88,7 @@ const IMG_H = IMG_W * 1.25;
 // short rows are centered, and nothing ever scrolls.
 const COMPARE_ROW_RECIPES: Record<number, number[]> = {
 	2: [2],
-	3: [3],
+	3: [2, 1],
 	4: [2, 2],
 	5: [3, 2],
 	6: [3, 3],
