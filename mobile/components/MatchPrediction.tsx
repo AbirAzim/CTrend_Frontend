@@ -266,7 +266,7 @@ function PredictionListModal({
           <FlatList
             data={rows}
             keyExtractor={(p) => p.id}
-            style={{ maxHeight: 380 }}
+            style={{ height: 340 }}
             ListEmptyComponent={
               loading
                 ? <ActivityIndicator style={{ margin: 24 }} color={colors.accent} />

@@ -144,6 +144,7 @@ export default function FeedScreen() {
   const { translateY } = useTabBar();
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
+  const tabBarAnimating = useRef(false);
   const filterVisible = useRef(true);
   const filterAnimating = useRef(false);
   const [filterBarHeight, setFilterBarHeight] = useState(50);
@@ -194,7 +195,10 @@ export default function FeedScreen() {
       // At top: restore both bars
       if (!tabBarVisible.current) {
         tabBarVisible.current = true;
-        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+        tabBarAnimating.current = true;
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          tabBarAnimating.current = false;
+        });
       }
       if (!filterVisible.current) {
         filterVisible.current = true;
@@ -204,13 +208,21 @@ export default function FeedScreen() {
       return;
     }
 
-    // Bottom nav: hides on scroll down, shows on scroll up
-    if (diff > 4 && tabBarVisible.current) {
+    // Bottom nav: hides on scroll down, shows on scroll up.
+    // Guard with tabBarAnimating to prevent rapid hide/show oscillation
+    // (flicker) when the scroll direction jitters within the 200ms animation.
+    if (diff > 4 && tabBarVisible.current && !tabBarAnimating.current) {
       tabBarVisible.current = false;
-      Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start();
-    } else if (diff < -4 && !tabBarVisible.current) {
+      tabBarAnimating.current = true;
+      Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start(() => {
+        tabBarAnimating.current = false;
+      });
+    } else if (diff < -4 && !tabBarVisible.current && !tabBarAnimating.current) {
       tabBarVisible.current = true;
-      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      tabBarAnimating.current = true;
+      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        tabBarAnimating.current = false;
+      });
     }
 
     // Filter bar: inverted — shows on scroll down, hides on scroll up.
@@ -269,6 +281,7 @@ export default function FeedScreen() {
     filterAnimating.current = false;
     lastScrollY.current = 0;
     tabBarVisible.current = true;
+    tabBarAnimating.current = false;
   }, [feedFilter, filterTranslateY]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
