@@ -51,6 +51,7 @@ import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
 import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import type { FeedPostView } from '@ctrend/shared/types/feed';
 import { useAuth } from '../context/AuthContext';
+import { MatchPrediction } from './MatchPrediction';
 import { useTheme } from '../context/ThemeContext';
 import type { ColorPalette } from '../context/ThemeContext';
 import { useSounds } from '../context/SoundContext';
@@ -2852,6 +2853,15 @@ function FeedPostCardComponent({
 						post.postOptions?.[1]?.label?.trim() ?? null,
 					]}
 					effectiveMinute={liveMinute}
+				/>
+			) : null}
+
+			{isMatchPost ? (
+				<MatchPrediction
+					postId={post.id}
+					homeTeam={compareLabel(post, 0)}
+					awayTeam={compareLabel(post, 1)}
+					enabled
 				/>
 			) : null}
 

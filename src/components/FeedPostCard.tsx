@@ -38,6 +38,7 @@ import {
 } from "../graphql/feed";
 import { apolloClient } from "../lib/apolloClient";
 import { postPermalink } from "../lib/postPermalink";
+import { MatchPrediction } from "./MatchPrediction";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -2375,6 +2376,15 @@ function FeedPostCardComponent({
           <span className="cx-mdb-row-arrow" aria-hidden>›</span>
         </button>
       )}
+
+      {isMatchPost ? (
+        <MatchPrediction
+          postId={post.id}
+          homeTeam={compareOptionLabel(post, 0)}
+          awayTeam={compareOptionLabel(post, 1)}
+          enabled={voteMode === "api"}
+        />
+      ) : null}
 
       <div className="cx-post-footer">
         {detailsOpen ? (
