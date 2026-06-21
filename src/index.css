@@ -4273,19 +4273,19 @@ a.cx-friend-avatar:hover {
   cursor: not-allowed;
 }
 
-/* Loser: heavy grayscale + scrim */
+/* Loser: lightly muted (not heavily dimmed) so it stays readable */
 .ig-compare-cell--closed:not(.ig-compare-cell--winner) {
-  opacity: 0.48;
-  filter: grayscale(0.85) saturate(0.25);
+  opacity: 0.78;
+  filter: grayscale(0.4) saturate(0.7);
   transform: scale(0.99);
 }
 
-/* Dark scrim overlay on loser */
+/* Soft scrim overlay on loser */
 .cx-loser-scrim {
   position: absolute;
   inset: 0;
   z-index: 3;
-  background: rgb(0 0 0 / 0.35);
+  background: rgb(0 0 0 / 0.18);
   pointer-events: none;
 }
 
@@ -4590,7 +4590,7 @@ a.cx-friend-avatar:hover {
 /* ── 4. Unchosen cells dim when user has voted ───────────────────────── */
 /* Your choice "spotlights" — everything else steps back */
 .ig-compare-cell--unchosen {
-  filter: brightness(0.72) saturate(0.55);
+  filter: brightness(0.9) saturate(0.85);
   transition:
     filter 0.45s var(--cx-ease-out),
     opacity 0.45s var(--cx-ease-out);

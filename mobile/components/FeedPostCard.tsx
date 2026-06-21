@@ -434,7 +434,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		},
 		compareWrap: { flexDirection: 'row' as const, gap: 3 },
 		compareCell: { flex: 1, height: IMG_H, overflow: 'hidden' as const },
-		compareCellLoser: { opacity: 0.5 },
+		compareCellLoser: { opacity: 0.78 },
 		// Colored glow border on the cell the viewer picked (mirrors web's
 		// `box-shadow: inset 0 0 0 3px <optionColor>`).
 		compareCellPicked: { borderWidth: 2.5 },
@@ -1610,7 +1610,7 @@ function FeedPostCardComponent({
 				}).start();
 			}
 			Animated.timing(cellOpacity[1], {
-				toValue: 0.55,
+				toValue: 0.8,
 				duration: 280,
 				useNativeDriver: true,
 			}).start();
@@ -1630,7 +1630,7 @@ function FeedPostCardComponent({
 				}).start();
 			}
 			Animated.timing(cellOpacity[0], {
-				toValue: 0.55,
+				toValue: 0.8,
 				duration: 280,
 				useNativeDriver: true,
 			}).start();
@@ -1704,7 +1704,7 @@ function FeedPostCardComponent({
 			} else {
 				badgeScale[i].setValue(0);
 				Animated.timing(cellOpacity[i], {
-					toValue: 0.55,
+					toValue: 0.8,
 					duration: 280,
 					useNativeDriver: true,
 				}).start();
@@ -2499,12 +2499,7 @@ function FeedPostCardComponent({
 										style={[
 											styles.multiCell,
 											{ width: multiCellWidth, height: multiCellWidth },
-											isLoser && { opacity: 0.5 },
-											isVoted &&
-												!isVotingClosed && [
-													st.compareCellPicked,
-													{ borderColor: optionColor },
-												],
+											isLoser && { opacity: 0.78 },
 											{ transform: [{ scale: cellScale[i] }] },
 										]}>
 										<Pressable
@@ -2596,11 +2591,6 @@ function FeedPostCardComponent({
 									style={[
 										st.compareCell,
 										isVotingClosed && !isWinner && st.compareCellLoser,
-										picked &&
-											!isVotingClosed && [
-												st.compareCellPicked,
-												{ borderColor: optionColor },
-											],
 										{
 											transform: [{ scale: cellScale[i] }],
 											// Once closed, drop the animated vote-dim and let the
