@@ -2,10 +2,15 @@ import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ACTIVE_CAMPAIGNS } from "@ctrend/shared/graphql/campaigns";
+import {
+  ACTIVE_CAMPAIGNS,
+  CAMPAIGN_WIN_LEADERBOARD,
+} from "@ctrend/shared/graphql/campaigns";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import worldcupPlayersAsset from "../assets/worldcup-players.png";
 
 const BG = "#5a0a0a";
+const MEDAL = ["#f5c518", "#cbd2d9", "#cd7f32"]; // gold, silver, bronze
 
 type Campaign = {
   id: string;
@@ -16,6 +21,66 @@ type Campaign = {
   ctaLabel: string;
   prizePerWinner: number;
 };
+
+type LeaderRow = {
+  rank: number;
+  wins: number;
+  user: {
+    id: string;
+    username?: string | null;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
+};
+
+/** Top-3 winners shown as a circular avatar cluster on the campaign banner. */
+function BannerLeaders({ campaignId }: { campaignId: string }) {
+  const { data } = useQuery<{ campaignWinLeaderboard: LeaderRow[] }>(
+    CAMPAIGN_WIN_LEADERBOARD,
+    { variables: { campaignId, take: 3 }, fetchPolicy: "cache-and-network" },
+  );
+  const rows = (data?.campaignWinLeaderboard ?? []).slice(0, 3);
+  if (rows.length === 0) return null;
+
+  return (
+    <View style={styles.leaders}>
+      <Text style={styles.leadersLabel}>🏆 Top</Text>
+      <View style={styles.leadersRow}>
+        {rows.map((row, i) => {
+          const u = row.user;
+          const name = u?.displayName?.trim() || u?.username || "User";
+          const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
+          const ring = MEDAL[row.rank - 1] ?? "#fff";
+          const big = row.rank === 1;
+          return (
+            <View
+              key={u?.id ?? row.rank}
+              style={[
+                styles.leader,
+                i > 0 && { marginLeft: 5 },
+                {
+                  borderColor: ring,
+                  width: big ? 32 : 28,
+                  height: big ? 32 : 28,
+                  borderRadius: big ? 16 : 14,
+                },
+              ]}
+            >
+              {img ? (
+                <Image source={{ uri: img }} style={styles.leaderImg} cachePolicy="memory-disk" />
+              ) : (
+                <Text style={styles.leaderFallback}>{name.charAt(0).toUpperCase()}</Text>
+              )}
+              <View style={[styles.leaderRank, { backgroundColor: ring }]}>
+                <Text style={styles.leaderRankText}>{row.rank}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function CampaignCard({ c }: { c: Campaign }) {
   return (
@@ -48,8 +113,11 @@ function CampaignCard({ c }: { c: Campaign }) {
         <Text style={styles.title} numberOfLines={1}>{c.name}</Text>
         <Text style={styles.desc} numberOfLines={2}>{c.bannerText}</Text>
 
-        <View style={styles.cta}>
-          <Text style={styles.ctaText}>{c.ctaLabel}</Text>
+        <View style={styles.actionsRow}>
+          <View style={styles.cta}>
+            <Text style={styles.ctaText}>{c.ctaLabel}</Text>
+          </View>
+          <BannerLeaders campaignId={c.id} />
         </View>
       </View>
     </Pressable>
@@ -140,7 +208,50 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    marginTop: 4,
   },
   ctaText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+  leaders: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: 20,
+    paddingVertical: 3,
+    paddingLeft: 8,
+    paddingRight: 8,
+  },
+  leadersLabel: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  leadersRow: { flexDirection: "row", alignItems: "center" },
+  leader: {
+    position: "relative",
+    borderWidth: 2,
+    backgroundColor: "#2a2a2a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  leaderImg: { width: "100%", height: "100%", borderRadius: 16 },
+  leaderFallback: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  leaderRank: {
+    position: "absolute",
+    bottom: -4,
+    right: -4,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: "#1a1a1a",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  leaderRankText: { color: "#3a2a00", fontSize: 8, fontWeight: "900" },
 });

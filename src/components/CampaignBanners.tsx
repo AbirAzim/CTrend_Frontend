@@ -1,6 +1,7 @@
 import { useQuery } from "@apollo/client";
 import { useNavigate } from "react-router-dom";
-import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
+import { ACTIVE_CAMPAIGNS, CAMPAIGN_WIN_LEADERBOARD } from "../graphql/campaigns";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 
 type Campaign = {
   id: string;
@@ -12,6 +13,54 @@ type Campaign = {
   ctaUrl: string;
   prizePerWinner: number;
 };
+
+type LeaderRow = {
+  rank: number;
+  wins: number;
+  user: {
+    id: string;
+    username?: string | null;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
+};
+
+/** Top-3 winners shown as a circular avatar cluster on the campaign banner. */
+function BannerLeaders({ campaignId }: { campaignId: string }) {
+  const { data } = useQuery<{ campaignWinLeaderboard: LeaderRow[] }>(
+    CAMPAIGN_WIN_LEADERBOARD,
+    { variables: { campaignId, take: 3 }, fetchPolicy: "cache-and-network" },
+  );
+  const rows = (data?.campaignWinLeaderboard ?? []).slice(0, 3);
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="cb-leaders" aria-label="Top campaign winners">
+      <span className="cb-leaders-label">🏆 Top winners</span>
+      <div className="cb-leaders-avatars">
+        {rows.map((row) => {
+          const u = row.user;
+          const name = u?.displayName?.trim() || u?.username || "User";
+          const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
+          return (
+            <span
+              key={u?.id ?? row.rank}
+              className={`cb-leader cb-leader--${row.rank}`}
+              title={`#${row.rank} ${name} — ${row.wins} win${row.wins === 1 ? "" : "s"}`}
+            >
+              {img ? (
+                <img src={img} alt="" />
+              ) : (
+                <span className="cb-leader-fallback">{name.charAt(0).toUpperCase()}</span>
+              )}
+              <span className="cb-leader-rank">{row.rank}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const navigate = useNavigate();
@@ -46,13 +95,16 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
         </div>
         <p className="cb-name">{campaign.name}</p>
         <p className="cb-text">{campaign.bannerText}</p>
-        <button
-          type="button"
-          className="cb-cta"
-          onClick={(e) => { e.stopPropagation(); go(); }}
-        >
-          {campaign.ctaLabel}
-        </button>
+        <div className="cb-card-actions">
+          <button
+            type="button"
+            className="cb-cta"
+            onClick={(e) => { e.stopPropagation(); go(); }}
+          >
+            {campaign.ctaLabel}
+          </button>
+          <BannerLeaders campaignId={campaign.id} />
+        </div>
       </div>
       {isWorldCup && (
         <img

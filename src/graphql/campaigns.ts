@@ -52,6 +52,23 @@ export const CAMPAIGN_BY_SLUG = gql`
   }
 `;
 
+/** Users ranked by most campaign wins — campaign detail page leaderboard. */
+export const CAMPAIGN_WIN_LEADERBOARD = gql`
+  query CampaignWinLeaderboard($campaignId: ID, $take: Int) {
+    campaignWinLeaderboard(campaignId: $campaignId, take: $take) {
+      rank
+      wins
+      totalPrize
+      user {
+        id
+        username
+        displayName
+        profileImageUrl
+      }
+    }
+  }
+`;
+
 export const CAMPAIGNS_ADMIN = gql`
   query CampaignsAdmin {
     campaigns {

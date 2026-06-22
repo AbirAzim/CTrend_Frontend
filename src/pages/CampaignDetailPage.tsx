@@ -1,8 +1,9 @@
 import { useQuery } from "@apollo/client";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { CAMPAIGN_BY_SLUG } from "../graphql/campaigns";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { CAMPAIGN_BY_SLUG, CAMPAIGN_WIN_LEADERBOARD } from "../graphql/campaigns";
 import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
+import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -418,6 +419,90 @@ function FixturesSection() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+type LeaderRow = {
+  rank: number;
+  wins: number;
+  totalPrize: number;
+  user: {
+    id: string;
+    username?: string | null;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
+};
+
+function WinnersLeaderboardSection({ campaignId }: { campaignId: string }) {
+  const [showAll, setShowAll] = useState(false);
+  const { data, loading } = useQuery<{ campaignWinLeaderboard: LeaderRow[] }>(
+    CAMPAIGN_WIN_LEADERBOARD,
+    {
+      variables: { campaignId, take: 50 },
+      fetchPolicy: "cache-and-network",
+    },
+  );
+
+  const allRows = data?.campaignWinLeaderboard ?? [];
+  const rows = showAll ? allRows : allRows.slice(0, 3);
+
+  return (
+    <section className="cd-section">
+      <h2 className="cd-section-title">🏆 Top campaign winners</h2>
+      <p className="cd-section-sub">Most match wins drawn from this campaign.</p>
+      {loading && allRows.length === 0 ? (
+        <p className="muted small">Loading…</p>
+      ) : allRows.length === 0 ? (
+        <p className="cd-lb-empty">No winners drawn yet — be the first!</p>
+      ) : (
+        <div className="cd-lb-list">
+          {rows.map((row) => {
+            const u = row.user;
+            const name = u?.displayName?.trim() || u?.username || "User";
+            const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
+            const medal =
+              row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : null;
+            const content = (
+              <>
+                <span className="cd-lb-rank">{medal ?? `#${row.rank}`}</span>
+                <span className="cd-lb-avatar" aria-hidden>
+                  {img ? (
+                    <img src={img} alt="" />
+                  ) : (
+                    <span className="cd-lb-avatar-fallback">
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </span>
+                <span className="cd-lb-name">{name}</span>
+                <span className="cd-lb-wins">
+                  {row.wins} {row.wins === 1 ? "win" : "wins"}
+                </span>
+              </>
+            );
+            return u?.id ? (
+              <Link key={u.id} to={`/profile/${u.id}`} className="cd-lb-row">
+                {content}
+              </Link>
+            ) : (
+              <div key={row.rank} className="cd-lb-row">
+                {content}
+              </div>
+            );
+          })}
+          {allRows.length > 3 && (
+            <button
+              type="button"
+              className="cd-lb-more"
+              onClick={() => setShowAll((s) => !s)}
+            >
+              {showAll ? "Show less" : `Show more (${allRows.length - 3})`}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function CampaignDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -491,6 +576,9 @@ export function CampaignDetailPage() {
 
       {/* Rules */}
       {c.rules && <RulesSection rules={c.rules} rulesBn={c.rulesBn} />}
+
+      {/* Most campaign wins leaderboard */}
+      <WinnersLeaderboardSection campaignId={c.id} />
 
       {/* Fixtures (World Cup only) */}
       {c.fixturesEnabled && <FixturesSection />}

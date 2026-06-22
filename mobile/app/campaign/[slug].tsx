@@ -2,9 +2,10 @@ import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import worldcupPlayersAsset from "../../assets/worldcup-players.png";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  InteractionManager,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,8 +13,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CAMPAIGN_BY_SLUG } from "@ctrend/shared/graphql/campaigns";
+import {
+  CAMPAIGN_BY_SLUG,
+  CAMPAIGN_WIN_LEADERBOARD,
+} from "@ctrend/shared/graphql/campaigns";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
+import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useTheme } from "../../context/ThemeContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -448,6 +453,117 @@ function RulesSection({
   );
 }
 
+// ─── Campaign winners leaderboard ──────────────────────────────────────────────
+
+type LeaderRow = {
+  rank: number;
+  wins: number;
+  totalPrize: number;
+  user: {
+    id: string;
+    username?: string | null;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+  } | null;
+};
+
+const LB_MEDAL = ["#f5c518", "#cbd2d9", "#cd7f32"]; // gold, silver, bronze
+
+function WinnersLeaderboardSection({
+  campaignId,
+  colors,
+}: {
+  campaignId: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const { data, loading } = useQuery<{ campaignWinLeaderboard: LeaderRow[] }>(
+    CAMPAIGN_WIN_LEADERBOARD,
+    { variables: { campaignId, take: 50 }, fetchPolicy: "cache-and-network" },
+  );
+  const allRows = data?.campaignWinLeaderboard ?? [];
+  const rows = showAll ? allRows : allRows.slice(0, 3);
+
+  if (loading && allRows.length === 0) {
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>🏆 Top campaign winners</Text>
+        <Text style={{ color: colors.muted, fontSize: 13 }}>Loading…</Text>
+      </View>
+    );
+  }
+  if (allRows.length === 0) {
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>🏆 Top campaign winners</Text>
+        <Text style={[styles.lbEmpty, { color: colors.muted, backgroundColor: colors.card, borderColor: colors.border }]}>
+          No winners drawn yet — be the first!
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 4 }]}>
+        🏆 Top campaign winners
+      </Text>
+      <Text style={{ color: colors.muted, fontSize: 12.5, marginBottom: 12 }}>
+        Most match wins drawn from this campaign.
+      </Text>
+      <View style={{ gap: 6 }}>
+        {rows.map((row) => {
+          const u = row.user;
+          const name = u?.displayName?.trim() || u?.username || "User";
+          const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
+          const medal = LB_MEDAL[row.rank - 1] ?? null;
+          return (
+            <Pressable
+              key={u?.id ?? row.rank}
+              style={[styles.lbRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => u?.id && router.push(`/profile/${u.id}` as `/${string}`)}
+            >
+              <Text style={[styles.lbRank, { color: medal ?? colors.muted }]}>
+                {medal ? ["🥇", "🥈", "🥉"][row.rank - 1] : `#${row.rank}`}
+              </Text>
+              <View
+                style={[
+                  styles.lbAvatar,
+                  { backgroundColor: colors.section, borderColor: medal ?? "transparent", borderWidth: medal ? 2 : 0 },
+                ]}
+              >
+                {img ? (
+                  <Image source={{ uri: img }} style={styles.lbAvatarImg} cachePolicy="memory-disk" />
+                ) : (
+                  <Text style={[styles.lbAvatarFallback, { color: colors.muted }]}>
+                    {name.charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <Text style={[styles.lbName, { color: colors.text }]} numberOfLines={1}>
+                {name}
+              </Text>
+              <Text style={styles.lbWins}>
+                {row.wins} {row.wins === 1 ? "win" : "wins"}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {allRows.length > 3 && (
+          <Pressable
+            style={[styles.lbMore, { borderColor: colors.border, backgroundColor: colors.card }]}
+            onPress={() => setShowAll((s) => !s)}
+          >
+            <Text style={[styles.lbMoreText, { color: colors.text }]}>
+              {showAll ? "Show less" : `Show more (${allRows.length - 3})`}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function CampaignDetailScreen() {
@@ -462,6 +578,15 @@ export default function CampaignDetailScreen() {
   });
 
   const campaign = data?.campaign;
+
+  // Defer the heavy sections (rules, leaderboard, all fixtures + group tables)
+  // until the navigation transition finishes, so opening/leaving the screen is
+  // snappy instead of janking while React renders everything synchronously.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => setReady(true));
+    return () => task.cancel();
+  }, []);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -558,13 +683,26 @@ export default function CampaignDetailScreen() {
               </View>
             ) : null}
 
-            {/* Rules */}
-            {campaign.rules ? (
-              <RulesSection rules={campaign.rules} rulesBn={campaign.rulesBn} colors={colors} />
-            ) : null}
+            {/* Heavy sections — mounted after the navigation transition so the
+                push/back feels instant. */}
+            {!ready ? (
+              <View style={[styles.center, { paddingVertical: 40 }]}>
+                <ActivityIndicator color={colors.accent} />
+              </View>
+            ) : (
+              <>
+                {/* Rules */}
+                {campaign.rules ? (
+                  <RulesSection rules={campaign.rules} rulesBn={campaign.rulesBn} colors={colors} />
+                ) : null}
 
-            {/* Fixtures (World Cup) */}
-            {campaign.fixturesEnabled && <FixturesSection colors={colors} />}
+                {/* Top campaign winners */}
+                <WinnersLeaderboardSection campaignId={campaign.id} colors={colors} />
+
+                {/* Fixtures (World Cup) */}
+                {campaign.fixturesEnabled && <FixturesSection colors={colors} />}
+              </>
+            )}
           </View>
         </ScrollView>
       )}
@@ -751,4 +889,54 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "transparent",
   },
   voteBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+
+  // Winners leaderboard
+  lbEmpty: {
+    fontSize: 13,
+    textAlign: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  lbRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  lbRank: { width: 30, textAlign: "center", fontWeight: "900", fontSize: 16 },
+  lbAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lbAvatarImg: { width: "100%", height: "100%" },
+  lbAvatarFallback: { fontWeight: "800", fontSize: 15 },
+  lbName: { flex: 1, fontWeight: "700", fontSize: 14 },
+  lbWins: {
+    fontWeight: "800",
+    fontSize: 12.5,
+    color: "#d99411",
+    backgroundColor: "rgba(245,197,24,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(245,197,24,0.3)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  lbMore: {
+    alignSelf: "center",
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  lbMoreText: { fontWeight: "700", fontSize: 13 },
 });
