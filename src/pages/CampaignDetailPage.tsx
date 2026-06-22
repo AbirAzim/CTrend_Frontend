@@ -255,6 +255,11 @@ function FixtureCard({ fixture }: { fixture: Fixture }) {
   const now = new Date();
   const kickoff = new Date(fixture.kickoff);
   const isUpcoming = kickoff > now && fixture.status !== "FINISHED";
+  // Campaign match posts publish (and voting opens) 24h before kickoff and close
+  // at kickoff. Only show "Cast your vote" inside that window.
+  const VOTE_OPEN_LEAD_MS = 24 * 60 * 60 * 1000;
+  const votingOpen =
+    isUpcoming && kickoff.getTime() - now.getTime() <= VOTE_OPEN_LEAD_MS;
   const isLive = fixture.status === "IN_PLAY" || fixture.status === "PAUSED";
   const isFinished = fixture.status === "FINISHED";
   const hasScore = isFinished || isLive;
@@ -322,8 +327,8 @@ function FixtureCard({ fixture }: { fixture: Fixture }) {
         </div>
       </div>
 
-      {/* Vote footer */}
-      {fixture.campaignPostId && isUpcoming && (
+      {/* Vote footer — only once the campaign post is published (24h before kickoff) */}
+      {fixture.campaignPostId && votingOpen ? (
         <div className="cd-fc-footer">
           <button
             type="button"
@@ -333,7 +338,11 @@ function FixtureCard({ fixture }: { fixture: Fixture }) {
             Cast your vote →
           </button>
         </div>
-      )}
+      ) : fixture.campaignPostId && isUpcoming ? (
+        <div className="cd-fc-footer">
+          <span className="cd-fc-vote-soon">🔒 Voting opens 24h before kickoff</span>
+        </div>
+      ) : null}
     </div>
   );
 }

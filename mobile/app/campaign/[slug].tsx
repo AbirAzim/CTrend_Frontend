@@ -217,6 +217,10 @@ function FixtureCard({
   const isLive = fixture.status === "IN_PLAY" || fixture.status === "PAUSED";
   const isFinished = fixture.status === "FINISHED";
   const isUpcoming = !isLive && !isFinished;
+  // Campaign match posts publish (voting opens) 24h before kickoff, close at
+  // kickoff. Only show "Cast your vote" inside that window.
+  const votingOpen =
+    isUpcoming && kickoff.getTime() - Date.now() <= 24 * 60 * 60 * 1000;
   const hasScore = isFinished || isLive;
   const homeWon = fixture.score.winner === "HOME_TEAM";
   const awayWon = fixture.score.winner === "AWAY_TEAM";
@@ -304,15 +308,19 @@ function FixtureCard({
         </View>
       </View>
 
-      {/* Vote button */}
-      {fixture.campaignPostId && isUpcoming && (
+      {/* Vote button — only once the campaign post is published (24h before kickoff) */}
+      {fixture.campaignPostId && votingOpen ? (
         <Pressable
           style={[styles.voteBtn, { backgroundColor: colors.accent }]}
           onPress={() => router.push(`/post/${fixture.campaignPostId}` as `/${string}`)}
         >
           <Text style={styles.voteBtnText}>Cast your vote →</Text>
         </Pressable>
-      )}
+      ) : fixture.campaignPostId && isUpcoming ? (
+        <View style={[styles.voteBtn, { borderColor: colors.border, borderWidth: 1 }]}>
+          <Text style={[styles.voteBtnText, { color: colors.muted }]}>🔒 Voting opens 24h before kickoff</Text>
+        </View>
+      ) : null}
       {fixture.campaignPostId && isFinished && (
         <Pressable
           style={[styles.voteBtn, { backgroundColor: colors.section, borderColor: colors.border }]}

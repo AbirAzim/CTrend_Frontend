@@ -64,8 +64,8 @@ function computeGroupTables(fixtures: WcFixture[]) {
     home.played++; away.played++;
     home.gf += f.score.home; home.ga += f.score.away;
     away.gf += f.score.away; away.ga += f.score.home;
-    if (f.score.winner === "home") { home.won++; home.pts += 3; away.lost++; }
-    else if (f.score.winner === "away") { away.won++; away.pts += 3; home.lost++; }
+    if (f.score.winner === "HOME_TEAM") { home.won++; home.pts += 3; away.lost++; }
+    else if (f.score.winner === "AWAY_TEAM") { away.won++; away.pts += 3; home.lost++; }
     else { home.drawn++; home.pts++; away.drawn++; away.pts++; }
     home.gd = home.gf - home.ga;
     away.gd = away.gf - away.ga;
@@ -206,14 +206,16 @@ function TeamCrest({ crest, name, size = 26 }: { crest: string; name: string; si
 function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnType<typeof makeStyles>; isDark: boolean }) {
   const live = isLive(fixture);
   const finished = isFinished(fixture);
-  const homeWon = fixture.score.winner === "home";
-  const awayWon = fixture.score.winner === "away";
+  const homeWon = fixture.score.winner === "HOME_TEAM";
+  const awayWon = fixture.score.winner === "AWAY_TEAM";
   const canVote = canVoteOnFixture(fixture);
 
   function handlePress() {
     if (live || finished) {
       router.push(`/world-cup/match/${fixture.id}` as `/${string}`);
-    } else if (fixture.campaignPostId) {
+    } else if (canVote && fixture.campaignPostId) {
+      // Only open the post once voting is open (post published) — avoids a 404
+      // on scheduled/unpublished campaign posts.
       router.push(`/post/${fixture.campaignPostId}` as `/${string}`);
     }
   }

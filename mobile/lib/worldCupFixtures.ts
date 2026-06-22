@@ -175,7 +175,8 @@ export function liveBadgeLabel(f: WcFixture): string {
 export function canVoteOnFixture(f: WcFixture): boolean {
   if (!f.campaignPostId) return false;
   if (!isUpcoming(f)) return false;
-  return new Date(f.kickoff).getTime() - Date.now() < 25 * 60 * 60 * 1000;
+  // Campaign posts publish (voting opens) 24h before kickoff.
+  return new Date(f.kickoff).getTime() - Date.now() <= 24 * 60 * 60 * 1000;
 }
 
 export function liveMinute(iso: string): number {
