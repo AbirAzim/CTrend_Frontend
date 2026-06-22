@@ -1824,6 +1824,8 @@ function FeedPostCardComponent({
 		const curStats = optimisticVote?.optionStats ?? post.optionStats ?? null;
 		// Coins are awarded once per post — only the first vote (no prior pick).
 		const hadNoVote = curVote === null && curMyIdx === null;
+		// Coins: unvoting reverses the vote reward (symmetric with the backend).
+		if (intent < 0 && !hadNoVote) spendCoins(COIN_AMOUNTS.VOTE);
 
 		// Apply optimistic update immediately
 		if (intent >= 0) {

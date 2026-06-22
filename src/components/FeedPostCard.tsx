@@ -1296,6 +1296,8 @@ function FeedPostCardComponent({
       navigate("/login", { state: { from: location.pathname } });
       return;
     }
+    // Coins: unvoting reverses the vote reward (symmetric with the backend).
+    dispatchCoinSpent(COIN_AMOUNTS.VOTE);
 
     // Optimistic clear: drop the viewer's pick and decrement that option.
     const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
