@@ -98,15 +98,20 @@ function buildPhotoMap(lineups: MatchLineup[]): Map<number, string> {
   return map;
 }
 
+/** A real scored goal — excludes disallowed goals, missed penalties, and
+ * penalty-shootout goals (API-Football marks all of these as type "Goal"). */
+function isScoredGoal(e: { type: string; detail?: string | null }): boolean {
+  if (e.type !== "Goal") return false;
+  const d = (e.detail || "").toLowerCase();
+  return (
+    !d.includes("disallow") && !d.includes("missed") && !d.includes("shootout")
+  );
+}
+
 // Goal scorers per team
 function goalScorers(events: MatchEvent[], team: "home" | "away") {
   return events
-    .filter(
-      (e) =>
-        e.type === "Goal" &&
-        e.team === team &&
-        !e.detail.toLowerCase().includes("disallow"),
-    )
+    .filter((e) => isScoredGoal(e) && e.team === team)
     .sort((a, b) => a.time - b.time)
     .map((e) => {
       const min = minuteLabel(e);
@@ -122,19 +127,30 @@ function ratingColor(r: number): string {
   return "#ef4444"; // red
 }
 
-function motm(ratings: PlayerRating[]): PlayerRating | null {
+// Man of the match: highest rating, but weighted by attacking output so a
+// match-winning scorer outranks a slightly-higher-rated player who didn't
+// contribute goals (API ratings alone can crown the wrong side).
+function motm(
+  ratings: PlayerRating[],
+  evMap: Map<string, PEvt>,
+): PlayerRating | null {
   if (!ratings.length) return null;
-  return ratings.reduce((best, cur) => {
-    const bn = parseFloat(best.rating ?? "0");
-    const cn = parseFloat(cur.rating ?? "0");
-    return cn > bn ? cur : best;
-  });
+  const impact = (r: PlayerRating): number => {
+    const base = parseFloat(r.rating ?? "0");
+    const ev =
+      (r.playerId != null && evMap.get(`id:${r.playerId}`)) ||
+      (r.name && evMap.get(`nm:${r.name.toLowerCase().trim()}`)) ||
+      null;
+    if (!ev) return base;
+    return base + ev.goals * 0.35 + ev.assists * 0.15 - ev.ownGoals * 0.5;
+  };
+  return ratings.reduce((best, cur) => (impact(cur) > impact(best) ? cur : best));
 }
 
 function deriveHalfScore(events: MatchEvent[]) {
   let home = 0, away = 0;
   for (const e of events) {
-    if (e.type !== "Goal" || e.detail.toLowerCase().includes("disallow") || e.time > 45) continue;
+    if (!isScoredGoal(e) || e.time > 45) continue;
     if (e.detail.includes("Own Goal")) { if (e.team === "home") away++; else home++; }
     else { if (e.team === "home") home++; else away++; }
   }
@@ -159,8 +175,8 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
   for (const e of events) {
     if (!e.player.name && e.player.id == null) continue;
     const pev = ensure(e.player);
-    if (e.type === "Goal" && !e.detail.toLowerCase().includes("disallow")) {
-      if (e.detail.includes("Own Goal")) {
+    if (isScoredGoal(e)) {
+      if (e.detail?.includes("Own Goal")) {
         pev.ownGoals++;
       } else {
         pev.goals++;
@@ -193,7 +209,7 @@ function GoalBar({ events, homeTeam, awayTeam }: {
   awayTeam: { shortName: string };
 }) {
   const goals = events
-    .filter(e => e.type === "Goal" && !e.detail.toLowerCase().includes("disallow"))
+    .filter(isScoredGoal)
     .sort((a, b) => a.time - b.time);
   if (!goals.length) return null;
 
@@ -439,12 +455,14 @@ function PitchAvatar({
 function FormationRows({
   players,
   reverse,
+  mirrorCols,
   photoMap,
   ratingMap,
   evMap,
 }: {
   players: LineupPlayer[];
   reverse: boolean;
+  mirrorCols: boolean;
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
   evMap: Map<string, PEvt>;
@@ -468,7 +486,7 @@ function FormationRows({
         const sorted = [...rps].sort((a, b) => {
           const ac = parseInt((a.grid ?? "0:1").split(":")[1], 10);
           const bc = parseInt((b.grid ?? "0:1").split(":")[1], 10);
-          return ac - bc;
+          return mirrorCols ? bc - ac : ac - bc;
         });
         return (
           <div key={row} className="md-frow">
@@ -598,12 +616,12 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
 
         {homeL && (
           <div className="md-pitch-half">
-            <FormationRows players={homeL.startXI} reverse={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
+            <FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
           </div>
         )}
         {awayL && (
           <div className="md-pitch-half">
-            <FormationRows players={awayL.startXI} reverse={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
+            <FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
           </div>
         )}
       </div>
@@ -830,7 +848,7 @@ function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
   const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
   const shownHome = scorersExpanded ? homeScorers : homeScorers.slice(0, SCORER_LIMIT);
   const shownAway = scorersExpanded ? awayScorers : awayScorers.slice(0, SCORER_LIMIT);
-  const star = (finished || live) ? motm(playerRatings) : null;
+  const star = (finished || live) ? motm(playerRatings, buildPlayerEventMap(events)) : null;
 
   return (
     <div className="md-hdr">

@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   wrap: { paddingBottom: 8 },
 
   card: {
-    height: 130,
+    minHeight: 130,
     backgroundColor: BG,
     borderRadius: 12,
     overflow: "hidden",

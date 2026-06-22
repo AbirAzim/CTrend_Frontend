@@ -75,7 +75,7 @@ function shortName(full?: string | null) {
 }
 function goalScorers(events: MatchEvent[], team: 'home' | 'away') {
 	return events
-		.filter(e => e.type === 'Goal' && e.team === team && !e.detail.toLowerCase().includes('disallow'))
+		.filter(e => { const d = (e.detail || '').toLowerCase(); return e.type === 'Goal' && e.team === team && !d.includes('disallow') && !d.includes('missed') && !d.includes('shootout'); })
 		.sort((a, b) => a.time - b.time)
 		.map(e => {
 			const min = minuteLabel(e);
@@ -89,14 +89,21 @@ function ratingColor(r: number) {
 	if (r >= 6.5) return '#f97316';
 	return '#ef4444';
 }
-function motmPlayer(ratings: PlayerRating[]): PlayerRating | null {
+function motmPlayer(ratings: PlayerRating[], evMap: Map<string, PEvt>): PlayerRating | null {
 	if (!ratings.length) return null;
-	return ratings.reduce((b, c) => parseFloat(c.rating ?? '0') > parseFloat(b.rating ?? '0') ? c : b);
+	const impact = (r: PlayerRating): number => {
+		const base = parseFloat(r.rating ?? '0');
+		const ev = (r.playerId != null && evMap.get(`id:${r.playerId}`)) || (r.name && evMap.get(`nm:${r.name.toLowerCase().trim()}`)) || null;
+		if (!ev) return base;
+		return base + ev.goals * 0.35 + ev.assists * 0.15 - ev.ownGoals * 0.5;
+	};
+	return ratings.reduce((b, c) => impact(c) > impact(b) ? c : b);
 }
 function deriveHalfScore(events: MatchEvent[]) {
 	let home = 0, away = 0;
 	for (const e of events) {
-		if (e.type !== 'Goal' || e.detail.toLowerCase().includes('disallow') || e.time > 45) continue;
+		const d = (e.detail || '').toLowerCase();
+		if (e.type !== 'Goal' || d.includes('disallow') || d.includes('missed') || d.includes('shootout') || e.time > 45) continue;
 		if (e.detail.includes('Own Goal')) { if (e.team === 'home') { away++; } else { home++; } }
 		else { if (e.team === 'home') { home++; } else { away++; } }
 	}
@@ -122,8 +129,9 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
 	for (const e of events) {
 		if (!e.player.name && e.player.id == null) continue;
 		const pev = ensure(e.player);
-		if (e.type === 'Goal' && !e.detail.toLowerCase().includes('disallow')) {
-			if (e.detail.includes('Own Goal')) {
+		const gd = (e.detail || '').toLowerCase();
+		if (e.type === 'Goal' && !gd.includes('disallow') && !gd.includes('missed') && !gd.includes('shootout')) {
+			if (gd.includes('own goal')) {
 				pev.ownGoals++;
 			} else {
 				pev.goals++;
@@ -157,7 +165,7 @@ function GoalBar({ events, homeTeam, awayTeam, isDark }: {
 	isDark: boolean;
 }) {
 	const goals = events
-		.filter(e => e.type === 'Goal' && !e.detail.toLowerCase().includes('disallow'))
+		.filter(e => { const d = (e.detail || '').toLowerCase(); return e.type === 'Goal' && !d.includes('disallow') && !d.includes('missed') && !d.includes('shootout'); })
 		.sort((a, b) => a.time - b.time);
 	if (!goals.length) return null;
 
@@ -235,12 +243,12 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 	const live = isLive(status);
 	const finished = isFinished(status);
 	const hasScore = live || finished;
-	const homeWon = score.winner === 'home';
-	const awayWon = score.winner === 'away';
+	const homeWon = score.winner === 'HOME_TEAM';
+	const awayWon = score.winner === 'AWAY_TEAM';
 	const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
 	const homeScorers = hasScore ? goalScorers(events, 'home') : [];
 	const awayScorers = hasScore ? goalScorers(events, 'away') : [];
-	const star = (finished || live) ? motmPlayer(playerRatings) : null;
+	const star = (finished || live) ? motmPlayer(playerRatings, buildPlayerEventMap(events)) : null;
 	const [scorersExpanded, setScorersExpanded] = useState(false);
 	const SCORER_LIMIT = 4;
 	const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
@@ -602,9 +610,9 @@ const pitch = StyleSheet.create({
 	subBadge: { position: 'absolute', top: -7, left: -7, flexDirection: 'row', alignItems: 'center', gap: 1, backgroundColor: 'rgba(15,23,42,0.9)', borderRadius: 99, paddingHorizontal: 3, paddingVertical: 1.5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.5, shadowRadius: 2, zIndex: 3 },
 	subArrUp: { fontSize: 7, fontWeight: '900', color: '#22c55e', lineHeight: 9 },
 	subArrDn: { fontSize: 7, fontWeight: '900', color: '#ef4444', lineHeight: 9 },
-	avatarWrap: { position: 'relative', width: 44, height: 44, marginBottom: 12 },
-	avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
-	avatarFallback: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
+	avatarWrap: { position: 'relative', width: 40, height: 40, marginBottom: 8 },
+	avatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
+	avatarFallback: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
 	avatarNum: { fontSize: 14, fontWeight: '800', color: '#fff' },
 	numBadge: { position: 'absolute', bottom: -7, left: -3, backgroundColor: '#1e3a5f', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, minWidth: 18, alignItems: 'center' },
 	numBadgeText: { fontSize: 8, fontWeight: '800', color: '#fff' },
@@ -618,8 +626,8 @@ const pitch = StyleSheet.create({
 	playerName: { fontSize: 9.5, fontWeight: '600', color: '#fff', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
 
-function FormationRows({ players, reverse, ratingMap, evMap, isDark }: {
-	players: LineupPlayer[]; reverse: boolean;
+function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark }: {
+	players: LineupPlayer[]; reverse: boolean; mirrorCols: boolean;
 	ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean;
 }) {
 	const byRow = new Map<number, LineupPlayer[]>();
@@ -641,7 +649,7 @@ function FormationRows({ players, reverse, ratingMap, evMap, isDark }: {
 				const sorted = [...rps].sort((a, b) => {
 					const ac = parseInt((a.grid ?? '0:1').split(':')[1], 10);
 					const bc = parseInt((b.grid ?? '0:1').split(':')[1], 10);
-					return ac - bc;
+					return mirrorCols ? bc - ac : ac - bc;
 				});
 				return (
 					<View key={row} style={fo.row}>
@@ -730,12 +738,12 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 
 				{homeL && (
 					<View style={lu2.pitchHalf}>
-						<FormationRows players={homeL.startXI} reverse={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
+						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 					</View>
 				)}
 				{awayL && (
 					<View style={lu2.pitchHalf}>
-						<FormationRows players={awayL.startXI} reverse={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
+						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 					</View>
 				)}
 			</View>
@@ -853,9 +861,9 @@ const lu2 = StyleSheet.create({
 	pitchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1 },
 	// Fixed aspect ratio → both halves are exactly equal height, so the SVG
 	// midline aligns with the real home/away boundary and players stay in-half.
-	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column', aspectRatio: 0.56, width: '100%' },
+	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column', aspectRatio: 0.5, width: '100%' },
 	pitchSvg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-	pitchHalf: { flex: 1, paddingHorizontal: 8, overflow: 'hidden' },
+	pitchHalf: { flex: 1, paddingHorizontal: 8, paddingVertical: 8, overflow: 'hidden' },
 	pitchTeamBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
 	pitchTeamBadgeBottom: {},
 	pitchCrest: { width: 18, height: 18 },
