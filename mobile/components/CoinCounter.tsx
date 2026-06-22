@@ -2,12 +2,13 @@ import { useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { PressableScale } from "./PressableScale";
-import { useCoins } from "../context/CoinsContext";
+import { useCoins, useCoinsBalance } from "../context/CoinsContext";
 
 /** Compact coin balance for the top bar. Doubles as the fly-animation target
  * and links to the coins hub (history + leaderboard). */
 export function CoinCounter() {
-  const { balance, registerCounter, counterAnim } = useCoins();
+  const { registerCounter, counterAnim } = useCoins();
+  const balance = useCoinsBalance();
   const viewRef = useRef<View | null>(null);
 
   return (

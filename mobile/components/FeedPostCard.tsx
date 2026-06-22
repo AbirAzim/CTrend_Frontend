@@ -2046,11 +2046,13 @@ function FeedPostCardComponent({
 		const next = !liked;
 		setLiked(next);
 		setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
+		// Coins: fire instantly (optimistic) so the reward feels immediate and the
+		// tap registers without waiting for the server. If the mutation fails, the
+		// debounced balance reconcile inside award/spend self-corrects.
+		if (next) awardCoins(COIN_AMOUNTS.HYPE);
+		else spendCoins(COIN_AMOUNTS.HYPE);
 		try {
 			await setHypeMut({ variables: { postId: post.id, active: next } });
-			// Coins: hyping earns; un-hyping reverses the reward (symmetric).
-			if (next) awardCoins(COIN_AMOUNTS.HYPE);
-			else spendCoins(COIN_AMOUNTS.HYPE);
 		} catch {
 			setLiked(!next);
 			setHypeCount((n) => Math.max(0, n + (next ? -1 : 1)));

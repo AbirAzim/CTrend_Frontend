@@ -19,7 +19,7 @@ import { COIN_AMOUNTS, COIN_META, type CoinType } from "@ctrend/shared/lib/coins
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../context/AuthContext";
-import { useCoins } from "../context/CoinsContext";
+import { useCoins, useCoinsBalance } from "../context/CoinsContext";
 import { useTheme, type ColorPalette } from "../context/ThemeContext";
 import { useTabBar } from "../context/TabBarContext";
 import { BottomNav } from "./BottomNav";
@@ -56,7 +56,8 @@ const EARN_ORDER: CoinType[] = [
 
 export function CoinsHub({ userId }: { userId?: string }) {
   const { user } = useAuth();
-  const { balance, refresh } = useCoins();
+  const { refresh } = useCoins();
+  const balance = useCoinsBalance();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { translateY } = useTabBar();

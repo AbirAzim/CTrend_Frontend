@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -22,22 +23,22 @@ import { useAuth } from "./AuthContext";
 
 type XY = { x: number; y: number };
 
-type CoinsContextValue = {
-  /** Lifetime balance, or null until loaded. */
-  balance: number | null;
-  /** Earn coins: bump the balance + fly animation from `origin` to the counter. */
+/**
+ * Action handlers are kept in their own context with a *stable* value (memoised,
+ * functions are useCallback) so the many `useCoins()` consumers (every
+ * FeedPostCard, etc.) never re-render when the balance/animation state changes.
+ * Only the counter/hub subscribe to the changing balance via `useCoinsBalance`.
+ */
+type CoinsActions = {
   awardCoins: (amount: number, origin?: XY | null) => void;
-  /** Spend/reverse coins (un-hype): decrement the balance with a drop pulse. */
   spendCoins: (amount: number) => void;
-  /** Re-fetch the authoritative balance from the server. */
   refresh: () => void;
-  /** Counter registers its View so coins know where to fly. */
   registerCounter: (node: View | null) => void;
-  /** Animated scale the counter binds to (bump on earn, dip on spend). */
   counterAnim: Animated.Value;
 };
 
-const CoinsContext = createContext<CoinsContextValue | null>(null);
+const CoinsActionsContext = createContext<CoinsActions | null>(null);
+const CoinsBalanceContext = createContext<number | null>(null);
 
 type FlySprite = {
   id: number;
@@ -105,7 +106,7 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
   );
 
   const spawnFly = useCallback((origin: XY, target: XY, amount: number) => {
-    const count = Math.min(6, Math.max(3, Math.round(amount / 4)));
+    const count = Math.min(4, Math.max(2, Math.round(amount / 6)));
     const made: FlySprite[] = [];
     for (let i = 0; i < count; i++) {
       const sprite: FlySprite = {
@@ -145,14 +146,13 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.loop(
-          Animated.timing(sprite.rotate, {
-            toValue: 1,
-            duration: 420,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-        ),
+        Animated.timing(sprite.rotate, {
+          toValue: 1,
+          duration: 720,
+          delay,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
       ]).start();
     });
 
@@ -202,18 +202,16 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
     [isAuthenticated, bumpCounter, scheduleReconcile],
   );
 
+  const actions = useMemo<CoinsActions>(
+    () => ({ awardCoins, spendCoins, refresh, registerCounter, counterAnim }),
+    [awardCoins, spendCoins, refresh, registerCounter, counterAnim],
+  );
+
   return (
-    <CoinsContext.Provider
-      value={{
-        balance,
-        awardCoins,
-        spendCoins,
-        refresh,
-        registerCounter,
-        counterAnim,
-      }}
-    >
-      {children}
+    <CoinsActionsContext.Provider value={actions}>
+      <CoinsBalanceContext.Provider value={balance}>
+        {children}
+      </CoinsBalanceContext.Provider>
       {sprites.length > 0 && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {sprites.map((s) => (
@@ -241,7 +239,7 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
           ))}
         </View>
       )}
-    </CoinsContext.Provider>
+    </CoinsActionsContext.Provider>
   );
 }
 
@@ -265,8 +263,15 @@ const styles = StyleSheet.create({
   flyText: { color: "#7a4a05", fontWeight: "900", fontSize: 11 },
 });
 
-export function useCoins(): CoinsContextValue {
-  const ctx = useContext(CoinsContext);
+/** Stable coin actions (award/spend/refresh/counter). Safe for hot paths like
+ * FeedPostCard — never re-renders on balance changes. */
+export function useCoins(): CoinsActions {
+  const ctx = useContext(CoinsActionsContext);
   if (!ctx) throw new Error("useCoins must be used within CoinsProvider");
   return ctx;
+}
+
+/** Subscribe to the live coin balance (counter/hub only). */
+export function useCoinsBalance(): number | null {
+  return useContext(CoinsBalanceContext);
 }
