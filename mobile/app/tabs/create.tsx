@@ -31,6 +31,8 @@ import { CompareImageCropper } from "../../components/CompareImageCropper";
 import { AppActionSheet } from "../../components/AppDialog";
 import { DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
+import { useCoins } from "../../context/CoinsContext";
+import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
@@ -360,6 +362,7 @@ export default function CreateScreen() {
   );
   const allowUserGlobalPosts = Boolean(platformSettingsData?.platformSettings?.allowUserGlobalPosts);
 
+  const { awardCoins } = useCoins();
   const [getUploadUrl] = useMutation<UploadUrlData>(GET_IMAGE_UPLOAD_URL);
   const [createPost, { loading: submitting }] = useMutation(CREATE_POST);
   const [createSystemPost, { loading: submittingSystem }] = useMutation(CREATE_SYSTEM_POST);
@@ -728,6 +731,8 @@ export default function CreateScreen() {
       const useSystem = isAdmin && (platformWide || isAnnouncement);
       const mutFn = useSystem ? createSystemPost : createPost;
       await mutFn({ variables: { input }, refetchQueries: useSystem ? [] : [{ query: FEED_POSTS }] });
+      // Coins: earn for creating a post (system/admin posts aren't rewarded).
+      if (!useSystem) awardCoins(COIN_AMOUNTS.POST);
       resetForm();
       router.replace("/tabs");
     } catch (err: unknown) {

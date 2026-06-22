@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { PressableScale } from "../../components/PressableScale";
+import { CoinCounter } from "../../components/CoinCounter";
 import logoAsset from "../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -91,6 +92,9 @@ function FeedTopBar() {
 
         {/* Create + Admin live in the bottom nav (Create FAB + Admin shield), so they're
             intentionally not duplicated here. */}
+
+        {/* Coins counter — signed-in only */}
+        {isAuthenticated && <CoinCounter />}
 
         {/* Notification bell — signed-in only */}
         {isAuthenticated && (

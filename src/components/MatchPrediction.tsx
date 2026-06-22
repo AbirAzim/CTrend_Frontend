@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
 
 type PredUser = {
   id: string;
@@ -100,10 +101,13 @@ export function MatchPrediction({
       return;
     }
     setError(null);
+    const isFirstPrediction = !mine;
     try {
       await submit({ variables: { postId, homeScore: h, awayScore: a } });
       setEditing(false);
       void refetch();
+      // Coins: earn for predicting (only the first time, not on edits).
+      if (isFirstPrediction) dispatchCoinEarned(COIN_AMOUNTS.PREDICTION);
     } catch (err) {
       setError(getApolloErrorMessage(err));
     }

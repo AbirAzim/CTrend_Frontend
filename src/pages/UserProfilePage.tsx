@@ -28,6 +28,7 @@ type UserProfile = {
   bio?: string | null;
   profileImageUrl?: string | null;
   interests?: string[] | null;
+  coins?: number | null;
 };
 
 type PostRow = {
@@ -415,6 +416,10 @@ export function UserProfilePage() {
             <strong>{userFriends.length.toLocaleString()}</strong>
             <span>friends ›</span>
           </button>
+          <Link to={`/coins/${profile.id}`} className="cx-profile-stat cx-profile-stat--btn">
+            <strong>{(profile.coins ?? 0).toLocaleString()}</strong>
+            <span>¢ coins ›</span>
+          </Link>
         </div>
       )}
 

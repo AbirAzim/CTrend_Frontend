@@ -9,6 +9,7 @@ import { MY_SAVED_POSTS } from "../graphql/feed";
 import { ME } from "../graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
 import { NotificationBell } from "../components/NotificationBell";
+import { CoinCounter } from "../components/CoinCounter";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { MessengerPanel } from "../components/MessengerPanel";
 import { WorldCupFloating } from "../components/WorldCupFloating";
@@ -285,6 +286,7 @@ export function AppShell() {
               {switchingRole ? "…" : isAdmin ? "Admin" : "User"}
             </button>
           )}
+          {isAuthenticated && <CoinCounter />}
           {isAuthenticated && <NotificationBell />}
           {isAuthenticated ? (
             <button

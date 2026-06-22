@@ -104,6 +104,7 @@ export const GET_USER_PROFILE = gql`
       bio
       profileImageUrl
       interests
+      coins
     }
   }
 `;

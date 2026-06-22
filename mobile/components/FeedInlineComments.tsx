@@ -29,6 +29,8 @@ import {
 import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
 import { useAuth } from '../context/AuthContext';
+import { useCoins } from '../context/CoinsContext';
+import { COIN_AMOUNTS } from '@ctrend/shared/lib/coins';
 import { useTheme } from '../context/ThemeContext';
 import { AppConfirmDialog } from './AppDialog';
 
@@ -112,6 +114,7 @@ export function FeedInlineComments({
 }) {
 	const { isDark } = useTheme();
 	const { isAuthenticated, user } = useAuth();
+	const { awardCoins } = useCoins();
 	const insets = useSafeAreaInsets();
 	const fb = fbPalette(isDark);
 	const st = makeStyles(fb);
@@ -189,6 +192,8 @@ export function FeedInlineComments({
 			setReplyTarget(null);
 			await refetch();
 			onCommentAdded?.();
+			// Coins: earn for commenting / replying.
+			awardCoins(COIN_AMOUNTS.COMMENT);
 			Keyboard.dismiss();
 			setTimeout(() => listRef.current?.scrollTo({ y: 0, animated: true }), 100);
 		} catch {

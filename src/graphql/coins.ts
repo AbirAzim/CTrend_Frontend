@@ -1,0 +1,47 @@
+import { gql } from "@apollo/client";
+
+/** Viewer's lifetime coin balance. */
+export const MY_COINS = gql`
+  query MyCoins {
+    myCoins
+  }
+`;
+
+/** Public coin history for any user (defaults to the viewer when omitted). */
+export const COIN_HISTORY = gql`
+  query CoinHistory($userId: ID, $skip: Int, $take: Int) {
+    coinHistory(userId: $userId, skip: $skip, take: $take) {
+      id
+      type
+      amount
+      createdAt
+    }
+  }
+`;
+
+/** All-time leaderboard — top coin earners. */
+export const COIN_LEADERBOARD = gql`
+  query CoinLeaderboard($take: Int) {
+    coinLeaderboard(take: $take) {
+      rank
+      coins
+      user {
+        id
+        username
+        displayName
+        profileImageUrl
+      }
+    }
+  }
+`;
+
+/** Claim the once-a-day login streak bonus. */
+export const CLAIM_DAILY_COINS = gql`
+  mutation ClaimDailyCoins {
+    claimDailyCoins {
+      awarded
+      balance
+      streakDays
+    }
+  }
+`;

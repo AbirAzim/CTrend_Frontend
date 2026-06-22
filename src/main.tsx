@@ -8,6 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { SoundPreferencesProvider } from "./context/SoundPreferencesContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { MessengerProvider } from "./context/MessengerContext";
+import { CoinsProvider } from "./context/CoinsContext";
 import App from "./App";
 import "./index.css";
 
@@ -20,7 +21,9 @@ const shell = (
         <SoundPreferencesProvider>
           <NotificationProvider>
             <MessengerProvider>
-              <App />
+              <CoinsProvider>
+                <App />
+              </CoinsProvider>
             </MessengerProvider>
           </NotificationProvider>
         </SoundPreferencesProvider>

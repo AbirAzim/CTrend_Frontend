@@ -22,6 +22,8 @@ import {
 } from "@ctrend/shared/graphql/predictions";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../context/AuthContext";
+import { useCoins } from "../context/CoinsContext";
+import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 
@@ -53,6 +55,7 @@ export function MatchPrediction({
   enabled: boolean;
 }) {
   const { isAuthenticated } = useAuth();
+  const { awardCoins } = useCoins();
   const { colors } = useTheme();
   const st = makeStyles(colors);
 
@@ -101,10 +104,13 @@ export function MatchPrediction({
       return;
     }
     setError(null);
+    const isFirstPrediction = !mine;
     try {
       await submit({ variables: { postId, homeScore: h, awayScore: a } });
       setEditing(false);
       void refetch();
+      // Coins: earn for predicting (only the first time, not on edits).
+      if (isFirstPrediction) awardCoins(COIN_AMOUNTS.PREDICTION);
     } catch {
       setError("Couldn't save your prediction.");
     }

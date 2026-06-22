@@ -7,6 +7,7 @@ import { PUBLIC_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
 import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
+import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
 import { useAuth } from "../context/AuthContext";
 import { ImagePositionEditor } from "../components/ImagePositionEditor";
 import { CompareImageCropper } from "../components/CompareImageCropper";
@@ -408,6 +409,8 @@ export function CreatePostPage() {
         // Don't refetch feed for scheduled posts — they won't appear there yet
         refetchQueries: scheduledAtIso ? [] : [{ query: FEED_POSTS }],
       });
+      // Coins: earn for creating a post (system/admin posts aren't rewarded).
+      if (!useSystemMutate) dispatchCoinEarned(COIN_AMOUNTS.POST);
       if (scheduledAtIso) {
         const formatted = new Date(scheduledAtIso).toLocaleString(undefined, {
           month: "short", day: "numeric", hour: "numeric", minute: "2-digit",

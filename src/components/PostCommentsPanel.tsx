@@ -11,6 +11,7 @@ import {
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
 
 type CommentAuthor = {
   id: string;
@@ -635,6 +636,8 @@ export function PostCommentsPanel({
             row.id === optimistic.id ? mergeServerComment(optimistic, created) : row,
           ),
         );
+        // Coins: earn for commenting.
+        dispatchCoinEarned(COIN_AMOUNTS.COMMENT);
       })
       .catch((err: unknown) => {
         setCommentsLive(snapshot);
@@ -689,6 +692,8 @@ export function PostCommentsPanel({
             row.id === optimistic.id ? mergeServerComment(optimistic, created) : row,
           ),
         );
+        // Coins: earn for replying.
+        dispatchCoinEarned(COIN_AMOUNTS.COMMENT);
       })
       .catch((err: unknown) => {
         setCommentsLive(snapshot);

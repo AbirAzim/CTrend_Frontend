@@ -52,6 +52,7 @@ import { ContentReportModal } from "./ContentReportModal";
 import { imageObjectPosition } from "../lib/imageFocal";
 import { categoryColorRgb } from "../lib/categoryColor";
 import { linkifyText } from "../lib/linkify";
+import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coins";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -797,9 +798,11 @@ function FeedPostCardComponent({
     post.saveCount,
   ]);
 
-  async function handleToggleHype() {
+  async function handleToggleHype(e?: React.MouseEvent) {
     const nextActive = !liked;
     const delta = nextActive ? 1 : -1;
+    // Capture the button element now — the synthetic event is reset after await.
+    const origin = (e?.currentTarget as Element | undefined) ?? null;
     setLiked(nextActive);
     setHypeCountLive((prev) => Math.max(0, prev + delta));
 
@@ -811,6 +814,9 @@ function FeedPostCardComponent({
       await setPostHypeMut({
         variables: { postId: post.id, active: nextActive },
       });
+      // Coins: hyping earns; un-hyping reverses the reward (symmetric).
+      if (nextActive) dispatchCoinEarned(COIN_AMOUNTS.HYPE, origin);
+      else dispatchCoinSpent(COIN_AMOUNTS.HYPE);
     } catch {
       // Rollback optimistic UI on failure.
       setLiked(!nextActive);
@@ -1324,7 +1330,7 @@ function FeedPostCardComponent({
     void processVoteIntent(-1);
   }
 
-  async function handleVote(clicked: "UP" | "DOWN") {
+  async function handleVote(clicked: "UP" | "DOWN", origin?: Element | null) {
     if (isVotingClosed) {
       return;
     }
@@ -1429,17 +1435,21 @@ function FeedPostCardComponent({
     setJustVoted(selectedOptionIndex);
     setDetailsOpen(true);
 
+    // Coins: earn for voting — only the first vote on this post (switching
+    // sides doesn't re-award; the backend is idempotent per post).
+    if (curVote === null) dispatchCoinEarned(COIN_AMOUNTS.VOTE, origin);
+
     await processVoteIntent(selectedOptionIndex);
   }
 
-  function handleBinaryCompareTap(side: 0 | 1) {
-    void handleVote(side === 0 ? "UP" : "DOWN");
+  function handleBinaryCompareTap(side: 0 | 1, origin?: Element | null) {
+    void handleVote(side === 0 ? "UP" : "DOWN", origin);
   }
 
   // Cast (or switch) an N-option vote by index — shared by multi-compare cells
   // and poll rows. API mode only: applies an optimistic stats update, then the
   // server result reconciles via `processVoteIntent`.
-  async function castOptionVote(index: number) {
+  async function castOptionVote(index: number, origin?: Element | null) {
     if (isVotingClosed) return;
     if (!isAuthenticated) {
       navigate("/login", { state: { from: location.pathname } });
@@ -1450,6 +1460,7 @@ function FeedPostCardComponent({
       void withdrawVote(index);
       return;
     }
+    const hadNoVote = activeMySelectedOptionIndex === null;
 
     // Compute instant optimistic counts — increment new pick, decrement old.
     const curPick = activeMySelectedOptionIndex;
@@ -1486,18 +1497,21 @@ function FeedPostCardComponent({
     setJustVoted(index);
     setDetailsOpen(true);
 
+    // Coins: earn for the first vote on this post (option switches don't re-award).
+    if (hadNoVote) dispatchCoinEarned(COIN_AMOUNTS.VOTE, origin);
+
     await processVoteIntent(index);
   }
 
   // Poll row tap → shared option-vote engine (API mode only; the mock/demo
   // feed never produces poll-format posts).
-  function handlePollTap(index: number) {
+  function handlePollTap(index: number, origin?: Element | null) {
     if (voteMode === "api") {
-      void castOptionVote(index);
+      void castOptionVote(index, origin);
     }
   }
 
-  async function handleMultiCompareTap(index: number) {
+  async function handleMultiCompareTap(index: number, origin?: Element | null) {
     if (isVotingClosed) {
       return;
     }
@@ -1510,7 +1524,7 @@ function FeedPostCardComponent({
     }
 
     if (voteMode === "api") {
-      await castOptionVote(index);
+      await castOptionVote(index, origin);
       return;
     }
 
@@ -2022,7 +2036,7 @@ function FeedPostCardComponent({
                           ? `Your choice: ${label} — tap to change`
                           : `Vote for ${label}`
                     }
-                    onClick={() => handlePollTap(i)}
+                    onClick={(e) => handlePollTap(i, e.currentTarget)}
                   >
                     {pollShowResults ? (
                       <span
@@ -2154,7 +2168,7 @@ function FeedPostCardComponent({
                           ? `Your choice: ${colTitle} — tap to change`
                           : `Vote for ${colTitle}`
                     }
-                    onClick={() => handleBinaryCompareTap(side)}
+                    onClick={(e) => handleBinaryCompareTap(side, e.currentTarget)}
                   >
                     <img
                       src={url}
@@ -2226,7 +2240,7 @@ function FeedPostCardComponent({
                             ? `Your choice: ${colTitle} — tap to change`
                             : `Vote for ${colTitle}`
                         }
-                        onClick={() => void handleMultiCompareTap(i)}
+                        onClick={(e) => void handleMultiCompareTap(i, e.currentTarget)}
                       >
                         <img
                           src={url}
@@ -2552,7 +2566,7 @@ function FeedPostCardComponent({
                 disabled={voteControlsDisabled}
                 aria-pressed={viewer === "UP"}
                 aria-label={viewer === "UP" ? "Remove upvote" : "Upvote"}
-                onClick={() => void handleVote("UP")}
+                onClick={(e) => void handleVote("UP", e.currentTarget)}
               >
                 <IconChevronUp active={viewer === "UP"} />
                 <span>{up.toLocaleString()}</span>
@@ -2563,7 +2577,7 @@ function FeedPostCardComponent({
                 disabled={voteControlsDisabled}
                 aria-pressed={viewer === "DOWN"}
                 aria-label={viewer === "DOWN" ? "Remove downvote" : "Downvote"}
-                onClick={() => void handleVote("DOWN")}
+                onClick={(e) => void handleVote("DOWN", e.currentTarget)}
               >
                 <IconChevronDown active={viewer === "DOWN"} />
                 <span>{down.toLocaleString()}</span>
@@ -2627,7 +2641,7 @@ function FeedPostCardComponent({
             title={liked ? "Unhype" : "Hype"}
             aria-pressed={liked}
             disabled={hypeUpdating}
-            onClick={() => void handleToggleHype()}
+            onClick={(e) => void handleToggleHype(e)}
           >
             <IconHeart filled={liked} />
             {hypeCount > 0 ? (

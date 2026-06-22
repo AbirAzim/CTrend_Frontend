@@ -47,6 +47,7 @@ type UserProfile = {
   bio?: string | null;
   profileImageUrl?: string | null;
   interests?: string[] | null;
+  coins?: number | null;
 };
 
 type PostThumb = {
@@ -529,6 +530,11 @@ export default function UserProfileScreen() {
               <Pressable style={styles.stat} onPress={() => jumpTo("friends")} android_ripple={{ color: colors.accent + "18" }}>
                 <Text style={[styles.statValue, { color: colors.accent }]}>{userFriends.length}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>friends ›</Text>
+              </Pressable>
+              <View style={[styles.statSep, { backgroundColor: colors.border }]} />
+              <Pressable style={styles.stat} onPress={() => router.push(`/coins/${profile.id}` as `/${string}`)} android_ripple={{ color: colors.accent + "18" }}>
+                <Text style={[styles.statValue, { color: "#f5c518" }]}>{profile.coins ?? 0}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>¢ coins ›</Text>
               </Pressable>
             </View>
           )}

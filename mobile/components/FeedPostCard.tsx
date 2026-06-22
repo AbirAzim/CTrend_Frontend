@@ -51,6 +51,8 @@ import { normalizeProfileImageUrl } from '@ctrend/shared/lib/profileImageUrl';
 import { formatRelativeTime } from '@ctrend/shared/lib/formatRelativeTime';
 import type { FeedPostView } from '@ctrend/shared/types/feed';
 import { useAuth } from '../context/AuthContext';
+import { useCoins } from '../context/CoinsContext';
+import { COIN_AMOUNTS } from '@ctrend/shared/lib/coins';
 import { MatchPrediction } from './MatchPrediction';
 import { useTheme } from '../context/ThemeContext';
 import type { ColorPalette } from '../context/ThemeContext';
@@ -1737,6 +1739,7 @@ function FeedPostCardComponent({
 		]).start();
 	}, [leftPct, rightPct]); // eslint-disable-line react-hooks/exhaustive-deps
 
+	const { awardCoins, spendCoins } = useCoins();
 	const [voteMut] = useMutation<VotePostData>(VOTE_POST);
 	const [removeVoteMut] = useMutation<RemoveVoteData>(REMOVE_VOTE);
 	const [setHypeMut] = useMutation(SET_POST_HYPE);
@@ -1819,10 +1822,14 @@ function FeedPostCardComponent({
 		const curUp = optimisticVote?.upvoteCount ?? post.upvoteCount;
 		const curDown = optimisticVote?.downvoteCount ?? post.downvoteCount;
 		const curStats = optimisticVote?.optionStats ?? post.optionStats ?? null;
+		// Coins are awarded once per post — only the first vote (no prior pick).
+		const hadNoVote = curVote === null && curMyIdx === null;
 
 		// Apply optimistic update immediately
 		if (intent >= 0) {
 			triggerVotePop(intent);
+			// Coins: earn for the first vote on this post (switching doesn't re-award).
+			if (hadNoVote) awardCoins(COIN_AMOUNTS.VOTE);
 			if (isBinary) {
 				let newUp = curUp;
 				let newDown = curDown;
@@ -2041,6 +2048,9 @@ function FeedPostCardComponent({
 		setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
 		try {
 			await setHypeMut({ variables: { postId: post.id, active: next } });
+			// Coins: hyping earns; un-hyping reverses the reward (symmetric).
+			if (next) awardCoins(COIN_AMOUNTS.HYPE);
+			else spendCoins(COIN_AMOUNTS.HYPE);
 		} catch {
 			setLiked(!next);
 			setHypeCount((n) => Math.max(0, n + (next ? -1 : 1)));
