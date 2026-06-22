@@ -111,8 +111,8 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
       const sprite: FlySprite = {
         id: spriteId++,
         pos: new Animated.ValueXY({
-          x: origin.x - 13 + (Math.random() * 24 - 12),
-          y: origin.y - 13 + (Math.random() * 18 - 9),
+          x: origin.x - 10 + (Math.random() * 24 - 12),
+          y: origin.y - 10 + (Math.random() * 18 - 9),
         }),
         rotate: new Animated.Value(0),
         opacity: new Animated.Value(0),
@@ -139,7 +139,7 @@ export function CoinsProvider({ children }: { children: ReactNode }) {
           }),
         ]),
         Animated.timing(sprite.pos, {
-          toValue: { x: target.x - 13, y: target.y - 13 },
+          toValue: { x: target.x - 10, y: target.y - 10 },
           duration: 720,
           delay,
           easing: Easing.inOut(Easing.cubic),
@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     top: 0,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: "#f5c518",
     alignItems: "center",
     justifyContent: "center",
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 4,
   },
-  flyText: { color: "#7a4a05", fontWeight: "900", fontSize: 14 },
+  flyText: { color: "#7a4a05", fontWeight: "900", fontSize: 11 },
 });
 
 export function useCoins(): CoinsContextValue {

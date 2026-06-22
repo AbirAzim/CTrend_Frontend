@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -21,6 +21,8 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../context/AuthContext";
 import { useCoins } from "../context/CoinsContext";
 import { useTheme, type ColorPalette } from "../context/ThemeContext";
+import { useTabBar } from "../context/TabBarContext";
+import { BottomNav } from "./BottomNav";
 
 type HistoryItem = { id: string; type: CoinType; amount: number; createdAt: string };
 type LeaderRow = {
@@ -57,8 +59,15 @@ export function CoinsHub({ userId }: { userId?: string }) {
   const { balance, refresh } = useCoins();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { translateY } = useTabBar();
   const st = makeStyles(colors);
   const isSelf = !userId || userId === user?.id;
+
+  // The feed hides the shared bottom nav on scroll (translateY). Reset it so the
+  // footer is always visible on the coins page.
+  useEffect(() => {
+    translateY.setValue(0);
+  }, [translateY]);
 
   const [tab, setTab] = useState<Tab>("history");
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
@@ -250,6 +259,7 @@ export function CoinsHub({ userId }: { userId?: string }) {
       </View>
 
       <FlatList
+        style={st.flex}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data={listProps.data as any[]}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -257,6 +267,7 @@ export function CoinsHub({ userId }: { userId?: string }) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         renderItem={listProps.renderItem as any}
         ListHeaderComponent={header}
+        ListFooterComponent={<View style={{ height: 16 }} />}
         onEndReached={listProps.onEndReached}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
@@ -264,8 +275,10 @@ export function CoinsHub({ userId }: { userId?: string }) {
             <Text style={st.empty}>{listProps.empty}</Text>
           ) : null
         }
-        contentContainerStyle={{ padding: 14, paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={{ padding: 14, flexGrow: 1 }}
       />
+
+      <BottomNav />
     </View>
   );
 }
