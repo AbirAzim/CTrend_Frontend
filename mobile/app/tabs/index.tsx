@@ -491,7 +491,7 @@ export default function FeedScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           style={[styles.list, { backgroundColor: colors.bg }]}
-          contentContainerStyle={{ paddingTop: filterBarHeight, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
+          contentContainerStyle={{ paddingTop: filterBarHeight + 8, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           initialNumToRender={6}

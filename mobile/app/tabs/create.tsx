@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import {
   Switch,
   Text,
   TextInput,
+  UIManager,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -38,6 +40,14 @@ import { FeedPostCard } from "../../components/FeedPostCard";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 
 const { width: SW } = Dimensions.get("window");
+
+// Enable smooth layout transitions (e.g. the campaign pill morph) on Android.
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -451,7 +461,10 @@ export default function CreateScreen() {
   }
   function removeSlot(id: string) {
     if (slots.length <= 2) return;
-    setSlots((prev) => prev.filter((s) => (s.id === id ? !s.locked : true)));
+    // Remove the targeted slot unless it's a locked (existing/voted) option;
+    // keep everything else. (The predicate was inverted, so unlocked options
+    // could never be removed.)
+    setSlots((prev) => prev.filter((s) => s.id !== id || s.locked));
   }
 
   // Clear the form back to a blank draft (after a successful launch, or when the
@@ -785,7 +798,22 @@ export default function CreateScreen() {
           <Text style={[st.screenTitle, { color: colors.text }]}>
             {isEdit ? "Edit Compare" : isAnnouncement ? "New Announcement" : isPoll ? "New Poll" : "New Compare"}
           </Text>
-          <View style={{ width: 60 }} />
+          {isEdit ? (
+            <View style={{ width: 60 }} />
+          ) : (
+            <Pressable
+              hitSlop={10}
+              style={{ width: 60, alignItems: "flex-end" }}
+              onPress={() =>
+                Alert.alert("Clear all?", "This will reset everything you've entered.", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Clear all", style: "destructive", onPress: () => resetForm() },
+                ])
+              }
+            >
+              <Text style={[st.clearAllText, { color: colors.muted }]}>Clear all</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* ── Format switcher (create only) ── */}
@@ -1061,24 +1089,49 @@ export default function CreateScreen() {
             </View>
           )}
 
-          {/* Non-admin: opt in to broadcast globally (Phase 36) */}
+          {/* Non-admin: who can see & vote (friends vs everyone) — plain-language
+              audience picker instead of a "global" toggle that confused users. */}
           {!isAdmin && allowUserGlobalPosts && (
-            <View style={[st.settingRow, { borderBottomColor: colors.border }]}>
-              <View style={{ flex: 1, paddingRight: 10 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ fontSize: 14 }}>🌍</Text>
-                  <Text style={[st.settingKey, { color: colors.text }]}>Post globally</Text>
-                </View>
-                <Text style={[st.optional, { color: colors.muted, marginTop: 2 }]}>
-                  Show this to everyone &amp; notify them with your name.
-                </Text>
+            <View style={[st.settingCol, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ fontSize: 14 }}>👀</Text>
+                <Text style={[st.settingKey, { color: colors.text }]}>Who can see &amp; vote?</Text>
               </View>
-              <Switch
-                value={broadcastGlobally}
-                onValueChange={setBroadcastGlobally}
-                trackColor={{ false: colors.section, true: "#16a34a" }}
-                thumbColor="#fff"
-              />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                {([
+                  { val: false, icon: "👥", title: "Friends only", desc: "Just your friends" },
+                  { val: true, icon: "🌍", title: "Everyone", desc: "Anyone on Ke Jitbe" },
+                ] as const).map((o) => {
+                  const active = broadcastGlobally === o.val;
+                  return (
+                    <Pressable
+                      key={o.title}
+                      onPress={() => setBroadcastGlobally(o.val)}
+                      style={[
+                        st.audCard,
+                        {
+                          borderColor: active ? colors.accent : colors.border,
+                          backgroundColor: active ? colors.accent + "1A" : colors.section,
+                        },
+                      ]}
+                    >
+                      <Text style={st.audIcon}>{o.icon}</Text>
+                      <Text style={[st.audTitle, { color: active ? colors.accent : colors.text }]}>{o.title}</Text>
+                      <Text style={[st.audDesc, { color: colors.muted }]}>{o.desc}</Text>
+                      {active && (
+                        <View style={[st.audCheck, { backgroundColor: colors.accent }]}>
+                          <Text style={st.audCheckText}>✓</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={[st.audHint, { color: colors.muted }]}>
+                {broadcastGlobally
+                  ? "🌍 Anyone on Ke Jitbe can see and vote — they'll see it's from you."
+                  : "👥 Only your friends can see and vote on this."}
+              </Text>
             </View>
           )}
 
@@ -1099,21 +1152,45 @@ export default function CreateScreen() {
             </View>
           </Pressable>
 
-          {/* Campaign (optional) */}
+          {/* Campaign (optional) — collapsed into a pill by default; the picker
+              opens in a slide-up modal, and the pill morphs in/out smoothly. */}
           {campaigns.length > 0 && (
-            <Pressable style={[st.settingRow, { borderBottomColor: colors.border }]} onPress={() => setCampaignModal(true)}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 14 }}>🎯</Text>
-                <Text style={[st.settingKey, { color: colors.text }]}>Campaign</Text>
-                <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
-              </View>
-              <View style={[st.catPicker, { backgroundColor: colors.section, borderColor: colors.border }]}>
-                <Text style={[st.catPickerText, { color: selectedCampaign ? colors.text : colors.muted }]} numberOfLines={1}>
-                  {selectedCampaign?.name?.trim() || "No campaign"}
-                </Text>
-                <Text style={[st.catChevron, { color: colors.muted }]}>▼</Text>
-              </View>
-            </Pressable>
+            <View style={[st.campaignRow, { borderBottomColor: colors.border }]}>
+              {selectedCampaign ? (
+                <View style={[st.campaignPill, { backgroundColor: colors.accent + "1A", borderColor: colors.accent }]}>
+                  <Pressable
+                    onPress={() => setCampaignModal(true)}
+                    hitSlop={6}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}
+                  >
+                    <Text style={{ fontSize: 12 }}>🎯</Text>
+                    <Text style={[st.campaignPillText, { color: colors.accent }]} numberOfLines={1}>
+                      {selectedCampaign.name}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setCampaignId("");
+                    }}
+                    hitSlop={8}
+                    style={st.campaignPillClose}
+                  >
+                    <Text style={[st.campaignPillX, { color: colors.accent }]}>✕</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => setCampaignModal(true)}
+                  style={[st.campaignAddPill, { borderColor: colors.accent + "55", backgroundColor: colors.section }]}
+                  hitSlop={4}
+                >
+                  <Text style={[st.campaignAddText, { color: colors.muted }]}>
+                    🎯  Add to a campaign
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           )}
 
           {/* Caption */}
@@ -1306,7 +1383,7 @@ export default function CreateScreen() {
                   <Pressable
                     key={camp.id}
                     style={[st.modalRow, { borderBottomColor: colors.border }, active && { backgroundColor: colors.section }]}
-                    onPress={() => { setCampaignId(camp.id); setCampaignModal(false); }}
+                    onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setCampaignId(camp.id); setCampaignModal(false); }}
                   >
                     <Text style={[st.modalRowText, { color: active ? colors.accent : colors.text }, active && { fontWeight: "700" }]}>
                       {camp.name?.trim() || camp.id}{suffix}
@@ -1395,6 +1472,64 @@ export default function CreateScreen() {
 const st = StyleSheet.create({
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
   screenTitle: { fontSize: 17, fontWeight: "800" },
+  clearAllText: { fontSize: 13, fontWeight: "700" },
+  // Slim, low-profile row — campaign sits as a small button on the right.
+  campaignRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+  },
+  campaignAddPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  campaignAddText: { fontSize: 12, fontWeight: "600" },
+  campaignPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: "100%",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 5,
+  },
+  campaignPillText: { fontSize: 12.5, fontWeight: "800", flexShrink: 1 },
+  campaignPillClose: { width: 18, height: 18, alignItems: "center", justifyContent: "center" },
+  campaignPillX: { fontSize: 11, fontWeight: "900" },
+  audCard: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 2,
+  },
+  audIcon: { fontSize: 22, marginBottom: 2 },
+  audTitle: { fontSize: 13.5, fontWeight: "800" },
+  audDesc: { fontSize: 11, textAlign: "center" },
+  audCheck: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  audCheckText: { color: "#fff", fontSize: 10, fontWeight: "900" },
+  audHint: { fontSize: 12, marginTop: 8, lineHeight: 16 },
   backText: { fontSize: 15, fontWeight: "600" },
 
   // Slot tile

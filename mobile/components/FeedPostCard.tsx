@@ -288,26 +288,26 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 	return {
 		card: {
 			backgroundColor: c.card,
-			marginBottom: 14,
+			marginBottom: 18,
 			marginHorizontal: 12,
-			borderRadius: 22,
-			borderWidth: 1,
+			borderRadius: 18,
+			borderWidth: StyleSheet.hairlineWidth,
 			borderColor: c.border,
 			overflow: 'hidden' as const,
-			// Soft, diffuse depth — the card floats cleanly over the feed rather
-			// than sitting in a hard-edged box.
-			elevation: 3,
+			// Light, diffuse depth — the card reads as a clean surface, not a heavy
+			// floating box. Softer than before for a calmer, more spacious feed.
+			elevation: 2,
 			shadowColor: '#000',
-			shadowOffset: { width: 0, height: 6 },
-			shadowOpacity: isDark ? 0.22 : 0.07,
-			shadowRadius: 16,
+			shadowOffset: { width: 0, height: 3 },
+			shadowOpacity: isDark ? 0.18 : 0.05,
+			shadowRadius: 10,
 		},
 		cardLive: {
 			borderColor: 'rgba(34,197,94,0.45)',
 			borderWidth: 2,
 		},
 		liveBorderOverlay: {
-			borderRadius: 22,
+			borderRadius: 18,
 			borderWidth: 2,
 			borderColor: 'rgba(34,197,94,0.45)',
 		},
@@ -324,18 +324,18 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			gap: 10,
 		},
 		avatarWrap: {
-			width: 42,
-			height: 42,
-			borderRadius: 21,
+			width: 38,
+			height: 38,
+			borderRadius: 19,
 			overflow: 'hidden' as const,
 		},
-		avatar: { width: 42, height: 42, borderRadius: 21 },
+		avatar: { width: 38, height: 38, borderRadius: 19 },
 		avatarFallback: {
 			backgroundColor: '#312e81',
 			justifyContent: 'center' as const,
 			alignItems: 'center' as const,
 		},
-		avatarText: { color: '#ffffff', fontSize: 16, fontWeight: '700' as const },
+		avatarText: { color: '#ffffff', fontSize: 15, fontWeight: '700' as const },
 		authorMeta: { flex: 1 },
 		authorNameRow: {
 			flexDirection: 'row' as const,
@@ -408,11 +408,11 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		caption: {
 			paddingHorizontal: 14,
 			paddingTop: 2,
-			paddingBottom: 12,
+			paddingBottom: 14,
 			fontSize: 15,
 			color: c.text,
 			lineHeight: 22,
-			fontWeight: '600' as const,
+			fontWeight: '400' as const,
 		},
 		captionAnnouncement: {
 			fontSize: 15,
@@ -435,7 +435,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			letterSpacing: 0.8,
 			color: isDark ? '#fb923c' : '#c2410c',
 		},
-		compareWrap: { flexDirection: 'row' as const, gap: 3 },
+		compareWrap: { flexDirection: 'row' as const, gap: 3, marginTop: 8 },
 		compareCell: { flex: 1, height: IMG_H, overflow: 'hidden' as const },
 		compareCellLoser: { opacity: 0.78 },
 		// Colored glow border on the cell the viewer picked (mirrors web's
@@ -639,7 +639,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		// ── Poll format — stacked option rows (per-option colour + voter chip) ──
 		pollBodyMedia: { paddingHorizontal: 14, paddingBottom: 6, gap: 6 },
 		pollBodyImage: { width: '100%' as const, height: 200, borderRadius: 10 },
-		pollOptions: { paddingHorizontal: 14, paddingTop: 4, gap: 10 },
+		pollOptions: { paddingHorizontal: 14, paddingTop: 10, gap: 10 },
 		// Neutral card row with a soft drop shadow for depth — the saturated lead
 		// edge (green once results show, accent for the viewer's pick before then)
 		// and the persistent accent border on the viewer's own pick are the only
@@ -713,7 +713,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			paddingVertical: 6,
 			gap: 8,
 		},
-		anonIcon: { fontSize: 13 },
+		anonIcon: { fontSize: 16 },
 		anonLabel: {
 			flex: 1,
 			fontSize: 12,
@@ -2707,8 +2707,8 @@ function FeedPostCardComponent({
 			{/* Anonymous vote toggle — always visible while voting is open */}
 			{(compareUrls || isPoll) && !isVotingClosed && isAuthenticated && (
 				<View style={st.anonRow}>
-					<Text style={st.anonIcon}>👻</Text>
-					<Text style={st.anonLabel}>Vote anonymously</Text>
+					<View style={{ flex: 1 }} />
+					<Text style={st.anonIcon}>🙈</Text>
 					<Switch
 						value={anon}
 						onValueChange={(val) => void handleAnonymousToggle(val)}
@@ -2719,7 +2719,7 @@ function FeedPostCardComponent({
 			)}
 
 			{/* Vote hint */}
-			{(compareUrls || isPoll) && !isVotingClosed ? (
+			{compareUrls && !isVotingClosed ? (
 				<View style={st.voteHintRow}>
 					<Text style={[st.voteHintText, hasVoted && st.voteHintRecorded]}>
 						{hasVoted

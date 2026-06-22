@@ -1,10 +1,28 @@
 import { useQuery } from '@apollo/client/react';
 import { router } from 'expo-router';
 import { memo, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+	LayoutAnimation,
+	Modal,
+	Platform,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	UIManager,
+	View,
+} from 'react-native';
 import { ACTIVE_CAMPAIGNS } from '@ctrend/shared/graphql/campaigns';
 import type { FeedPostCampaignView } from '@ctrend/shared/types/feed';
 import { useTheme } from '../context/ThemeContext';
+
+// Smooth expand/collapse on Android.
+if (
+	Platform.OS === 'android' &&
+	UIManager.setLayoutAnimationEnabledExperimental
+) {
+	UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Props = {
 	campaign: FeedPostCampaignView;
@@ -12,12 +30,13 @@ type Props = {
 type CampaignRow = { id: string; name: string; isDefault?: boolean | null };
 type ActiveCampaignsData = { activeCampaigns: CampaignRow[] };
 
-/** Quiet single-line campaign tag + "See other campaigns" sheet on a compare linked to a promotion (Phase 22–23). */
+/** Compact campaign tag — collapsed to a small chip on the right by default,
+ * expands to the full ribbon (name + prize + browse) on tap. */
 function PostCampaignBadgeComponent({ campaign }: Props) {
 	const { colors, isDark } = useTheme();
 	const [listOpen, setListOpen] = useState(false);
-	// Gold is reserved for the small "CAMPAIGN" kicker only — everything else in
-	// this tag reads as plain neutral chrome so it never outweighs the caption.
+	const [expanded, setExpanded] = useState(false);
+	// Gold is reserved for the small "CAMPAIGN" kicker only.
 	const gold = isDark ? '#fbbf24' : '#b45309';
 
 	const { data } = useQuery<ActiveCampaignsData>(ACTIVE_CAMPAIGNS, {
@@ -36,46 +55,75 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 		router.navigate({ pathname: '/tabs', params: { campaign: id } });
 	}
 
-	return (
-		<View style={styles.wrap}>
-			<Pressable
-				style={({ pressed }) => [
-					styles.ribbon,
-					{ backgroundColor: colors.section, borderColor: colors.border },
-					pressed && { opacity: 0.85 },
-				]}
-				onPress={() =>
-					router.push(`/campaign/${campaign.slug}` as `/${string}`)
-				}
-				accessibilityRole='button'
-				accessibilityLabel={`Campaign: ${campaign.name}`}>
-				<Text style={styles.icon}>🎯</Text>
-				<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
-				<Text
-					style={[styles.name, { color: colors.text }]}
-					numberOfLines={1}>
-					{campaign.name}
-				</Text>
-				{campaign.prizePerWinner > 0 ? (
-					<Text
-						style={[styles.prize, { color: colors.subtext }]}
-						numberOfLines={1}>
-						· {campaign.prizePerWinner} BDT
-					</Text>
-				) : null}
-				<Text style={[styles.chevron, { color: colors.subtext }]}>›</Text>
-			</Pressable>
+	function toggle() {
+		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+		setExpanded((e) => !e);
+	}
 
-			{others.length > 1 ? (
+	return (
+		<View style={[styles.wrap, !expanded && styles.wrapCollapsed]}>
+			{!expanded ? (
+				// Collapsed: small chip on the right
 				<Pressable
-					style={styles.otherBtn}
-					onPress={() => setListOpen(true)}
-					hitSlop={6}>
-					<Text style={[styles.otherBtnText, { color: colors.accent }]}>
-						See other campaigns
-					</Text>
+					style={({ pressed }) => [
+						styles.chip,
+						{ backgroundColor: colors.section, borderColor: colors.border },
+						pressed && { opacity: 0.85 },
+					]}
+					onPress={toggle}
+					hitSlop={6}
+					accessibilityRole='button'
+					accessibilityLabel={`Campaign: ${campaign.name}. Tap to expand.`}>
+					<Text style={styles.icon}>🎯</Text>
+					<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
+					<Text style={[styles.chevron, { color: colors.subtext }]}>▾</Text>
 				</Pressable>
-			) : null}
+			) : (
+				// Expanded: full ribbon
+				<>
+					<Pressable
+						style={({ pressed }) => [
+							styles.ribbon,
+							{ backgroundColor: colors.section, borderColor: colors.border },
+							pressed && { opacity: 0.85 },
+						]}
+						onPress={() =>
+							router.push(`/campaign/${campaign.slug}` as `/${string}`)
+						}
+						accessibilityRole='button'
+						accessibilityLabel={`Open campaign: ${campaign.name}`}>
+						<Text style={styles.icon}>🎯</Text>
+						<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
+						<Text
+							style={[styles.name, { color: colors.text }]}
+							numberOfLines={1}>
+							{campaign.name}
+						</Text>
+						{campaign.prizePerWinner > 0 ? (
+							<Text
+								style={[styles.prize, { color: colors.subtext }]}
+								numberOfLines={1}>
+								· {campaign.prizePerWinner} BDT
+							</Text>
+						) : null}
+						<Text style={[styles.chevron, { color: colors.subtext }]}>›</Text>
+						<Pressable onPress={toggle} hitSlop={8} style={styles.collapseBtn}>
+							<Text style={[styles.chevron, { color: colors.subtext }]}>▴</Text>
+						</Pressable>
+					</Pressable>
+
+					{others.length > 1 ? (
+						<Pressable
+							style={styles.otherBtn}
+							onPress={() => setListOpen(true)}
+							hitSlop={6}>
+							<Text style={[styles.otherBtnText, { color: colors.accent }]}>
+								See other campaigns
+							</Text>
+						</Pressable>
+					) : null}
+				</>
+			)}
 
 			<Modal
 				visible={listOpen}
@@ -115,6 +163,16 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 
 const styles = StyleSheet.create({
 	wrap: { marginHorizontal: 14, marginBottom: 8 },
+	wrapCollapsed: { alignItems: 'flex-end' },
+	chip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 5,
+		paddingHorizontal: 9,
+		paddingVertical: 4,
+		borderRadius: 999,
+		borderWidth: 1,
+	},
 	ribbon: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -124,6 +182,7 @@ const styles = StyleSheet.create({
 		borderRadius: 999,
 		borderWidth: 1,
 	},
+	collapseBtn: { marginLeft: 2, paddingHorizontal: 2 },
 	otherBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
 	otherBtnText: { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 	overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
