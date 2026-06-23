@@ -690,17 +690,11 @@ function PlayerMatchCard({
   );
 }
 
-function LineupTab({ fixture }: { fixture: FixtureDetails }) {
+function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlayerClick?: (id: number) => void }) {
   const { lineups, events } = fixture;
-  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   if (lineups.length === 0) {
     return <div className="md-empty">Lineups will appear closer to kickoff.</div>;
   }
-
-  const statsByPlayer = new Map<number, PlayerMatchStat>(
-    (fixture.playerMatchStats ?? []).map((s) => [s.playerId, s])
-  );
-  const selectedStat = selectedPlayerId != null ? statsByPlayer.get(selectedPlayerId) ?? null : null;
 
   const homeL = lineups.find((l) => l.team === "home");
   const awayL = lineups.find((l) => l.team === "away");
@@ -759,12 +753,12 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
 
         {homeL && (
           <div className="md-pitch-half">
-            <FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={setSelectedPlayerId} />
+            <FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={onPlayerClick} />
           </div>
         )}
         {awayL && (
           <div className="md-pitch-half">
-            <FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={setSelectedPlayerId} />
+            <FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={onPlayerClick} />
           </div>
         )}
       </div>
@@ -835,11 +829,6 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
         <div className="md-legend-item"><span className="md-eico md-eico--card md-eico--red" /> Red card</div>
       </div>
 
-      <PlayerMatchCard
-        stat={selectedStat}
-        fixture={fixture}
-        onClose={() => setSelectedPlayerId(null)}
-      />
     </div>
   );
 }
@@ -979,7 +968,7 @@ function clientMinute(kickoff: string): number {
 }
 
 
-function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
+function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlayerClick?: (id: number) => void }) {
   const { status, minute, score, events, homeTeam, awayTeam, venue, playerRatings, kickoff } = fixture;
   const live = isLive(status);
   const finished = isFinished(status);
@@ -1070,7 +1059,12 @@ function MatchHeader({ fixture }: { fixture: FixtureDetails }) {
 
       {/* Man of the Match */}
       {star && (
-        <div className="md-motm">
+        <div
+          className={`md-motm${onPlayerClick && star.playerId != null ? " md-motm--tappable" : ""}`}
+          onClick={onPlayerClick && star.playerId != null ? () => onPlayerClick(star.playerId) : undefined}
+          role={onPlayerClick && star.playerId != null ? "button" : undefined}
+          tabIndex={onPlayerClick && star.playerId != null ? 0 : undefined}
+        >
           <div className="md-motm-avatar">
             {star.photo && !motmImgFailed ? (
               <img src={star.photo} alt={star.name} className="md-motm-photo" onError={() => setMotmImgFailed(true)} />
@@ -1114,6 +1108,12 @@ export function MatchDetailPage() {
   const fixture = data?.worldCupFixture;
   const matchIsLive = fixture ? isLive(fixture.status) : false;
   const [refreshing, setRefreshing] = useState(false);
+  // Player match-stat card — opened from the MoTM card or any pitch player.
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const selectedStat =
+    selectedPlayerId != null
+      ? (fixture?.playerMatchStats ?? []).find((s) => s.playerId === selectedPlayerId) ?? null
+      : null;
   const onReload = useCallback(() => {
     if (refreshing) return;
     setRefreshing(true);
@@ -1169,7 +1169,7 @@ export function MatchDetailPage() {
 
       {fixture && (
         <>
-          <MatchHeader fixture={fixture} />
+          <MatchHeader fixture={fixture} onPlayerClick={setSelectedPlayerId} />
 
           <div className="md-tabs">
             {(["overview", "lineup", "stats"] as Tab[]).map((tab) => (
@@ -1186,9 +1186,15 @@ export function MatchDetailPage() {
 
           <div className="md-content">
             {activeTab === "overview" && <OverviewTab fixture={fixture} />}
-            {activeTab === "lineup" && <LineupTab fixture={fixture} />}
+            {activeTab === "lineup" && <LineupTab fixture={fixture} onPlayerClick={setSelectedPlayerId} />}
             {activeTab === "stats" && <StatsTab fixture={fixture} />}
           </div>
+
+          <PlayerMatchCard
+            stat={selectedStat}
+            fixture={fixture}
+            onClose={() => setSelectedPlayerId(null)}
+          />
         </>
       )}
     </div>

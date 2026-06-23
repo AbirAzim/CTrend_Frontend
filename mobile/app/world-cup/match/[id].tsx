@@ -253,7 +253,7 @@ const gb = StyleSheet.create({
 
 // ─── Match header ─────────────────────────────────────────────────────────────
 
-function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
+function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails; isDark: boolean; onPlayerPress?: (id: number) => void }) {
 	const { status, minute, score, events, homeTeam, awayTeam, playerRatings, kickoff } = fixture;
 	const live = isLive(status);
 	const finished = isFinished(status);
@@ -352,7 +352,10 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 
 			{/* MoTM */}
 			{star && star.rating && parseFloat(star.rating) >= 6.5 ? (
-				<View style={[mh.motm, { borderColor: isDark ? 'rgba(245,158,11,0.35)' : 'rgba(245,158,11,0.4)', backgroundColor: isDark ? 'rgba(245,158,11,0.08)' : 'rgba(254,243,199,0.7)' }]}>
+				<Pressable
+					onPress={onPlayerPress && star.playerId != null ? () => onPlayerPress(star.playerId) : undefined}
+					disabled={!onPlayerPress || star.playerId == null}
+					style={({ pressed }) => [mh.motm, { borderColor: isDark ? 'rgba(245,158,11,0.35)' : 'rgba(245,158,11,0.4)', backgroundColor: isDark ? 'rgba(245,158,11,0.08)' : 'rgba(254,243,199,0.7)', opacity: pressed ? 0.7 : 1 }]}>
 					<View style={mh.motmLeft}>
 						{star.photo
 							? <Image source={{ uri: star.photo }} style={mh.motmPhoto} contentFit='cover' borderRadius={26} />
@@ -369,7 +372,7 @@ function MatchHeader({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 							{star.team === 'home' ? fixture.homeTeam.name : fixture.awayTeam.name}
 						</Text>
 					</View>
-				</View>
+				</Pressable>
 			) : null}
 
 			{/* Venue */}
@@ -745,6 +748,7 @@ function PlayerMatchCard({ stat, fixture, isDark, onClose }: {
 					<View style={[pc.handle, { backgroundColor: border }]} />
 					{stat && (
 						<>
+							<ScrollView style={pc.scrollBody} showsVerticalScrollIndicator={false}>
 							<View style={pc.header}>
 								{photo
 									? <Image source={{ uri: photo }} style={pc.avatar} contentFit='cover' borderRadius={30} />
@@ -786,22 +790,21 @@ function PlayerMatchCard({ stat, fixture, isDark, onClose }: {
 							{rows.length > 0 ? (
 								<>
 									<Text style={[pc.sectionTitle, { color: textPrimary }]}>Key stats</Text>
-									<ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-										<View style={[pc.statsBox, { backgroundColor: surface }]}>
-											{rows.map((r, i) => (
-												<View
-													key={r.label}
-													style={[pc.statRow, i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
-													<Text style={[pc.statLabel, { color: textSub }]}>{r.label}</Text>
-													<Text style={[pc.statValue, { color: textPrimary }]}>{r.value}</Text>
-												</View>
-											))}
-										</View>
-									</ScrollView>
+									<View style={[pc.statsBox, { backgroundColor: surface }]}>
+										{rows.map((r, i) => (
+											<View
+												key={r.label}
+												style={[pc.statRow, i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
+												<Text style={[pc.statLabel, { color: textSub }]}>{r.label}</Text>
+												<Text style={[pc.statValue, { color: textPrimary }]}>{r.value}</Text>
+											</View>
+										))}
+									</View>
 								</>
 							) : (
 								<Text style={[pc.empty, { color: textSub }]}>Detailed stats aren't available for this player.</Text>
 							)}
+							</ScrollView>
 
 							<Pressable style={[pc.closeBtn, { borderColor: border }]} onPress={onClose}>
 								<Text style={[pc.closeText, { color: textPrimary }]}>Close</Text>
@@ -816,7 +819,8 @@ function PlayerMatchCard({ stat, fixture, isDark, onClose }: {
 
 const pc = StyleSheet.create({
 	backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-	sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28 },
+	sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28, maxHeight: '88%' },
+	scrollBody: { flexShrink: 1 },
 	handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
 	header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
 	avatar: { width: 60, height: 60 },
@@ -840,19 +844,12 @@ const pc = StyleSheet.create({
 });
 
 
-function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
+function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails; isDark: boolean; onPlayerPress?: (id: number) => void }) {
 	const { lineups, playerRatings, homeTeam, awayTeam, events } = fixture;
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
 	const textSub = isDark ? '#cbd5e1' : '#475569';
 	const surface = isDark ? '#111827' : '#fff';
 	const rowBorder = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
-
-	// Tap a player on the pitch → open their per-match stat card.
-	const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
-	const statsByPlayer = new Map<number, PlayerMatchStat>(
-		(fixture.playerMatchStats ?? []).map((s) => [s.playerId, s]),
-	);
-	const selectedStat = selectedPlayerId != null ? statsByPlayer.get(selectedPlayerId) ?? null : null;
 
 	if (lineups.length === 0) {
 		return (
@@ -931,12 +928,12 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 
 				{homeL && (
 					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
-						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={setSelectedPlayerId} />
+						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={onPlayerPress} />
 					</View>
 				)}
 				{awayL && (
 					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
-						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={setSelectedPlayerId} />
+						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={onPlayerPress} />
 					</View>
 				)}
 			</View>
@@ -1046,13 +1043,6 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 					)}
 				</View>
 			)}
-
-			<PlayerMatchCard
-				stat={selectedStat}
-				fixture={fixture}
-				isDark={isDark}
-				onClose={() => setSelectedPlayerId(null)}
-			/>
 		</View>
 	);
 }
@@ -1299,6 +1289,8 @@ export default function MatchDetailScreen() {
 	const insets = useSafeAreaInsets();
 	const lastScrollY = useRef(0);
 	const tabBarVisible = useRef(true);
+	// Player match-stat card — opened from the MoTM card or any pitch player.
+	const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
 	// Always show footer when entering this screen
 	useState(() => { translateY.setValue(0); });
 	const TAB_BAR_H = 60 + insets.bottom + 6;
@@ -1328,6 +1320,10 @@ export default function MatchDetailScreen() {
 		{ variables: { id }, fetchPolicy: 'cache-and-network', errorPolicy: 'all', pollInterval: 30_000 },
 	);
 	const fixture = data?.worldCupFixture;
+	const selectedStat =
+		selectedPlayerId != null
+			? (fixture?.playerMatchStats ?? []).find((s) => s.playerId === selectedPlayerId) ?? null
+			: null;
 	const [refreshing, setRefreshing] = useState(false);
 	const onReload = useCallback(() => {
 		if (refreshing) return;
@@ -1372,7 +1368,7 @@ export default function MatchDetailScreen() {
 				</View>
 			) : fixture ? (
 				<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: TAB_BAR_H }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
-					<MatchHeader fixture={fixture} isDark={isDark} />
+					<MatchHeader fixture={fixture} isDark={isDark} onPlayerPress={setSelectedPlayerId} />
 
 					{/* Tab bar */}
 					<View style={[scr.tabBar, { backgroundColor: surface, borderBottomColor: borderC }]}>
@@ -1395,7 +1391,7 @@ export default function MatchDetailScreen() {
 					{/* Content */}
 					<View style={{ backgroundColor: surface }}>
 						{activeTab === 'overview' && <OverviewTab fixture={fixture} isDark={isDark} />}
-						{activeTab === 'lineup' && <LineupTab fixture={fixture} isDark={isDark} />}
+						{activeTab === 'lineup' && <LineupTab fixture={fixture} isDark={isDark} onPlayerPress={setSelectedPlayerId} />}
 						{activeTab === 'stats' && <StatsTab fixture={fixture} isDark={isDark} />}
 					</View>
 				</ScrollView>
@@ -1404,6 +1400,14 @@ export default function MatchDetailScreen() {
 			<View style={scr.bottomNavOverlay} pointerEvents="box-none">
 				<BottomNav />
 			</View>
+			{fixture && (
+				<PlayerMatchCard
+					stat={selectedStat}
+					fixture={fixture}
+					isDark={isDark}
+					onClose={() => setSelectedPlayerId(null)}
+				/>
+			)}
 		</View>
 	);
 }

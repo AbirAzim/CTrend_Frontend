@@ -21915,6 +21915,8 @@ a.cd-lb-row:hover {
 .md-pa { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; }
 .md-pa--tappable { cursor: pointer; }
 .md-pa--tappable:hover { transform: translateY(-1px); }
+.md-motm--tappable { cursor: pointer; }
+.md-motm--tappable:hover { filter: brightness(1.03); }
 
 /* ── Player match-stat card (click a player on the pitch) ── */
 .md-pmc-backdrop {
