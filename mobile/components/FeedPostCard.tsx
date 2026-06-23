@@ -42,6 +42,8 @@ import {
 	POST_VOTE_UPDATED,
 	POST_UPDATED,
 	DELETE_POST,
+	PIN_POST,
+	UNPIN_POST,
 	EXTEND_POST_VOTING,
 	FEED_POSTS,
 	VOTERS_BY_POST,
@@ -358,6 +360,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			marginTop: 1,
 		},
 		metaText: { fontSize: 12, fontWeight: '500' as const, color: c.subtext },
+		pinnedMeta: { color: c.tint ?? c.text, fontWeight: '700' as const },
 		metaSep: { fontSize: 12, color: c.muted },
 		metaCatRow: {
 			flexDirection: 'row' as const,
@@ -1329,6 +1332,7 @@ function FeedPostCardComponent({
 	).current;
 
 	const isOwner = !!user && !!post.authorId && user.id === post.authorId;
+	const isAdmin = user?.role?.toLowerCase() === 'admin';
 
 	const [detailsExpanded, setDetailsExpanded] = useState(false);
 	// Category chip: tap to reveal a small "Category" tooltip (auto-hides).
@@ -1745,6 +1749,9 @@ function FeedPostCardComponent({
 	const [setHypeMut] = useMutation(SET_POST_HYPE);
 	const [setKeepMut] = useMutation(SET_POST_KEEP);
 	const [deleteMut] = useMutation(DELETE_POST);
+	const [pinMut] = useMutation(PIN_POST);
+	const [unpinMut] = useMutation(UNPIN_POST);
+	const [pinBusy, setPinBusy] = useState(false);
 	const [extendMut] = useMutation(EXTEND_POST_VOTING);
 
 	function triggerVotePop(idx: number) {
@@ -2109,7 +2116,7 @@ function FeedPostCardComponent({
 			router.push('/auth/login');
 			return;
 		}
-		if (isOwner) {
+		if (isOwner || isAdmin) {
 			setMoreMenuVisible(true);
 			return;
 		}
@@ -2167,6 +2174,23 @@ function FeedPostCardComponent({
 				},
 			},
 		]);
+	}
+
+	async function handleTogglePin() {
+		setMoreMenuVisible(false);
+		if (pinBusy) return;
+		setPinBusy(true);
+		try {
+			const mutate = post.pinned ? unpinMut : pinMut;
+			await mutate({
+				variables: { postId: post.id },
+				refetchQueries: [{ query: FEED_POSTS }],
+			});
+		} catch {
+			Alert.alert('Error', 'Could not update the pin.');
+		} finally {
+			setPinBusy(false);
+		}
 	}
 
 	async function handleExtendVoting(hours: number) {
@@ -2279,6 +2303,14 @@ function FeedPostCardComponent({
 									);
 								}
 							};
+							if (post.pinned) {
+								pushSep();
+								nodes.push(
+									<Text key="pin" style={[st.metaText, st.pinnedMeta]}>
+										📌 Pinned
+									</Text>,
+								);
+							}
 							if (isPlatformPost) {
 								pushSep();
 								nodes.push(
@@ -3156,17 +3188,35 @@ function FeedPostCardComponent({
 						<View
 							style={[styles.menuHandle, { backgroundColor: colors.border }]}
 						/>
-						<Pressable
-							style={[styles.menuRow, { borderBottomColor: colors.border }]}
-							onPress={() => {
-								setMoreMenuVisible(false);
-								router.push({ pathname: '/tabs/create', params: { editId: post.id } });
-							}}>
-							<Text style={[styles.menuRowText, { color: colors.text }]}>
-								✏️ Edit post
-							</Text>
-						</Pressable>
-						{activeIsVotingOpen && (
+						{isAdmin && (
+							<Pressable
+								style={[styles.menuRow, { borderBottomColor: colors.border }]}
+								disabled={pinBusy}
+								onPress={handleTogglePin}>
+								<Text style={[styles.menuRowText, { color: colors.text }]}>
+									{post.pinned
+										? pinBusy
+											? '📌 Unpinning…'
+											: '📌 Unpin post'
+										: pinBusy
+											? '📌 Pinning…'
+											: '📌 Pin to top'}
+								</Text>
+							</Pressable>
+						)}
+						{isOwner && (
+							<Pressable
+								style={[styles.menuRow, { borderBottomColor: colors.border }]}
+								onPress={() => {
+									setMoreMenuVisible(false);
+									router.push({ pathname: '/tabs/create', params: { editId: post.id } });
+								}}>
+								<Text style={[styles.menuRowText, { color: colors.text }]}>
+									✏️ Edit post
+								</Text>
+							</Pressable>
+						)}
+						{isOwner && activeIsVotingOpen && (
 							<Pressable
 								style={[styles.menuRow, { borderBottomColor: colors.border }]}
 								onPress={() => {
@@ -3178,11 +3228,13 @@ function FeedPostCardComponent({
 								</Text>
 							</Pressable>
 						)}
-						<Pressable style={styles.menuRow} onPress={handleDelete}>
-							<Text style={[styles.menuRowText, { color: '#ef4444' }]}>
-								🗑 Delete post
-							</Text>
-						</Pressable>
+						{(isOwner || isAdmin) && (
+							<Pressable style={styles.menuRow} onPress={handleDelete}>
+								<Text style={[styles.menuRowText, { color: '#ef4444' }]}>
+									🗑 Delete post
+								</Text>
+							</Pressable>
+						)}
 					</View>
 				</Pressable>
 			</Modal>

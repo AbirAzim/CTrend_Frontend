@@ -56,6 +56,7 @@ export const POST_CAMPAIGN_WINNER_FIELDS = `
   fixtureWinnerAt
   fixtureId
   lineupAvailable
+  pinned
 `;
 
 /** Real feed + voting — implement on backend per `backend_req.md` (Feed & votes). */
@@ -470,6 +471,26 @@ export const POST_UPDATED = gql`
 export const DELETE_POST = gql`
   mutation DeletePost($postId: ID!) {
     deletePost(postId: $postId)
+  }
+`;
+
+/** Admin-only: pin a post to the top of the All + Community feeds. */
+export const PIN_POST = gql`
+  mutation PinPost($postId: ID!) {
+    pinPost(postId: $postId) {
+      id
+      pinned
+    }
+  }
+`;
+
+/** Admin-only: remove a post's pin. */
+export const UNPIN_POST = gql`
+  mutation UnpinPost($postId: ID!) {
+    unpinPost(postId: $postId) {
+      id
+      pinned
+    }
   }
 `;
 

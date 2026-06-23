@@ -24,6 +24,8 @@ import {
 } from "./IgIcons";
 import {
   DELETE_POST,
+  PIN_POST,
+  UNPIN_POST,
   FEED_POSTS,
   GET_POST_BY_ID,
   MY_SAVED_POSTS,
@@ -539,7 +541,7 @@ function FeedPostCardComponent({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
   const isOwner = !!authUser && !!post.authorId && authUser.id === post.authorId;
-  const isAdmin = authUser?.role === "admin";
+  const isAdmin = authUser?.role?.toLowerCase() === "admin";
   const canDelete = isOwner || isAdmin;
 
   const [deletePostMut, { loading: deleting }] = useMutation(DELETE_POST, {
@@ -550,6 +552,27 @@ function FeedPostCardComponent({
     try {
       await deletePostMut({ variables: { postId: post.id } });
       setDeleteConfirm(false);
+    } catch {
+      // error surfaced via Apollo
+    }
+  }
+
+  const [pinPostMut, { loading: pinningPost }] = useMutation(PIN_POST, {
+    refetchQueries: [{ query: FEED_POSTS }],
+  });
+  const [unpinPostMut, { loading: unpinningPost }] = useMutation(UNPIN_POST, {
+    refetchQueries: [{ query: FEED_POSTS }],
+  });
+  const pinBusy = pinningPost || unpinningPost;
+
+  async function handleTogglePin() {
+    try {
+      if (post.pinned) {
+        await unpinPostMut({ variables: { postId: post.id } });
+      } else {
+        await pinPostMut({ variables: { postId: post.id } });
+      }
+      setMoreOpen(false);
     } catch {
       // error surfaced via Apollo
     }
@@ -1801,6 +1824,11 @@ function FeedPostCardComponent({
           </span>
         </div>
       ) : null}
+      {post.pinned ? (
+        <div className="cx-pinned-ribbon" aria-label="Pinned post">
+          <span aria-hidden="true">📌</span> Pinned
+        </div>
+      ) : null}
       <header className="ig-post-header">
         {isPlatformPost ? (
           <div className="ig-post-user cx-platform-post-user">
@@ -1896,6 +1924,23 @@ function FeedPostCardComponent({
           </button>
           {moreOpen && (
             <div className="ig-more-menu" role="menu">
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="ig-more-item"
+                  role="menuitem"
+                  disabled={pinBusy}
+                  onClick={() => void handleTogglePin()}
+                >
+                  {post.pinned
+                    ? pinBusy
+                      ? "Unpinning…"
+                      : "📌 Unpin post"
+                    : pinBusy
+                      ? "Pinning…"
+                      : "📌 Pin to top"}
+                </button>
+              )}
               {canDelete && !deleteConfirm && (
                 <button
                   type="button"

@@ -126,6 +126,7 @@ export function mapGqlPostToFeedView(p: {
   fixtureWinnerAt?: string | null;
   fixtureId?: string | null;
   lineupAvailable?: boolean | null;
+  pinned?: boolean | null;
 }): FeedPostView {
   const imageUrls = (p.imageUrls ?? []).filter(
     (u) => typeof u === "string" && u.trim().length > 0,
@@ -250,5 +251,6 @@ export function mapGqlPostToFeedView(p: {
     fixtureWinnerAt: p.fixtureWinnerAt ?? null,
     fixtureId: p.fixtureId ?? null,
     lineupAvailable: p.lineupAvailable ?? false,
+    pinned: Boolean(p.pinned),
   };
 }

@@ -96,6 +96,8 @@ export type FeedPostView = {
   fixtureWinnerAt?: string | null;
   fixtureId?: string | null;
   lineupAvailable?: boolean;
+  /** True when an admin has pinned this post to the top of the feed. */
+  pinned?: boolean;
 };
 
 export type VoteOptionStatView = {

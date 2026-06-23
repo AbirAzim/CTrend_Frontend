@@ -103,6 +103,8 @@ export type FeedPostView = {
   fixtureId?: string | null;
   /** True once lineups have been published for this fixture. */
   lineupAvailable?: boolean | null;
+  /** True when an admin has pinned this post to the top of the feed. */
+  pinned?: boolean | null;
 };
 
 export type FeedPostCampaignView = {
