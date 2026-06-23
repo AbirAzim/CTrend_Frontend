@@ -84,6 +84,8 @@ type Message = {
   viewerReaction?: string | null;
   replyTo?: ReplyPreview | null;
   createdAt: string;
+  /** Client-side delivery state for optimistic (not-yet-confirmed) messages. */
+  status?: "sending" | "failed";
 };
 
 /** Snippet text for a quoted message: trimmed text, else "📷 Photo". */
@@ -151,6 +153,7 @@ function MessageBubble({
   onDelete,
   onCopy,
   onForward,
+  onRetry,
 }: {
   msg: Message;
   isOwn: boolean;
@@ -168,6 +171,7 @@ function MessageBubble({
   onDelete: () => void;
   onCopy: () => void;
   onForward: () => void;
+  onRetry: () => void;
 }) {
   const isModerator = msg.senderId === MODERATOR_SENDER_ID;
   const avatar = isModerator ? null : normalizeProfileImageUrl(msg.senderAvatar);
@@ -432,11 +436,20 @@ function MessageBubble({
             </View>
           )}
 
-          {/* Time + seen */}
-          <Text style={[styles.bubbleTime, { color: colors.muted }]}>
-            {formatRelativeTime(msg.createdAt)}
-            {isOwn && msg.readBy.length > 1 ? "  ✓✓" : ""}
-          </Text>
+          {/* Time + seen — or a tap-to-retry note if delivery failed. Optimistic
+              ("sending") messages render the normal time so they look instant. */}
+          {msg.status === "failed" ? (
+            <Pressable onPress={onRetry} hitSlop={6}>
+              <Text style={[styles.bubbleTime, { color: "#ef4444" }]}>
+                ⚠ Not delivered · Tap to retry
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={[styles.bubbleTime, { color: colors.muted }]}>
+              {formatRelativeTime(msg.createdAt)}
+              {isOwn && msg.status !== "sending" && msg.readBy.length > 1 ? "  ✓✓" : ""}
+            </Text>
+          )}
         </View>
 
         {/* Standalone reply arrow — inner side of others' bubbles (Messenger-style) */}
@@ -466,14 +479,12 @@ export default function ChatScreen() {
   const loadingMoreRef = useRef(false);
   const [text, setText] = useState("");
   const textRef = useRef("");
-  const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
   const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
   const [activeReplyMsgId, setActiveReplyMsgId] = useState<string | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
@@ -729,7 +740,23 @@ export default function ChatScreen() {
       if (!msg || msg.conversationId !== conversationId) return;
       if (seenIds.current.has(msg.id)) return;
       seenIds.current.add(msg.id);
-      setMessages((prev) => [msg, ...prev]);
+      setMessages((prev) => {
+        // When our own message echoes back, replace the matching optimistic
+        // ("sending") placeholder instead of appending a duplicate.
+        const base =
+          msg.senderId === user?.id
+            ? prev.filter(
+                (m) =>
+                  !(
+                    m.status === "sending" &&
+                    m.text === msg.text &&
+                    Boolean(m.imageUrl) === Boolean(msg.imageUrl)
+                  ),
+              )
+            : prev;
+        if (base.some((m) => m.id === msg.id)) return base;
+        return [msg, ...base];
+      });
       if (msg.senderId !== user?.id) {
         playNotification();
         Vibration.vibrate(150);
@@ -872,29 +899,48 @@ export default function ChatScreen() {
   }
 
   // ── Send ────────────────────────────────────────────────────────────────────
-  async function handleSend() {
-    const msgText = textRef.current.trim();
-    if (!msgText && !imageUri) return;
-    if (!conversationId) return;
+  // Core send: shows the bubble instantly (optimistic), then uploads any image
+  // and fires the mutation in the background. No loading state blocks the UI —
+  // the message is on screen immediately and reconciled when the server confirms.
+  async function dispatchSend(opts: {
+    text: string;
+    imageUri: string | null;
+    replyTo: ReplyPreview | null;
+  }) {
+    if (!conversationId || !user) return;
+    const msgText = opts.text.trim();
+    const pendingImageUri = opts.imageUri;
+    if (!msgText && !pendingImageUri) return;
+    const replyTo = opts.replyTo;
+    const replyToId = replyTo?.messageId;
 
-    setSending(true);
-    if (typingTimeout.current) clearTimeout(typingTimeout.current);
-    void setTypingMut({ variables: { conversationId, isTyping: false } }).catch(() => {});
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimistic: Message = {
+      id: tempId,
+      conversationId,
+      senderId: user.id,
+      senderName: user.displayName?.trim() || user.username || "You",
+      senderAvatar: user.profileImageUrl ?? null,
+      text: msgText || " ",
+      imageUrl: pendingImageUri ?? null, // local preview until upload completes
+      deleted: false,
+      forwarded: false,
+      readBy: [],
+      reactions: [],
+      viewerReaction: null,
+      replyTo: replyTo ?? null,
+      createdAt: new Date().toISOString(),
+      status: "sending",
+    };
+    setMessages((prev) => [optimistic, ...prev]);
+    requestAnimationFrame(() =>
+      listRef.current?.scrollToOffset({ offset: 0, animated: true })
+    );
 
     try {
       let uploadedUrl: string | undefined;
-      if (imageUri) {
-        setImageUploading(true);
-        uploadedUrl = await uploadImage(imageUri);
-        setImageUri(null);
-        setImageUploading(false);
-      }
-
-      textRef.current = "";
-      setText("");
-      const replyToId = replyTarget?.messageId;
-      setReplyTarget(null);
-      await sendMessage({
+      if (pendingImageUri) uploadedUrl = await uploadImage(pendingImageUri);
+      const res = await sendMessage({
         variables: {
           conversationId,
           text: msgText || " ",
@@ -902,22 +948,55 @@ export default function ChatScreen() {
           ...(replyToId ? { replyToId } : {}),
         },
       });
-      // Snap to the newest message (offset 0 on the inverted list), even if the
-      // user had scrolled up to reply to an older message.
-      requestAnimationFrame(() =>
-        listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      const real = (res.data as { sendMessage?: Message } | null | undefined)?.sendMessage;
+      if (real) {
+        seenIds.current.add(real.id);
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => m.id !== tempId);
+          // The subscription may have already delivered the real message.
+          return withoutTemp.some((m) => m.id === real.id)
+            ? withoutTemp
+            : [real, ...withoutTemp];
+        });
+      }
+    } catch {
+      // Keep the bubble but flag it so the user can tap to retry.
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m)),
       );
-    } catch { /* message failed silently */ }
-    finally {
-      setSending(false);
-      setImageUploading(false);
     }
+  }
+
+  function handleSend() {
+    const msgText = textRef.current.trim();
+    if (!msgText && !imageUri) return;
+    if (!conversationId) return;
+
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    void setTypingMut({ variables: { conversationId, isTyping: false } }).catch(() => {});
+
+    const opts = { text: msgText, imageUri, replyTo: replyTarget };
+    // Clear the composer immediately so it feels instant.
+    textRef.current = "";
+    setText("");
+    setImageUri(null);
+    setReplyTarget(null);
+    void dispatchSend(opts);
+  }
+
+  function retrySend(failed: Message) {
+    setMessages((prev) => prev.filter((m) => m.id !== failed.id));
+    void dispatchSend({
+      text: failed.text,
+      imageUri: failed.imageUrl ?? null,
+      replyTo: failed.replyTo ?? null,
+    });
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const typingLabel = Array.from(typingUsers.values()).join(", ");
-  const canSend = (text.trim().length > 0 || imageUri !== null) && !sending && !imageUploading;
+  const canSend = text.trim().length > 0 || imageUri !== null;
 
   const handleLoadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMore || !conversationId || messages.length === 0) return;
@@ -1067,6 +1146,7 @@ export default function ChatScreen() {
                   onDelete={() => handleDeleteMessage(msg)}
                   onCopy={() => handleCopy(msg)}
                   onForward={() => handleForward(msg)}
+                  onRetry={() => retrySend(msg)}
                 />
               );
             }}
@@ -1127,11 +1207,6 @@ export default function ChatScreen() {
         {imageUri && (
           <View style={[styles.imagePreviewBar, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
             <Image source={{ uri: imageUri }} style={styles.imagePreview} contentFit="cover" />
-            {imageUploading && (
-              <View style={styles.imageUploadingOverlay}>
-                <ActivityIndicator color="#fff" />
-              </View>
-            )}
             <Pressable style={styles.imageRemoveBtn} onPress={() => setImageUri(null)}>
               <Text style={styles.imageRemoveText}>✕</Text>
             </Pressable>
@@ -1187,11 +1262,7 @@ export default function ChatScreen() {
             }}
             disabled={!canSend}
           >
-            {sending || imageUploading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={[styles.sendBtnText, { color: canSend ? "#fff" : colors.muted }]}>↑</Text>
-            )}
+            <Text style={[styles.sendBtnText, { color: canSend ? "#fff" : colors.muted }]}>↑</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
