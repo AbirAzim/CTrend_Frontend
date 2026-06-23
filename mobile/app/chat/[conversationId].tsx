@@ -174,29 +174,37 @@ function MessageBubble({
   const initial = (msg.senderName ?? "?").slice(0, 1).toUpperCase();
   const activeReactions = (msg.reactions ?? []).filter((r) => r.count > 0);
 
-  // Swipe left→right to reply (WhatsApp-style), with a haptic at the threshold.
+  // Swipe to reply (WhatsApp/Messenger-style), with a haptic at the threshold.
+  // Direction mirrors the bubble's alignment: incoming messages swipe right (→),
+  // your own messages swipe left (←).
   const swipeX = useRef(new Animated.Value(0)).current;
   const swipeFired = useRef(false);
   const onReplyRef = useRef(onReply);
   onReplyRef.current = onReply;
+  // dir: +1 = swipe right (incoming), -1 = swipe left (own). Held in a ref so the
+  // PanResponder (created once) always reads the current side.
+  const dirRef = useRef(isOwn ? -1 : 1);
+  dirRef.current = isOwn ? -1 : 1;
   const SWIPE_TRIGGER = 56;
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_e, g) =>
-        g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+        g.dx * dirRef.current > 12 &&
+        Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
       onPanResponderGrant: () => {
         swipeFired.current = false;
       },
       onPanResponderMove: (_e, g) => {
-        const x = Math.max(0, Math.min(g.dx, 72));
-        swipeX.setValue(x);
-        if (!swipeFired.current && x >= SWIPE_TRIGGER) {
+        // Distance travelled in the allowed direction (always >= 0).
+        const dist = Math.max(0, Math.min(g.dx * dirRef.current, 72));
+        swipeX.setValue(dist * dirRef.current);
+        if (!swipeFired.current && dist >= SWIPE_TRIGGER) {
           swipeFired.current = true;
           Vibration.vibrate(12);
         }
       },
       onPanResponderRelease: (_e, g) => {
-        if (g.dx >= SWIPE_TRIGGER) onReplyRef.current();
+        if (g.dx * dirRef.current >= SWIPE_TRIGGER) onReplyRef.current();
         Animated.spring(swipeX, { toValue: 0, useNativeDriver: false, friction: 7 }).start();
       },
       onPanResponderTerminate: () => {
@@ -204,9 +212,10 @@ function MessageBubble({
       },
     }),
   ).current;
+  // swipeX is signed (negative when own slides left); opacity tracks its magnitude.
   const replyIconOpacity = swipeX.interpolate({
-    inputRange: [0, SWIPE_TRIGGER],
-    outputRange: [0, 1],
+    inputRange: [-SWIPE_TRIGGER, 0, SWIPE_TRIGGER],
+    outputRange: [1, 0, 1],
     extrapolate: "clamp",
   });
 
@@ -268,7 +277,7 @@ function MessageBubble({
       )}
 
       {/* Swipe-to-reply arrow revealed underneath as the bubble slides right */}
-      <Animated.View style={[styles.swipeReplyIcon, { opacity: replyIconOpacity }]} pointerEvents="none">
+      <Animated.View style={[styles.swipeReplyIcon, isOwn && styles.swipeReplyIconOwn, { opacity: replyIconOpacity }]} pointerEvents="none">
         <Ionicons name="arrow-undo" size={20} color={colors.accent} />
       </Animated.View>
       <Animated.View
@@ -997,6 +1006,9 @@ export default function ChatScreen() {
             data={messages}
             keyExtractor={(m) => m.id}
             inverted
+            // Let touches reach the message rows while the keyboard is open so
+            // swipe-to-reply still works; tapping empty space still dismisses.
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.messagesList}
             onEndReached={() => void handleLoadMore()}
             onEndReachedThreshold={0.3}
@@ -1317,6 +1329,7 @@ const styles = StyleSheet.create({
   // Bubbles
   bubbleRow: { flexDirection: "row", marginBottom: 4, alignItems: "flex-end" },
   swipeReplyIcon: { position: "absolute", left: 16, top: 0, bottom: 0, justifyContent: "center", zIndex: 0 },
+  swipeReplyIconOwn: { left: undefined, right: 16 },
   bubbleRowOwn: { justifyContent: "flex-end" },
   bubbleRowOther: { justifyContent: "flex-start" },
   bubbleAvatarSlot: { width: 32, marginRight: 6 },
