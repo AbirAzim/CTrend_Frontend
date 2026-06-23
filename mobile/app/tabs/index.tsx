@@ -490,6 +490,9 @@ export default function FeedScreen() {
           extraData={coachPostId}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          // Let taps reach cards while the keyboard is open (e.g. submitting a
+          // score prediction) instead of the first tap only dismissing it.
+          keyboardShouldPersistTaps="handled"
           style={[styles.list, { backgroundColor: colors.bg }]}
           contentContainerStyle={{ paddingTop: filterBarHeight + 8, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
           onScroll={handleScroll}
