@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomNav } from "../components/BottomNav";
 import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "@ctrend/shared/graphql/worldcup";
 import { useTheme } from "../context/ThemeContext";
+import { useTabBar } from "../context/TabBarContext";
 import {
   type WcFixture,
   WC_STAGE_LABELS,
@@ -325,7 +326,18 @@ function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnTyp
 export default function WorldCupScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { translateY } = useTabBar();
   const followed = useFollowedTeam();
+
+  // The feed (and match-detail screen) hide the shared bottom nav on scroll
+  // (translateY). Reset it every time this screen gains focus so the footer is
+  // always visible here instead of being translated off-screen — which would
+  // otherwise leave blank space at the bottom (incl. after back-navigation).
+  useFocusEffect(
+    useCallback(() => {
+      translateY.setValue(0);
+    }, [translateY]),
+  );
   const st = makeStyles(colors);
   const [, setTick] = useState(0);
   const params = useLocalSearchParams<{ tab?: string }>();
