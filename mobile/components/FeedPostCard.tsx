@@ -2446,15 +2446,15 @@ function FeedPostCardComponent({
 								(stat?.count ?? 0) > 0 && stat?.count === pollMaxCount;
 							const isWinner = isVotingClosed && isLeading;
 							const isLoser = pollShowResults && !isLeading && !picked;
-							// Every row that's either the current leader or the viewer's own
-							// pick gets a proportional fill, not just a border — so a picked
-							// underdog still reads as "filled in", just in accent instead of
-							// green, rather than looking empty next to the leading bar.
+							// Every option gets its own colored proportional fill (overlay),
+							// not just the leader — a distinct hue per option from the shared
+							// split palette. Pick/winner stay flagged via border + medal.
+							const optColor = MULTI_SPLIT_COLORS[i % MULTI_SPLIT_COLORS.length];
 							const leadColor = isLeading
 								? GREEN
 								: picked
 									? colors.accent
-									: null;
+									: optColor;
 							return (
 								<Pressable
 									key={`${post.id}-poll-${i}`}
@@ -2466,14 +2466,12 @@ function FeedPostCardComponent({
 									]}
 									onPress={() => handleCellTap(i)}
 									disabled={isVotingClosed}>
-									{pollShowResults && leadColor ? (
+									{pollShowResults ? (
 										<View
 											pointerEvents='none'
 											style={[
 												st.pollFill,
-												isWinner
-													? { width: `${pct}%`, backgroundColor: 'rgba(245,158,11,0.10)' }
-													: { width: `${pct}%`, backgroundColor: leadColor, opacity: 0.2 },
+												{ width: `${pct}%`, backgroundColor: optColor, opacity: 0.22 },
 											]}
 										/>
 									) : null}
