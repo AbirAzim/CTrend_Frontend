@@ -21913,6 +21913,51 @@ a.cd-lb-row:hover {
 
 /* Player avatar on pitch */
 .md-pa { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; }
+.md-pa--tappable { cursor: pointer; }
+.md-pa--tappable:hover { transform: translateY(-1px); }
+
+/* ── Player match-stat card (click a player on the pitch) ── */
+.md-pmc-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.md-pmc {
+  position: relative;
+  width: 100%; max-width: 440px; max-height: 88vh; overflow-y: auto;
+  background: var(--ig-bg, #fff);
+  color: var(--ig-text, #0f172a);
+  border: 1px solid var(--ig-border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+.md-pmc-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: rgb(var(--cx-ink-rgb) / 0.08);
+  color: var(--ig-text);
+  font-size: 14px; line-height: 1;
+}
+.md-pmc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-right: 28px; }
+.md-pmc-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: rgb(var(--cx-ink-rgb) / 0.06); flex-shrink: 0; }
+.md-pmc-head-info { flex: 1; min-width: 0; }
+.md-pmc-name { font-size: 18px; font-weight: 800; }
+.md-pmc-meta, .md-pmc-context { font-size: 12px; font-weight: 600; color: var(--ig-text-secondary); margin-top: 2px; }
+.md-pmc-rating { color: #fff; font-size: 16px; font-weight: 800; padding: 6px 10px; border-radius: 8px; }
+.md-pmc-tiles { display: flex; gap: 8px; margin-bottom: 18px; }
+.md-pmc-tile { flex: 1; text-align: center; padding: 12px 4px; border-radius: 12px; background: rgb(var(--cx-ink-rgb) / 0.05); }
+.md-pmc-tile-val { font-size: 20px; font-weight: 800; }
+.md-pmc-tile-lbl { font-size: 11px; font-weight: 600; color: var(--ig-text-secondary); margin-top: 3px; }
+.md-pmc-section { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ig-text-secondary); margin-bottom: 8px; }
+.md-pmc-stats { background: rgb(var(--cx-ink-rgb) / 0.05); border-radius: 12px; padding: 2px 14px; }
+.md-pmc-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--ig-border); }
+.md-pmc-stat-row:last-child { border-bottom: none; }
+.md-pmc-stat-label { font-size: 14px; color: var(--ig-text-secondary); }
+.md-pmc-stat-value { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.md-pmc-empty { font-size: 13px; text-align: center; color: var(--ig-text-secondary); padding: 20px 0; }
 .md-pa-circle {
   width: 44px; height: 44px; border-radius: 50%;
   background: rgba(0,0,0,0.45);

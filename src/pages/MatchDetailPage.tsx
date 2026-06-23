@@ -46,6 +46,40 @@ type PlayerRating = {
   photo?: string | null;
 };
 
+type PlayerMatchStat = {
+  playerId: number;
+  name: string;
+  team: "home" | "away";
+  photo?: string | null;
+  number?: number | null;
+  position?: string | null;
+  minutes?: number | null;
+  rating?: string | null;
+  captain?: boolean | null;
+  substitute?: boolean | null;
+  goals?: number | null;
+  assists?: number | null;
+  shotsTotal?: number | null;
+  shotsOn?: number | null;
+  keyPasses?: number | null;
+  passesTotal?: number | null;
+  passAccuracy?: number | null;
+  dribblesAttempts?: number | null;
+  dribblesSuccess?: number | null;
+  foulsDrawn?: number | null;
+  foulsCommitted?: number | null;
+  tacklesTotal?: number | null;
+  interceptions?: number | null;
+  duelsTotal?: number | null;
+  duelsWon?: number | null;
+  offsides?: number | null;
+  yellow?: number | null;
+  red?: number | null;
+  penaltyScored?: number | null;
+  penaltyMissed?: number | null;
+  saves?: number | null;
+};
+
 type FixtureDetails = {
   id: string;
   homeTeam: { name: string; shortName: string; crest: string };
@@ -63,6 +97,7 @@ type FixtureDetails = {
   lineups: MatchLineup[];
   stats: MatchStat[];
   playerRatings: PlayerRating[];
+  playerMatchStats?: PlayerMatchStat[];
   detailsSyncedAt?: string | null;
 };
 
@@ -395,11 +430,13 @@ function PitchAvatar({
   photoMap,
   ratingMap,
   evMap,
+  onClick,
 }: {
   player: LineupPlayer;
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
   evMap: Map<string, PEvt>;
+  onClick?: () => void;
 }) {
   const photo = playerPhoto(player, photoMap);
   const [imgFailed, setImgFailed] = useState(false);
@@ -407,7 +444,12 @@ function PitchAvatar({
   const pev = evMap.get(pEvtKey(player));
 
   return (
-    <div className="md-pa">
+    <div
+      className={`md-pa${onClick ? " md-pa--tappable" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="md-pa-av-wrap">
         {/* Sub icon sits above the circle, centered */}
         {(pev?.subOff || pev?.subOn) && (
@@ -458,6 +500,7 @@ function FormationRows({
   photoMap,
   ratingMap,
   evMap,
+  onPlayerClick,
 }: {
   players: LineupPlayer[];
   reverse: boolean;
@@ -465,6 +508,7 @@ function FormationRows({
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
   evMap: Map<string, PEvt>;
+  onPlayerClick?: (id: number) => void;
 }) {
   const byRow = new Map<number, LineupPlayer[]>();
   for (const p of players) {
@@ -490,7 +534,14 @@ function FormationRows({
         return (
           <div key={row} className="md-frow">
             {sorted.map((p) => (
-              <PitchAvatar key={p.id ?? p.name} player={p} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
+              <PitchAvatar
+                key={p.id ?? p.name}
+                player={p}
+                photoMap={photoMap}
+                ratingMap={ratingMap}
+                evMap={evMap}
+                onClick={p.id != null && onPlayerClick ? () => onPlayerClick(p.id as number) : undefined}
+              />
             ))}
           </div>
         );
@@ -552,11 +603,104 @@ function BenchCell({
   );
 }
 
+function PlayerMatchCard({
+  stat,
+  fixture,
+  onClose,
+}: {
+  stat: PlayerMatchStat | null;
+  fixture: FixtureDetails;
+  onClose: () => void;
+}) {
+  if (!stat) return null;
+  const rNum = stat.rating ? parseFloat(stat.rating) : null;
+  const teamName = stat.team === "home" ? fixture.homeTeam.shortName : fixture.awayTeam.shortName;
+  const photo = stat.photo ?? `https://media.api-sports.io/football/players/${stat.playerId}.png`;
+
+  const rows: Array<{ label: string; value: string }> = [];
+  const push = (label: string, v: number | null | undefined, fmt?: (n: number) => string) => {
+    if (v == null) return;
+    rows.push({ label, value: fmt ? fmt(v) : String(v) });
+  };
+  push("Total shots", stat.shotsTotal);
+  push("Shots on target", stat.shotsOn);
+  push("Chances created", stat.keyPasses);
+  if (stat.dribblesAttempts != null || stat.dribblesSuccess != null)
+    rows.push({ label: "Dribbles (won/att)", value: `${stat.dribblesSuccess ?? 0}/${stat.dribblesAttempts ?? 0}` });
+  push("Pass accuracy", stat.passAccuracy, (n) => `${n}%`);
+  push("Tackles", stat.tacklesTotal);
+  push("Interceptions", stat.interceptions);
+  if (stat.duelsTotal != null || stat.duelsWon != null)
+    rows.push({ label: "Duels (won/total)", value: `${stat.duelsWon ?? 0}/${stat.duelsTotal ?? 0}` });
+  push("Fouls won", stat.foulsDrawn);
+  push("Fouls committed", stat.foulsCommitted);
+  push("Offsides", stat.offsides);
+  push("Saves", stat.saves);
+  if (stat.penaltyScored) push("Penalties scored", stat.penaltyScored);
+  if (stat.penaltyMissed) push("Penalties missed", stat.penaltyMissed);
+  if (stat.yellow) push("Yellow cards", stat.yellow);
+  if (stat.red) push("Red cards", stat.red);
+
+  return (
+    <div className="md-pmc-backdrop" onClick={onClose} role="presentation">
+      <div className="md-pmc" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <button className="md-pmc-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="md-pmc-header">
+          <img
+            className="md-pmc-avatar"
+            src={photo}
+            alt={stat.name}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+          />
+          <div className="md-pmc-head-info">
+            <div className="md-pmc-name">{stat.name}{stat.captain ? "  (C)" : ""}</div>
+            <div className="md-pmc-meta">
+              {[stat.position, stat.number != null ? `#${stat.number}` : null, teamName].filter(Boolean).join("  ·  ")}
+            </div>
+            <div className="md-pmc-context">
+              {fixture.homeTeam.shortName} {fixture.score.home ?? 0}–{fixture.score.away ?? 0} {fixture.awayTeam.shortName}
+            </div>
+          </div>
+          {rNum != null && (
+            <span className="md-pmc-rating" style={{ background: ratingColor(rNum) }}>{rNum.toFixed(1)}</span>
+          )}
+        </div>
+        <div className="md-pmc-tiles">
+          <div className="md-pmc-tile"><div className="md-pmc-tile-val">{stat.minutes != null ? `${stat.minutes}'` : "—"}</div><div className="md-pmc-tile-lbl">Minutes</div></div>
+          <div className="md-pmc-tile"><div className="md-pmc-tile-val">{stat.goals ?? 0}</div><div className="md-pmc-tile-lbl">Goals</div></div>
+          <div className="md-pmc-tile"><div className="md-pmc-tile-val">{stat.assists ?? 0}</div><div className="md-pmc-tile-lbl">Assists</div></div>
+        </div>
+        {rows.length > 0 ? (
+          <>
+            <div className="md-pmc-section">Key stats</div>
+            <div className="md-pmc-stats">
+              {rows.map((r) => (
+                <div key={r.label} className="md-pmc-stat-row">
+                  <span className="md-pmc-stat-label">{r.label}</span>
+                  <span className="md-pmc-stat-value">{r.value}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="md-pmc-empty">Detailed stats aren't available for this player.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LineupTab({ fixture }: { fixture: FixtureDetails }) {
   const { lineups, events } = fixture;
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   if (lineups.length === 0) {
     return <div className="md-empty">Lineups will appear closer to kickoff.</div>;
   }
+
+  const statsByPlayer = new Map<number, PlayerMatchStat>(
+    (fixture.playerMatchStats ?? []).map((s) => [s.playerId, s])
+  );
+  const selectedStat = selectedPlayerId != null ? statsByPlayer.get(selectedPlayerId) ?? null : null;
 
   const homeL = lineups.find((l) => l.team === "home");
   const awayL = lineups.find((l) => l.team === "away");
@@ -615,12 +759,12 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
 
         {homeL && (
           <div className="md-pitch-half">
-            <FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
+            <FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={setSelectedPlayerId} />
           </div>
         )}
         {awayL && (
           <div className="md-pitch-half">
-            <FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} />
+            <FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={setSelectedPlayerId} />
           </div>
         )}
       </div>
@@ -690,6 +834,12 @@ function LineupTab({ fixture }: { fixture: FixtureDetails }) {
         <div className="md-legend-item"><span className="md-eico md-eico--card md-eico--yellow" /> Yellow card</div>
         <div className="md-legend-item"><span className="md-eico md-eico--card md-eico--red" /> Red card</div>
       </div>
+
+      <PlayerMatchCard
+        stat={selectedStat}
+        fixture={fixture}
+        onClose={() => setSelectedPlayerId(null)}
+      />
     </div>
   );
 }

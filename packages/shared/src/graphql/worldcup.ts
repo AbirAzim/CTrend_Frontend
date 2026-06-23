@@ -70,6 +70,13 @@ export const WORLD_CUP_FIXTURE_DETAILS = gql`
       }
       stats { type home away }
       playerRatings { playerId name team rating photo }
+      playerMatchStats {
+        playerId name team photo number position minutes rating captain substitute
+        goals assists shotsTotal shotsOn keyPasses passesTotal passAccuracy
+        dribblesAttempts dribblesSuccess foulsDrawn foulsCommitted
+        tacklesTotal interceptions duelsTotal duelsWon offsides yellow red
+        penaltyScored penaltyMissed saves
+      }
       detailsSyncedAt
     }
   }

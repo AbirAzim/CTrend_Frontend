@@ -10,6 +10,7 @@ import {
 	Animated,
 	ActivityIndicator,
 	Easing,
+	Modal,
 	Pressable,
 	ScrollView,
 	StyleSheet,
@@ -41,6 +42,20 @@ type PlayerRating = {
 	playerId: number; name: string; team: 'home' | 'away';
 	rating?: string | null; photo?: string | null;
 };
+type PlayerMatchStat = {
+	playerId: number; name: string; team: 'home' | 'away'; photo?: string | null;
+	number?: number | null; position?: string | null; minutes?: number | null;
+	rating?: string | null; captain?: boolean | null; substitute?: boolean | null;
+	goals?: number | null; assists?: number | null;
+	shotsTotal?: number | null; shotsOn?: number | null; keyPasses?: number | null;
+	passesTotal?: number | null; passAccuracy?: number | null;
+	dribblesAttempts?: number | null; dribblesSuccess?: number | null;
+	foulsDrawn?: number | null; foulsCommitted?: number | null;
+	tacklesTotal?: number | null; interceptions?: number | null;
+	duelsTotal?: number | null; duelsWon?: number | null; offsides?: number | null;
+	yellow?: number | null; red?: number | null;
+	penaltyScored?: number | null; penaltyMissed?: number | null; saves?: number | null;
+};
 type FixtureDetails = {
 	id: string;
 	homeTeam: { name: string; shortName: string; crest: string };
@@ -52,6 +67,7 @@ type FixtureDetails = {
 	campaignPostId?: string | null;
 	events: MatchEvent[]; lineups: MatchLineup[];
 	stats: MatchStat[]; playerRatings: PlayerRating[];
+	playerMatchStats?: PlayerMatchStat[];
 	detailsSyncedAt?: string | null;
 };
 
@@ -555,15 +571,15 @@ const ov = StyleSheet.create({
 // ─── Lineup tab ───────────────────────────────────────────────────────────────
 
 function PitchPlayer({
-	player, ratingMap, evMap,
-}: { player: LineupPlayer; ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean }) {
+	player, ratingMap, evMap, onPress,
+}: { player: LineupPlayer; ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean; onPress?: () => void }) {
 	const [imgFailed, setImgFailed] = useState(false);
 	const rating = player.id != null ? ratingMap.get(player.id) : undefined;
 	const rNum = rating ? parseFloat(rating) : null;
 	const pev = evMap.get(pEvtKey(player));
 
 	return (
-		<View style={pitch.playerWrap}>
+		<Pressable style={pitch.playerWrap} onPress={onPress} disabled={!onPress}>
 			<View style={pitch.avatarWrap}>
 				{player.photo && !imgFailed
 					? <Image source={{ uri: player.photo }} style={pitch.avatar} contentFit='cover' borderRadius={22} onError={() => setImgFailed(true)} />
@@ -600,7 +616,7 @@ function PitchPlayer({
 				</View>
 			)}
 			<Text style={pitch.playerName} numberOfLines={1}>{shortName(player.name)}</Text>
-		</View>
+		</Pressable>
 	);
 }
 
@@ -625,9 +641,10 @@ const pitch = StyleSheet.create({
 	playerName: { fontSize: 9.5, fontWeight: '600', color: '#fff', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
 
-function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark }: {
+function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark, onPlayerPress }: {
 	players: LineupPlayer[]; reverse: boolean; mirrorCols: boolean;
 	ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean;
+	onPlayerPress?: (id: number) => void;
 }) {
 	const byRow = new Map<number, LineupPlayer[]>();
 	for (const p of players) {
@@ -653,7 +670,14 @@ function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark 
 				return (
 					<View key={row} style={fo.row}>
 						{sorted.map(p => (
-							<PitchPlayer key={p.id ?? p.name} player={p} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
+							<PitchPlayer
+								key={p.id ?? p.name}
+								player={p}
+								ratingMap={ratingMap}
+								evMap={evMap}
+								isDark={isDark}
+								onPress={p.id != null && onPlayerPress ? () => onPlayerPress(p.id as number) : undefined}
+							/>
 						))}
 					</View>
 				);
@@ -666,12 +690,169 @@ const fo = StyleSheet.create({
 	row: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
 });
 
+// ─── Player match-stat card (tap a player on the pitch) ─────────────────────────
+
+function PlayerMatchCard({ stat, fixture, isDark, onClose }: {
+	stat: PlayerMatchStat | null;
+	fixture: FixtureDetails;
+	isDark: boolean;
+	onClose: () => void;
+}) {
+	const bg = isDark ? '#0f172a' : '#fff';
+	const surface = isDark ? '#1e293b' : '#f8fafc';
+	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
+	const textSub = isDark ? '#94a3b8' : '#64748b';
+	const border = isDark ? 'rgba(255,255,255,0.10)' : '#e2e8f0';
+
+	const rNum = stat?.rating ? parseFloat(stat.rating) : null;
+	const teamName = stat?.team === 'home' ? fixture.homeTeam.shortName : fixture.awayTeam.shortName;
+	const photo = stat
+		? (stat.photo ?? `https://media.api-sports.io/football/players/${stat.playerId}.png`)
+		: null;
+
+	const rows: Array<{ label: string; value: string }> = [];
+	const push = (label: string, v: number | null | undefined, fmt?: (n: number) => string) => {
+		if (v == null) return;
+		rows.push({ label, value: fmt ? fmt(v) : String(v) });
+	};
+	if (stat) {
+		push('Total shots', stat.shotsTotal);
+		push('Shots on target', stat.shotsOn);
+		push('Chances created', stat.keyPasses);
+		if (stat.dribblesAttempts != null || stat.dribblesSuccess != null) {
+			rows.push({ label: 'Dribbles (won/att)', value: `${stat.dribblesSuccess ?? 0}/${stat.dribblesAttempts ?? 0}` });
+		}
+		push('Pass accuracy', stat.passAccuracy, (n) => `${n}%`);
+		push('Tackles', stat.tacklesTotal);
+		push('Interceptions', stat.interceptions);
+		if (stat.duelsTotal != null || stat.duelsWon != null) {
+			rows.push({ label: 'Duels (won/total)', value: `${stat.duelsWon ?? 0}/${stat.duelsTotal ?? 0}` });
+		}
+		push('Fouls won', stat.foulsDrawn);
+		push('Fouls committed', stat.foulsCommitted);
+		push('Offsides', stat.offsides);
+		push('Saves', stat.saves);
+		if (stat.penaltyScored) push('Penalties scored', stat.penaltyScored);
+		if (stat.penaltyMissed) push('Penalties missed', stat.penaltyMissed);
+		if (stat.yellow) push('Yellow cards', stat.yellow);
+		if (stat.red) push('Red cards', stat.red);
+	}
+
+	return (
+		<Modal visible={stat != null} transparent animationType='slide' onRequestClose={onClose} statusBarTranslucent>
+			<Pressable style={pc.backdrop} onPress={onClose}>
+				<Pressable style={[pc.sheet, { backgroundColor: bg }]} onPress={() => {}}>
+					<View style={[pc.handle, { backgroundColor: border }]} />
+					{stat && (
+						<>
+							<View style={pc.header}>
+								{photo
+									? <Image source={{ uri: photo }} style={pc.avatar} contentFit='cover' borderRadius={30} />
+									: <View style={[pc.avatar, { backgroundColor: surface, borderRadius: 30 }]} />
+								}
+								<View style={{ flex: 1 }}>
+									<Text style={[pc.name, { color: textPrimary }]} numberOfLines={2}>
+										{stat.name}{stat.captain ? '  (C)' : ''}
+									</Text>
+									<Text style={[pc.meta, { color: textSub }]} numberOfLines={1}>
+										{[stat.position, stat.number != null ? `#${stat.number}` : null, teamName].filter(Boolean).join('  ·  ')}
+									</Text>
+									<Text style={[pc.context, { color: textSub }]} numberOfLines={1}>
+										{fixture.homeTeam.shortName} {fixture.score.home ?? 0}–{fixture.score.away ?? 0} {fixture.awayTeam.shortName}
+									</Text>
+								</View>
+								{rNum != null && (
+									<View style={[pc.ratingBadge, { backgroundColor: ratingColor(rNum) }]}>
+										<Text style={pc.ratingText}>{rNum.toFixed(1)}</Text>
+									</View>
+								)}
+							</View>
+
+							<View style={pc.tiles}>
+								<View style={[pc.tile, { backgroundColor: surface }]}>
+									<Text style={[pc.tileVal, { color: textPrimary }]}>{stat.minutes != null ? `${stat.minutes}'` : '—'}</Text>
+									<Text style={[pc.tileLbl, { color: textSub }]}>Minutes</Text>
+								</View>
+								<View style={[pc.tile, { backgroundColor: surface }]}>
+									<Text style={[pc.tileVal, { color: textPrimary }]}>{stat.goals ?? 0}</Text>
+									<Text style={[pc.tileLbl, { color: textSub }]}>Goals</Text>
+								</View>
+								<View style={[pc.tile, { backgroundColor: surface }]}>
+									<Text style={[pc.tileVal, { color: textPrimary }]}>{stat.assists ?? 0}</Text>
+									<Text style={[pc.tileLbl, { color: textSub }]}>Assists</Text>
+								</View>
+							</View>
+
+							{rows.length > 0 ? (
+								<>
+									<Text style={[pc.sectionTitle, { color: textPrimary }]}>Key stats</Text>
+									<ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+										<View style={[pc.statsBox, { backgroundColor: surface }]}>
+											{rows.map((r, i) => (
+												<View
+													key={r.label}
+													style={[pc.statRow, i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
+													<Text style={[pc.statLabel, { color: textSub }]}>{r.label}</Text>
+													<Text style={[pc.statValue, { color: textPrimary }]}>{r.value}</Text>
+												</View>
+											))}
+										</View>
+									</ScrollView>
+								</>
+							) : (
+								<Text style={[pc.empty, { color: textSub }]}>Detailed stats aren't available for this player.</Text>
+							)}
+
+							<Pressable style={[pc.closeBtn, { borderColor: border }]} onPress={onClose}>
+								<Text style={[pc.closeText, { color: textPrimary }]}>Close</Text>
+							</Pressable>
+						</>
+					)}
+				</Pressable>
+			</Pressable>
+		</Modal>
+	);
+}
+
+const pc = StyleSheet.create({
+	backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+	sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28 },
+	handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+	header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+	avatar: { width: 60, height: 60 },
+	name: { fontSize: 18, fontWeight: '800' },
+	meta: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+	context: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+	ratingBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+	ratingText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+	tiles: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+	tile: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+	tileVal: { fontSize: 20, fontWeight: '800' },
+	tileLbl: { fontSize: 11, fontWeight: '600', marginTop: 3 },
+	sectionTitle: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+	statsBox: { borderRadius: 12, paddingHorizontal: 14 },
+	statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 11 },
+	statLabel: { fontSize: 14, fontWeight: '500' },
+	statValue: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+	empty: { fontSize: 13, textAlign: 'center', paddingVertical: 20 },
+	closeBtn: { marginTop: 16, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+	closeText: { fontSize: 15, fontWeight: '700' },
+});
+
+
 function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
 	const { lineups, playerRatings, homeTeam, awayTeam, events } = fixture;
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
 	const textSub = isDark ? '#cbd5e1' : '#475569';
 	const surface = isDark ? '#111827' : '#fff';
 	const rowBorder = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
+
+	// Tap a player on the pitch → open their per-match stat card.
+	const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+	const statsByPlayer = new Map<number, PlayerMatchStat>(
+		(fixture.playerMatchStats ?? []).map((s) => [s.playerId, s]),
+	);
+	const selectedStat = selectedPlayerId != null ? statsByPlayer.get(selectedPlayerId) ?? null : null;
 
 	if (lineups.length === 0) {
 		return (
@@ -750,12 +931,12 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 
 				{homeL && (
 					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
-						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
+						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={setSelectedPlayerId} />
 					</View>
 				)}
 				{awayL && (
 					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
-						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
+						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={setSelectedPlayerId} />
 					</View>
 				)}
 			</View>
@@ -865,6 +1046,13 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 					)}
 				</View>
 			)}
+
+			<PlayerMatchCard
+				stat={selectedStat}
+				fixture={fixture}
+				isDark={isDark}
+				onClose={() => setSelectedPlayerId(null)}
+			/>
 		</View>
 	);
 }
@@ -1183,7 +1371,7 @@ export default function MatchDetailScreen() {
 					</Pressable>
 				</View>
 			) : fixture ? (
-				<ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
+				<ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: TAB_BAR_H }} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
 					<MatchHeader fixture={fixture} isDark={isDark} />
 
 					{/* Tab bar */}
@@ -1212,12 +1400,16 @@ export default function MatchDetailScreen() {
 					</View>
 				</ScrollView>
 			) : null}
-			<BottomNav />
+			{/* Overlay so hiding it (translateY) leaves no blank slot behind. */}
+			<View style={scr.bottomNavOverlay} pointerEvents="box-none">
+				<BottomNav />
+			</View>
 		</View>
 	);
 }
 
 const scr = StyleSheet.create({
+	bottomNavOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 	topBar: {
 		flexDirection: 'row', alignItems: 'center',
 		paddingTop: 52, paddingBottom: 12, paddingHorizontal: 16,
