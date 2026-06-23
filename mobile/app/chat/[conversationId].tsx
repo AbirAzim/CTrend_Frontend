@@ -428,7 +428,7 @@ function MessageBubble({
                     msg.viewerReaction === r.emoji && styles.reactionChipActive,
                   ]}
                 >
-                  <Text style={styles.reactionChipText}>
+                  <Text style={[styles.reactionChipText, { color: colors.text }]}>
                     {r.emoji} {r.count}
                   </Text>
                 </Pressable>

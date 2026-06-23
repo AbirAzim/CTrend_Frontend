@@ -698,6 +698,19 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 	const awaySubs = sortSubs(awayL?.substitutes ?? []);
 	const maxSubs = Math.max(homeSubs.length, awaySubs.length);
 
+	// Size the pitch from the real formation depth so the GK rows at the top and
+	// bottom edges always fit (and aren't clipped by the field line) on every
+	// screen size — a fixed aspect ratio left them too cramped on smaller phones.
+	// Both halves share the larger row count so the halfway line stays centered.
+	const distinctRows = (ps: LineupPlayer[]) =>
+		new Set(ps.filter((p) => p.grid).map((p) => parseInt(p.grid!.split(':')[0], 10))).size || 1;
+	// Per-row height must cover: avatar (40) + number/rating badges + an optional
+	// goals/assists icon row + the player name + breathing room — otherwise deep
+	// formations overflow the half and the edge GK's name falls outside the field.
+	const PITCH_ROW_H = 106;
+	const halfHeight =
+		Math.max(distinctRows(homeL?.startXI ?? []), distinctRows(awayL?.startXI ?? [])) * PITCH_ROW_H;
+
 	return (
 		<View style={{ paddingBottom: 24 }}>
 			{/* Goal bar */}
@@ -718,7 +731,7 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 			</View>
 
 			{/* Green pitch */}
-			<View style={lu2.pitch}>
+			<View style={[lu2.pitch, { height: halfHeight * 2 }]}>
 				<Svg style={lu2.pitchSvg} viewBox="0 0 100 160" preserveAspectRatio="none">
 					<Rect width="100" height="160" fill="#2d7a3a" />
 					<Rect x="4" y="6" width="92" height="148" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
@@ -736,12 +749,12 @@ function LineupTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boole
 				</Svg>
 
 				{homeL && (
-					<View style={lu2.pitchHalf}>
+					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
 						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 					</View>
 				)}
 				{awayL && (
-					<View style={lu2.pitchHalf}>
+					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
 						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} />
 					</View>
 				)}
@@ -860,9 +873,9 @@ const lu2 = StyleSheet.create({
 	pitchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1 },
 	// Fixed aspect ratio → both halves are exactly equal height, so the SVG
 	// midline aligns with the real home/away boundary and players stay in-half.
-	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column', aspectRatio: 0.5, width: '100%' },
+	pitch: { backgroundColor: '#2d7a3a', overflow: 'hidden', flexDirection: 'column', width: '100%' },
 	pitchSvg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-	pitchHalf: { flex: 1, paddingHorizontal: 8, paddingVertical: 8, overflow: 'hidden' },
+	pitchHalf: { paddingHorizontal: 8, paddingVertical: 24, overflow: 'hidden' },
 	pitchTeamBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
 	pitchTeamBadgeBottom: {},
 	pitchCrest: { width: 18, height: 18 },
