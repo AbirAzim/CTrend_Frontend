@@ -15,7 +15,7 @@ import {
   UNFRIEND,
   CANCEL_FRIEND_REQUEST,
 } from "../graphql/friends";
-import { START_DIRECT_CONVERSATION } from "../graphql/messages";
+import { START_DIRECT_CONVERSATION, CONTACT_ADMIN } from "../graphql/messages";
 import { ME, UPDATE_PROFILE, USER_POSTS, MY_VOTED_POSTS } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "../graphql/feed";
@@ -120,6 +120,37 @@ function profileTabSearch(tab: ProfileContentTab): string {
   if (tab === "kept") return "?tab=kept";
   if (tab === "voted") return "?tab=voted";
   return "";
+}
+
+/** "Contact admin" footer link — opens (and seeds) the user's support thread. */
+function ContactAdminLink() {
+  const { openChat } = useMessenger();
+  const [contactAdmin, { loading }] = useMutation<{ contactAdmin: { id: string } }>(CONTACT_ADMIN);
+  async function go() {
+    try {
+      const { data } = await contactAdmin();
+      const id = data?.contactAdmin?.id;
+      if (id) openChat(id);
+    } catch {
+      /* ignore — user can retry */
+    }
+  }
+  return (
+    <button
+      type="button"
+      className="cx-profile-quick-link"
+      onClick={() => void go()}
+      disabled={loading}
+      style={{ border: "none", background: "none", width: "100%", font: "inherit", textAlign: "left", cursor: "pointer" }}
+    >
+      <span className="cx-profile-quick-link-icon" aria-hidden>💬</span>
+      <span className="cx-profile-quick-link-text">
+        <strong>Contact admin</strong>
+        <span className="muted small">Questions, bugs or feedback — we'll reply</span>
+      </span>
+      <span className="cx-profile-quick-link-arrow" aria-hidden>→</span>
+    </button>
+  );
 }
 
 export function ProfilePage() {
@@ -1488,6 +1519,7 @@ export function ProfilePage() {
       ) : null}
 
       <div className="cx-profile-footer-links">
+        <ContactAdminLink />
         <NavLink to="/credits" className="cx-profile-quick-link">
           <span className="cx-profile-quick-link-icon" aria-hidden>👥</span>
           <span className="cx-profile-quick-link-text">

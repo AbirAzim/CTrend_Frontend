@@ -36,7 +36,7 @@ import {
   CANCEL_FRIEND_REQUEST,
 } from "@ctrend/shared/graphql/friends";
 import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "@ctrend/shared/graphql/feed";
-import { START_DIRECT_CONVERSATION } from "@ctrend/shared/graphql/messages";
+import { START_DIRECT_CONVERSATION, CONTACT_ADMIN } from "@ctrend/shared/graphql/messages";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -331,6 +331,17 @@ export default function ProfileScreen() {
   }, [search, peopleTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [startDm] = useMutation<{ startDirectConversation: { id: string } }>(START_DIRECT_CONVERSATION);
+  const [contactAdminMut, { loading: contactingAdmin }] = useMutation<{ contactAdmin: { id: string } }>(CONTACT_ADMIN);
+
+  async function handleContactAdmin() {
+    try {
+      const { data } = await contactAdminMut();
+      const id = data?.contactAdmin?.id;
+      if (id) router.push(`/chat/${id}` as `/${string}`);
+    } catch {
+      /* ignore — user can retry */
+    }
+  }
   const [switchRole, { loading: roleLoading }] = useMutation<{ switchActiveRole: { accessToken: string; user: { id: string; role: string } } }>(SWITCH_ACTIVE_ROLE);
   const [addFriendMut] = useMutation(ADD_FRIEND);
   const [unfriendMut] = useMutation(UNFRIEND);
@@ -614,6 +625,24 @@ export default function ProfileScreen() {
               )}
               <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "600", marginRight: 2 }}>›</Text>
             </View>
+          </Pressable>
+
+          {/* ── Contact admin ── */}
+          <Pressable
+            style={[st.contactAdminRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => void handleContactAdmin()}
+            disabled={contactingAdmin}
+          >
+            <View style={st.contactAdminLeft}>
+              <Text style={st.contactAdminIcon}>💬</Text>
+              <View>
+                <Text style={[st.contactAdminTitle, { color: colors.text }]}>Contact admin</Text>
+                <Text style={[st.contactAdminSub, { color: colors.muted }]}>Questions, bugs or feedback — we'll reply</Text>
+              </View>
+            </View>
+            <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "600", marginRight: 2 }}>
+              {contactingAdmin ? "…" : "›"}
+            </Text>
           </Pressable>
 
           {/* ── Legal & about (collapsible) ── */}
@@ -1045,6 +1074,21 @@ const st = StyleSheet.create({
   editRow: { flexDirection: "row", paddingHorizontal: 16, gap: 10, marginBottom: 16 },
   editBtn: { flex: 1, borderRadius: 10, paddingVertical: 9, borderWidth: 1, alignItems: "center" },
   editBtnText: { fontSize: 13, fontWeight: "700" },
+  contactAdminRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  contactAdminLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  contactAdminIcon: { fontSize: 20 },
+  contactAdminTitle: { fontSize: 14, fontWeight: "800" },
+  contactAdminSub: { fontSize: 11.5, marginTop: 1 },
   logoutBtn: { borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16, borderWidth: 1 },
   logoutBtnText: { fontSize: 13, fontWeight: "700" },
 

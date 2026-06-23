@@ -84,6 +84,28 @@ export const START_DIRECT_CONVERSATION = gql`
   }
 `;
 
+/** User taps "Contact admin" — opens/seeds their support (moderator) thread. */
+export const CONTACT_ADMIN = gql`
+  mutation ContactAdmin {
+    contactAdmin {
+      id
+      type
+      name
+      participantIds
+      participants {
+        id
+        displayName
+        avatarUrl
+        online
+      }
+      lastMessageText
+      lastMessageAt
+      unreadCount
+      createdAt
+    }
+  }
+`;
+
 export const CREATE_GROUP_CONVERSATION = gql`
   mutation CreateGroupConversation($memberIds: [ID!]!, $name: String!) {
     createGroupConversation(memberIds: $memberIds, name: $name) {
