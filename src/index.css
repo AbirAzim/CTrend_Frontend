@@ -21606,6 +21606,14 @@ a.cd-lb-row:hover {
   border-radius: 6px;
   padding: 2px 6px;
 }
+.wc-player-apps {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ig-muted, #65676b);
+  white-space: nowrap;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    Match Detail Page  (.md-*)

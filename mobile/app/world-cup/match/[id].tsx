@@ -84,10 +84,9 @@ function goalScorers(events: MatchEvent[], team: 'home' | 'away') {
 		});
 }
 function ratingColor(r: number) {
-	if (r >= 8.5) return '#f59e0b';
-	if (r >= 7.5) return '#22c55e';
-	if (r >= 6.5) return '#f97316';
-	return '#ef4444';
+	if (r >= 7) return '#22c55e'; // green
+	if (r >= 5) return '#f59e0b'; // yellow
+	return '#ef4444'; // red
 }
 function motmPlayer(ratings: PlayerRating[], evMap: Map<string, PEvt>): PlayerRating | null {
 	if (!ratings.length) return null;

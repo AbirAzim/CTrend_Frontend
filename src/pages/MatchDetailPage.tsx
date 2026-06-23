@@ -121,9 +121,8 @@ function goalScorers(events: MatchEvent[], team: "home" | "away") {
 }
 
 function ratingColor(r: number): string {
-  if (r >= 8.5) return "#f59e0b"; // gold
-  if (r >= 7.5) return "#22c55e"; // green
-  if (r >= 6.5) return "#f97316"; // orange
+  if (r >= 7) return "#22c55e"; // green
+  if (r >= 5) return "#f59e0b"; // yellow
   return "#ef4444"; // red
 }
 

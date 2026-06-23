@@ -120,11 +120,11 @@ function FixtureRow({ fixture }: { fixture: WcFixture }) {
 
 // ─── Top scorers / assists ────────────────────────────────────────────────────
 
-type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number };
-type TopAssistant = { playerId: number | null; name: string; team: string; teamCrest: string | null; assists: number };
+type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number; matchesPlayed: number };
+type TopAssistant = { playerId: number | null; name: string; team: string; teamCrest: string | null; assists: number; matchesPlayed: number };
 
-function PlayerRow({ rank, name, team, teamCrest, stat, statLabel }: {
-  rank: number; name: string; team: string; teamCrest: string | null; stat: number; statLabel: string;
+function PlayerRow({ rank, name, team, teamCrest, stat, statLabel, matches }: {
+  rank: number; name: string; team: string; teamCrest: string | null; stat: number; statLabel: string; matches: number;
 }) {
   return (
     <div className="wc-player-row">
@@ -138,6 +138,7 @@ function PlayerRow({ rank, name, team, teamCrest, stat, statLabel }: {
           {team}
         </span>
       </div>
+      <span className="wc-player-apps" title="Matches played">{matches} {matches === 1 ? "match" : "matches"}</span>
       <span className="wc-player-stat" title={statLabel}>{stat}</span>
     </div>
   );
@@ -156,7 +157,7 @@ function TopStatsSection({ scorers, assistants, loading }: {
         {scorers.length === 0
           ? <p className="wc-stats-empty">No goals recorded yet.</p>
           : scorers.map((s, i) => (
-            <PlayerRow key={`${s.name}-${s.team}`} rank={i + 1} name={s.name} team={s.team} teamCrest={s.teamCrest} stat={s.goals} statLabel="Goals" />
+            <PlayerRow key={`${s.name}-${s.team}`} rank={i + 1} name={s.name} team={s.team} teamCrest={s.teamCrest} stat={s.goals} statLabel="Goals" matches={s.matchesPlayed} />
           ))
         }
       </section>
@@ -165,7 +166,7 @@ function TopStatsSection({ scorers, assistants, loading }: {
         {assistants.length === 0
           ? <p className="wc-stats-empty">No assists recorded yet.</p>
           : assistants.map((a, i) => (
-            <PlayerRow key={`${a.name}-${a.team}`} rank={i + 1} name={a.name} team={a.team} teamCrest={a.teamCrest} stat={a.assists} statLabel="Assists" />
+            <PlayerRow key={`${a.name}-${a.team}`} rank={i + 1} name={a.name} team={a.team} teamCrest={a.teamCrest} stat={a.assists} statLabel="Assists" matches={a.matchesPlayed} />
           ))
         }
       </section>

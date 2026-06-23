@@ -182,6 +182,7 @@ export const WORLD_CUP_TOP_STATS = gql`
       team
       teamCrest
       goals
+      matchesPlayed
     }
     worldCupTopAssistants {
       playerId
@@ -189,6 +190,7 @@ export const WORLD_CUP_TOP_STATS = gql`
       team
       teamCrest
       assists
+      matchesPlayed
     }
   }
 `;

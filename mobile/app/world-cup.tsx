@@ -28,8 +28,8 @@ import {
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
 
 type FixturesData = { worldCupFixtures: WcFixture[] };
-type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number };
-type TopAssistant = { playerId: number | null; name: string; team: string; teamCrest: string | null; assists: number };
+type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number; matchesPlayed: number };
+type TopAssistant = { playerId: number | null; name: string; team: string; teamCrest: string | null; assists: number; matchesPlayed: number };
 type TopStatsData = { worldCupTopScorers: TopScorer[]; worldCupTopAssistants: TopAssistant[] };
 type Palette = ReturnType<typeof useTheme>["colors"];
 
@@ -137,8 +137,8 @@ function GroupStandings({ fixtures, st }: { fixtures: WcFixture[]; st: ReturnTyp
 
 // ─── Top scorers / assists ────────────────────────────────────────────────────
 
-function PlayerRow({ rank, name, team, teamCrest, stat, st }: {
-  rank: number; name: string; team: string; teamCrest: string | null; stat: number;
+function PlayerRow({ rank, name, team, teamCrest, stat, matches, st }: {
+  rank: number; name: string; team: string; teamCrest: string | null; stat: number; matches: number;
   st: ReturnType<typeof makeStyles>;
 }) {
   return (
@@ -153,6 +153,7 @@ function PlayerRow({ rank, name, team, teamCrest, stat, st }: {
           <Text style={st.playerTeam} numberOfLines={1}>{team}</Text>
         </View>
       </View>
+      <Text style={st.playerApps}>{matches} {matches === 1 ? "match" : "matches"}</Text>
       <Text style={st.playerStat}>{stat}</Text>
     </View>
   );
@@ -173,7 +174,7 @@ function TopStatsSection({ scorers, assistants, loading, st }: {
         {scorers.length === 0
           ? <Text style={st.statusMsg}>No goals yet.</Text>
           : scorers.map((s, i) => (
-            <PlayerRow key={`${s.name}-${s.team}`} rank={i + 1} name={s.name} team={s.team} teamCrest={s.teamCrest} stat={s.goals} st={st} />
+            <PlayerRow key={`${s.name}-${s.team}`} rank={i + 1} name={s.name} team={s.team} teamCrest={s.teamCrest} stat={s.goals} matches={s.matchesPlayed} st={st} />
           ))}
       </View>
       <View style={st.statsCol}>
@@ -181,7 +182,7 @@ function TopStatsSection({ scorers, assistants, loading, st }: {
         {assistants.length === 0
           ? <Text style={st.statusMsg}>No assists yet.</Text>
           : assistants.map((a, i) => (
-            <PlayerRow key={`${a.name}-${a.team}`} rank={i + 1} name={a.name} team={a.team} teamCrest={a.teamCrest} stat={a.assists} st={st} />
+            <PlayerRow key={`${a.name}-${a.team}`} rank={i + 1} name={a.name} team={a.team} teamCrest={a.teamCrest} stat={a.assists} matches={a.matchesPlayed} st={st} />
           ))}
       </View>
     </View>
@@ -720,6 +721,13 @@ function makeStyles(c: Palette) {
       color: c.accent,
       minWidth: 22,
       textAlign: "center",
+    },
+    playerApps: {
+      marginLeft: "auto",
+      fontSize: 10,
+      fontWeight: "600",
+      color: c.muted,
+      marginRight: 10,
     },
   });
 }
