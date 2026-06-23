@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ke Jitbe",
     "slug": "ke-jitbe",
-    "version": "1.6.1",
+    "version": "1.7.0",
     "scheme": "ctrend",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
