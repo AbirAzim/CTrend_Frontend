@@ -3,6 +3,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/post/:id",
+      "destination": "/api/post-og?id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
