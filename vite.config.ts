@@ -23,7 +23,9 @@ export default defineConfig(({ mode }) => {
       : undefined;
 
   return {
-    base: "./",
+    // Absolute base so hashed assets resolve at any route depth (e.g. a direct
+    // load of /post/:id). With "./" they resolved to /post/assets/* → 404 → blank.
+    base: "/",
     plugins: [react()],
     server: {
       port: 5173,
