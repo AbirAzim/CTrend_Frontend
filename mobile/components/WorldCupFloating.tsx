@@ -2,7 +2,7 @@ import { useQuery } from "@apollo/client/react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -78,7 +78,7 @@ const ds = StyleSheet.create({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function WorldCupFloating() {
+function WorldCupFloatingInner() {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -187,10 +187,13 @@ export function WorldCupFloating() {
 
   // ── Adaptive countdown tick ───────────────────────────────────────────────
   const allFixturesRef = useRef<WcFixture[]>([]);
+  const visibleRef = useRef(false);
   useEffect(() => {
     let id: ReturnType<typeof setTimeout>;
     function schedule() {
-      const fast = needsSecondTick(allFixturesRef.current);
+      // Only tick every second when the card is actually open (showing a live
+      // countdown). Collapsed → 30s, so it doesn't churn the JS thread app-wide.
+      const fast = visibleRef.current && needsSecondTick(allFixturesRef.current);
       id = setTimeout(() => { setTick((n) => n + 1); schedule(); }, fast ? 1000 : 30_000);
     }
     schedule();
@@ -213,6 +216,7 @@ export function WorldCupFloating() {
 
   const fixtures = data?.worldCupFixtures ?? [];
   allFixturesRef.current = fixtures;
+  visibleRef.current = visible;
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
   const live = liveFixtures(filtered);
   const nextDays = groupByDay(nextUpcoming(filtered, 3));
@@ -283,11 +287,15 @@ export function WorldCupFloating() {
   useEffect(() => {
     glowAnim.setValue(0);
     if (!visible) return;
+    // Finite attention pulse (not an infinite loop). A perpetual color-interpolated
+    // loop runs ~60 JS-thread updates/sec forever (color can't use the native
+    // driver), which janks the whole app since this overlay is mounted globally.
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, { toValue: 1, duration: 1100, useNativeDriver: false }),
         Animated.timing(glowAnim, { toValue: 0, duration: 1100, useNativeDriver: false }),
       ]),
+      { iterations: 4 },
     );
     loop.start();
     return () => loop.stop();
@@ -314,7 +322,7 @@ export function WorldCupFloating() {
         ? `/world-cup/match/${f.id}`
         : f.campaignPostId
           ? `/post/${f.campaignPostId}`
-          : "/world-cup";
+          : "/tabs/world-cup";
     router.push(dest as `/${string}`);
     animateClose();
   }
@@ -345,7 +353,7 @@ export function WorldCupFloating() {
               <Animated.View style={[st.titleBtn, { borderColor: glowBorderC, backgroundColor: glowBgC }]}>
                 <Pressable
                   style={({ pressed }) => [st.titleBtnInner, pressed && { opacity: 0.82 }]}
-                  onPress={() => { router.push("/world-cup" as `/${string}`); animateClose(); }}
+                  onPress={() => { router.push("/tabs/world-cup" as `/${string}`); animateClose(); }}
                 >
                   <Image source={trophyAsset} style={st.headTrophy} contentFit="contain" />
                   <View style={st.headTextCol}>
@@ -472,6 +480,11 @@ export function WorldCupFloating() {
     </View>
   );
 }
+
+// Memoized: this overlay is mounted on every screen, so without memo it would
+// re-render on every navigation (it takes no props) — adding lag app-wide once
+// World Cup data is loaded. With memo it only re-renders on its own state/data.
+export const WorldCupFloating = memo(WorldCupFloatingInner);
 
 // ─── Theme-aware styles ───────────────────────────────────────────────────────
 

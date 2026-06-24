@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@apollo/client/react";
-import { Tabs, router } from "expo-router";
+import { useQuery, useApolloClient } from "@apollo/client/react";
+import { Tabs, router, usePathname } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
+import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
@@ -28,6 +29,11 @@ function FloatingTabBar(props: {
     { fetchPolicy: "cache-and-network", skip: !isAuthenticated, pollInterval: 15000 },
   );
   const totalUnread = (convData?.myConversations ?? []).reduce((s, c) => s + (c.unreadCount > 0 ? 1 : 0), 0);
+
+  // Highlight the World Cup icon when that page is open (it lives outside the
+  // tab navigator, so the tab state doesn't track it).
+  const pathname = usePathname();
+  const wcActive = pathname?.includes("world-cup") ?? false;
 
   // Initialize saved count from server on startup
   const { data: savedData } = useQuery<{ mySavedPosts: unknown[] }>(MY_SAVED_POSTS, {
@@ -64,6 +70,10 @@ function FloatingTabBar(props: {
         ]}
       >
         {props.state.routes.map((route, index) => {
+          // World Cup is a tab (for kept-alive switching) but its button is
+          // rendered manually in the 6th slot below — skip the auto-render so it
+          // doesn't show a second, icon-less tab here.
+          if (route.name === "world-cup") return null;
           const focused = props.state.index === index;
           const descriptor = props.descriptors[route.key];
           const label = descriptor.options.title ?? route.name;
@@ -157,12 +167,20 @@ function FloatingTabBar(props: {
           </Animated.View>
         ) : (
           <Animated.View style={styles.tabItem}>
-            <Pressable style={styles.tabPress} onPress={() => router.push("/world-cup" as `/${string}`)}>
+            <Pressable style={styles.tabPress} onPress={() => router.navigate("/tabs/world-cup" as `/${string}`)}>
               <View style={styles.iconWrap}>
-                <Ionicons name="trophy" size={26} color={isDark ? "#c7c7c7" : "#9ca3af"} />
+                <Ionicons
+                  name={wcActive ? "trophy" : "trophy-outline"}
+                  size={26}
+                  color={wcActive ? (isDark ? "#ffffff" : colors.accent) : isDark ? "#c7c7c7" : "#9ca3af"}
+                />
               </View>
               <Text
-                style={[styles.tabLabel, { color: isDark ? "#c7c7c7" : "#9ca3af" }]}
+                style={[
+                  styles.tabLabel,
+                  { color: wcActive ? (isDark ? "#ffffff" : colors.accent) : isDark ? "#c7c7c7" : "#9ca3af" },
+                  wcActive && styles.tabLabelActive,
+                ]}
                 numberOfLines={1}
               >
                 World Cup
@@ -178,8 +196,19 @@ function FloatingTabBar(props: {
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function TabsLayout() {
-  const { hydrated } = useAuth();
+  const { hydrated, user } = useAuth();
   const { colors } = useTheme();
+  const client = useApolloClient();
+
+  // Warm the World Cup fixtures cache once, in the background, so tapping the
+  // trophy opens instantly. Imperative (not useQuery) so it never re-renders or
+  // slows the tab bar. Non-admins only (they're the ones who see the WC icon).
+  useEffect(() => {
+    if (!hydrated || user?.role?.toLowerCase() === "admin") return;
+    void client
+      .query({ query: WORLD_CUP_FIXTURES, fetchPolicy: "cache-first" })
+      .catch(() => {});
+  }, [hydrated, user, client]);
 
   if (!hydrated) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
@@ -228,6 +257,9 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* World Cup is a real tab (kept alive → instant switching). The custom
+          FloatingTabBar renders its button manually in the 6th slot. */}
+      <Tabs.Screen name="world-cup" options={{ title: "World Cup" }} />
     </Tabs>
   );
 }

@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { ActivityIndicator, InteractionManager, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BottomNav } from "../components/BottomNav";
 import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "@ctrend/shared/graphql/worldcup";
-import { useTheme } from "../context/ThemeContext";
-import { useTabBar } from "../context/TabBarContext";
+import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
 import {
   type WcFixture,
   WC_STAGE_LABELS,
@@ -25,8 +24,8 @@ import {
   liveFixtures,
   needsSecondTick,
   upcomingFixtures,
-} from "../lib/worldCupFixtures";
-import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
+} from "../../lib/worldCupFixtures";
+import { setFollowedTeam, useFollowedTeam } from "../../lib/wcTeam";
 
 type FixturesData = { worldCupFixtures: WcFixture[] };
 type TopScorer = { playerId: number | null; name: string; team: string; teamCrest: string | null; goals: number; matchesPlayed: number };
@@ -81,7 +80,7 @@ function computeGroupTables(fixtures: WcFixture[]) {
 }
 
 function GroupStandings({ fixtures, st }: { fixtures: WcFixture[]; st: ReturnType<typeof makeStyles> }) {
-  const tables = computeGroupTables(fixtures);
+  const tables = useMemo(() => computeGroupTables(fixtures), [fixtures]);
   if (!tables.length) return null;
   return (
     <View>
@@ -205,7 +204,7 @@ function TeamCrest({ crest, name, size = 26 }: { crest: string; name: string; si
   );
 }
 
-function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnType<typeof makeStyles>; isDark: boolean }) {
+const FixtureRow = memo(function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnType<typeof makeStyles>; isDark: boolean }) {
   const live = isLive(fixture);
   const finished = isFinished(fixture);
   const homeWon = fixture.score.winner === "HOME_TEAM";
@@ -319,7 +318,7 @@ function FixtureRow({ fixture, st, isDark }: { fixture: WcFixture; st: ReturnTyp
       </View>
     </Pressable>
   );
-}
+});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -333,16 +332,35 @@ export default function WorldCupScreen() {
   // (translateY). Reset it every time this screen gains focus so the footer is
   // always visible here instead of being translated off-screen — which would
   // otherwise leave blank space at the bottom (incl. after back-navigation).
+  const focusedRef = useRef(true);
   useFocusEffect(
     useCallback(() => {
       translateY.setValue(0);
+      focusedRef.current = true;
+      return () => { focusedRef.current = false; };
     }, [translateY]),
   );
-  const st = makeStyles(colors);
+  const st = useMemo(() => makeStyles(colors), [colors]);
   const [, setTick] = useState(0);
+  // Defer the heavy fixtures list until the navigation transition finishes, so
+  // tapping the World Cup icon feels instant (the screen shows immediately, the
+  // ~100-row list renders a beat later instead of blocking the tap).
+  const [contentReady, setContentReady] = useState(false);
   const params = useLocalSearchParams<{ tab?: string }>();
   const initTab = params.tab === "results" || params.tab === "standings" || params.tab === "stats" ? params.tab : "fixtures";
   const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings" | "stats">(initTab);
+  // Each sub-tab is rendered once (the first time it's opened) and then kept
+  // mounted (just hidden) — so switching back never reloads it.
+  const [visited, setVisited] = useState<Record<string, boolean>>({ [initTab]: true });
+  useEffect(() => {
+    setVisited((v) => (v[activeTab] ? v : { ...v, [activeTab]: true }));
+  }, [activeTab]);
+  // Defer the heavy list render once on mount so opening the screen is instant
+  // (skeleton shows briefly, then the list fills in after the transition).
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => setContentReady(true));
+    return () => task.cancel();
+  }, []);
 
   const { data, loading, error } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
     fetchPolicy: "cache-and-network",
@@ -359,24 +377,38 @@ export default function WorldCupScreen() {
   useEffect(() => {
     let id: ReturnType<typeof setTimeout>;
     function schedule() {
-      const fast = needsSecondTick(upcomingFixtures(fixtures));
+      // Pause the fast countdown when the screen isn't focused (e.g. covered by
+      // a match detail) so it doesn't re-render in the background.
+      const fast = focusedRef.current && needsSecondTick(upcomingFixtures(fixtures));
       id = setTimeout(() => { setTick((n) => n + 1); schedule(); }, fast ? 1000 : 30_000);
     }
     schedule();
     return () => clearTimeout(id);
   }); // re-runs when fixtures changes
 
-  const teams = fixtureTeams(fixtures);
-  const filtered = fixtures.filter((f) => involvesTeam(f, followed));
-  const live = liveFixtures(filtered);
-  const upcomingDays = groupByDay(upcomingFixtures(filtered));
-  const recent = finishedFixtures(filtered);
-
-  const byStage: Record<string, WcFixture[]> = {};
-  for (const f of filtered) (byStage[f.stage] ??= []).push(f);
-  const sortedStages = Object.keys(byStage).sort(
-    (a, b) => (WC_STAGE_ORDER[a] ?? 99) - (WC_STAGE_ORDER[b] ?? 99),
+  // Memoize the expensive, time-independent derived data so sub-tab switches and
+  // the countdown tick don't recompute it every render.
+  const teams = useMemo(() => fixtureTeams(fixtures), [fixtures]);
+  const filtered = useMemo(
+    () => fixtures.filter((f) => involvesTeam(f, followed)),
+    [fixtures, followed],
   );
+  const { byStage, sortedStages } = useMemo(() => {
+    const bs: Record<string, WcFixture[]> = {};
+    for (const f of filtered) (bs[f.stage] ??= []).push(f);
+    const ss = Object.keys(bs).sort(
+      (a, b) => (WC_STAGE_ORDER[a] ?? 99) - (WC_STAGE_ORDER[b] ?? 99),
+    );
+    return { byStage: bs, sortedStages: ss };
+  }, [filtered]);
+  // Time-dependent buckets — recompute each render so fixtures move between
+  // live/upcoming/finished as kickoff times pass (the tick drives this).
+  // Memoized on [filtered] so switching sub-tabs (which re-renders the screen)
+  // doesn't recompute these or re-render the memoized rows; they refresh when the
+  // fixtures data changes (60s poll).
+  const live = useMemo(() => liveFixtures(filtered), [filtered]);
+  const upcomingDays = useMemo(() => groupByDay(upcomingFixtures(filtered)), [filtered]);
+  const recent = useMemo(() => finishedFixtures(filtered), [filtered]);
 
   const TAB_LABELS: Record<typeof activeTab, string> = {
     fixtures: "Fixtures",
@@ -387,13 +419,8 @@ export default function WorldCupScreen() {
 
   return (
     <View style={[st.flex, { backgroundColor: colors.bg }]}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={[st.topRow, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={[st.back, { color: colors.muted }]}>← Back</Text>
-        </Pressable>
+      <View style={[st.topRow, { paddingTop: insets.top + 8, justifyContent: "center" }]}>
         <Text style={[st.screenTitle, { color: colors.text }]}>🏆 World Cup 2026</Text>
-        <View style={{ width: 56 }} />
       </View>
 
       {/* Sticky tab bar */}
@@ -412,7 +439,7 @@ export default function WorldCupScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 14, paddingBottom: insets.bottom + 32, gap: 8 }}
+        contentContainerStyle={{ padding: 14, paddingBottom: insets.bottom + 96, gap: 8 }}
         showsVerticalScrollIndicator={false}
       >
         {fixtures.length > 0 && (
@@ -456,8 +483,17 @@ export default function WorldCupScreen() {
           <Text style={st.statusMsg}>No fixtures yet. An admin can sync them.</Text>
         ) : null}
 
-        {activeTab === "fixtures" && (
-          <>
+        {!contentReady && fixtures.length > 0 ? (
+          <View style={{ gap: 10, marginTop: 4 }}>
+            <View style={[st.skelLine, { width: 110, height: 14 }]} />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <View key={i} style={st.skelCard} />
+            ))}
+          </View>
+        ) : null}
+
+        {contentReady && visited.fixtures && (
+          <View style={activeTab === "fixtures" ? undefined : st.tabHidden}>
             {live.length > 0 && (
               <View>
                 <Text style={st.sectionTitle}>🔴 Live now</Text>
@@ -503,11 +539,11 @@ export default function WorldCupScreen() {
             {followed && filtered.length === 0 && fixtures.length > 0 ? (
               <Text style={st.statusMsg}>No matches found for {followed}.</Text>
             ) : null}
-          </>
+          </View>
         )}
 
-        {activeTab === "results" && (
-          <>
+        {contentReady && visited.results && (
+          <View style={activeTab === "results" ? undefined : st.tabHidden}>
             {live.length === 0 && recent.length === 0 ? (
               <Text style={st.statusMsg}>No results yet.</Text>
             ) : (
@@ -529,25 +565,28 @@ export default function WorldCupScreen() {
                 )}
               </>
             )}
-          </>
+          </View>
         )}
 
-        {activeTab === "standings" && (
-          <GroupStandings fixtures={filtered} st={st} />
+        {contentReady && visited.standings && (
+          <View style={activeTab === "standings" ? undefined : st.tabHidden}>
+            <GroupStandings fixtures={filtered} st={st} />
+          </View>
         )}
 
-        {activeTab === "stats" && (
-          statsError
-            ? <Text style={st.statusMsg}>Failed to load stats. {statsError.message}</Text>
-            : <TopStatsSection
-                scorers={statsData?.worldCupTopScorers ?? []}
-                assistants={statsData?.worldCupTopAssistants ?? []}
-                loading={statsLoading && !statsData}
-                st={st}
-              />
+        {contentReady && visited.stats && (
+          <View style={activeTab === "stats" ? undefined : st.tabHidden}>
+            {statsError
+              ? <Text style={st.statusMsg}>Failed to load stats. {statsError.message}</Text>
+              : <TopStatsSection
+                  scorers={statsData?.worldCupTopScorers ?? []}
+                  assistants={statsData?.worldCupTopAssistants ?? []}
+                  loading={statsLoading && !statsData}
+                  st={st}
+                />}
+          </View>
         )}
       </ScrollView>
-      <BottomNav />
     </View>
   );
 }
@@ -594,6 +633,9 @@ function makeStyles(c: Palette) {
     chipTextActive: { color: "#fff" },
     centerState: { paddingVertical: 30, alignItems: "center" },
     statusMsg: { color: c.muted, fontSize: 13, textAlign: "center", paddingVertical: 16 },
+    skelLine: { backgroundColor: c.section, borderRadius: 6, opacity: 0.7 },
+    skelCard: { height: 64, borderRadius: 12, backgroundColor: c.section, opacity: 0.6 },
+    tabHidden: { display: "none" },
     sectionTitle: { fontSize: 15, fontWeight: "800", color: c.text, marginTop: 8, marginBottom: 6 },
     dayTitle: {
       fontSize: 11,

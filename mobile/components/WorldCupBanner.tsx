@@ -92,10 +92,10 @@ export function WorldCupBanner() {
       if (isLive(feature) || isFinished(feature)) {
         router.push(`/world-cup/match/${feature.id}` as `/${string}`);
       } else {
-        router.push("/world-cup?tab=results" as `/${string}`);
+        router.push("/tabs/world-cup?tab=results" as `/${string}`);
       }
     } else {
-      router.push("/world-cup" as `/${string}`);
+      router.push("/tabs/world-cup" as `/${string}`);
     }
   }
 

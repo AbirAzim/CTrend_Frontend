@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@apollo/client/react";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { useEffect } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +30,8 @@ export function BottomNav({ active }: { active?: TabName }) {
   const insets = useSafeAreaInsets();
   const { savedCount, setSavedCount, translateY } = useTabBar();
   const isAdmin = user?.role?.toLowerCase() === "admin";
+  const pathname = usePathname();
+  const wcActive = pathname?.includes("world-cup") ?? false;
 
   const { data: convData } = useQuery<{ myConversations: Array<{ unreadCount: number }> }>(
     MY_CONVERSATIONS,
@@ -132,12 +134,20 @@ export function BottomNav({ active }: { active?: TabName }) {
         </View>
       ) : (
         <View style={styles.tabItem}>
-          <Pressable style={styles.tabPress} onPress={() => router.push("/world-cup" as `/${string}`)}>
+          <Pressable style={styles.tabPress} onPress={() => router.navigate("/tabs/world-cup" as `/${string}`)}>
             <View style={styles.iconWrap}>
-              <Ionicons name="trophy" size={26} color={isDark ? "#c7c7c7" : "#9ca3af"} />
+              <Ionicons
+                name={wcActive ? "trophy" : "trophy-outline"}
+                size={26}
+                color={wcActive ? (isDark ? "#ffffff" : colors.accent) : isDark ? "#c7c7c7" : "#9ca3af"}
+              />
             </View>
             <Text
-              style={[styles.tabLabel, { color: isDark ? "#c7c7c7" : "#9ca3af" }]}
+              style={[
+                styles.tabLabel,
+                { color: wcActive ? (isDark ? "#ffffff" : colors.accent) : isDark ? "#c7c7c7" : "#9ca3af" },
+                wcActive && styles.tabLabelActive,
+              ]}
               numberOfLines={1}
             >
               World Cup

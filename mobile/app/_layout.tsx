@@ -8,7 +8,13 @@ import { AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { enableFreeze } from "react-native-screens";
 import { apolloClient, onWsConnected } from "../lib/apolloClient";
+
+// Freeze off-screen screens so background routes (the feed, World Cup, etc.) stop
+// re-rendering while they're not visible — keeps navigation smooth (e.g. the feed
+// doesn't keep working while you're on World Cup, and vice-versa).
+enableFreeze(true);
 import { onAuthExpired, clearAuthExpired } from "../lib/authExpiredState";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
