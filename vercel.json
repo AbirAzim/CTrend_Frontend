@@ -4,6 +4,13 @@
   "rewrites": [
     {
       "source": "/post/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|Googlebot|bingbot|Applebot|embedly|vkShare|SkypeUriPreview|Iframely).*"
+        }
+      ],
       "destination": "/api/post-og?id=:id"
     },
     {

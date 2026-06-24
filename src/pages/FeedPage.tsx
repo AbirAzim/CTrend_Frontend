@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import type { FeedPostView } from "../types/feed";
 import { CampaignBanners } from "../components/CampaignBanners";
+import { AppDownloadPromo } from "../components/AppDownloadPromo";
 
 
 type FriendRow = {
@@ -576,6 +577,8 @@ export function FeedPage() {
             </li>
           ))}
         </ul>
+
+        <AppDownloadPromo variant="compact" />
       </aside>
       ) : null}
 
@@ -608,6 +611,11 @@ export function FeedPage() {
         </div>
 
         <CampaignBanners />
+
+        {/* Android app promo — shown in-feed on phones (the desktop rail has its own). */}
+        <div className="app-promo-feed-mobile">
+          <AppDownloadPromo variant="compact" />
+        </div>
 
         {loading && !data && !useMockFeed && (
           <p className="ig-feed-status">Loading feed…</p>

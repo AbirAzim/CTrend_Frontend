@@ -201,6 +201,55 @@ a:hover {
   box-sizing: border-box;
 }
 
+/* ── Android app download promo (QR + Google Play badge) ── */
+.app-promo {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--ig-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgb(var(--cx-ink-rgb) / 0.03);
+}
+.app-promo--card { margin-top: 24px; }
+/* Compact (narrow side rail): stack vertically so the QR never overlaps text. */
+.app-promo--compact {
+  margin-top: 18px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.app-promo--compact .app-promo-qr { align-self: center; }
+/* QR on the right */
+.app-promo-qr {
+  flex-shrink: 0;
+  line-height: 0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px;
+  border: 1px solid var(--ig-border);
+}
+.app-promo-qr img { width: 104px; height: 104px; display: block; }
+.app-promo--compact .app-promo-qr img { width: 88px; height: 88px; }
+/* Text / logo / badge on the right */
+.app-promo-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.app-promo-head { display: flex; align-items: center; gap: 8px; }
+.app-promo-logo { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.app-promo-title { font-weight: 800; font-size: 14px; color: var(--ig-text); }
+.app-promo-sub { font-size: 12px; color: var(--ig-text-secondary); line-height: 1.35; }
+.app-promo-badge { display: inline-block; line-height: 0; margin-top: 2px; }
+.app-promo-badge img { height: 42px; width: auto; display: block; }
+/* A QR is useless on a phone screen — hide it, keep the badge. */
+@media (max-width: 640px) {
+  .app-promo-qr { display: none; }
+}
+
+/* In-feed promo: only on phones (the desktop right rail carries its own). */
+.app-promo-feed-mobile { display: none; }
+@media (max-width: 979px) {
+  .app-promo-feed-mobile { display: block; margin: 10px 12px 0; }
+}
+
 .auth-card {
   width: 100%;
   max-width: 22rem;

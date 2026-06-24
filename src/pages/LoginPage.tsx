@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { GOOGLE_LOGIN, LOGIN } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { PasswordField } from "../components/PasswordField";
+import { AppDownloadPromo } from "../components/AppDownloadPromo";
 import {
   getNativeGoogleIdToken,
   isNativeGoogleAuthAvailable,
@@ -178,6 +179,8 @@ export function LoginPage() {
             <code>VITE_GOOGLE_CLIENT_ID</code> in <code>.env</code>.
           </p>
         )}
+
+        <AppDownloadPromo variant="card" />
       </div>
     </div>
   );
