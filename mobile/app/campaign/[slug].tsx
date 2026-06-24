@@ -1,10 +1,11 @@
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import worldcupPlayersAsset from "../../assets/worldcup-players.png";
-import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   InteractionManager,
   Pressable,
   ScrollView,
@@ -20,6 +21,8 @@ import {
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBar } from "../../context/TabBarContext";
+import { BottomNav } from "../../components/BottomNav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -578,6 +581,37 @@ export default function CampaignDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { translateY } = useTabBar();
+  // Reset on focus so the footer is visible when entering the screen.
+  useFocusEffect(
+    useCallback(() => {
+      translateY.setValue(0);
+    }, [translateY]),
+  );
+
+  // Hide the footer on scroll-down, reveal on scroll-up — same as the feed.
+  const TAB_BAR_H = 60 + insets.bottom + 6;
+  const lastScrollY = useRef(0);
+  const tabBarVisible = useRef(true);
+  function handleScroll(e: { nativeEvent: { contentOffset: { y: number } } }) {
+    const y = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    lastScrollY.current = y;
+    if (y < 60) {
+      if (!tabBarVisible.current) {
+        tabBarVisible.current = true;
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      }
+      return;
+    }
+    if (diff > 4 && tabBarVisible.current) {
+      tabBarVisible.current = false;
+      Animated.timing(translateY, { toValue: TAB_BAR_H, duration: 200, useNativeDriver: true }).start();
+    } else if (diff < -4 && !tabBarVisible.current) {
+      tabBarVisible.current = true;
+      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    }
+  }
 
   const { data, loading, error } = useQuery<CampaignData>(CAMPAIGN_BY_SLUG, {
     variables: { slug },
@@ -630,8 +664,10 @@ export default function CampaignDetailScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 96 }]}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {/* Campaign banner card — same style as feed banner */}
           <View style={styles.bannerCard}>
@@ -714,6 +750,10 @@ export default function CampaignDetailScreen() {
           </View>
         </ScrollView>
       )}
+
+      <View style={styles.bottomNavOverlay} pointerEvents="box-none">
+        <BottomNav />
+      </View>
     </View>
   );
 }
@@ -722,6 +762,7 @@ export default function CampaignDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  bottomNavOverlay: { position: "absolute", left: 0, right: 0, bottom: 0 },
 
   // Banner card (same as CampaignBanner feed card)
   bannerCard: {

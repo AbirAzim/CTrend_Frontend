@@ -638,13 +638,13 @@ function makeStyles(c: Palette) {
     tabHidden: { display: "none" },
     sectionTitle: { fontSize: 15, fontWeight: "800", color: c.text, marginTop: 8, marginBottom: 6 },
     dayTitle: {
-      fontSize: 11,
+      fontSize: 14.5,
       fontWeight: "800",
-      letterSpacing: 0.5,
+      letterSpacing: 0.3,
       textTransform: "uppercase",
       color: c.accent,
-      marginTop: 6,
-      marginBottom: 4,
+      marginTop: 10,
+      marginBottom: 6,
     },
     dividerTitle: {
       fontSize: 15,
