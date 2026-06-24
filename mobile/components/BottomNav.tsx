@@ -118,7 +118,7 @@ export function BottomNav({ active }: { active?: TabName }) {
 
       {right.map(renderTab)}
 
-      {isAdmin && (
+      {isAdmin ? (
         <View style={styles.tabItem}>
           <Pressable style={styles.tabPress} onPress={() => router.push("/admin" as `/${string}`)}>
             <View style={styles.iconWrap}>
@@ -127,6 +127,20 @@ export function BottomNav({ active }: { active?: TabName }) {
             </View>
             <Text style={[styles.tabLabel, { color: colors.accent }, styles.tabLabelActive]} numberOfLines={1}>
               Admin
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.tabItem}>
+          <Pressable style={styles.tabPress} onPress={() => router.push("/world-cup" as `/${string}`)}>
+            <View style={styles.iconWrap}>
+              <Ionicons name="trophy" size={26} color={isDark ? "#c7c7c7" : "#9ca3af"} />
+            </View>
+            <Text
+              style={[styles.tabLabel, { color: isDark ? "#c7c7c7" : "#9ca3af" }]}
+              numberOfLines={1}
+            >
+              World Cup
             </Text>
           </Pressable>
         </View>

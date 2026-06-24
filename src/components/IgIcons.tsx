@@ -135,6 +135,39 @@ export function IconShield({ size = 26, active }: IconProps) {
   );
 }
 
+export function IconTrophy({ size = 26, active }: IconProps) {
+  if (active) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+        <path
+          fill="currentColor"
+          d="M18 2H6v1H2v4a4 4 0 0 0 4 4 6 6 0 0 0 5 4.9V19H8v2h8v-2h-3v-3.1A6 6 0 0 0 18 11a4 4 0 0 0 4-4V3h-4V2zM4 7V5h2v4a2 2 0 0 1-2-2zm16 0a2 2 0 0 1-2 2V5h2v2z"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M6 3h12v5a6 6 0 0 1-12 0V3z" />
+      <path d="M6 4H3v3a3 3 0 0 0 3 3" />
+      <path d="M18 4h3v3a3 3 0 0 1-3 3" />
+      <path d="M12 14v3" />
+      <path d="M8.5 21h7" />
+      <path d="M10 17h4l-.5 4h-3l-.5-4z" />
+    </svg>
+  );
+}
+
 export function IconUser({ size = 26, active }: IconProps) {
   if (active) {
     return (

@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { useMutation, useQuery } from "@apollo/client";
-import { IconBookmark, IconHome, IconLogin, IconLogout, IconMessages, IconPlusSquare, IconShield, IconUser } from "../components/IgIcons";
+import { IconBookmark, IconHome, IconLogin, IconLogout, IconMessages, IconPlusSquare, IconShield, IconTrophy, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS } from "../graphql/feed";
@@ -134,6 +134,7 @@ export function AppShell() {
       keeps: isAuthenticated && isBottomNavKeeps(location),
       profile: isAuthenticated && isBottomNavProfile(location),
       admin: isBottomNavAdmin(location),
+      worldCup: location.pathname.startsWith("/world-cup"),
     };
   }, [location, isAuthenticated, messengerOpen]);
 
@@ -322,7 +323,7 @@ export function AppShell() {
       <MessengerPanel />
 
       <nav
-        className={`ig-bottom-nav ig-bottom-nav--${isAdmin ? "six" : "five"}${navHidden ? " ig-bottom-nav--hidden" : ""}`}
+        className={`ig-bottom-nav ig-bottom-nav--six${navHidden ? " ig-bottom-nav--hidden" : ""}`}
         aria-label="Main"
       >
         <Link
@@ -385,7 +386,7 @@ export function AppShell() {
         >
           <IconUser active={bottomNavActive.profile} />
         </Link>
-        {isAdmin && (
+        {isAdmin ? (
           <Link
             to="/admin"
             className={`ig-nav-item ig-nav-item--admin${bottomNavActive.admin ? " ig-nav-item--active" : ""}`}
@@ -394,6 +395,16 @@ export function AppShell() {
             aria-current={bottomNavActive.admin ? "page" : undefined}
           >
             <IconShield active={bottomNavActive.admin} />
+          </Link>
+        ) : (
+          <Link
+            to="/world-cup"
+            className={`ig-nav-item ig-nav-item--worldcup${bottomNavActive.worldCup ? " ig-nav-item--active" : ""}`}
+            aria-label="World Cup"
+            title="World Cup"
+            aria-current={bottomNavActive.worldCup ? "page" : undefined}
+          >
+            <IconTrophy active={bottomNavActive.worldCup} />
           </Link>
         )}
       </nav>

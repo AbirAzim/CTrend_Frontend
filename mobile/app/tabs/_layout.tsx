@@ -142,8 +142,8 @@ function FloatingTabBar(props: {
           );
         })}
 
-        {/* ── Admin shield tab (admin users only) ── */}
-        {isAdmin && (
+        {/* ── 6th slot: Admin shield for admins, else World Cup for everyone ── */}
+        {isAdmin ? (
           <Animated.View style={styles.tabItem}>
             <Pressable style={styles.tabPress} onPress={() => router.push("/admin" as `/${string}`)}>
               <View style={styles.iconWrap}>
@@ -152,6 +152,20 @@ function FloatingTabBar(props: {
               </View>
               <Text style={[styles.tabLabel, { color: colors.accent }, styles.tabLabelActive]} numberOfLines={1}>
                 Admin
+              </Text>
+            </Pressable>
+          </Animated.View>
+        ) : (
+          <Animated.View style={styles.tabItem}>
+            <Pressable style={styles.tabPress} onPress={() => router.push("/world-cup" as `/${string}`)}>
+              <View style={styles.iconWrap}>
+                <Ionicons name="trophy" size={26} color={isDark ? "#c7c7c7" : "#9ca3af"} />
+              </View>
+              <Text
+                style={[styles.tabLabel, { color: isDark ? "#c7c7c7" : "#9ca3af" }]}
+                numberOfLines={1}
+              >
+                World Cup
               </Text>
             </Pressable>
           </Animated.View>
