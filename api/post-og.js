@@ -3,57 +3,16 @@
 // run JS. Real browsers never hit this — vercel.json only routes known crawler
 // User-Agents here; humans get the normal SPA at /post/:id.
 
-const GRAPHQL_HTTP =
-  process.env.VITE_GRAPHQL_HTTP ||
-  process.env.GRAPHQL_HTTP ||
-  'https://seashell-app-stt6c.ondigitalocean.app/graphql';
+import {
+  esc,
+  fetchPost,
+  buildPostMeta,
+  SITE_NAME,
+} from './_postOgShared.js';
 
-const SITE_NAME = 'Ke Jitbe';
+function metaTags(post, pageUrl, origin) {
+  const meta = buildPostMeta(post, pageUrl, origin);
 
-const POST_QUERY = `
-  query OgPost($id: ID!) {
-    getPostById(id: $id) {
-      id
-      type
-      caption
-      authorDisplayName
-      authorUsername
-      imageUrls
-      options { label imageUrl }
-      category { name }
-    }
-  }
-`;
-
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function truncate(s, n) {
-  const t = String(s ?? '').trim().replace(/\s+/g, ' ');
-  return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
-}
-
-async function fetchPost(id) {
-  try {
-    const res = await fetch(GRAPHQL_HTTP, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: POST_QUERY, variables: { id } }),
-    });
-    const json = await res.json();
-    return json?.data?.getPostById ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function metaTags(post, pageUrl) {
   if (!post) {
     return [
       `<title>${SITE_NAME}</title>`,
@@ -67,40 +26,29 @@ function metaTags(post, pageUrl) {
     ].join('\n  ');
   }
 
-  const author =
-    (post.authorDisplayName && post.authorDisplayName.trim()) ||
-    (post.authorUsername ? `@${post.authorUsername}` : SITE_NAME);
-  const caption = (post.caption || '').trim();
-  const title = caption ? truncate(caption, 70) : `${author} on ${SITE_NAME}`;
-  let description = caption ? truncate(caption, 200) : '';
-  if (!description) {
-    const cat = post.category?.name;
-    description = cat
-      ? `Vote on this ${cat} comparison on ${SITE_NAME} — compare · vote · vibe.`
-      : `Vote on this comparison on ${SITE_NAME} — compare · vote · vibe.`;
-  }
-  const optImg = (post.options || []).map((o) => o?.imageUrl).find(Boolean);
-  const image = optImg || (post.imageUrls || []).find(Boolean) || null;
-
   const tags = [
-    `<title>${esc(title)} · ${SITE_NAME}</title>`,
-    `<meta name="description" content="${esc(description)}" />`,
+    `<title>${esc(meta.title)} · ${SITE_NAME}</title>`,
+    `<meta name="description" content="${esc(meta.description)}" />`,
     `<meta property="og:site_name" content="${SITE_NAME}" />`,
-    `<meta property="og:title" content="${esc(title)}" />`,
-    `<meta property="og:description" content="${esc(description)}" />`,
+    `<meta property="og:title" content="${esc(meta.title)}" />`,
+    `<meta property="og:description" content="${esc(meta.description)}" />`,
     `<meta property="og:url" content="${esc(pageUrl)}" />`,
-    `<meta property="og:type" content="article" />`,
-    `<meta name="twitter:title" content="${esc(title)}" />`,
-    `<meta name="twitter:description" content="${esc(description)}" />`,
+    `<meta property="og:type" content="${meta.type}" />`,
+    `<meta name="twitter:title" content="${esc(meta.title)}" />`,
+    `<meta name="twitter:description" content="${esc(meta.description)}" />`,
   ];
-  if (image) {
-    tags.push(`<meta property="og:image" content="${esc(image)}" />`);
-    tags.push(`<meta property="og:image:alt" content="${esc(title)}" />`);
+
+  if (meta.image) {
+    tags.push(`<meta property="og:image" content="${esc(meta.image)}" />`);
+    tags.push(`<meta property="og:image:width" content="1200" />`);
+    tags.push(`<meta property="og:image:height" content="630" />`);
+    tags.push(`<meta property="og:image:alt" content="${esc(meta.title)}" />`);
     tags.push(`<meta name="twitter:card" content="summary_large_image" />`);
-    tags.push(`<meta name="twitter:image" content="${esc(image)}" />`);
+    tags.push(`<meta name="twitter:image" content="${esc(meta.image)}" />`);
   } else {
     tags.push(`<meta name="twitter:card" content="summary" />`);
   }
+
   return tags.join('\n  ');
 }
 
@@ -108,7 +56,8 @@ export default async function handler(req, res) {
   const id = (req.query && req.query.id) || '';
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const proto = req.headers['x-forwarded-proto'] || 'https';
-  const pageUrl = `${proto}://${host}/post/${id}`;
+  const origin = `${proto}://${host}`;
+  const pageUrl = `${origin}/post/${id}`;
 
   const post = id ? await fetchPost(id) : null;
 
@@ -117,7 +66,7 @@ export default async function handler(req, res) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  ${metaTags(post, pageUrl)}
+  ${metaTags(post, pageUrl, origin)}
 </head>
 <body>
   <p>Opening on ${SITE_NAME}… <a href="${esc(pageUrl)}">Tap here if it doesn't redirect.</a></p>
