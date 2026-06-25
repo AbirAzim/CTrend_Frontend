@@ -1144,8 +1144,8 @@ function FeedPostCardComponent({
     return activeOptionStats.reduce((a, s) => a + Math.round(s.count), 0);
   }, [isPoll, activeOptionStats]);
   const pollPick = isPoll ? activeMySelectedOptionIndex : null;
-  const pollHasVoted = pollPick !== null && pollPick !== undefined;
-  const pollShowResults = pollHasVoted || isVotingClosed;
+  // Poll results (%, bar, voter count) are always visible — no vote required.
+  const pollShowResults = true;
   const pollLeaderPct = pollPercents.length ? Math.max(...pollPercents) : null;
   const isPollWinnerIndex = (i: number): boolean =>
     isVotingClosed &&
@@ -2755,18 +2755,20 @@ function FeedPostCardComponent({
                   ? `${isMatchPost ? "📊" : "🏆"} ${votingWinnerSummary || "Results are in"}`
                   : `${votingHasEndDate ? "⏳ " : ""}${votingStatusLabel}`}
               </span>
-              <button
-                type="button"
-                className="cx-action-rail-details"
-                aria-expanded={detailsOpen}
-                aria-controls={`post-details-${post.id}`}
-                onClick={() => setDetailsOpen((prev) => !prev)}
-              >
-                {detailsOpen ? "Hide details" : "See details"}
-                <span className="cx-action-rail-details-arrow" aria-hidden>
-                  {detailsOpen ? "‹" : "›"}
-                </span>
-              </button>
+              {!isPoll ? (
+                <button
+                  type="button"
+                  className="cx-action-rail-details"
+                  aria-expanded={detailsOpen}
+                  aria-controls={`post-details-${post.id}`}
+                  onClick={() => setDetailsOpen((prev) => !prev)}
+                >
+                  {detailsOpen ? "Hide details" : "See details"}
+                  <span className="cx-action-rail-details-arrow" aria-hidden>
+                    {detailsOpen ? "‹" : "›"}
+                  </span>
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
