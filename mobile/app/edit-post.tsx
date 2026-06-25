@@ -2,11 +2,12 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -158,6 +159,7 @@ export default function EditPostScreen() {
     Array<{ label: string; imageUrl: string; imageFocalX?: number | null; imageFocalY?: number | null }>
   >([]);
   const [isPoll, setIsPoll] = useState(false);
+  const [isAnnouncement, setIsAnnouncement] = useState(false);
   // Whether the post already has votes — gates the replace-photo warning.
   const [hasVotes, setHasVotes] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
@@ -197,6 +199,12 @@ export default function EditPostScreen() {
     return d;
   });
 
+  // Reset initialization when postId changes so a mounted screen re-hydrates
+  // with the new post's data instead of showing the previous post's form state.
+  useEffect(() => {
+    setInitialized(false);
+  }, [postId]);
+
   // Pre-fill form when post loads
   useEffect(() => {
     if (!postData?.getPostById || initialized) return;
@@ -204,7 +212,9 @@ export default function EditPostScreen() {
     // Guard against hydrating with another post's (stale) data.
     if (post.id !== postId) return;
     const poll = post.format === "poll";
+    const announcement = post.format === "announcement";
     setIsPoll(poll);
+    setIsAnnouncement(announcement);
     const optionVotes = (post.optionStats ?? []).reduce(
       (sum, s) => sum + (s.count ?? 0),
       0,
@@ -230,7 +240,13 @@ export default function EditPostScreen() {
         setInitialVotingEnd(post.votingEndsAt);
       }
     }
-    if (poll) {
+    if (announcement) {
+      // Announcement body images sit in imageUrls; there are no compare options.
+      setBodyImages(
+        (post.imageUrls ?? []).map((url, i) => ({ id: `body-${i}`, url, existing: true })),
+      );
+      setOptions([]);
+    } else if (poll) {
       // Poll options carry their own (optional) thumbnail; body photos are separate.
       setOptions(
         (post.postOptions ?? []).map((o) => ({
@@ -269,6 +285,18 @@ export default function EditPostScreen() {
     if (router.canGoBack()) router.back();
     else router.replace("/tabs" as never);
   }
+
+  // Android hardware back button — use the same goBack() fallback so pressing
+  // the system back never closes the app when the stack is empty.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        goBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, []),
+  );
 
   // Upload a freshly picked image into an option slot; a new image resets that
   // option's focal point (it was framed at pick time).
@@ -481,6 +509,27 @@ export default function EditPostScreen() {
       deadlineInput = { votingEndsAt: votingEnd.toISOString() };
     }
 
+    if (isAnnouncement) {
+      try {
+        await updatePost({
+          variables: {
+            postId,
+            input: {
+              caption: caption.trim() || undefined,
+              categoryId,
+              imageUrls: bodyImages.map((b) => b.url.trim()).filter((u) => u.length > 0),
+              ...adminInput,
+              ...scheduleInput,
+            },
+          },
+        });
+        goBack();
+      } catch (err: unknown) {
+        setSubmitError(getApolloErrorMessage(err));
+      }
+      return;
+    }
+
     if (isPoll) {
       const labeled = options.filter((o) => o.label.trim().length > 0);
       if (labeled.length < 2) {
@@ -576,10 +625,53 @@ export default function EditPostScreen() {
             <Text style={[st.cancelText, { color: colors.muted }]}>← Back</Text>
           </TouchableOpacity>
           <Text style={[st.screenTitle, { color: colors.text }]}>
-            {isScheduled ? "Edit Scheduled" : isPoll ? "Edit Poll" : "Edit Compare"}
+            {isScheduled ? "Edit Scheduled" : isAnnouncement ? "Edit Announcement" : isPoll ? "Edit Poll" : "Edit Compare"}
           </Text>
           <View style={{ width: 60 }} />
         </View>
+
+        {/* Announcement body images */}
+        {isAnnouncement ? (
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[st.cardLabel, { color: colors.subtext }]}>IMAGES</Text>
+            <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10 }}>
+              Optional images shown in the announcement.
+            </Text>
+            <View style={st.bodyPhotoRow}>
+              {bodyImages.map((b) => (
+                <View key={b.id} style={[st.bodyPhoto, { backgroundColor: colors.section }]}>
+                  {b.url ? (
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => requestReplaceBody(b.id)}>
+                      <Image source={{ uri: b.url }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+                    </Pressable>
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
+                      <Text style={{ fontSize: 18, color: "#fff" }}>🖼</Text>
+                    </View>
+                  )}
+                  {bodyUploadingId === b.id ? (
+                    <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
+                      <ActivityIndicator color="#fff" size="small" />
+                    </View>
+                  ) : (
+                    <Pressable style={st.bodyPhotoRemove} onPress={() => removeBodyImage(b.id)} hitSlop={6}>
+                      <Text style={st.bodyPhotoRemoveText}>✕</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+              {bodyImages.length < 6 ? (
+                <Pressable
+                  style={[st.bodyPhoto, st.bodyPhotoAdd, { borderColor: colors.border }]}
+                  onPress={addBodyImage}
+                  disabled={bodyUploadingId !== null}
+                >
+                  <Text style={{ fontSize: 26, color: colors.muted }}>+</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         {/* Poll context/body photos — editable (replace/remove resets votes) */}
         {isPoll ? (
@@ -628,6 +720,7 @@ export default function EditPostScreen() {
         ) : null}
 
         {/* Options — labels + positions editable; replacing a photo resets votes */}
+        {!isAnnouncement ? (
         <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[st.cardLabel, { color: colors.subtext }]}>
             {isPoll ? "POLL OPTIONS" : "COMPARE OPTIONS"}
@@ -699,6 +792,7 @@ export default function EditPostScreen() {
             );
           })}
         </View>
+        ) : null}
 
         {/* Settings */}
         <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -727,7 +821,7 @@ export default function EditPostScreen() {
               style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
               value={caption}
               onChangeText={setCaption}
-              placeholder={isPoll ? "What's this poll about?" : "What are you comparing?"}
+              placeholder={isAnnouncement ? "Write your announcement…" : isPoll ? "What's this poll about?" : "What are you comparing?"}
               placeholderTextColor={colors.muted}
               multiline
               numberOfLines={2}

@@ -147,8 +147,9 @@ export function mapGqlPostToFeedView(p: {
     rawType === "system" || rawType === "org" || rawType === "user"
       ? rawType
       : null;
+  const fmt = p.format?.toLowerCase();
   const format: PostFormat =
-    p.format?.toLowerCase() === "poll" ? "poll" : "compare";
+    fmt === "poll" ? "poll" : fmt === "announcement" ? "announcement" : "compare";
   return {
     id: p.id,
     postType,

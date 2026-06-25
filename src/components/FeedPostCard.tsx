@@ -51,6 +51,7 @@ import { PostCampaignBadge } from "./PostCampaignBadge";
 import { PostVoteWinnerBanner } from "./PostVoteWinnerBanner";
 import { PostCampaignWinnerBanner } from "./PostCampaignWinnerBanner";
 import { ContentReportModal } from "./ContentReportModal";
+import { EditPostModal } from "./EditPostModal";
 import { imageObjectPosition } from "../lib/imageFocal";
 import { categoryColorRgb } from "../lib/categoryColor";
 import { linkifyText } from "../lib/linkify";
@@ -539,6 +540,7 @@ function FeedPostCardComponent({
   const [moreOpen, setMoreOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
   const isOwner = !!authUser && !!post.authorId && authUser.id === post.authorId;
   const isAdmin = authUser?.role?.toLowerCase() === "admin";
@@ -1941,6 +1943,16 @@ function FeedPostCardComponent({
                       : "📌 Pin to top"}
                 </button>
               )}
+              {(isAdmin || isOwner) && (
+                <button
+                  type="button"
+                  className="ig-more-item"
+                  role="menuitem"
+                  onClick={() => { setMoreOpen(false); setEditModalOpen(true); }}
+                >
+                  Edit post
+                </button>
+              )}
               {canDelete && !deleteConfirm && (
                 <button
                   type="button"
@@ -2990,6 +3002,29 @@ function FeedPostCardComponent({
         }
         contextUrl={postPermalink(post.id)}
       />
+
+      {editModalOpen && (
+        <EditPostModal
+          post={{
+            id: post.id,
+            format: post.format,
+            caption: post.caption,
+            imageUrls: post.imageUrls ?? [],
+            options: post.postOptions,
+            category: post.category ? { id: post.category.id, name: post.category.name } : undefined,
+            campaign: post.campaign ? { id: post.campaign.id, name: post.campaign.name, slug: post.campaign.slug ?? "" } : undefined,
+            votingEndsAt: post.votingEndsAt,
+            isVotingOpen: post.isVotingOpen,
+            upvoteCount: post.upvoteCount,
+            downvoteCount: post.downvoteCount,
+            optionStats: post.optionStats,
+            status: post.status,
+            scheduledAt: post.scheduledAt,
+          }}
+          onClose={() => setEditModalOpen(false)}
+          onSaved={() => setEditModalOpen(false)}
+        />
+      )}
     </article>
   );
 }

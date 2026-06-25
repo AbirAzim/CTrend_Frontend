@@ -153,7 +153,14 @@ export default function PostDetailScreen() {
           <View style={st.ownerActions}>
             <TouchableOpacity
               style={st.ownerBtn}
-              onPress={() => router.push({ pathname: "/tabs/create", params: { editId: post.id } })}
+              onPress={() => {
+                const fmt = post.format ?? "";
+                if (fmt === "poll" || fmt === "announcement") {
+                  router.push({ pathname: "/edit-post", params: { postId: post.id } } as never);
+                } else {
+                  router.push({ pathname: "/tabs/create", params: { editId: post.id } });
+                }
+              }}
               accessibilityLabel="Edit this post"
             >
               <Text style={st.ownerBtnText}>✏️ Edit post</Text>

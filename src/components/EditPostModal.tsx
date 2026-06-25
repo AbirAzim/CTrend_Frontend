@@ -95,6 +95,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const { user } = useAuth();
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const isPoll = (post.format ?? "").toLowerCase() === "poll";
+  const isAnnouncement = (post.format ?? "").toLowerCase() === "announcement";
   // A post still queued for a future go-live: the schedule time can be changed.
   // Once published it can't, but the voting deadline (end time) still can.
   const isScheduled = (post.status ?? "").toLowerCase() === "scheduled";
@@ -451,6 +452,25 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
           : undefined,
     };
 
+    if (isAnnouncement) {
+      try {
+        await updatePostMut({
+          variables: {
+            postId: post.id,
+            input: {
+              ...sharedInput,
+              imageUrls: bodyImages.map((b) => b.url.trim()).filter((u) => u.length > 0),
+            },
+          },
+        });
+        onSaved();
+        onClose();
+      } catch (err: unknown) {
+        setError(getApolloErrorMessage(err));
+      }
+      return;
+    }
+
     if (isPoll) {
       const labeled = pollOptions.filter((o) => o.label.trim().length > 0);
       if (labeled.length < 2) {
@@ -464,8 +484,6 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             input: {
               ...sharedInput,
               resetVotes: resetVotesRef.current,
-              // Context/body photos. Replacing/removing an existing one flags
-              // resetVotes; adding is safe.
               imageUrls: bodyImages
                 .map((b) => b.url.trim())
                 .filter((u) => u.length > 0),
@@ -706,7 +724,69 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             </label>
           ) : null}
 
-          {isPoll ? (
+          {isAnnouncement ? (
+            <>
+              <p className="cx-edit-section-label">
+                Images
+                <span className="cx-edit-item-count">{bodyImages.length} / 6</span>
+              </p>
+              <p className="muted small cx-edit-locked-note">Optional images shown in the announcement.</p>
+              <div className="cx-edit-poll-photos">
+                {bodyImages.map((b) => (
+                  <div className="cx-edit-poll-photo" key={b.id}>
+                    {b.url ? (
+                      <img src={b.url} alt="" />
+                    ) : (
+                      <span className="cx-edit-item-placeholder">🖼</span>
+                    )}
+                    {bodyUploadingId === b.id && (
+                      <span className="cx-edit-poll-photo-uploading">…</span>
+                    )}
+                    <div className="cx-edit-poll-photo-actions">
+                      <button
+                        type="button"
+                        className="cx-edit-poll-photo-btn"
+                        title={b.url ? "Replace photo" : "Upload photo"}
+                        disabled={bodyUploadingId !== null}
+                        onClick={() => requestBodyReplace(b.id)}
+                      >
+                        {b.url ? "🔁" : "📁"}
+                      </button>
+                      <button
+                        type="button"
+                        className="cx-edit-poll-photo-btn cx-edit-poll-photo-btn--remove"
+                        title="Remove photo"
+                        onClick={() => removeBodyImage(b.id)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <input
+                      ref={(el) => { bodyFileRefs.current[b.id] = el; }}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void handleBodyFileUpload(b.id, f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </div>
+                ))}
+                {bodyImages.length < 6 && (
+                  <button
+                    type="button"
+                    className="cx-edit-poll-photo cx-edit-poll-photo--add"
+                    onClick={addBodyImage}
+                    disabled={bodyUploadingId !== null}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+            </>
+          ) : isPoll ? (
             <>
               <p className="cx-edit-section-label">
                 Poll photos

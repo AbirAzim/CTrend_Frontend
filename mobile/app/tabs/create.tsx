@@ -400,9 +400,9 @@ export default function CreateScreen() {
     if (editLoadedRef.current === editId) return;
     editLoadedRef.current = editId ?? null;
     votesResetRef.current = false;
-    // Polls have a different edit model (locked photos, label-only) handled by
-    // the dedicated poll-aware editor. Hand off so feed/keeps edits work too.
-    if ((post.format ?? "").toLowerCase() === "poll") {
+    // Polls and announcements have dedicated edit UIs — hand off.
+    const fmt = (post.format ?? "").toLowerCase();
+    if (fmt === "poll" || fmt === "announcement") {
       router.replace(`/edit-post?postId=${post.id}` as never);
       return;
     }
@@ -439,10 +439,11 @@ export default function CreateScreen() {
   }, [hydrated, isAuthenticated]);
 
   // This screen lives in the tab navigator, so it stays mounted between visits.
-  // When it returns to "create" mode (no editId), clear the form. (Re-hydration
-  // for a different editId is handled by the id-keyed effect above.)
+  // Reset when editId is cleared (back to create mode) OR when it switches from
+  // one post directly to another (A→B without going through null) to avoid
+  // showing the previous post's stale form values while the new post loads.
   useEffect(() => {
-    if (!editId) {
+    if (!editId || (editLoadedRef.current !== null && editLoadedRef.current !== editId)) {
       editLoadedRef.current = null;
       resetForm();
     }

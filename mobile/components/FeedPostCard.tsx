@@ -1170,70 +1170,77 @@ function AdaptiveImage({
 	return onPress ? <Pressable onPress={onPress}>{image}</Pressable> : image;
 }
 
+const ANN_GAP = 2;
+// Half-width of a thumbnail cell — same size whether in a 2-col row or centred alone.
+const ANN_THUMB_W = (CARD_CONTENT_W - ANN_GAP) / 2;
+
+function AnnGridThumb({
+	uri, index, onPress, overlay, solo,
+}: { uri: string; index: number; onPress: (i: number) => void; overlay?: string; solo?: boolean }) {
+	return (
+		<Pressable onPress={() => onPress(index)} style={solo ? { width: ANN_THUMB_W } : { flex: 1 }}>
+			<View style={{ width: '100%', aspectRatio: 1 }}>
+				<Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit='cover' cachePolicy='memory-disk' />
+				{overlay ? (
+					<View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+						<Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>{overlay}</Text>
+					</View>
+				) : null}
+			</View>
+		</Pressable>
+	);
+}
+
 function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImagePress: (index: number) => void }) {
 	const count = urls.length;
-	const gap = 2;
-	const screenWidth = Dimensions.get('window').width;
-	const halfW = (screenWidth - gap) / 2;
 
 	if (count === 1) {
 		return <AdaptiveImage uri={urls[0]} onPress={() => onImagePress(0)} />;
 	}
-	if (count === 2) {
-		return (
-			<View style={{ flexDirection: 'row', gap }}>
-				{urls.map((u, i) => (
-					<Pressable key={i} onPress={() => onImagePress(i)} style={{ flex: 1 }}>
-						<Image source={{ uri: u }} style={{ width: '100%', aspectRatio: 1 }} contentFit='contain' cachePolicy='memory-disk' />
-					</Pressable>
-				))}
-			</View>
-		);
+	// All multi-image layouts use equal-sized square thumbnails in rows of 2.
+	// 2 → [2]
+	// 3 → [2, 1 centred]
+	// 4 → [2, 2]
+	// 5 → [2, 2, 1 centred]
+	// 6 → [2, 2, 2]
+	// 7+ → [2, 2, 2] with "+N" on last visible cell
+	const visibleCount = Math.min(count, 6);
+	const hiddenCount = count - visibleCount;
+
+	// Split into rows of 2; last row may have 1 item (centred).
+	const rows: number[][] = [];
+	for (let i = 0; i < visibleCount; i += 2) {
+		rows.push(urls.slice(i, i + 2).map((_, j) => i + j));
 	}
-	if (count === 3) {
-		return (
-			<View>
-				<AdaptiveImage uri={urls[0]} onPress={() => onImagePress(0)} />
-				<View style={{ flexDirection: 'row', gap, marginTop: gap }}>
-					{urls.slice(1).map((u, i) => (
-						<Pressable key={i} onPress={() => onImagePress(i + 1)} style={{ flex: 1 }}>
-							<Image source={{ uri: u }} style={{ width: '100%', aspectRatio: 1 }} contentFit='contain' cachePolicy='memory-disk' />
-						</Pressable>
-					))}
-				</View>
-			</View>
-		);
-	}
-	if (count === 4) {
-		return (
-			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
-				{urls.map((u, i) => (
-					<Pressable key={i} onPress={() => onImagePress(i)} style={{ width: halfW }}>
-						<Image source={{ uri: u }} style={{ width: '100%', aspectRatio: 1 }} contentFit='contain' cachePolicy='memory-disk' />
-					</Pressable>
-				))}
-			</View>
-		);
-	}
-	// 5 or 6: first large, then 2-col grid
-	const extra = count - 5;
+
 	return (
-		<View>
-			<AdaptiveImage uri={urls[0]} onPress={() => onImagePress(0)} />
-			<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap, marginTop: gap }}>
-				{urls.slice(1, 5).map((u, i) => (
-					<Pressable key={i} onPress={() => onImagePress(i + 1)} style={{ width: halfW }}>
-						<View style={{ width: '100%', aspectRatio: 1 }}>
-							<Image source={{ uri: u }} style={{ width: '100%', height: '100%' }} contentFit='contain' cachePolicy='memory-disk' />
-							{i === 3 && extra > 0 && (
-								<View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
-									<Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>+{extra + 1}</Text>
-								</View>
-							)}
-						</View>
-					</Pressable>
-				))}
-			</View>
+		<View style={{ gap: ANN_GAP }}>
+			{rows.map((row, ri) => {
+				const isSolo = row.length === 1;
+				const isLastRow = ri === rows.length - 1;
+				return (
+					<View
+						key={ri}
+						style={[
+							{ flexDirection: 'row', gap: ANN_GAP },
+							isSolo && { justifyContent: 'center' },
+						]}>
+						{row.map((urlIdx, ci) => {
+							const isLastCell = isLastRow && ci === row.length - 1;
+							return (
+								<AnnGridThumb
+									key={urlIdx}
+									uri={urls[urlIdx]}
+									index={urlIdx}
+									onPress={onImagePress}
+									solo={isSolo}
+									overlay={isLastCell && hiddenCount > 0 ? `+${hiddenCount}` : undefined}
+								/>
+							);
+						})}
+					</View>
+				);
+			})}
 		</View>
 	);
 }
@@ -3207,7 +3214,11 @@ function FeedPostCardComponent({
 								style={[styles.menuRow, { borderBottomColor: colors.border }]}
 								onPress={() => {
 									setMoreMenuVisible(false);
-									router.push({ pathname: '/tabs/create', params: { editId: post.id } });
+									if (isAnnouncement || isPoll) {
+										router.push({ pathname: '/edit-post', params: { postId: post.id } } as never);
+									} else {
+										router.push({ pathname: '/tabs/create', params: { editId: post.id } });
+									}
 								}}>
 								<Text style={[styles.menuRowText, { color: colors.text }]}>
 									✏️ Edit post
