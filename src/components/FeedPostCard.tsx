@@ -319,13 +319,13 @@ const MAX_ANN_IMG_RATIO = 1.91;
 
 function AnnouncementImg({
   src,
+  variant = "adaptive",
   className = "",
-  hero = false,
   onClick,
 }: {
   src: string;
+  variant?: "adaptive" | "thumb";
   className?: string;
-  hero?: boolean;
   onClick: () => void;
 }) {
   const [ratio, setRatio] = useState<number | null>(null);
@@ -333,21 +333,27 @@ function AnnouncementImg({
     <img
       src={src}
       alt=""
-      className={`cx-ann-img${hero ? " cx-ann-img--hero" : ""} ${className}`}
+      className={`cx-ann-img cx-ann-img--${variant} ${className}`.trim()}
       loading="lazy"
       decoding="async"
       onClick={onClick}
-      style={ratio ? { aspectRatio: ratio } : undefined}
-      onLoad={(e) => {
-        const img = e.currentTarget;
-        if (img.naturalWidth && img.naturalHeight) {
-          const r = Math.min(
-            Math.max(img.naturalWidth / img.naturalHeight, MIN_ANN_IMG_RATIO),
-            MAX_ANN_IMG_RATIO,
-          );
-          setRatio(r);
-        }
-      }}
+      style={
+        variant === "adaptive" && ratio ? { aspectRatio: ratio } : undefined
+      }
+      onLoad={
+        variant === "adaptive"
+          ? (e) => {
+              const img = e.currentTarget;
+              if (img.naturalWidth && img.naturalHeight) {
+                const r = Math.min(
+                  Math.max(img.naturalWidth / img.naturalHeight, MIN_ANN_IMG_RATIO),
+                  MAX_ANN_IMG_RATIO,
+                );
+                setRatio(r);
+              }
+            }
+          : undefined
+      }
     />
   );
 }
@@ -421,54 +427,54 @@ function AnnouncementImageGrid({ urls }: { urls: string[] }) {
   if (count === 1) {
     return (
       <div className="cx-ann-grid cx-ann-grid--1">
-        <AnnouncementImg src={urls[0]} hero onClick={() => setOpenIndex(0)} />
+        <AnnouncementImg
+          src={urls[0]}
+          variant="adaptive"
+          onClick={() => setOpenIndex(0)}
+        />
         {lightbox}
       </div>
     );
   }
-  if (count === 2) {
-    return (
-      <div className="cx-ann-grid cx-ann-grid--2">
-        {urls.map((u, i) => <AnnouncementImg key={i} src={u} onClick={() => setOpenIndex(i)} />)}
-        {lightbox}
-      </div>
+
+  // Match mobile: equal square thumbs in rows of 2 (last row centred if solo).
+  const visibleCount = Math.min(count, 6);
+  const hiddenCount = count - visibleCount;
+  const rows: number[][] = [];
+  for (let i = 0; i < visibleCount; i += 2) {
+    rows.push(
+      Array.from({ length: Math.min(2, visibleCount - i) }, (_, j) => i + j),
     );
   }
-  if (count === 3) {
-    return (
-      <div className="cx-ann-grid cx-ann-grid--3">
-        <AnnouncementImg src={urls[0]} hero className="cx-ann-img--main" onClick={() => setOpenIndex(0)} />
-        <div className="cx-ann-grid-sub">
-          {urls.slice(1).map((u, i) => <AnnouncementImg key={i} src={u} onClick={() => setOpenIndex(i + 1)} />)}
-        </div>
-        {lightbox}
-      </div>
-    );
-  }
-  if (count === 4) {
-    return (
-      <div className="cx-ann-grid cx-ann-grid--4">
-        {urls.map((u, i) => <AnnouncementImg key={i} src={u} onClick={() => setOpenIndex(i)} />)}
-        {lightbox}
-      </div>
-    );
-  }
-  // 5 or 6: first image large, rest in 2-col grid below (up to 5 shown with "+N more")
-  const shown = urls.slice(0, 5);
-  const extra = count - 5;
+
   return (
-    <div className="cx-ann-grid cx-ann-grid--5plus">
-      <AnnouncementImg src={urls[0]} hero className="cx-ann-img--main" onClick={() => setOpenIndex(0)} />
-      <div className="cx-ann-grid-sub">
-        {shown.slice(1).map((u, i) => (
-          <div key={i} className="cx-ann-img-wrap">
-            <AnnouncementImg src={u} onClick={() => setOpenIndex(i + 1)} />
-            {i === 3 && extra > 0 && (
-              <div className="cx-ann-img-more">+{extra + 1}</div>
-            )}
+    <div className="cx-ann-grid cx-ann-grid--rows">
+      {rows.map((row, rowIdx) => {
+        const isSolo = row.length === 1;
+        const isLastRow = rowIdx === rows.length - 1;
+        return (
+          <div
+            key={`ann-row-${row[0]}`}
+            className={`cx-ann-row${isSolo ? " cx-ann-row--solo" : ""}`}
+          >
+            {row.map((urlIdx, colIdx) => {
+              const isLastCell = isLastRow && colIdx === row.length - 1;
+              return (
+                <div key={urlIdx} className="cx-ann-thumb-wrap">
+                  <AnnouncementImg
+                    src={urls[urlIdx]}
+                    variant="thumb"
+                    onClick={() => setOpenIndex(urlIdx)}
+                  />
+                  {isLastCell && hiddenCount > 0 ? (
+                    <div className="cx-ann-img-more">+{hiddenCount}</div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        );
+      })}
       {lightbox}
     </div>
   );
@@ -700,6 +706,16 @@ function FeedPostCardComponent({
   const isMatchInPlay = post.matchScore?.status === "IN_PLAY";
   const liveMinute = isMatchInPlay ? (post.matchScore?.minute ?? null) : null;
 
+  function closeVotersList() {
+    setShowVoters(false);
+    setVoterSearch("");
+    setVoterOptionIndex(undefined);
+    setVoters([]);
+    setVotersHasMore(false);
+    setVotersError(null);
+    votersReqId.current += 1;
+  }
+
   useEffect(() => {
     if (!showVoters) {
       return;
@@ -711,7 +727,7 @@ function FeedPostCardComponent({
     // defer attaching it one tick so the opening click doesn't close it.
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setShowVoters(false);
+        closeVotersList();
       }
     }
     function handleOutsideClick(event: MouseEvent) {
@@ -719,7 +735,7 @@ function FeedPostCardComponent({
       if (target instanceof Node && votersModalCardRef.current?.contains(target)) {
         return;
       }
-      setShowVoters(false);
+      closeVotersList();
     }
 
     document.addEventListener("keydown", handleEscape);
@@ -1606,6 +1622,19 @@ function FeedPostCardComponent({
   // rows above the viewport the way regrouping would.
   const showVoterOptionTag = voterOptionIndex === undefined;
   const loadedVotersCount = voters.length;
+  const voterOptionCount = isPoll
+    ? pollOptionCount
+    : compareUrls?.length ?? 2;
+  const voterFilterTabs = useMemo(() => {
+    if (voterOptionCount < 1) return [];
+    return [
+      { label: "All", value: undefined as number | undefined },
+      ...Array.from({ length: voterOptionCount }, (_, i) => ({
+        label: compareOptionLabel(post, i) || `Option ${i + 1}`,
+        value: i,
+      })),
+    ];
+  }, [voterOptionCount, post]);
   const leftPct =
     binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : null;
   const rightPct =
@@ -2813,7 +2842,7 @@ function FeedPostCardComponent({
                   </span>
                 ) : null}
               </div>
-              <button type="button" className="cx-modal-close" onClick={() => setShowVoters(false)}>
+              <button type="button" className="cx-modal-close" onClick={closeVotersList}>
                 Close
               </button>
             </div>
@@ -2840,6 +2869,25 @@ function FeedPostCardComponent({
                     ×
                   </button>
                 ) : null}
+              </div>
+            ) : null}
+            {voteMode === "api" && voterFilterTabs.length > 1 ? (
+              <div className="cx-voters-tabs" role="tablist" aria-label="Filter voters by option">
+                {voterFilterTabs.map((tab) => {
+                  const active = voterOptionIndex === tab.value;
+                  return (
+                    <button
+                      key={tab.value ?? "all"}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={`cx-voters-tab${active ? " cx-voters-tab--active" : ""}`}
+                      onClick={() => setVoterOptionIndex(tab.value)}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
             {votersInitialLoading ? (

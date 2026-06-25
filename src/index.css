@@ -2369,36 +2369,47 @@ html[data-topbar-hidden="true"] .ff-bar-outer {
   padding: 12px 14px;
 }
 
-/* Announcement image grid */
+/* Announcement image grid — mirrors mobile AnnouncementImageGrid */
 .cx-ann-grid {
   display: grid;
   gap: 2px;
   overflow: hidden;
 }
 .cx-ann-grid--1 { grid-template-columns: 1fr; }
-.cx-ann-grid--2 { grid-template-columns: 1fr 1fr; }
-.cx-ann-grid--3 { grid-template-columns: 1fr; }
-.cx-ann-grid--3 .cx-ann-grid-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
-.cx-ann-grid--4 { grid-template-columns: 1fr 1fr; }
-.cx-ann-grid--5plus { grid-template-columns: 1fr; }
-.cx-ann-grid--5plus .cx-ann-grid-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.cx-ann-grid--rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cx-ann-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+.cx-ann-row--solo {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+.cx-ann-row--solo .cx-ann-thumb-wrap {
+  width: 50%;
+}
+.cx-ann-thumb-wrap {
+  position: relative;
+}
 .cx-ann-img {
   width: 100%;
   display: block;
-  object-fit: contain;
-  /* Letterbox bars follow the theme (card surface) instead of hard black. */
   background: var(--ig-card);
-  aspect-ratio: 1/1;
   cursor: zoom-in;
 }
-/* Hero (full-width single/lead) images: fill the card width and let height follow
-   the image's own aspect ratio — no cap, so there's never blank/letterboxed space. */
-.cx-ann-img--hero {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 16/9; /* fallback until natural size is known; overridden inline once loaded */
+.cx-ann-img--adaptive {
+  object-fit: contain;
+  aspect-ratio: 16 / 9;
 }
-.cx-ann-img-wrap { position: relative; }
+.cx-ann-img--thumb {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
 .cx-ann-img-more {
   position: absolute;
   inset: 0;
@@ -6397,6 +6408,10 @@ a.cx-friend-avatar:hover {
     0 28px 80px rgb(2 6 23 / 0.5),
     0 10px 30px rgb(var(--cx-accent-rgb) / 0.18);
   animation: cx-voters-pop 0.26s var(--cx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+  display: flex;
+  flex-direction: column;
+  max-height: min(82dvh, 560px);
+  overflow: hidden;
 }
 
 @keyframes cx-voters-pop {
@@ -6491,6 +6506,45 @@ a.cx-friend-avatar:hover {
   color: var(--cx-ink);
 }
 
+.cx-voters-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 14px 8px;
+  flex-shrink: 0;
+}
+
+.cx-voters-tab {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ig-border);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s var(--cx-ease-out),
+    border-color 0.15s var(--cx-ease-out),
+    color 0.15s var(--cx-ease-out);
+}
+
+.cx-voters-tab:hover {
+  border-color: rgb(var(--cx-accent-rgb) / 0.35);
+  color: var(--cx-accent-deep);
+}
+
+.cx-voters-tab--active {
+  background: var(--cx-accent-mid);
+  border-color: var(--cx-accent-mid);
+  color: #fff;
+}
+
+.cx-voters-tab--active:hover {
+  color: #fff;
+}
+
 .cx-voters-loading {
   display: flex;
   align-items: center;
@@ -6519,13 +6573,13 @@ a.cx-friend-avatar:hover {
 .cx-voters-scroll {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: min(48dvh, 400px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* When the list reaches its top/bottom, let the scroll flow to the page
-     behind (no `overscroll-behavior: contain`) so scrolling is never blocked. */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -10147,6 +10201,20 @@ a.cx-action-chip {
 :root[data-theme="dark"] .cx-voters-search-clear:hover {
   background: rgb(255 255 255 / 0.18);
   color: #e6edff;
+}
+:root[data-theme="dark"] .cx-voters-tab {
+  border-color: rgb(148 163 184 / 0.22);
+  color: rgb(148 163 184 / 0.9);
+}
+:root[data-theme="dark"] .cx-voters-tab:hover {
+  border-color: rgb(var(--cx-accent-rgb) / 0.45);
+  color: #c7d2fe;
+}
+:root[data-theme="dark"] .cx-voters-tab--active,
+:root[data-theme="dark"] .cx-voters-tab--active:hover {
+  background: var(--cx-accent-mid);
+  border-color: var(--cx-accent-mid);
+  color: #fff;
 }
 
 :root[data-theme="dark"] .ig-topbar-logout {
