@@ -517,6 +517,24 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontWeight: '800' as const,
 			letterSpacing: 0.6,
 		},
+		// Compact cell: thin dark strip at the very bottom edge — just the % number.
+		// The image is fully visible; a green/gold border on the wrapper signals voted/winner.
+		compactStrip: {
+			position: 'absolute' as const,
+			bottom: 0,
+			left: 0,
+			right: 0,
+			paddingVertical: 4,
+			backgroundColor: 'rgba(0,0,0,0.52)',
+			alignItems: 'center' as const,
+			justifyContent: 'center' as const,
+		},
+		compactPct: {
+			color: '#ffffff',
+			fontSize: 11,
+			fontWeight: '800' as const,
+			letterSpacing: -0.2,
+		},
 		winnerBadgeRow: {
 			position: 'absolute' as const,
 			top: 12,
@@ -1459,6 +1477,8 @@ function FeedPostCardComponent({
 	const multiCellWidth = Math.floor(
 		(CARD_CONTENT_W - (compareMaxCols - 1) * MULTI_GRID_GAP) / compareMaxCols,
 	);
+	// Cells narrower than this threshold get a compact overlay (no label/meter).
+	const isCompactCell = multiCellWidth < 140;
 	// Precompute each row's starting option index for row-based rendering.
 	let compareRowCursor = 0;
 	const compareRowsWithStart = compareRows.map((size) => {
@@ -2553,6 +2573,8 @@ function FeedPostCardComponent({
 											{ width: multiCellWidth, height: multiCellWidth },
 											isLoser && { opacity: 0.78 },
 											{ transform: [{ scale: cellScale[i] }] },
+											isCompactCell && isWinner && { borderWidth: 2.5, borderColor: '#f59e0b' },
+											isCompactCell && isVoted && !isVotingClosed && { borderWidth: 2.5, borderColor: '#22c55e' },
 										]}>
 										<Pressable
 											style={styles.fill}
@@ -2568,25 +2590,33 @@ function FeedPostCardComponent({
 												)}
 												cachePolicy='memory-disk'
 											/>
-											<View style={st.pctOverlay}>
-												<View style={st.pctMainPill}>
-													<Text style={st.pctText}>{pct}%</Text>
+											{isCompactCell ? (
+												<View style={st.compactStrip}>
+													<Text style={st.compactPct}>
+														{isVoted && !isVotingClosed ? `✓ ${pct}%` : `${pct}%`}
+													</Text>
 												</View>
-												<Text style={st.pctLabel} numberOfLines={1}>
-													{label}
-												</Text>
-												<View style={st.compareMeter}>
-													<View
-														style={[
-															st.compareMeterFill,
-															{
-																width: `${Math.max(0, Math.min(100, pct))}%`,
-																backgroundColor: optionColor,
-															},
-														]}
-													/>
+											) : (
+												<View style={st.pctOverlay}>
+													<View style={st.pctMainPill}>
+														<Text style={st.pctText}>{pct}%</Text>
+													</View>
+													<Text style={st.pctLabel} numberOfLines={1}>
+														{label}
+													</Text>
+													<View style={st.compareMeter}>
+														<View
+															style={[
+																st.compareMeterFill,
+																{
+																	width: `${Math.max(0, Math.min(100, pct))}%`,
+																	backgroundColor: optionColor,
+																},
+															]}
+														/>
+													</View>
 												</View>
-											</View>
+											)}
 											<Animated.View
 												pointerEvents='none'
 												style={[
@@ -2597,7 +2627,7 @@ function FeedPostCardComponent({
 													},
 												]}
 											/>
-											{isVoted && !isVotingClosed && (
+											{!isCompactCell && isVoted && !isVotingClosed && (
 												<Animated.View
 													style={[
 														st.votedBadgeRow,
@@ -2608,7 +2638,7 @@ function FeedPostCardComponent({
 													</View>
 												</Animated.View>
 											)}
-											{isWinner && (
+											{!isCompactCell && isWinner && (
 												<View style={st.winnerBadgeRow}>
 													<View style={st.winnerBadge}>
 														<Text style={st.winnerBadgeText}>👑 WINNER</Text>
