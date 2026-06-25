@@ -26,15 +26,17 @@ export type WcFixture = {
 
 export const WC_STAGE_ORDER: Record<string, number> = {
   GROUP_STAGE: 0,
-  LAST_16: 1,
-  QUARTER_FINALS: 2,
-  SEMI_FINALS: 3,
-  THIRD_PLACE: 4,
-  FINAL: 5,
+  LAST_32: 1,
+  LAST_16: 2,
+  QUARTER_FINALS: 3,
+  SEMI_FINALS: 4,
+  THIRD_PLACE: 5,
+  FINAL: 6,
 };
 
 export const WC_STAGE_LABELS: Record<string, string> = {
   GROUP_STAGE: "Group Stage",
+  LAST_32: "Round of 32",
   LAST_16: "Round of 16",
   QUARTER_FINALS: "Quarter Finals",
   SEMI_FINALS: "Semi Finals",
