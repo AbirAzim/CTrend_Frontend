@@ -84,7 +84,8 @@ const { width: SCREEN_W } = Dimensions.get('window');
 // than the screen. Compare grids must size against this, not SCREEN_W.
 const CARD_MARGIN_H = 12;
 const CARD_CONTENT_W = SCREEN_W - CARD_MARGIN_H * 2;
-const MULTI_GRID_GAP = 2;
+const MULTI_GRID_GAP = 3;
+const MULTI_GRID_GAP_DENSE = 5;
 const IMG_W = (SCREEN_W - 2) / 2;
 const IMG_H = IMG_W * 1.25;
 
@@ -115,6 +116,31 @@ function getCompareRows(n: number): number[] {
 		rem -= take;
 	}
 	return rows;
+}
+
+/** Mobile feed: 5–8 option compares use 2 columns so cells stay legible. */
+function getMobileCompareRows(n: number): number[] {
+	if (n >= 5 && n <= 8) {
+		const rows: number[] = [];
+		let rem = n;
+		while (rem > 0) {
+			rows.push(Math.min(2, rem));
+			rem -= Math.min(2, rem);
+		}
+		return rows;
+	}
+	return getCompareRows(n);
+}
+
+type CompareOverlayMode = 'full' | 'compact' | 'minimal';
+
+function getCompareOverlayMode(
+	compareCount: number,
+	cellWidth: number,
+): CompareOverlayMode {
+	if (compareCount >= 9 || cellWidth < 115) return 'minimal';
+	if (compareCount >= 5 || cellWidth < 160) return 'compact';
+	return 'full';
 }
 
 const GREEN = '#22c55e';
@@ -206,6 +232,83 @@ function compareLabel(post: FeedPostView, idx: number): string {
 	const stat = post.optionStats?.find((s) => s.index === idx)?.label?.trim();
 	if (stat) return stat;
 	return post.postOptions?.[idx]?.label?.trim() ?? `Side ${idx + 1}`;
+}
+
+type OptionStat = NonNullable<FeedPostView['optionStats']>[number];
+
+function viewerVoteForIntent(
+	isBinary: boolean,
+	intent: number,
+): FeedPostView['viewerVote'] {
+	if (!isBinary) {
+		if (intent === 0) return 'UP';
+		if (intent === 1) return 'DOWN';
+		return null;
+	}
+	return intent === 0 ? 'UP' : 'DOWN';
+}
+
+function buildOptionStatsBase(
+	post: FeedPostView,
+	curStats: FeedPostView['optionStats'] | null | undefined,
+	optionCount: number,
+): OptionStat[] {
+	const byIndex = new Map<number, OptionStat>();
+	for (const s of curStats ?? post.optionStats ?? []) {
+		byIndex.set(s.index, { ...s, count: Math.round(s.count) });
+	}
+	for (let i = 0; i < optionCount; i++) {
+		if (!byIndex.has(i)) {
+			byIndex.set(i, {
+				index: i,
+				label: compareLabel(post, i),
+				count: 0,
+				percentage: 0,
+			});
+		}
+	}
+	return Array.from(byIndex.values()).sort((a, b) => a.index - b.index);
+}
+
+function applyMultiVoteOptimistic(
+	post: FeedPostView,
+	curStats: FeedPostView['optionStats'] | null | undefined,
+	curMyIdx: number | null,
+	intent: number,
+	optionCount: number,
+): OptionStat[] {
+	const stats = buildOptionStatsBase(post, curStats, optionCount);
+	const updated = stats.map((s) => {
+		let c = s.count;
+		if (s.index === intent) c += 1;
+		if (curMyIdx !== null && s.index === curMyIdx && curMyIdx !== intent) {
+			c = Math.max(0, c - 1);
+		}
+		return { ...s, count: c };
+	});
+	const total = updated.reduce((sum, s) => sum + s.count, 0);
+	return updated.map((s) => ({
+		...s,
+		percentage: total > 0 ? (s.count / total) * 100 : 0,
+	}));
+}
+
+function optionStatsFromCounts(
+	post: FeedPostView,
+	prevStats: FeedPostView['optionStats'] | null | undefined,
+	counts: number[],
+	pcts: number[],
+	optionCount: number,
+): OptionStat[] {
+	const base = buildOptionStatsBase(post, prevStats, optionCount);
+	const total = counts.reduce((a, b) => a + b, 0);
+	return base.map((s) => ({
+		...s,
+		count: counts[s.index] ?? s.count,
+		percentage:
+			pcts[s.index] ??
+			(total > 0 ? ((counts[s.index] ?? 0) / total) * 100 : 0),
+	}));
 }
 
 function PollBodyImage({ uri, radius, bg }: { uri: string; radius: number; bg: string }) {
@@ -534,6 +637,109 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontSize: 11,
 			fontWeight: '800' as const,
 			letterSpacing: -0.2,
+		},
+		// Medium-density overlay: bottom scrim with label + inline % + slim bar.
+		compactOverlay: {
+			position: 'absolute' as const,
+			bottom: 0,
+			left: 0,
+			right: 0,
+			paddingTop: 18,
+			paddingBottom: 8,
+			paddingHorizontal: 8,
+			backgroundColor: 'rgba(0,0,0,0.45)',
+		},
+		compactLabel: {
+			color: '#ffffff',
+			fontSize: 12,
+			fontWeight: '700' as const,
+			textAlign: 'center' as const,
+			marginBottom: 5,
+		},
+		compactMetaRow: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 6,
+		},
+		compactMeter: {
+			flex: 1,
+			height: 4,
+			borderRadius: 999,
+			backgroundColor: 'rgba(255,255,255,0.22)',
+			overflow: 'hidden' as const,
+		},
+		compactMeterFill: {
+			height: '100%' as const,
+			borderRadius: 999,
+		},
+		compactPctInline: {
+			color: '#ffffff',
+			fontSize: 12,
+			fontWeight: '800' as const,
+			minWidth: 34,
+			textAlign: 'right' as const,
+		},
+		votedRing: {
+			borderWidth: 1.5,
+			borderColor: 'rgba(34,197,94,0.45)',
+		},
+		winnerRing: {
+			borderWidth: 1.5,
+			borderColor: 'rgba(245,158,11,0.5)',
+		},
+		// Ultra-dense: image-first with only a colored edge bar; labels live below.
+		minimalBar: {
+			position: 'absolute' as const,
+			bottom: 0,
+			left: 0,
+			right: 0,
+			height: 4,
+			flexDirection: 'row' as const,
+			backgroundColor: 'rgba(255,255,255,0.18)',
+		},
+		minimalBarFill: {
+			height: '100%' as const,
+		},
+		compareLegendScroll: {
+			marginTop: 8,
+			paddingHorizontal: 2,
+		},
+		compareLegendRow: {
+			flexDirection: 'row' as const,
+			gap: 6,
+			paddingHorizontal: 2,
+		},
+		compareLegendChip: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 5,
+			paddingHorizontal: 9,
+			paddingVertical: 5,
+			borderRadius: 999,
+			backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)',
+			borderWidth: 1,
+			borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.08)',
+			maxWidth: 148,
+		},
+		compareLegendChipVoted: {
+			borderColor: 'rgba(34,197,94,0.55)',
+			backgroundColor: 'rgba(34,197,94,0.12)',
+		},
+		compareLegendDot: {
+			width: 7,
+			height: 7,
+			borderRadius: 4,
+		},
+		compareLegendText: {
+			flexShrink: 1,
+			fontSize: 11,
+			fontWeight: '600' as const,
+			color: c.text,
+		},
+		compareLegendPct: {
+			fontSize: 11,
+			fontWeight: '800' as const,
+			color: c.subtext,
 		},
 		winnerBadgeRow: {
 			position: 'absolute' as const,
@@ -1472,13 +1678,16 @@ function FeedPostCardComponent({
 	// the same square size (sized to the widest row so images stay identical),
 	// short rows centered, no scrolling. Width excludes the card's side margins.
 	const compareCount = compareUrls?.length ?? 0;
-	const compareRows = getCompareRows(compareCount);
+	const compareRows = getMobileCompareRows(compareCount);
 	const compareMaxCols = compareRows.length ? Math.max(...compareRows) : 1;
+	const multiGridGap =
+		compareCount >= 5 || compareMaxCols >= 3 ? MULTI_GRID_GAP_DENSE : MULTI_GRID_GAP;
 	const multiCellWidth = Math.floor(
-		(CARD_CONTENT_W - (compareMaxCols - 1) * MULTI_GRID_GAP) / compareMaxCols,
+		(CARD_CONTENT_W - (compareMaxCols - 1) * multiGridGap) / compareMaxCols,
 	);
-	// Cells narrower than this threshold get a compact overlay (no label/meter).
-	const isCompactCell = multiCellWidth < 140;
+	const compareOverlayMode = getCompareOverlayMode(compareCount, multiCellWidth);
+	const useBorderState =
+		compareOverlayMode !== 'full' || multiCellWidth < 140;
 	// Precompute each row's starting option index for row-based rendering.
 	let compareRowCursor = 0;
 	const compareRowsWithStart = compareRows.map((size) => {
@@ -1628,8 +1837,9 @@ function FeedPostCardComponent({
 		}
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// Badge spring entrance + cell dim when viewer vote changes
+	// Badge spring entrance + cell dim when viewer vote changes (binary only)
 	useEffect(() => {
+		if (!isBinary) return;
 		const prev = prevViewer.current;
 		prevViewer.current = viewer;
 		const isNew = viewer !== prev && prev !== undefined;
@@ -1698,7 +1908,7 @@ function FeedPostCardComponent({
 				friction: 10,
 			}).start();
 		}
-	}, [viewer]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [viewer, isBinary]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Multi-option: badge + dim when mySelectedOptionIndex changes (null = withdraw)
 	useEffect(() => {
@@ -1896,23 +2106,20 @@ function FeedPostCardComponent({
 					votingEndsAt: activeVotingEndsAt,
 				});
 			} else {
-				const rawCounts = (curStats ?? []).map((s) => {
-					let c = s.count;
-					if (s.index === intent) c += 1;
-					if (curMyIdx !== null && s.index === curMyIdx && curMyIdx !== intent)
-						c = Math.max(0, c - 1);
-					return { ...s, count: c };
-				});
-				const newTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
+				const optionCount = compareUrls?.length ?? curStats?.length ?? 0;
+				const nextStats = applyMultiVoteOptimistic(
+					post,
+					curStats,
+					curMyIdx,
+					intent,
+					optionCount,
+				);
 				setOptimisticVote({
 					upvoteCount: curUp,
 					downvoteCount: curDown,
 					viewerVote: null,
 					mySelectedOptionIndex: intent,
-					optionStats: rawCounts.map((s) => ({
-						...s,
-						percentage: newTotal > 0 ? (s.count / newTotal) * 100 : 0,
-					})),
+					optionStats: nextStats,
 					isVotingOpen: activeIsVotingOpen,
 					votingEndsAt: activeVotingEndsAt,
 				});
@@ -1944,17 +2151,21 @@ function FeedPostCardComponent({
 					votingEndsAt: activeVotingEndsAt,
 				});
 			} else {
-				const rawCounts = (curStats ?? []).map((s) => ({
-					...s,
-					count: s.index === curMyIdx ? Math.max(0, s.count - 1) : s.count,
-				}));
-				const newTotal = rawCounts.reduce((sum, s) => sum + s.count, 0);
+				const optionCount = compareUrls?.length ?? curStats?.length ?? 0;
+				const withdrawn = buildOptionStatsBase(post, curStats, optionCount).map(
+					(s) => ({
+						...s,
+						count:
+							s.index === curMyIdx ? Math.max(0, s.count - 1) : s.count,
+					}),
+				);
+				const newTotal = withdrawn.reduce((sum, s) => sum + s.count, 0);
 				setOptimisticVote({
 					upvoteCount: curUp,
 					downvoteCount: curDown,
 					viewerVote: null,
 					mySelectedOptionIndex: null,
-					optionStats: rawCounts.map((s) => ({
+					optionStats: withdrawn.map((s) => ({
 						...s,
 						percentage: newTotal > 0 ? (s.count / newTotal) * 100 : 0,
 					})),
@@ -1997,20 +2208,19 @@ function FeedPostCardComponent({
 							Math.max(0, Math.round(n)),
 						);
 						const pcts = payload.percentages ?? [];
-						const total = counts.reduce((a, b) => a + b, 0);
+						const optionCount = compareUrls?.length ?? counts.length;
 						setOptimisticVote((prev) => ({
 							upvoteCount: counts[0] ?? prev?.upvoteCount ?? 0,
 							downvoteCount: counts[1] ?? prev?.downvoteCount ?? 0,
 							viewerVote: null,
 							mySelectedOptionIndex: null,
-							optionStats:
-								prev?.optionStats?.map((s, i) => ({
-									...s,
-									count: counts[i] ?? s.count,
-									percentage:
-										pcts[i] ??
-										(total > 0 ? ((counts[i] ?? 0) / total) * 100 : 0),
-								})) ?? null,
+							optionStats: optionStatsFromCounts(
+								post,
+								prev?.optionStats,
+								counts,
+								pcts,
+								optionCount,
+							),
 							isVotingOpen: prev?.isVotingOpen ?? null,
 							votingEndsAt: prev?.votingEndsAt ?? null,
 						}));
@@ -2030,20 +2240,19 @@ function FeedPostCardComponent({
 							Math.max(0, Math.round(n)),
 						);
 						const pcts = payload.percentages ?? [];
-						const total = counts.reduce((a, b) => a + b, 0);
+						const optionCount = compareUrls?.length ?? counts.length;
 						setOptimisticVote((prev) => ({
 							upvoteCount: counts[0] ?? prev?.upvoteCount ?? 0,
 							downvoteCount: counts[1] ?? prev?.downvoteCount ?? 0,
-							viewerVote: currentIntent === 0 ? 'UP' : 'DOWN',
+							viewerVote: viewerVoteForIntent(isBinary, currentIntent),
 							mySelectedOptionIndex: currentIntent,
-							optionStats:
-								prev?.optionStats?.map((s, i) => ({
-									...s,
-									count: counts[i] ?? s.count,
-									percentage:
-										pcts[i] ??
-										(total > 0 ? ((counts[i] ?? 0) / total) * 100 : 0),
-								})) ?? null,
+							optionStats: optionStatsFromCounts(
+								post,
+								prev?.optionStats,
+								counts,
+								pcts,
+								optionCount,
+							),
 							isVotingOpen: prev?.isVotingOpen ?? null,
 							votingEndsAt: prev?.votingEndsAt ?? null,
 						}));
@@ -2544,17 +2753,18 @@ function FeedPostCardComponent({
 			) : compareUrls && !isBinary ? (
 				/* ── Multi-option grid (3+ options) ── */
 				<View style={styles.coachAnchor}>
-				<View style={styles.multiGrid}>
+				<View style={[styles.multiGrid, { gap: multiGridGap }]}>
 					{compareRowsWithStart.map(({ size, start }, rowIdx) => (
 						<View
 							key={`${post.id}-mrow-${rowIdx}`}
-							style={styles.multiRow}>
+							style={[styles.multiRow, { gap: multiGridGap }]}>
 							{Array.from({ length: size }, (_, col) => {
 								const i = start + col;
 								const url = compareUrls[i];
 								const stat = activeStats?.find((s) => s.index === i);
 								const pct = stat ? Math.round(stat.percentage) : 0;
-								const label = compareLabel(post, i);
+								const label =
+									stat?.label?.trim() || compareLabel(post, i);
 								const isVoted = activeMyIdx === i;
 								const maxCount = Math.max(
 									...(activeStats?.map((s) => s.count) ?? [0]),
@@ -2565,16 +2775,20 @@ function FeedPostCardComponent({
 									stat?.count === maxCount;
 								const isLoser = isVotingClosed && !isWinner;
 								const optionColor = MULTI_SPLIT_COLORS[i % 10];
+								const cellRadius =
+									compareOverlayMode === 'full' ? 6 : 10;
 								return (
 									<Animated.View
 										key={`${post.id}-multi-${i}`}
 										style={[
 											styles.multiCell,
-											{ width: multiCellWidth, height: multiCellWidth },
+											{
+												width: multiCellWidth,
+												height: multiCellWidth,
+												borderRadius: cellRadius,
+											},
 											isLoser && { opacity: 0.78 },
 											{ transform: [{ scale: cellScale[i] }] },
-											isCompactCell && isWinner && { borderWidth: 2.5, borderColor: '#f59e0b' },
-											isCompactCell && isVoted && !isVotingClosed && { borderWidth: 2.5, borderColor: '#22c55e' },
 										]}>
 										<Pressable
 											style={styles.fill}
@@ -2589,12 +2803,40 @@ function FeedPostCardComponent({
 													post.postOptions?.[i]?.imageFocalY,
 												)}
 												cachePolicy='memory-disk'
+												recyclingKey={`${post.id}-opt-${i}`}
 											/>
-											{isCompactCell ? (
-												<View style={st.compactStrip}>
-													<Text style={st.compactPct}>
-														{isVoted && !isVotingClosed ? `✓ ${pct}%` : `${pct}%`}
+											{compareOverlayMode === 'minimal' ? (
+												<View style={st.minimalBar}>
+													<View
+														style={[
+															st.minimalBarFill,
+															{
+																flex: Math.max(pct, 0),
+																backgroundColor: optionColor,
+															},
+														]}
+													/>
+													<View style={{ flex: Math.max(100 - pct, 0) }} />
+												</View>
+											) : compareOverlayMode === 'compact' ? (
+												<View style={st.compactOverlay}>
+													<Text style={st.compactLabel} numberOfLines={1}>
+														{label}
 													</Text>
+													<View style={st.compactMetaRow}>
+														<View style={st.compactMeter}>
+															<View
+																style={[
+																	st.compactMeterFill,
+																	{
+																		width: `${Math.max(0, Math.min(100, pct))}%`,
+																		backgroundColor: optionColor,
+																	},
+																]}
+															/>
+														</View>
+														<Text style={st.compactPctInline}>{pct}%</Text>
+													</View>
 												</View>
 											) : (
 												<View style={st.pctOverlay}>
@@ -2617,6 +2859,26 @@ function FeedPostCardComponent({
 													</View>
 												</View>
 											)}
+											{useBorderState && isVoted && !isVotingClosed ? (
+												<View
+													pointerEvents='none'
+													style={[
+														styles.absoluteFill,
+														st.votedRing,
+														{ borderRadius: cellRadius },
+													]}
+												/>
+											) : null}
+											{useBorderState && isWinner ? (
+												<View
+													pointerEvents='none'
+													style={[
+														styles.absoluteFill,
+														st.winnerRing,
+														{ borderRadius: cellRadius },
+													]}
+												/>
+											) : null}
 											<Animated.View
 												pointerEvents='none'
 												style={[
@@ -2627,7 +2889,7 @@ function FeedPostCardComponent({
 													},
 												]}
 											/>
-											{!isCompactCell && isVoted && !isVotingClosed && (
+											{compareOverlayMode === 'full' && isVoted && !isVotingClosed && (
 												<Animated.View
 													style={[
 														st.votedBadgeRow,
@@ -2638,7 +2900,7 @@ function FeedPostCardComponent({
 													</View>
 												</Animated.View>
 											)}
-											{!isCompactCell && isWinner && (
+											{compareOverlayMode === 'full' && isWinner && (
 												<View style={st.winnerBadgeRow}>
 													<View style={st.winnerBadge}>
 														<Text style={st.winnerBadgeText}>👑 WINNER</Text>
@@ -2652,6 +2914,39 @@ function FeedPostCardComponent({
 						</View>
 					))}
 				</View>
+				{compareOverlayMode === 'minimal' ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={st.compareLegendRow}
+						style={st.compareLegendScroll}>
+						{compareUrls.map((_, i) => {
+							const stat = activeStats?.find((s) => s.index === i);
+							const pct = stat ? Math.round(stat.percentage) : 0;
+							const label = compareLabel(post, i);
+							const isVoted = activeMyIdx === i;
+							return (
+								<View
+									key={`${post.id}-legend-${i}`}
+									style={[
+										st.compareLegendChip,
+										isVoted && st.compareLegendChipVoted,
+									]}>
+									<View
+										style={[
+											st.compareLegendDot,
+											{ backgroundColor: MULTI_SPLIT_COLORS[i % 10] },
+										]}
+									/>
+									<Text style={st.compareLegendText} numberOfLines={1}>
+										{label}
+									</Text>
+									<Text style={st.compareLegendPct}>{pct}%</Text>
+								</View>
+							);
+						})}
+					</ScrollView>
+				) : null}
 				{coachActive ? (
 					<VoteCoachmark onDone={() => onCoachmarkDismiss?.('timeout')} />
 				) : null}
@@ -3880,11 +4175,9 @@ const styles = StyleSheet.create({
 	// Multi-option grid (3–4 options)
 	multiGrid: {
 		flexDirection: 'column',
-		gap: MULTI_GRID_GAP,
 	},
 	multiRow: {
 		flexDirection: 'row',
-		gap: MULTI_GRID_GAP,
 		justifyContent: 'center',
 	},
 	multiCell: { overflow: 'hidden' },
