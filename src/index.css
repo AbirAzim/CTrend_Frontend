@@ -193,11 +193,14 @@ a:hover {
 
 /* Auth */
 .auth-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: max(1.5rem, env(safe-area-inset-top, 0px))
+    max(1.5rem, env(safe-area-inset-right, 0px))
+    max(1.5rem, env(safe-area-inset-bottom, 0px))
+    max(1.5rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
 }
 
@@ -10435,6 +10438,12 @@ a.cx-action-chip {
   opacity: 1;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .cx-profile-avatar--editable .cx-avatar-edit-btn {
+    opacity: 1;
+  }
+}
+
 .cx-avatar-error {
   margin: 4px 0 0;
   font-size: 0.75rem;
@@ -18322,12 +18331,68 @@ a.cd-lb-row:hover {
   border-bottom: 1px solid var(--ig-border, #eee);
 }
 .nb-header-title { font-weight: 700; font-size: 0.95rem; }
+.nb-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
 .nb-mark-all { background: none; border: none; cursor: pointer; font-size: 0.75rem; color: var(--ig-accent, #0095f6); }
 .nb-mark-all:hover { text-decoration: underline; }
 
 .nb-empty { padding: 24px 16px; text-align: center; color: var(--ig-muted, #888); font-size: 0.85rem; }
 
 .nb-list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+
+@media (max-width: 768px), ((hover: none) and (pointer: coarse)) {
+  .nb-mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 119;
+    border: none;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+  }
+
+  .nb-dropdown--mobile {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+    border: none;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: none;
+  }
+
+  .nb-dropdown--mobile .nb-list {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nb-mobile-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: rgb(var(--cx-ink-rgb) / 0.08);
+    color: var(--ig-text);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+}
 
 .nb-item {
   display: flex;
@@ -20064,12 +20129,60 @@ a.cd-lb-row:hover {
   /* Slightly taller tap targets on primary actions (not inputs) */
   .ig-bottom-nav-item,
   .ig-topbar-icon-btn,
+  .ig-nav-item,
+  .ig-icon-btn,
+  .nb-btn,
   .cx-gsearch-mobile-btn,
   .cw-emoji-toggle,
   .cw-send-btn,
   .cw-img-btn,
-  .ig-post-comments-submit {
+  .ig-post-comments-submit,
+  .cx-friend-msg-btn,
+  .md-back,
+  .ig-post-detail-back,
+  .nb-btn,
+  .nb-action-btn,
+  .cx-friend-actions .btn-ghost,
+  .cx-side-head .btn-ghost {
     touch-action: manipulation;
+  }
+
+  .cx-friend-actions .btn-ghost,
+  .cx-side-head .btn-ghost,
+  .cx-friend-msg-btn,
+  .md-back,
+  .ig-post-detail-back,
+  .nb-btn,
+  .nb-action-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .cx-friend-msg-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .cx-coin-counter {
+    height: 40px;
+    padding: 0 10px 0 8px;
+    font-size: 0.82rem;
+  }
+
+  .ig-bottom-nav--six {
+    max-width: min(100%, calc(100% - 12px));
+    padding: 0 4px;
+    gap: 0;
+  }
+
+  .ig-nav-item {
+    width: 42px;
+    height: 42px;
+  }
+
+  .ig-nav-item svg {
+    width: 21px;
+    height: 21px;
   }
 
   /* Modals / sheets: contain overscroll; use dynamic viewport height */
@@ -20125,6 +20238,33 @@ a.cd-lb-row:hover {
 
   .cx-profile {
     margin-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .wc-page,
+  .cd-page,
+  .md-page {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .ig-post-detail-back {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .ig-nav-item {
+    width: 38px;
+    height: 38px;
+  }
+
+  .ig-nav-item svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .ig-bottom-nav--six {
+    padding: 0 2px;
   }
 }
 
@@ -21642,8 +21782,12 @@ a.cd-lb-row:hover {
   margin-bottom: 4px;
   background: var(--ig-bg);
   position: sticky;
-  top: 0;
+  top: calc(max(8px, env(safe-area-inset-top)) + var(--topbar-h, 60px));
   z-index: 10;
+  transition: top 0.22s ease-out;
+}
+html[data-topbar-hidden="true"] .wc-tab-bar {
+  top: max(8px, env(safe-area-inset-top));
 }
 .wc-tab-btn {
   flex: 1;
@@ -21761,7 +21905,7 @@ a.cd-lb-row:hover {
 /* Top bar */
 .md-topbar {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 16px 12px;
   border-bottom: 1px solid var(--ig-border);
   position: sticky; top: 0; z-index: 30;
   background: var(--ig-bg);
@@ -21859,7 +22003,12 @@ a.cd-lb-row:hover {
 /* ── Tab bar ── */
 .md-tabs {
   display: flex; border-bottom: 1px solid var(--ig-border);
-  position: sticky; top: 49px; background: var(--ig-bg); z-index: 20;
+  position: sticky;
+  top: calc(52px + env(safe-area-inset-top, 0px));
+  background: var(--ig-bg); z-index: 20;
+}
+html[data-minimal-chrome="true"] .ig-topbar {
+  display: none;
 }
 .md-tab {
   flex: 1; padding: 12px 4px; background: none; border: none;
@@ -21953,26 +22102,59 @@ a.cd-lb-row:hover {
    ───────────────────────────── */
 .md-lineup { padding-bottom: 24px; }
 
+/* Pitch stage — full width on phones; wider centered pitch on desktop browsers. */
+.md-pitch-stage {
+  width: 100%;
+  max-width: min(680px, 94vw);
+  margin: 0 auto;
+}
+
+@media (min-width: 901px) {
+  .md-pitch-stage {
+    max-width: 760px;
+  }
+
+  .md-pa {
+    width: 64px;
+    max-width: 64px;
+  }
+
+  .md-frow {
+    gap: 4px;
+    padding: 0 6px;
+  }
+}
+
 /* Team badges sit outside the green pitch, above it */
 .md-pitch-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 6px 12px;
   background: var(--ig-surface);
   border-bottom: 1px solid var(--ig-border);
+}
+.md-pitch-header .md-pitch-team-badge {
+  color: var(--cx-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 0;
+}
+.md-pitch-header .md-pitch-formation {
+  color: var(--ig-muted);
 }
 
 .md-pitch {
   background: #2d7a3a;
   padding: 0;
   position: relative;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* Fixed aspect → both halves are exactly equal, so the SVG midline aligns
-     with the real home/away boundary and players stay within their half. */
-  aspect-ratio: 0.6;
+  width: 100%;
+  /* Height is set inline from formation depth (see LineupTab). */
+  min-height: 280px;
+  overflow: hidden;
 }
 
 /* SVG field drawn as absolute background */
@@ -21987,13 +22169,26 @@ a.cd-lb-row:hover {
 
 .md-pitch-half {
   flex: 1;
-  padding: 4px 8px;
+  padding: 12px 5%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   position: relative;
   z-index: 1;
   overflow: hidden;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.md-pitch-half--home {
+  justify-content: flex-start;
+  /* Inset from top touchline / penalty arc (matches SVG y≈6–29). */
+  padding-top: max(48px, 10%);
+  padding-bottom: max(16px, 5%);
+}
+.md-pitch-half--away {
+  justify-content: flex-end;
+  padding-top: max(16px, 5%);
+  padding-bottom: max(48px, 10%);
 }
 
 /* Team badge in pitch half */
@@ -22024,12 +22219,50 @@ a.cd-lb-row:hover {
   pointer-events: none;
 }
 
-/* Formation rows */
-.md-frows { display: flex; flex-direction: column; justify-content: space-evenly; flex: 1; width: 100%; }
-.md-frow  { display: flex; justify-content: space-evenly; align-items: flex-start; flex-wrap: wrap; gap: 4px; }
+/* Formation rows — space-between pushes GK to goal line, outfield toward halfway. */
+.md-frows {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+.md-frow {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 2px;
+  width: 100%;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+/* GK row — keep avatar + name fully inside the field lines, not on them. */
+.md-pitch-half--home .md-frow--gk {
+  padding-top: 10px;
+}
+.md-pitch-half--away .md-frow--gk {
+  padding-bottom: 12px;
+}
+/* Outfield rows nearest the halfway line — small inset from centre. */
+.md-pitch-half--home .md-frow:last-child:not(.md-frow--gk) {
+  padding-bottom: 4px;
+}
+.md-pitch-half--away .md-frow:first-child:not(.md-frow--gk) {
+  padding-top: 4px;
+}
 
 /* Player avatar on pitch */
-.md-pa { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; }
+.md-pa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  width: 58px;
+  max-width: 58px;
+}
 .md-pa--tappable { cursor: pointer; }
 .md-pa--tappable:hover { transform: translateY(-1px); }
 .md-motm--tappable { cursor: pointer; }
@@ -22105,14 +22338,14 @@ a.cd-lb-row:hover {
 }
 .md-pa-label {
   font-size: 0.68rem; font-weight: 700; color: #fff;
-  text-align: center; max-width: 56px;
-  white-space: normal; word-break: break-word;
+  text-align: center; width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   line-height: 1.2;
   text-shadow: 0 1px 4px rgba(0,0,0,0.6);
 }
 
 /* Bench — side by side */
-.md-bench { border-top: 1px solid var(--ig-border); }
+.md-bench { border-top: 1px solid var(--ig-border); margin-top: 0; }
 
 .md-bench-hdr {
   display: flex; align-items: center; justify-content: space-between;
@@ -22418,6 +22651,178 @@ a.cd-lb-row:hover {
 }
 .md-gbar-tick--home { background: #22c55e; }
 .md-gbar-tick--away { background: #f97316; }
+
+/* Match detail — mobile browser */
+@media (max-width: 560px) {
+  .md-page {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .md-topbar {
+    padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+  }
+
+  .md-topbar-title { font-size: 0.92rem; }
+
+  .md-tabs {
+    top: calc(49px + env(safe-area-inset-top, 0px));
+  }
+
+  .md-tab {
+    padding: 11px 2px;
+    font-size: 0.8rem;
+  }
+
+  .md-hdr { padding: 16px 12px 12px; }
+  .md-hdr-crest { width: 44px; height: 44px; }
+  .md-hdr-crest-ph { width: 44px; height: 44px; }
+  .md-sc { font-size: 2.1rem; }
+  .md-hdr-tname { font-size: 0.78rem; }
+
+  .md-goal-bar { padding: 8px 10px 10px; }
+  .md-gbar-scorer { font-size: 0.72rem; }
+  .md-gbar-team { font-size: 0.62rem; min-width: 22px; }
+
+  .md-pitch-stage {
+    max-width: 100%;
+  }
+
+  .md-pitch-header {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 6px 10px;
+  }
+
+  .md-pitch-header .md-pitch-team-badge {
+    font-size: 0.64rem;
+    gap: 4px;
+  }
+
+  .md-pitch-half {
+    padding-left: 4%;
+    padding-right: 4%;
+  }
+
+  .md-pitch-half--home {
+    padding-top: max(40px, 9%);
+    padding-bottom: max(12px, 4%);
+  }
+
+  .md-pitch-half--away {
+    padding-top: max(12px, 4%);
+    padding-bottom: max(40px, 9%);
+  }
+
+  .md-pitch-half--away .md-frow--gk {
+    padding-bottom: 8px;
+  }
+
+  .md-pa {
+    width: 52px;
+    max-width: 52px;
+  }
+
+  .md-pa-circle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .md-pa-num { font-size: 0.78rem; }
+
+  .md-pa-num-badge {
+    min-width: 14px;
+    height: 14px;
+    font-size: 0.5rem;
+  }
+
+  .md-pa-label { font-size: 0.6rem; }
+
+  .md-pa-rating {
+    font-size: 0.58rem;
+    padding: 1px 4px;
+  }
+
+  .md-pa-events { gap: 1px; }
+  .md-pa-ev-goal,
+  .md-pa-ev-assist { font-size: 0.62rem; }
+  .md-pa-ev-og { font-size: 0.54rem; }
+
+  .md-bench-hdr {
+    padding: 10px 8px 8px;
+    gap: 4px;
+  }
+
+  .md-bench-hdr-side {
+    gap: 4px;
+    font-size: 0.72rem;
+    min-width: 0;
+  }
+
+  .md-bench-hdr-side span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .md-bench-hdr-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+
+  .md-bench-pair {
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  }
+
+  .md-bc {
+    padding: 8px 6px;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .md-bc-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .md-bc-name {
+    font-size: 0.74rem;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.2;
+  }
+
+  .md-bc-meta {
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .md-bc-pos { font-size: 0.6rem; }
+  .md-bc-rating { font-size: 0.64rem; padding: 1px 5px; }
+
+  .md-coaches { padding: 12px; }
+  .md-coach-card { min-width: 0; flex: 1 1 100%; }
+
+  .md-legend {
+    gap: 8px 14px;
+    padding: 12px;
+  }
+
+  .md-legend-item { font-size: 0.72rem; }
+
+  .md-pmc {
+    max-height: min(88dvh, calc(100dvh - 24px));
+    padding: 16px;
+  }
+
+  .md-pmc-header { gap: 10px; }
+  .md-pmc-avatar { width: 52px; height: 52px; }
+  .md-pmc-name { font-size: 16px; }
+}
 
 /* ── Rating in bench cell ── */
 .md-bc-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; }

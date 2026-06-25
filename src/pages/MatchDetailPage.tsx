@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCallback, useState } from "react";
 import { WORLD_CUP_FIXTURE_DETAILS } from "../graphql/worldcup";
 
@@ -415,6 +415,18 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
 
 // ─── Lineup tab ───────────────────────────────────────────────────────────────
 
+/** Per-row vertical space on the pitch — must fit avatar, badges, event icons, and name. */
+const PITCH_ROW_H = 110;
+/** Extra clearance so home/away GK names stay inside the field markings. */
+const PITCH_HALF_EDGE = 44;
+
+function distinctFormationRows(players: LineupPlayer[]): number {
+  const rows = new Set(
+    players.filter((p) => p.grid).map((p) => parseInt(p.grid!.split(":")[0], 10)),
+  );
+  return rows.size || 1;
+}
+
 function playerPhoto(player: LineupPlayer, photoMap: Map<number, string>): string | null {
   if (player.photo) return player.photo;
   if (player.id != null) {
@@ -488,7 +500,7 @@ function PitchAvatar({
           {pev.assists > 0 && <span className="md-pa-ev-assist">{"👟".repeat(Math.min(pev.assists, 2))}{pev.assists > 2 ? `×${pev.assists}` : ""}</span>}
         </span>
       )}
-      <span className="md-pa-label">{player.name}</span>
+      <span className="md-pa-label" title={player.name}>{shortName(player.name)}</span>
     </div>
   );
 }
@@ -522,6 +534,7 @@ function FormationRows({
 
   let rows = [...byRow.entries()].sort((a, b) => a[0] - b[0]);
   if (reverse) rows = rows.reverse();
+  const gkRowNum = rows.length ? Math.min(...rows.map(([r]) => r)) : 0;
 
   return (
     <div className="md-frows">
@@ -532,7 +545,10 @@ function FormationRows({
           return mirrorCols ? bc - ac : ac - bc;
         });
         return (
-          <div key={row} className="md-frow">
+          <div
+            key={row}
+            className={`md-frow${row === gkRowNum ? " md-frow--gk" : ""}`}
+          >
             {sorted.map((p) => (
               <PitchAvatar
                 key={p.id ?? p.name}
@@ -709,13 +725,19 @@ function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlay
     [...subs].sort((a, b) => (evMap.get(pEvtKey(b))?.subOn ? 1 : 0) - (evMap.get(pEvtKey(a))?.subOn ? 1 : 0));
   const homeSubs = sortSubs(homeL?.substitutes ?? []);
   const awaySubs = sortSubs(awayL?.substitutes ?? []);
+  const halfHeight =
+    Math.max(
+      distinctFormationRows(homeL?.startXI ?? []),
+      distinctFormationRows(awayL?.startXI ?? []),
+    ) * PITCH_ROW_H + PITCH_HALF_EDGE;
 
   return (
     <div className="md-lineup">
       {/* ── Goal bar ── */}
       <GoalBar events={events} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />
 
-      {/* ── Team badges above/below pitch ── */}
+      {/* ── Pitch (phone-width stage — avoids empty green margins on desktop) ── */}
+      <div className="md-pitch-stage">
       <div className="md-pitch-header">
         {homeL && (
           <div className="md-pitch-team-badge">
@@ -733,8 +755,7 @@ function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlay
         )}
       </div>
 
-      {/* ── Pitch ── */}
-      <div className="md-pitch">
+      <div className="md-pitch" style={{ height: halfHeight * 2 }}>
         <svg className="md-pitch-svg" viewBox="0 0 100 160" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
           <rect width="100" height="160" fill="#2d7a3a" />
           <rect x="4" y="6" width="92" height="148" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.35" />
@@ -752,15 +773,16 @@ function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlay
         </svg>
 
         {homeL && (
-          <div className="md-pitch-half">
+          <div className="md-pitch-half md-pitch-half--home" style={{ height: halfHeight, flex: "none" }}>
             <FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={onPlayerClick} />
           </div>
         )}
         {awayL && (
-          <div className="md-pitch-half">
+          <div className="md-pitch-half md-pitch-half--away" style={{ height: halfHeight, flex: "none" }}>
             <FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} onPlayerClick={onPlayerClick} />
           </div>
         )}
+      </div>
       </div>
 
       {/* ── Bench (side-by-side) ── */}
@@ -1098,7 +1120,12 @@ type Tab = "overview" | "lineup" | "stats";
 export function MatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (tabFromUrl === "lineup" || tabFromUrl === "stats") return tabFromUrl;
+    return "overview";
+  });
 
   const { data, loading, error, refetch } = useQuery<{ worldCupFixture: FixtureDetails }>(
     WORLD_CUP_FIXTURE_DETAILS,

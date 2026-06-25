@@ -19,6 +19,7 @@ import {
 import { IconArchive, IconMarkRead } from "./IgIcons";
 import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME, PLATFORM_BRAND_LOGO_URL } from "../lib/moderatorBrand";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { useMobileShell } from "../lib/useMobileShell";
 import { CLAIM_POST_VOTE_PRIZE } from "../graphql/feed";
 
 function timeAgo(iso: string): string {
@@ -96,6 +97,7 @@ export function NotificationBell() {
   } = useNotifications();
   const { openChat, refetchConversations, ensureConversation } = useMessenger();
   const navigate = useNavigate();
+  const mobileShell = useMobileShell();
   const [open, setOpen] = useState(false);
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set());
   const [claimedPostIds, setClaimedPostIds] = useState<Set<string>>(() => {
@@ -329,15 +331,40 @@ export function NotificationBell() {
         )}
       </button>
 
+      {open && mobileShell ? (
+        <button
+          type="button"
+          className="nb-mobile-backdrop"
+          aria-label="Close notifications"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+
       {open && (
-        <div className="nb-dropdown" role="menu" aria-label="Notifications">
+        <div
+          className={`nb-dropdown${mobileShell ? " nb-dropdown--mobile" : ""}`}
+          role="menu"
+          aria-label="Notifications"
+        >
           <div className="nb-header">
             <span className="nb-header-title">Notifications</span>
-            {unreadCount > 0 && (
-              <button type="button" className="nb-mark-all" onClick={markAllRead}>
-                Mark all read
-              </button>
-            )}
+            <div className="nb-header-actions">
+              {unreadCount > 0 && (
+                <button type="button" className="nb-mark-all" onClick={markAllRead}>
+                  Mark all read
+                </button>
+              )}
+              {mobileShell ? (
+                <button
+                  type="button"
+                  className="nb-mobile-close"
+                  aria-label="Close"
+                  onClick={() => setOpen(false)}
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {notifications.length === 0 ? (

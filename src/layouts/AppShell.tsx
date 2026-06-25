@@ -67,11 +67,18 @@ export function AppShell() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const minimalChrome = /^\/world-cup\/match\//.test(location.pathname);
   const [navHidden, setNavHidden] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
   useEffect(() => {
     document.documentElement.dataset.topbarHidden = topbarHidden ? "true" : "false";
   }, [topbarHidden]);
+  useEffect(() => {
+    document.documentElement.dataset.minimalChrome = minimalChrome ? "true" : "false";
+    return () => {
+      document.documentElement.removeAttribute("data-minimal-chrome");
+    };
+  }, [minimalChrome]);
   const mobileShell = useMobileShell();
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [theme, setTheme] = useState<ThemeMode>(() => {
