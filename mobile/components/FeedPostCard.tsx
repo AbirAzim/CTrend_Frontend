@@ -884,7 +884,10 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			shadowRadius: 3,
 			elevation: 1,
 		},
-		pollRowPicked: { borderColor: c.accent, borderWidth: 2 },
+		pollRowPicked: {
+			borderColor: withAlpha(c.accent, 0.42),
+			borderWidth: 1.5,
+		},
 		pollRowWinner: { borderColor: 'rgba(245,158,11,0.35)', borderWidth: 1.5 },
 		pollRowLoser: { opacity: 0.55 },
 		pollFill: {
@@ -1706,7 +1709,8 @@ function FeedPostCardComponent({
 		: 0;
 	const pollPick = isPoll ? activeMyIdx : null;
 	const pollHasVoted = pollPick !== null && pollPick !== undefined;
-	const pollShowResults = pollHasVoted || isVotingClosed;
+	// Poll results (%, bar, voter count) are always visible — no vote required.
+	const pollShowResults = true;
 	const pollMaxCount = Math.max(0, ...(activeStats?.map((s) => s.count) ?? []));
 
 	useEffect(() => {
@@ -2681,7 +2685,8 @@ function FeedPostCardComponent({
 							const isLeading =
 								(stat?.count ?? 0) > 0 && stat?.count === pollMaxCount;
 							const isWinner = isVotingClosed && isLeading;
-							const isLoser = pollShowResults && !isLeading && !picked;
+							const isLoser =
+								(pollHasVoted || isVotingClosed) && !isLeading && !picked;
 							// Every option gets its own colored proportional fill (overlay),
 							// not just the leader — a distinct hue per option from the shared
 							// split palette. Pick/winner stay flagged via border + medal.
@@ -3408,24 +3413,27 @@ function FeedPostCardComponent({
 							)}
 						</View>
 
-						{/* Zone 2 — status + see details (compare & poll posts, not announcements) */}
+						{/* Zone 2 — status + see details (compare posts only; poll has no expandable panel) */}
 						{!isAnnouncement && statusText ? (
 							<View style={st.actionRailContext}>
 								<Text
 									style={[
 										st.actionStatusText,
 										isVotingClosed && st.actionStatusTextResult,
+										isPoll && { flex: 1 },
 									]}
 									numberOfLines={1}>
 									{statusText}
 								</Text>
-								<Pressable
-									style={st.seeDetailsBtn2}
-									onPress={() => setDetailsExpanded((v) => !v)}>
-									<Text style={st.seeDetailsBtnText2}>
-										{detailsExpanded ? 'Hide ‹' : 'See details ›'}
-									</Text>
-								</Pressable>
+								{!isPoll ? (
+									<Pressable
+										style={st.seeDetailsBtn2}
+										onPress={() => setDetailsExpanded((v) => !v)}>
+										<Text style={st.seeDetailsBtnText2}>
+											{detailsExpanded ? 'Hide ‹' : 'See details ›'}
+										</Text>
+									</Pressable>
+								) : null}
 							</View>
 						) : null}
 					</View>
