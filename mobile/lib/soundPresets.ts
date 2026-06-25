@@ -6,7 +6,8 @@ export type VoteSoundId =
   | "slot-tick"
   | "thock"
   | "whistle-chirp"
-  | "success-duo";
+  | "success-duo"
+  | "silent";
 
 export type NotificationSoundId =
   | "ascending-chime"
@@ -15,7 +16,8 @@ export type NotificationSoundId =
   | "soft-chime"
   | "gentle-bell"
   | "whistle-chirp"
-  | "buzz-in";
+  | "buzz-in"
+  | "silent";
 
 export type MessageSoundId =
   | "gentle-ping"
@@ -23,7 +25,8 @@ export type MessageSoundId =
   | "coin-ping"
   | "thock"
   | "slot-tick"
-  | "buzz-in";
+  | "buzz-in"
+  | "silent";
 
 export type SoundCategory = "vote" | "notification" | "message";
 
@@ -49,14 +52,14 @@ export const DEFAULT_MESSAGE_SOUND_ID: MessageSoundId = "gentle-ping";
 
 const VOTE_IDS: VoteSoundId[] = [
   "buzz-in", "crowd-pop", "soft-pop", "coin-ping",
-  "slot-tick", "thock", "whistle-chirp", "success-duo",
+  "slot-tick", "thock", "whistle-chirp", "success-duo", "silent",
 ];
 const NOTIFICATION_IDS: NotificationSoundId[] = [
   "ascending-chime", "success-duo", "coin-ping",
-  "soft-chime", "gentle-bell", "whistle-chirp", "buzz-in",
+  "soft-chime", "gentle-bell", "whistle-chirp", "buzz-in", "silent",
 ];
 const MESSAGE_IDS: MessageSoundId[] = [
-  "gentle-ping", "soft-pop", "coin-ping", "thock", "slot-tick", "buzz-in",
+  "gentle-ping", "soft-pop", "coin-ping", "thock", "slot-tick", "buzz-in", "silent",
 ];
 
 export function isVoteSoundId(v: string): v is VoteSoundId {
@@ -84,6 +87,7 @@ export const VOTE_SOUND_PRESETS: SoundPresetMeta[] = [
   meta("thock", "Thock", "Keyboard confirm.", "~100ms", "⌨️"),
   meta("whistle-chirp", "Whistle chirp", "Short ref whistle.", "~180ms", "⚽"),
   meta("success-duo", "Success duo", "Two-note rise.", "~220ms", "✅"),
+  meta("silent", "Silent", "No sound when you vote.", "—", "🔇"),
 ];
 
 export const NOTIFICATION_SOUND_PRESETS: SoundPresetMeta[] = [
@@ -94,6 +98,7 @@ export const NOTIFICATION_SOUND_PRESETS: SoundPresetMeta[] = [
   meta("gentle-bell", "Gentle bell", "Single soft bell.", "~350ms", "🛎️"),
   meta("whistle-chirp", "Whistle chirp", "Sporty alert.", "~180ms", "⚽"),
   meta("buzz-in", "Buzz-in", "Sharp buzz alert.", "~130ms", "📳"),
+  meta("silent", "Silent", "No sound for notifications.", "—", "🔇"),
 ];
 
 export const MESSAGE_SOUND_PRESETS: SoundPresetMeta[] = [
@@ -103,6 +108,7 @@ export const MESSAGE_SOUND_PRESETS: SoundPresetMeta[] = [
   meta("thock", "Thock", "Tactile tap.", "~100ms", "⌨️"),
   meta("slot-tick", "Slot tick", "Quick click.", "~60ms", "🎰"),
   meta("buzz-in", "Buzz-in", "Buzz on new message.", "~130ms", "🔔"),
+  meta("silent", "Silent", "No sound for messages.", "—", "🔇"),
 ];
 
 export const SOUND_PRESETS_BY_CATEGORY: Record<SoundCategory, SoundPresetMeta[]> = {

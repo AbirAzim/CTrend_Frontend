@@ -30,8 +30,6 @@ export default function SoundPreferencesScreen() {
     setSoundPreference,
     savingPreference,
     previewSound,
-    prepareSounds,
-    soundsReady,
     setVibrationEnabled,
   } = useSounds();
 
@@ -98,18 +96,8 @@ export default function SoundPreferencesScreen() {
       >
         {/* Lead text */}
         <Text style={[st.lead, { color: colors.muted }]}>
-          Choose sounds for votes, notifications, and messages. Saved on this device.
+          Choose sounds for votes, notifications, and messages. Saved on this device. Plays at your phone's media volume.
         </Text>
-
-        {/* Load sounds — primes the players so the first preview plays */}
-        <Pressable
-          style={[st.loadBtn, { borderColor: colors.accent, backgroundColor: soundsReady ? colors.section : "transparent" }]}
-          onPress={() => prepareSounds()}
-        >
-          <Text style={[st.loadBtnText, { color: colors.accent }]}>
-            {soundsReady ? "✓  Sounds ready" : "⬇  Load sounds"}
-          </Text>
-        </Pressable>
 
         {/* Vibration toggle */}
         <View style={[st.vibrationRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -186,15 +174,17 @@ export default function SoundPreferencesScreen() {
                     <Text style={[st.cardDuration, { color: colors.muted }]}>{preset.duration}</Text>
                   </View>
                 </View>
-                <Pressable
-                  style={[st.previewBtn, { borderColor: colors.accent, opacity: isPreviewing ? 0.5 : 1 }]}
-                  onPress={(e) => { e.stopPropagation?.(); handlePreview(preset.id); }}
-                  hitSlop={6}
-                >
-                  <Text style={[st.previewBtnText, { color: colors.accent }]}>
-                    {isPreviewing ? "▶" : "▶ Preview"}
-                  </Text>
-                </Pressable>
+                {preset.id !== "silent" ? (
+                  <Pressable
+                    style={[st.previewBtn, { borderColor: colors.accent, opacity: isPreviewing ? 0.5 : 1 }]}
+                    onPress={(e) => { e.stopPropagation?.(); handlePreview(preset.id); }}
+                    hitSlop={6}
+                  >
+                    <Text style={[st.previewBtnText, { color: colors.accent }]}>
+                      {isPreviewing ? "▶" : "▶ Preview"}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </Pressable>
             );
           })}
@@ -219,11 +209,6 @@ const st = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: "700" },
   savingIndicator: { width: 20 },
   lead: { fontSize: 13, marginHorizontal: 16, marginTop: 14, marginBottom: 8, lineHeight: 18 },
-  loadBtn: {
-    marginHorizontal: 16, marginBottom: 10, borderRadius: 10, borderWidth: 1,
-    paddingVertical: 10, alignItems: "center", justifyContent: "center",
-  },
-  loadBtnText: { fontSize: 13, fontWeight: "700" },
   vibrationRow: {
     flexDirection: "row", alignItems: "center", gap: 12,
     marginHorizontal: 16, marginBottom: 12, borderRadius: 12, borderWidth: 1,
