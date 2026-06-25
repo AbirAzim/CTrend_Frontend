@@ -21,7 +21,6 @@
   "dependencies": {
     "@apollo/client": "^3.13.8",
     "@react-oauth/google": "^0.13.5",
-    "@vercel/og": "^0.11.1",
     "apollo3-cache-persist": "^0.15.0",
     "expo": "~56.0.6",
     "graphql": "^16.11.0",
@@ -29,7 +28,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-native": "0.85.3",
-    "react-router-dom": "^7.14.0"
+    "react-router-dom": "^7.14.0",
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

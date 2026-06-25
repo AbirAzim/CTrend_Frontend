@@ -8,7 +8,7 @@ import {
   fetchPost,
   buildPostMeta,
   SITE_NAME,
-} from './_postOgShared.js';
+} from './postOgShared.js';
 
 function metaTags(post, pageUrl, origin) {
   const meta = buildPostMeta(post, pageUrl, origin);
