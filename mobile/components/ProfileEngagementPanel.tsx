@@ -20,6 +20,8 @@ import { useCoins } from "../context/CoinsContext";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 import { InviteFriendModal } from "./InviteFriendModal";
+import { LeaderboardRankBadge } from "./LeaderboardRankBadge";
+import { useCoinLeaderboardRank } from "../hooks/useCoinLeaderboardRank";
 
 type CampaignWinRow = {
   campaignId?: string | null;
@@ -61,6 +63,7 @@ export function ProfileEngagementPanel({
     { fetchPolicy: "cache-first" },
   );
   const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
+  const coinRank = useCoinLeaderboardRank(userId, coins);
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
   const [redeem, { loading: redeeming }] = useMutation(REDEEM_REFERRAL_CODE);
 
@@ -126,6 +129,12 @@ export function ProfileEngagementPanel({
           <Text style={st.cardSub} numberOfLines={2}>
             {isSelf ? "Activity & voting" : `${displayName ?? "Member"}`}
           </Text>
+          {coinRank ? (
+            <View style={st.rankChip}>
+              <LeaderboardRankBadge rank={coinRank} size="sm" />
+              <Text style={st.rankChipLabel}>Leaderboard</Text>
+            </View>
+          ) : null}
           {isSelf ? (
             <Pressable style={st.claimBtn} onPress={(e) => { e.stopPropagation?.(); void onClaim(); }} disabled={claiming}>
               <Text style={st.claimBtnText}>{claiming ? "…" : "📅 Daily"}</Text>
@@ -346,6 +355,27 @@ function makeStyles(c: ColorPalette) {
       marginTop: 2,
     },
     cardSubPaused: { color: c.muted, lineHeight: 12 },
+    rankChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      alignSelf: "flex-start",
+      marginTop: 6,
+      paddingVertical: 3,
+      paddingRight: 7,
+      paddingLeft: 3,
+      borderRadius: 999,
+      backgroundColor: "rgba(245,197,24,0.14)",
+      borderWidth: 1,
+      borderColor: "rgba(245,197,24,0.32)",
+    },
+    rankChipLabel: {
+      fontSize: 8,
+      fontWeight: "800",
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+      color: "#d99411",
+    },
     claimBtn: {
       alignSelf: "flex-start",
       marginTop: 8,

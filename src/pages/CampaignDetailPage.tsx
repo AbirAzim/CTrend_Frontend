@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { CAMPAIGN_BY_SLUG, CAMPAIGN_WIN_LEADERBOARD } from "../graphql/campaigns";
 import { WORLD_CUP_FIXTURES } from "../graphql/worldcup";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { LeaderboardRankBadge } from "../components/LeaderboardRankBadge";
+import { leaderboardRankRowClass } from "@ctrend/shared/lib/leaderboardRank";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -467,11 +469,10 @@ function WinnersLeaderboardSection({ campaignId }: { campaignId: string }) {
             const u = row.user;
             const name = u?.displayName?.trim() || u?.username || "User";
             const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
-            const medal =
-              row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : null;
+            const rowTierClass = leaderboardRankRowClass(row.rank);
             const content = (
               <>
-                <span className="cd-lb-rank">{medal ?? `#${row.rank}`}</span>
+                <LeaderboardRankBadge rank={row.rank} />
                 <span className="cd-lb-avatar" aria-hidden>
                   {img ? (
                     <img src={img} alt="" />
@@ -488,11 +489,11 @@ function WinnersLeaderboardSection({ campaignId }: { campaignId: string }) {
               </>
             );
             return u?.id ? (
-              <Link key={u.id} to={`/profile/${u.id}`} className="cd-lb-row">
+              <Link key={u.id} to={`/profile/${u.id}`} className={`cd-lb-row${rowTierClass ? ` ${rowTierClass}` : ""}`}>
                 {content}
               </Link>
             ) : (
-              <div key={row.rank} className="cd-lb-row">
+              <div key={row.rank} className={`cd-lb-row${rowTierClass ? ` ${rowTierClass}` : ""}`}>
                 {content}
               </div>
             );

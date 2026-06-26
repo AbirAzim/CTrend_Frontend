@@ -755,9 +755,9 @@ export function ProfilePage() {
         </button>
       </div>
 
-      {user?.id ? (
+      {userId ? (
         <ProfileEngagementPanel
-          userId={user.id}
+          userId={userId}
           coins={balance ?? 0}
           isSelf
           displayName={displayName}

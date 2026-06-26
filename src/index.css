@@ -23603,6 +23603,107 @@ html[data-minimal-chrome="true"] .ig-topbar {
   cursor: pointer;
 }
 
+/* Leaderboard rank badges (podium + numbered) */
+.lb-rank-badge {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lb-rank-badge--md {
+  width: 36px;
+  height: 36px;
+}
+.lb-rank-badge--sm {
+  width: 28px;
+  height: 28px;
+}
+.lb-rank-badge-num {
+  font-weight: 900;
+  line-height: 1;
+}
+.lb-rank-badge--md .lb-rank-badge-num { font-size: 0.9rem; }
+.lb-rank-badge--sm .lb-rank-badge-num { font-size: 0.75rem; }
+.lb-rank-badge--gold {
+  background: linear-gradient(145deg, #ffe88a 0%, #f5c518 48%, #d99411 100%);
+  border: 2px solid rgba(255, 232, 138, 0.85);
+  color: #5c3a00;
+  box-shadow: 0 2px 10px rgba(245, 197, 24, 0.35);
+}
+.lb-rank-badge--gold .lb-rank-badge-num { color: #5c3a00; }
+.lb-rank-badge--silver {
+  background: linear-gradient(145deg, #f0f4f8 0%, #c0c8d4 50%, #9aa5b5 100%);
+  border: 2px solid rgba(232, 237, 242, 0.9);
+  color: #3d4654;
+  box-shadow: 0 2px 8px rgba(148, 163, 184, 0.28);
+}
+.lb-rank-badge--bronze {
+  background: linear-gradient(145deg, #e8a86a 0%, #cd7f32 50%, #9a5c1a 100%);
+  border: 2px solid rgba(232, 168, 106, 0.75);
+  color: #4a2c0a;
+  box-shadow: 0 2px 8px rgba(205, 127, 50, 0.3);
+}
+.lb-rank-badge--default {
+  background: var(--ig-section, #f4f4f5);
+  border: 1px solid var(--ig-border, #e4e4e7);
+  color: var(--ig-muted, #65676b);
+  box-shadow: none;
+}
+
+.lb-row--gold {
+  border-color: rgba(245, 197, 24, 0.45) !important;
+  background: linear-gradient(135deg, rgba(245, 197, 24, 0.14), rgba(255, 255, 255, 0)) !important;
+}
+.lb-row--silver {
+  border-color: rgba(192, 200, 212, 0.55) !important;
+  background: linear-gradient(135deg, rgba(192, 200, 212, 0.12), rgba(255, 255, 255, 0)) !important;
+}
+.lb-row--bronze {
+  border-color: rgba(205, 127, 50, 0.45) !important;
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.1), rgba(255, 255, 255, 0)) !important;
+}
+:root[data-theme="dark"] .lb-row--gold {
+  background: linear-gradient(135deg, rgba(245, 197, 24, 0.12), rgba(0, 0, 0, 0)) !important;
+}
+:root[data-theme="dark"] .lb-row--silver {
+  background: linear-gradient(135deg, rgba(192, 200, 212, 0.1), rgba(0, 0, 0, 0)) !important;
+}
+:root[data-theme="dark"] .lb-row--bronze {
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.1), rgba(0, 0, 0, 0)) !important;
+}
+
+.cx-profile-reward-card-sub-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.cx-profile-rank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+  padding: 3px 8px 3px 4px;
+  border-radius: 999px;
+  background: rgba(245, 197, 24, 0.14);
+  border: 1px solid rgba(245, 197, 24, 0.32);
+}
+.cx-profile-rank-chip-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #b8860b;
+}
+:root[data-theme="dark"] .cx-profile-rank-chip-label { color: #f5c518; }
+
 /* Leaderboard rows */
 .cx-coins-lb-row {
   display: flex;

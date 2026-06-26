@@ -8,6 +8,8 @@ import { useCoins } from "../context/CoinsContext";
 import { COIN_AMOUNTS } from "../lib/coins";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useState } from "react";
+import { LeaderboardRankBadge } from "./LeaderboardRankBadge";
+import { useCoinLeaderboardRank } from "../hooks/useCoinLeaderboardRank";
 
 type CampaignWinRow = {
   campaignId?: string | null;
@@ -48,6 +50,7 @@ export function ProfileEngagementPanel({
     { fetchPolicy: "cache-first" },
   );
   const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
+  const coinRank = useCoinLeaderboardRank(userId, coins);
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
   const [redeem, { loading: redeeming }] = useMutation(REDEEM_REFERRAL_CODE);
 
@@ -111,9 +114,17 @@ export function ProfileEngagementPanel({
           <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--coin" aria-hidden>¢</span>
           <span className="cx-profile-reward-card-label">Engagement coins</span>
           <span className="cx-profile-reward-card-value">{coins.toLocaleString()}</span>
-          <span className="cx-profile-reward-card-sub">
-            {isSelf ? "Activity & voting" : `${displayName ?? "Member"}'s balance`}
-          </span>
+          <div className="cx-profile-reward-card-sub-row">
+            <span className="cx-profile-reward-card-sub">
+              {isSelf ? "Activity & voting" : `${displayName ?? "Member"}'s balance`}
+            </span>
+            {coinRank ? (
+              <span className="cx-profile-rank-chip">
+                <LeaderboardRankBadge rank={coinRank} size="sm" />
+                <span className="cx-profile-rank-chip-label">Leaderboard</span>
+              </span>
+            ) : null}
+          </div>
           {isSelf ? (
             <button
               type="button"

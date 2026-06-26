@@ -12,6 +12,8 @@ import { COIN_AMOUNTS, COIN_META, type CoinType } from "../lib/coins";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { LeaderboardRankBadge } from "../components/LeaderboardRankBadge";
+import { leaderboardRankRowClass } from "@ctrend/shared/lib/leaderboardRank";
 
 type HistoryItem = {
   id: string;
@@ -217,17 +219,14 @@ export function CoinsPage() {
             const name = u?.displayName?.trim() || u?.username || "User";
             const isMe = u?.id && u.id === user?.id;
             const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
-            const medal =
-              row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : null;
+            const rowTierClass = leaderboardRankRowClass(row.rank);
             return (
               <Link
                 key={u?.id ?? row.rank}
                 to={u?.id ? `/coins/${u.id}` : "#"}
-                className={`cx-coins-lb-row${isMe ? " cx-coins-lb-row--me" : ""}`}
+                className={`cx-coins-lb-row${isMe ? " cx-coins-lb-row--me" : ""}${rowTierClass ? ` ${rowTierClass}` : ""}`}
               >
-                <span className="cx-coins-lb-rank">
-                  {medal ?? `#${row.rank}`}
-                </span>
+                <LeaderboardRankBadge rank={row.rank} />
                 <span className="cx-coins-lb-avatar" aria-hidden>
                   {img ? (
                     <img src={img} alt="" />

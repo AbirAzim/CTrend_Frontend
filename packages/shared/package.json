@@ -25,6 +25,7 @@
     "./lib/contentReport": "./src/lib/contentReport.ts",
     "./lib/formatRelativeTime": "./src/lib/formatRelativeTime.ts",
     "./lib/friendRequestNotification": "./src/lib/friendRequestNotification.ts",
+    "./lib/leaderboardRank": "./src/lib/leaderboardRank.ts",
     "./lib/mapGqlPostToFeedView": "./src/lib/mapGqlPostToFeedView.ts",
     "./lib/notificationTime": "./src/lib/notificationTime.ts",
     "./lib/parseTextLinks": "./src/lib/parseTextLinks.ts",

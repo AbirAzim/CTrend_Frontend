@@ -42,6 +42,13 @@ export const COIN_LEADERBOARD = gql`
   }
 `;
 
+/** Leaderboard position for a user (null if no coins earned). */
+export const COIN_LEADERBOARD_RANK = gql`
+  query CoinLeaderboardRank($userId: ID) {
+    coinLeaderboardRank(userId: $userId)
+  }
+`;
+
 /** Claim the once-a-day login streak bonus. */
 export const CLAIM_DAILY_COINS = gql`
   mutation ClaimDailyCoins {

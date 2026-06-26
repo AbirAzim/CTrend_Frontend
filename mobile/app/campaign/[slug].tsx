@@ -23,6 +23,8 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
 import { BottomNav } from "../../components/BottomNav";
+import { LeaderboardRankBadge } from "../../components/LeaderboardRankBadge";
+import { leaderboardRankRowClass } from "@ctrend/shared/lib/leaderboardRank";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -478,7 +480,11 @@ type LeaderRow = {
   } | null;
 };
 
-const LB_MEDAL = ["#f5c518", "#cbd2d9", "#cd7f32"]; // gold, silver, bronze
+const LB_ROW_TIER: Record<string, { border: string; bg: string }> = {
+  "lb-row--gold": { border: "rgba(245,197,24,0.45)", bg: "rgba(245,197,24,0.12)" },
+  "lb-row--silver": { border: "rgba(192,200,212,0.5)", bg: "rgba(192,200,212,0.1)" },
+  "lb-row--bronze": { border: "rgba(205,127,50,0.45)", bg: "rgba(205,127,50,0.1)" },
+};
 
 function WinnersLeaderboardSection({
   campaignId,
@@ -527,20 +533,25 @@ function WinnersLeaderboardSection({
           const u = row.user;
           const name = u?.displayName?.trim() || u?.username || "User";
           const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
-          const medal = LB_MEDAL[row.rank - 1] ?? null;
+          const tierKey = leaderboardRankRowClass(row.rank);
+          const tierStyle = tierKey ? LB_ROW_TIER[tierKey] : null;
           return (
             <Pressable
               key={u?.id ?? row.rank}
-              style={[styles.lbRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[
+                styles.lbRow,
+                {
+                  backgroundColor: tierStyle?.bg ?? colors.card,
+                  borderColor: tierStyle?.border ?? colors.border,
+                },
+              ]}
               onPress={() => u?.id && router.push(`/profile/${u.id}` as `/${string}`)}
             >
-              <Text style={[styles.lbRank, { color: medal ?? colors.muted }]}>
-                {medal ? ["🥇", "🥈", "🥉"][row.rank - 1] : `#${row.rank}`}
-              </Text>
+              <LeaderboardRankBadge rank={row.rank} />
               <View
                 style={[
                   styles.lbAvatar,
-                  { backgroundColor: colors.section, borderColor: medal ?? "transparent", borderWidth: medal ? 2 : 0 },
+                  { backgroundColor: colors.section },
                 ]}
               >
                 {img ? (

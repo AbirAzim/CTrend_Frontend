@@ -23,6 +23,8 @@ import { useCoins, useCoinsBalance } from "../context/CoinsContext";
 import { useTheme, type ColorPalette } from "../context/ThemeContext";
 import { useTabBar } from "../context/TabBarContext";
 import { BottomNav } from "./BottomNav";
+import { LeaderboardRankBadge } from "./LeaderboardRankBadge";
+import { leaderboardRankRowClass } from "@ctrend/shared/lib/leaderboardRank";
 
 type HistoryItem = { id: string; type: CoinType; amount: number; createdAt: string };
 type LeaderRow = {
@@ -172,13 +174,21 @@ export function CoinsHub({ userId }: { userId?: string }) {
     const name = u?.displayName?.trim() || u?.username || "User";
     const isMe = !!u?.id && u.id === user?.id;
     const img = normalizeProfileImageUrl(u?.profileImageUrl ?? null);
-    const medal = row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : null;
+    const tier = leaderboardRankRowClass(row.rank);
+    const tierStyle =
+      tier === "lb-row--gold"
+        ? st.lbRowGold
+        : tier === "lb-row--silver"
+          ? st.lbRowSilver
+          : tier === "lb-row--bronze"
+            ? st.lbRowBronze
+            : null;
     return (
       <Pressable
-        style={[st.lbRow, isMe && st.lbRowMe]}
+        style={[st.lbRow, isMe && st.lbRowMe, tierStyle]}
         onPress={() => u?.id && router.push(`/coins/${u.id}` as `/${string}`)}
       >
-        <Text style={st.lbRank}>{medal ?? `#${row.rank}`}</Text>
+        <LeaderboardRankBadge rank={row.rank} />
         <View style={st.lbAvatar}>
           {img ? (
             <Image source={{ uri: img }} style={st.lbAvatarImg} />
@@ -374,7 +384,9 @@ function makeStyles(c: ColorPalette) {
       marginBottom: 6,
     },
     lbRowMe: { borderColor: "rgba(245,197,24,0.5)", backgroundColor: "rgba(245,197,24,0.10)" },
-    lbRank: { width: 34, textAlign: "center", fontWeight: "900", fontSize: 15, color: c.muted },
+    lbRowGold: { borderColor: "rgba(245,197,24,0.45)", backgroundColor: "rgba(245,197,24,0.12)" },
+    lbRowSilver: { borderColor: "rgba(192,200,212,0.5)", backgroundColor: "rgba(192,200,212,0.1)" },
+    lbRowBronze: { borderColor: "rgba(205,127,50,0.45)", backgroundColor: "rgba(205,127,50,0.1)" },
     lbAvatar: {
       width: 40,
       height: 40,
