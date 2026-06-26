@@ -82,25 +82,25 @@ Every Play Store upload needs a higher `versionCode` than the previous one. Edit
 
 **`mobile/android/app/build.gradle`**
 ```gradle
-versionCode 37          ← increment by 1
-versionName "1.10.0"   ← bump semver (major.minor.patch)
+versionCode 38          ← increment by 1
+versionName "1.11.0"   ← bump semver (major.minor.patch)
 ```
 
 **`mobile/app.json`**
 ```json
-"version": "1.10.0",
+"version": "1.11.0",
 "android": {
-  "versionCode": 37,
+  "versionCode": 38,
 ```
 
 **`packages/shared/src/lib/appUpdate.ts`**
 ```ts
-export const BUNDLED_ANDROID_VERSION_CODE = 37;
+export const BUNDLED_ANDROID_VERSION_CODE = 38;
 ```
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.9.0 release: **versionCode 36** across all three files.
+Current version after 1.10.0 release: **versionCode 37** across all three files.
 
 ---
 
@@ -177,13 +177,14 @@ Verify cold start works, login works, feed loads from production API.
 1. Open [Play Console](https://play.google.com/console) → your app → **Testing → Closed testing**
 2. Click **Create new release**
 3. Upload `mobile/android/app/build/outputs/bundle/release/app-release.aab`
-4. **Release name:** `{versionName} ({versionCode})` — e.g. `1.9.0 (36)`
+4. **Release name:** `{versionName} ({versionCode})` — e.g. `1.10.0 (37)`
 5. **What's new** (shown to users in Play Store update listing):
    ```
    • [Feature 1 in plain language]
    • [Feature 2]
    • Bug fixes and stability improvements
    ```
+   See **Play Console copy** below for the current release.
 6. Click **Save → Review release → Start rollout to Closed testing**
 
 Play Store links:
@@ -206,8 +207,34 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.10.0 (37)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.10.0 (37)
+```
+
+**What's new** (user-facing release notes)
+```
+• Leaderboard ranks on your profile — see your coin standing at a glance
+• Smarter notifications — vote, comment, and chat alerts work reliably in the background
+• Invite friends anytime; referral points can be turned on or off by admins
+• Cleaner rewards cards and a polished app launch screen
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Major quality release: notification pipeline (FCM + Notifee), referral program toggle,
+coin leaderboard rank badges, splash screen branding, profile rewards UI, startup sound fix.
+Requires backend deploy with coinLeaderboardRank + referralSystemEnabled APIs.
+```
 
 ---
 
@@ -280,7 +307,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.9.0 (versionCode 36) |
+| Current version | 1.10.0 (versionCode 37) |
 
 ---
 
