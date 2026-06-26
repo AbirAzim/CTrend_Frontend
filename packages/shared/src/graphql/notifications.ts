@@ -19,6 +19,7 @@ export const MY_NOTIFICATIONS = gql`
         read
         archived
         createdAt
+        updatedAt
       }
       totalCount
       unreadCount
@@ -80,6 +81,7 @@ export const NEW_NOTIFICATION_SUB = gql`
       read
       archived
       createdAt
+      updatedAt
     }
   }
 `;

@@ -20,6 +20,7 @@ import { REFERRAL_POINTS } from "../graphql/coins";
 import { REFERRAL_POINTS_HISTORY } from "../graphql/referrals";
 import { useAuth } from "./AuthContext";
 import { playNotificationChime } from "../lib/notificationSound";
+import { notificationActivityAt } from "@ctrend/shared/lib/notificationTime";
 
 export type NotificationItem = {
   id: string;
@@ -37,7 +38,16 @@ export type NotificationItem = {
   read: boolean;
   archived?: boolean;
   createdAt: string;
+  updatedAt?: string | null;
 };
+
+function sortNotifications(items: NotificationItem[]): NotificationItem[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(notificationActivityAt(b)).getTime() -
+      new Date(notificationActivityAt(a)).getTime(),
+  );
+}
 
 type NotificationContextValue = {
   notifications: NotificationItem[];
@@ -66,7 +76,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // FAB badge, not the bell icon.
       const items: NotificationItem[] = data?.myNotifications?.items ?? [];
       setNotifications(
-        items.filter((n) => n.type !== "MESSAGE" && !n.archived),
+        sortNotifications(items.filter((n) => n.type !== "MESSAGE" && !n.archived)),
       );
     },
   });
@@ -116,15 +126,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (!n || n.type === "MESSAGE" || n.archived) return;
       let skipChime = false;
       setNotifications((prev) => {
-        // Grouped notifications (POST_HYPE / POST_COMMENT) reuse the same id
-        // when updated — replace the existing entry rather than duplicating
         const existingIdx = prev.findIndex((p) => p.id === n.id);
         if (existingIdx >= 0) {
           if (n.type === 'FRIEND_REQUEST') skipChime = true;
           const merged = { ...prev[existingIdx], ...n, read: n.read ?? false };
-          return [merged, ...prev.slice(0, existingIdx), ...prev.slice(existingIdx + 1)];
+          return sortNotifications([
+            merged,
+            ...prev.slice(0, existingIdx),
+            ...prev.slice(existingIdx + 1),
+          ]);
         }
-        return [n, ...prev];
+        return sortNotifications([n, ...prev]);
       });
       if (!skipChime) playNotificationChime();
       if (n.type === "REFERRAL_JOINED" || n.type === "REFERRAL_REDEEMED") {

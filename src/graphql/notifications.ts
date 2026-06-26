@@ -1,79 +1,9 @@
-import { gql } from "@apollo/client";
-
-export const MY_NOTIFICATIONS = gql`
-  query MyNotifications($skip: Int, $take: Int) {
-    myNotifications(skip: $skip, take: $take) {
-      items {
-        id
-        type
-        title
-        body
-        referenceId
-        referenceType
-        postId
-        actorCount
-        latestActorId
-        latestActorName
-        latestActorAvatar
-        commentId
-        read
-        archived
-        createdAt
-      }
-      totalCount
-      unreadCount
-    }
-  }
-`;
-
-export const UNREAD_NOTIFICATION_COUNT = gql`
-  query UnreadNotificationCount {
-    unreadNotificationCount
-  }
-`;
-
-export const MARK_NOTIFICATION_READ = gql`
-  mutation MarkNotificationRead($id: ID!) {
-    markNotificationRead(id: $id)
-  }
-`;
-
-export const MARK_ALL_NOTIFICATIONS_READ = gql`
-  mutation MarkAllNotificationsRead {
-    markAllNotificationsRead
-  }
-`;
-
-export const ARCHIVE_NOTIFICATION = gql`
-  mutation ArchiveNotification($id: ID!) {
-    archiveNotification(id: $id)
-  }
-`;
-
-export const SEND_ADMIN_BROADCAST = gql`
-  mutation SendAdminBroadcast($title: String!, $body: String!) {
-    sendAdminBroadcast(title: $title, body: $body)
-  }
-`;
-
-export const NEW_NOTIFICATION_SUB = gql`
-  subscription NewNotification {
-    newNotification {
-      id
-      type
-      title
-      body
-      referenceId
-      referenceType
-      postId
-      commentId
-      actorCount
-      latestActorId
-      latestActorName
-      latestActorAvatar
-      read
-      archived
-      createdAt
-    }
-  }
-`;
+export {
+  MY_NOTIFICATIONS,
+  UNREAD_NOTIFICATION_COUNT,
+  MARK_NOTIFICATION_READ,
+  MARK_ALL_NOTIFICATIONS_READ,
+  ARCHIVE_NOTIFICATION,
+  SEND_ADMIN_BROADCAST,
+  NEW_NOTIFICATION_SUB,
+} from "@ctrend/shared/graphql/notifications";

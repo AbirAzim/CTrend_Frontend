@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { notificationActivityAt } from "@ctrend/shared/lib/notificationTime";
 import { useMutation, useQuery } from "@apollo/client";
 import { useNotifications, type NotificationItem } from "../context/NotificationContext";
 import { useMessenger } from "../context/MessengerContext";
@@ -450,7 +451,7 @@ export function NotificationBell() {
                         {n.body}
                       </p>
                       <div className="nb-item-meta">
-                        <span className="nb-item-time">{timeAgo(n.createdAt)}</span>
+                        <span className="nb-item-time">{timeAgo(notificationActivityAt(n))}</span>
                         {showFriendReqActions ? (
                           <button
                             type="button"

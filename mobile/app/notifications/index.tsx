@@ -38,6 +38,7 @@ import { MY_FRIENDS } from "@ctrend/shared/graphql/friends";
 import { CLAIM_POST_VOTE_PRIZE } from "@ctrend/shared/graphql/feed";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import { notificationActivityAt } from "@ctrend/shared/lib/notificationTime";
 import { PLAY_STORE_CLOSED_TESTING_URL } from "@ctrend/shared/lib/appUpdate";
 import logoAsset from "../../assets/logo.png";
 import { BottomNav } from "../../components/BottomNav";
@@ -63,7 +64,16 @@ type GqlNotification = {
   read: boolean;
   archived?: boolean;
   createdAt: string;
+  updatedAt?: string | null;
 };
+
+function sortNotifications(items: GqlNotification[]): GqlNotification[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(notificationActivityAt(b)).getTime() -
+      new Date(notificationActivityAt(a)).getTime(),
+  );
+}
 
 type NotifData = {
   myNotifications: {
@@ -400,7 +410,7 @@ function NotifRow({
 
           {/* Time + mark-read button on same line (swipe replaces Dismiss) */}
           <View style={st.metaRow}>
-            <Text style={st.timeText}>{formatRelativeTime(notif.createdAt)}</Text>
+            <Text style={st.timeText}>{formatRelativeTime(notificationActivityAt(notif))}</Text>
             {!notif.read && (
               <Pressable
                 hitSlop={10}
@@ -541,10 +551,10 @@ export default function NotificationsScreen() {
       if (!n || n.archived) return;
       setItems((prev) => {
         const exists = prev.some((x) => x.id === n.id);
-        if (exists) {
-          return [n, ...prev.filter((x) => x.id !== n.id)];
-        }
-        return [n, ...prev];
+        const merged = exists
+          ? [n, ...prev.filter((x) => x.id !== n.id)]
+          : [n, ...prev];
+        return sortNotifications(merged);
       });
     },
   });

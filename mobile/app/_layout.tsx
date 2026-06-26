@@ -20,7 +20,7 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import { TabBarProvider } from "../context/TabBarContext";
 import { SoundProvider, useSounds } from "../context/SoundContext";
-import { NotificationProvider, useNotification, type NotifToast } from "../context/NotificationContext";
+import { NotificationProvider, type NotifToast } from "../context/NotificationContext";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { ForceUpdateModal } from "../components/ForceUpdateModal";
 import { WorldCupFloating } from "../components/WorldCupFloating";
@@ -174,7 +174,6 @@ async function resolveActorAvatar(
 // Fires for bell-type notifications (votes, comments, friend requests, etc.) on every screen.
 function GlobalNotificationSubscription() {
   const { isAuthenticated } = useAuth();
-  const { showToast } = useNotification();
   const { playNotification } = useSounds();
   const client = useApolloClient();
 
@@ -194,36 +193,29 @@ function GlobalNotificationSubscription() {
 
       playNotification();
 
-      // Resolve avatar once — used for in-app banner + Android status-bar notification.
-      void resolveActorAvatar(
-        client,
-        raw.latestActorAvatar as string | null | undefined,
-        actorId,
-      ).then((actorAvatar) => {
-        showToast({
-          id: n.id,
-          type: n.type,
-          title,
-          body,
-          referenceId: n.referenceId,
-          referenceType: n.referenceType,
-          postId,
-          actorAvatarUrl: actorAvatar,
+      // Foreground: system tray via Notifee (native FCM is skipped while app is open).
+      // Background/killed: CtrendMessagingService renders the push — no JS post here.
+      if (AppState.currentState === "active") {
+        void initMessageNotifications();
+        void resolveActorAvatar(
+          client,
+          raw.latestActorAvatar as string | null | undefined,
+          actorId,
+        ).then((actorAvatar) => {
+          void postBellNotification({
+            title,
+            body,
+            actorAvatar,
+            notifType: n.type ?? null,
+            referenceType: n.referenceType ?? null,
+            referenceId: n.referenceId ?? null,
+            postId,
+            commentId,
+          });
         });
-        void postBellNotification({
-          title,
-          body,
-          actorAvatar,
-          notifType: n.type ?? null,
-          referenceType: n.referenceType ?? null,
-          referenceId: n.referenceId ?? null,
-          postId,
-          commentId,
-        });
-      });
+      }
 
-      // Refresh bell badge count
-      void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
+      void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT, MY_NOTIFICATIONS] });
 
       if (n.type === "REFERRAL_JOINED" || n.type === "REFERRAL_REDEEMED") {
         void client.refetchQueries({

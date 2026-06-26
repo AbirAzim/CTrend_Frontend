@@ -26,7 +26,7 @@
     "./lib/formatRelativeTime": "./src/lib/formatRelativeTime.ts",
     "./lib/friendRequestNotification": "./src/lib/friendRequestNotification.ts",
     "./lib/mapGqlPostToFeedView": "./src/lib/mapGqlPostToFeedView.ts",
-    "./lib/moderatorBrand": "./src/lib/moderatorBrand.ts",
+    "./lib/notificationTime": "./src/lib/notificationTime.ts",
     "./lib/parseTextLinks": "./src/lib/parseTextLinks.ts",
     "./lib/profileImageUrl": "./src/lib/profileImageUrl.ts",
     "./lib/referralInvite": "./src/lib/referralInvite.ts",
