@@ -23772,6 +23772,66 @@ a.cx-profile-reward-card:hover {
   background: linear-gradient(155deg, rgba(129, 140, 248, 0.2) 0%, rgba(67, 56, 202, 0.1) 100%);
 }
 
+.cx-profile-reward-card--paused {
+  pointer-events: none;
+  cursor: default;
+  background: linear-gradient(
+    155deg,
+    rgba(196, 181, 253, 0.14) 0%,
+    rgba(99, 102, 241, 0.07) 55%,
+    rgba(67, 56, 202, 0.04) 100%
+  ) !important;
+  border-color: rgba(129, 140, 248, 0.28) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="dark"] .cx-profile-reward-card--paused {
+  background: linear-gradient(
+    155deg,
+    rgba(129, 140, 248, 0.12) 0%,
+    rgba(67, 56, 202, 0.06) 100%
+  ) !important;
+  border-color: rgba(129, 140, 248, 0.22) !important;
+}
+
+.cx-profile-reward-card-paused-badge {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  z-index: 2;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.16);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+:root[data-theme="dark"] .cx-profile-reward-card-paused-badge {
+  background: rgba(99, 102, 241, 0.22);
+  color: #a5b4fc;
+  border-color: rgba(165, 180, 252, 0.35);
+}
+
+.cx-profile-reward-card-icon--paused {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+
+.cx-profile-reward-card-value--paused {
+  color: var(--ig-muted);
+  opacity: 0.85;
+}
+
+.cx-profile-reward-card-paused-note {
+  color: var(--ig-muted);
+  line-height: 1.4;
+  max-width: 13rem;
+}
+
 .cx-profile-reward-card--disabled {
   opacity: 0.72;
   filter: grayscale(0.35);
@@ -24024,6 +24084,15 @@ a.cx-profile-reward-card:hover {
   border-radius: 14px;
   border: 1px solid var(--ig-border);
   background: var(--ig-card);
+}
+
+.cx-profile-actions-bar--invite-only {
+  justify-content: stretch;
+}
+
+.cx-profile-actions-bar--invite-only .cx-profile-invite-btn {
+  flex: 1;
+  width: 100%;
 }
 
 .cx-profile-redeem-zone {

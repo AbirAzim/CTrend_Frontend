@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Keyboard,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -117,7 +116,7 @@ export function ProfileEngagementPanel({
   return (
     <View style={st.wrap}>
       <Text style={st.kicker}>REWARDS & ACHIEVEMENTS</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.grid}>
+      <View style={st.grid}>
         <Pressable style={[st.card, st.cardCoins]} onPress={() => router.push(coinsRoute)}>
           <View style={st.iconCoin}>
             <Text style={st.iconCoinGlyph}>¢</Text>
@@ -169,19 +168,21 @@ export function ProfileEngagementPanel({
             <Text style={st.cardCta}>History ›</Text>
           </Pressable>
         ) : (
-          <View style={[st.card, st.cardPoints, st.cardPointsDisabled]} accessibilityState={{ disabled: true }}>
-            <View style={[st.iconPoints, st.iconPointsDisabled]}>
+          <View style={[st.card, st.cardPoints, st.cardPointsPaused]} accessibilityState={{ disabled: true }}>
+            <View style={st.pausedBadge}>
+              <Text style={st.pausedBadgeText}>Paused</Text>
+            </View>
+            <View style={[st.iconPoints, st.iconPointsPaused]}>
               <Text style={st.iconPointsGlyph}>✦</Text>
             </View>
             <Text style={st.cardLabel}>Points</Text>
-            <Text style={st.cardValue}>—</Text>
-            <Text style={st.cardSub} numberOfLines={2}>
-              {isSelf ? "Disabled by admin" : "Unavailable"}
+            <Text style={[st.cardValue, st.cardValuePaused]}>—</Text>
+            <Text style={[st.cardSub, st.cardSubPaused]} numberOfLines={3}>
+              {isSelf ? "Rewards paused · invite below" : "Unavailable"}
             </Text>
-            <Text style={[st.cardCta, st.cardCtaDisabled]}>Disabled</Text>
           </View>
         )}
-      </ScrollView>
+      </View>
 
       {isSelf ? (
         <View style={[st.actionsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -249,15 +250,21 @@ function makeStyles(c: ColorPalette) {
       letterSpacing: 0.6,
       color: c.muted,
       marginBottom: 8,
-      marginLeft: 18,
+      marginHorizontal: 16,
     },
-    grid: { paddingHorizontal: 16, gap: 10 },
+    grid: {
+      flexDirection: "row",
+      paddingHorizontal: 16,
+      gap: 8,
+      alignItems: "stretch",
+    },
     card: {
-      width: 132,
-      borderRadius: 18,
+      flex: 1,
+      minWidth: 0,
+      borderRadius: 16,
       borderWidth: 1,
-      padding: 12,
-      minHeight: 168,
+      padding: 10,
+      minHeight: 156,
     },
     cardCoins: {
       borderColor: "rgba(245,197,24,0.38)",
@@ -271,33 +278,50 @@ function makeStyles(c: ColorPalette) {
       borderColor: "rgba(129,140,248,0.4)",
       backgroundColor: "rgba(99,102,241,0.14)",
     },
-    cardPointsDisabled: {
-      borderColor: c.border,
-      backgroundColor: c.section,
-      opacity: 0.72,
+    cardPointsPaused: {
+      borderColor: "rgba(129,140,248,0.28)",
+      backgroundColor: "rgba(99,102,241,0.08)",
+    },
+    pausedBadge: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 999,
+      backgroundColor: "rgba(99,102,241,0.18)",
+      borderWidth: 1,
+      borderColor: "rgba(99,102,241,0.3)",
+    },
+    pausedBadgeText: {
+      fontSize: 8,
+      fontWeight: "800",
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+      color: "#818cf8",
     },
     iconCoin: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       backgroundColor: "#f5c518",
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 6,
     },
-    iconCoinGlyph: { color: "#7a4a05", fontWeight: "900", fontSize: 20 },
-    iconTrophy: { fontSize: 32, lineHeight: 36, marginBottom: 2 },
+    iconCoinGlyph: { color: "#7a4a05", fontWeight: "900", fontSize: 17 },
+    iconTrophy: { fontSize: 28, lineHeight: 32, marginBottom: 2 },
     iconPoints: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       backgroundColor: "#6366f1",
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 6,
     },
-    iconPointsGlyph: { color: "#e0e7ff", fontWeight: "900", fontSize: 18 },
-    iconPointsDisabled: { backgroundColor: c.muted },
+    iconPointsGlyph: { color: "#e0e7ff", fontWeight: "900", fontSize: 16 },
+    iconPointsPaused: { backgroundColor: "rgba(99,102,241,0.45)", opacity: 0.75 },
     cardLabel: {
       fontSize: 9,
       fontWeight: "800",
@@ -306,20 +330,22 @@ function makeStyles(c: ColorPalette) {
       color: c.muted,
     },
     cardValue: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: "900",
       color: c.text,
-      lineHeight: 28,
+      lineHeight: 24,
       marginTop: 2,
       fontVariant: ["tabular-nums"],
     },
+    cardValuePaused: { color: c.muted, opacity: 0.85 },
     cardSub: {
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: "600",
       color: c.subtext,
-      lineHeight: 14,
+      lineHeight: 13,
       marginTop: 2,
     },
+    cardSubPaused: { color: c.muted, lineHeight: 12 },
     claimBtn: {
       alignSelf: "flex-start",
       marginTop: 8,
@@ -328,17 +354,17 @@ function makeStyles(c: ColorPalette) {
       paddingHorizontal: 8,
       borderRadius: 999,
     },
-    claimBtnText: { color: "#7a4a05", fontWeight: "800", fontSize: 10 },
+    claimBtnText: { color: "#7a4a05", fontWeight: "800", fontSize: 9 },
     claimMsg: { color: c.text, fontWeight: "700", fontSize: 9, marginTop: 4 },
     winPreview: { fontSize: 10, fontWeight: "700", color: c.text, marginTop: 6 },
     cardCta: {
-      fontSize: 9,
+      fontSize: 8,
       fontWeight: "800",
       color: c.muted,
-      marginTop: 8,
+      marginTop: "auto" as const,
+      paddingTop: 6,
       letterSpacing: 0.3,
     },
-    cardCtaDisabled: { color: c.muted, opacity: 0.7 },
     actionsBar: {
       marginHorizontal: 16,
       marginTop: 10,

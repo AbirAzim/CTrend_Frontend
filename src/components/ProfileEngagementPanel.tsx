@@ -174,7 +174,7 @@ export function ProfileEngagementPanel({
         </div>
 
         <div
-          className={`cx-profile-reward-card cx-profile-reward-card--points${referralEnabled ? "" : " cx-profile-reward-card--disabled"}`}
+          className={`cx-profile-reward-card cx-profile-reward-card--points${referralEnabled ? "" : " cx-profile-reward-card--paused"}`}
           aria-disabled={!referralEnabled}
         >
           {referralEnabled ? (
@@ -197,13 +197,15 @@ export function ProfileEngagementPanel({
           ) : (
             <div className="cx-profile-reward-card-link cx-profile-reward-card-link--static">
               <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
-              <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
+              <span className="cx-profile-reward-card-paused-badge">Paused</span>
+              <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points cx-profile-reward-card-icon--paused" aria-hidden>✦</span>
               <span className="cx-profile-reward-card-label">Referral points</span>
-              <span className="cx-profile-reward-card-value">—</span>
-              <span className="cx-profile-reward-card-sub">
-                {isSelf ? "Program disabled by admin" : "Not available"}
+              <span className="cx-profile-reward-card-value cx-profile-reward-card-value--paused">—</span>
+              <span className="cx-profile-reward-card-sub cx-profile-reward-card-paused-note">
+                {isSelf
+                  ? "Rewards paused · invites still work below"
+                  : "Not available"}
               </span>
-              <span className="cx-profile-reward-card-cta cx-profile-reward-card-cta--muted">Disabled</span>
             </div>
           )}
         </div>
@@ -212,7 +214,7 @@ export function ProfileEngagementPanel({
       {isSelf ? (
         <div className="cx-profile-engage-actions">
           <form
-            className="cx-profile-actions-bar"
+            className={`cx-profile-actions-bar${referralEnabled ? "" : " cx-profile-actions-bar--invite-only"}`}
             onSubmit={(e) => {
               if (!referralEnabled) {
                 e.preventDefault();
