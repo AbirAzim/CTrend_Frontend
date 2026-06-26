@@ -12,7 +12,9 @@ export function VerifyEmailPage() {
   const { isAuthenticated, setSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const email = (location.state as { email?: string } | null)?.email ?? "";
+  const email = (location.state as { email?: string; referralCode?: string } | null)?.email ?? "";
+  const referralCode =
+    (location.state as { email?: string; referralCode?: string } | null)?.referralCode ?? "";
 
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
   const [formError, setFormError] = useState<string | null>(null);
@@ -91,7 +93,13 @@ export function VerifyEmailPage() {
     e.preventDefault();
     setFormError(null);
     try {
-      const { data } = await verifyEmail({ variables: { email, code } });
+      const { data } = await verifyEmail({
+        variables: {
+          email,
+          code,
+          referralCode: referralCode.trim() || undefined,
+        },
+      });
       const payload = data?.verifyEmail;
       if (!payload?.accessToken || !payload.user) {
         setFormError("Invalid response from server.");
@@ -123,6 +131,12 @@ export function VerifyEmailPage() {
         <p className="muted">
           We sent a 6-digit code to <strong>{email}</strong>. Enter it below to
           activate your account.
+          {referralCode ? (
+            <>
+              {" "}
+              Your referral code <strong>{referralCode}</strong> will be applied after verification.
+            </>
+          ) : null}
         </p>
 
         <form onSubmit={onVerify} className="auth-form">

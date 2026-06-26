@@ -49,8 +49,8 @@ export const GOOGLE_LOGIN = gql`
 `;
 
 export const VERIFY_EMAIL = gql`
-  mutation VerifyEmail($email: String!, $code: String!) {
-    verifyEmail(email: $email, code: $code) {
+  mutation VerifyEmail($email: String!, $code: String!, $referralCode: String) {
+    verifyEmail(email: $email, code: $code, referralCode: $referralCode) {
       accessToken
       refreshToken
       user {

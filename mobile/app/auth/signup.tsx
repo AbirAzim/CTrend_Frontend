@@ -1,8 +1,8 @@
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import logoAsset from "../../assets/logo.png";
-import { Link, router } from "expo-router";
-import { useState } from "react";
+import { Link, router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { SIGNUP } from "@ctrend/shared/graphql/auth";
+import { INVITATION_SIGNUP_INFO } from "@ctrend/shared/graphql/referrals";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { AuthDivider, GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { LegalLinksFooter } from "../../components/LegalLinksFooter";
@@ -25,12 +26,41 @@ type SignupData = { signup: boolean };
 
 export default function SignupScreen() {
   const { colors } = useTheme();
-  const [email, setEmail] = useState("");
+  const params = useLocalSearchParams<{ email?: string; referralCode?: string; token?: string }>();
+  const inviteToken = typeof params.token === "string" ? params.token : undefined;
+  const [email, setEmail] = useState(() => (typeof params.email === "string" ? params.email.trim().toLowerCase() : ""));
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState(() =>
+    typeof params.referralCode === "string" ? params.referralCode.trim().toUpperCase() : "",
+  );
   const [error, setError] = useState<string | null>(null);
+  const [invited, setInvited] = useState(() => Boolean(params.email));
+
+  const { data: inviteInfo, loading: loadingInvite, error: inviteError } = useQuery<{
+    invitationSignupInfo: { email: string; referralCode: string; role: string };
+  }>(INVITATION_SIGNUP_INFO, {
+    variables: { token: inviteToken! },
+    skip: !inviteToken || Boolean(params.email),
+  });
 
   const [signupMut, { loading }] = useMutation<SignupData>(SIGNUP);
+
+  useEffect(() => {
+    const info = inviteInfo?.invitationSignupInfo;
+    if (!info) return;
+    if (info.role === "admin") {
+      router.replace(`/auth/accept-invitation/${inviteToken}`);
+      return;
+    }
+    setEmail(info.email);
+    setReferralCode(info.referralCode.toUpperCase());
+    setInvited(true);
+  }, [inviteInfo, inviteToken]);
+
+  useEffect(() => {
+    if (inviteError) setError("This invitation link has expired or is no longer valid.");
+  }, [inviteError]);
 
   async function handleSignup() {
     setError(null);
@@ -40,7 +70,10 @@ export default function SignupScreen() {
     if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     try {
       await signupMut({ variables: { email: e, password, displayName: n || undefined } });
-      router.push({ pathname: "/auth/verify-email", params: { email: e } });
+      router.push({
+        pathname: "/auth/verify-email",
+        params: { email: e, referralCode: referralCode.trim().toUpperCase() || "" },
+      });
     } catch (err: unknown) {
       setError(getApolloErrorMessage(err));
     }
@@ -62,6 +95,12 @@ export default function SignupScreen() {
 
         <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.formTitle, { color: colors.text }]}>Create account</Text>
+          {invited ? (
+            <Text style={[styles.inviteNote, { color: colors.subtext }]}>
+              You&apos;ve been invited — your email and referral code are ready below.
+            </Text>
+          ) : null}
+          {loadingInvite ? <ActivityIndicator color={colors.accent} style={{ marginBottom: 4 }} /> : null}
           <View style={styles.formSubRow}>
             <Text style={[styles.formSubText, { color: colors.subtext }]}>Already have one? </Text>
             <Link href="/auth/login" style={[styles.formSubLink, { color: colors.accent }]}>Log in</Link>
@@ -97,8 +136,20 @@ export default function SignupScreen() {
             onChangeText={setPassword}
             placeholder="At least 8 characters"
             placeholderTextColor={colors.muted}
-            returnKeyType="done"
+            returnKeyType="next"
             onSubmitEditing={() => void handleSignup()}
+          />
+
+          <Text style={[styles.label, { color: colors.subtext }]}>Referral code (optional)</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+            value={referralCode}
+            onChangeText={(t) => setReferralCode(t.toUpperCase())}
+            placeholder="From your invite email"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={12}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -128,6 +179,7 @@ const styles = StyleSheet.create({
   tagline: { fontSize: 14, marginTop: 2 },
   form: { borderRadius: 20, padding: 24, gap: 8, borderWidth: 1 },
   formTitle: { fontSize: 26, fontWeight: "800", marginBottom: 2 },
+  inviteNote: { fontSize: 13, lineHeight: 19, marginBottom: 4 },
   formSubRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   formSubText: { fontSize: 14 },
   formSubLink: { fontSize: 14, fontWeight: "600" },

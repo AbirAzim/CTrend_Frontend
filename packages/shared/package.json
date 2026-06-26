@@ -15,6 +15,7 @@
     "./graphql/messages": "./src/graphql/messages.ts",
     "./graphql/notifications": "./src/graphql/notifications.ts",
     "./graphql/profile": "./src/graphql/profile.ts",
+    "./graphql/referrals": "./src/graphql/referrals.ts",
     "./graphql/search": "./src/graphql/search.ts",
     "./graphql/upload": "./src/graphql/upload.ts",
     "./graphql/worldcup": "./src/graphql/worldcup.ts",

@@ -27,7 +27,11 @@ type ResendData = { resendVerificationEmail: boolean };
 const CODE_LENGTH = 6;
 
 export default function VerifyEmailScreen() {
-  const { email } = useLocalSearchParams<{ email: string }>();
+  const { email, referralCode: referralCodeParam } = useLocalSearchParams<{
+    email: string;
+    referralCode?: string;
+  }>();
+  const referralCode = (referralCodeParam ?? "").trim().toUpperCase();
   const { setSession } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -100,7 +104,13 @@ export default function VerifyEmailScreen() {
     if (!email || code.length !== CODE_LENGTH) return;
     setError(null);
     try {
-      const { data } = await verifyMut({ variables: { email, code } });
+      const { data } = await verifyMut({
+        variables: {
+          email,
+          code,
+          referralCode: referralCode || undefined,
+        },
+      });
       if (!data?.verifyEmail) throw new Error("Verification failed.");
       await setSession(data.verifyEmail.accessToken, data.verifyEmail.user);
       router.replace("/");
@@ -136,6 +146,11 @@ export default function VerifyEmailScreen() {
         <Text style={[styles.sub, { color: colors.subtext }]}>
           We sent a 6-digit code to{"\n"}
           <Text style={{ color: colors.accent, fontWeight: "700" }}>{email ?? "your email"}</Text>
+          {referralCode ? (
+            <>
+              {"\n"}Referral code <Text style={{ fontWeight: "700" }}>{referralCode}</Text> will be applied after verification.
+            </>
+          ) : null}
         </Text>
 
         {/* Digit inputs */}

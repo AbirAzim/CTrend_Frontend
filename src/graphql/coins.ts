@@ -7,6 +7,12 @@ export const MY_COINS = gql`
   }
 `;
 
+export const REFERRAL_POINTS = gql`
+  query ReferralPoints($userId: ID!) {
+    referralPoints(userId: $userId)
+  }
+`;
+
 /** Public coin history for any user (defaults to the viewer when omitted). */
 export const COIN_HISTORY = gql`
   query CoinHistory($userId: ID, $skip: Int, $take: Int) {

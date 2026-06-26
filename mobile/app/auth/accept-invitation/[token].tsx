@@ -1,8 +1,8 @@
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import logoAsset from "../../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ACCEPT_INVITATION } from "@ctrend/shared/graphql/auth";
+import { INVITATION_SIGNUP_INFO } from "@ctrend/shared/graphql/referrals";
 import { getApolloErrorMessage } from "../../../lib/apolloErrorMessage";
 import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "../../../context/ThemeContext";
@@ -29,12 +30,28 @@ export default function AcceptInvitationScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
+  const { data: inviteInfo, loading: loadingInfo } = useQuery<{
+    invitationSignupInfo: { email: string; referralCode: string; role: string };
+  }>(INVITATION_SIGNUP_INFO, {
+    variables: { token: token! },
+    skip: !token,
+  });
+
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [acceptMut, { loading }] = useMutation<AcceptData>(ACCEPT_INVITATION);
+
+  useEffect(() => {
+    const info = inviteInfo?.invitationSignupInfo;
+    if (!info || info.role === "admin") return;
+    router.replace({
+      pathname: "/auth/signup",
+      params: { email: info.email, referralCode: info.referralCode },
+    });
+  }, [inviteInfo]);
 
   async function handleSubmit() {
     setError(null);
@@ -66,6 +83,32 @@ export default function AcceptInvitationScreen() {
     }
   }
 
+  if (!token) {
+    return (
+      <View style={[styles.flex, styles.center, { backgroundColor: colors.bg, padding: 24 }]}>
+        <Text style={[styles.error, { textAlign: "center" }]}>Invalid invitation link.</Text>
+      </View>
+    );
+  }
+
+  if (loadingInfo) {
+    return (
+      <View style={[styles.flex, styles.center, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  const role = inviteInfo?.invitationSignupInfo?.role;
+  if (role && role !== "admin") {
+    return (
+      <View style={[styles.flex, styles.center, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={[styles.sub, { color: colors.subtext, marginTop: 12 }]}>Opening sign up…</Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: colors.bg }]}
@@ -77,9 +120,9 @@ export default function AcceptInvitationScreen() {
       >
         <View style={styles.header}>
           <Image source={logoAsset} style={styles.logo} contentFit="contain" />
-          <Text style={[styles.title, { color: colors.text }]}>You're invited! 🎉</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Admin invitation</Text>
           <Text style={[styles.sub, { color: colors.subtext }]}>
-            Set up your account to join Ke Jitbe.
+            Set up your admin account to join Ke Jitbe.
           </Text>
         </View>
 
@@ -138,6 +181,7 @@ export default function AcceptInvitationScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  center: { alignItems: "center", justifyContent: "center" },
   container: { paddingHorizontal: 24, gap: 16 },
   header: { alignItems: "center", marginBottom: 8, gap: 8 },
   logo: { width: 90, height: 78 },

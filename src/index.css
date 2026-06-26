@@ -23627,8 +23627,8 @@ html[data-minimal-chrome="true"] .ig-topbar {
 
 .cx-profile-engage-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -23637,7 +23637,7 @@ html[data-minimal-chrome="true"] .ig-topbar {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  min-height: 220px;
+  min-height: 190px;
   padding: 16px 14px 14px;
   border-radius: 18px;
   border: 1px solid transparent;
@@ -23662,6 +23662,23 @@ a.cx-profile-reward-card:hover {
   border-color: rgba(245, 158, 11, 0.32);
 }
 
+.cx-profile-reward-card--points {
+  background: linear-gradient(155deg, rgba(196, 181, 253, 0.28) 0%, rgba(99, 102, 241, 0.14) 50%, rgba(67, 56, 202, 0.08) 100%);
+  border-color: rgba(129, 140, 248, 0.38);
+}
+
+:root[data-theme="dark"] .cx-profile-reward-card--coins {
+  background: linear-gradient(155deg, rgba(245, 197, 24, 0.18) 0%, rgba(180, 120, 10, 0.08) 100%);
+}
+
+:root[data-theme="dark"] .cx-profile-reward-card--wins {
+  background: linear-gradient(155deg, rgba(245, 158, 11, 0.16) 0%, rgba(120, 60, 5, 0.08) 100%);
+}
+
+:root[data-theme="dark"] .cx-profile-reward-card--points {
+  background: linear-gradient(155deg, rgba(129, 140, 248, 0.2) 0%, rgba(67, 56, 202, 0.1) 100%);
+}
+
 .cx-profile-reward-card-glow {
   position: absolute;
   top: -30px;
@@ -23675,6 +23692,10 @@ a.cx-profile-reward-card:hover {
 
 .cx-profile-reward-card-glow--wins {
   background: radial-gradient(circle, rgba(251, 191, 36, 0.35) 0%, transparent 70%);
+}
+
+.cx-profile-reward-card-glow--points {
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.4) 0%, transparent 70%);
 }
 
 .cx-profile-reward-card-icon {
@@ -23704,6 +23725,20 @@ a.cx-profile-reward-card:hover {
   font-size: 2.1rem;
   line-height: 1;
   filter: drop-shadow(0 2px 6px rgba(245, 158, 11, 0.35));
+}
+
+.cx-profile-reward-card-icon--points {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #e0e7ff;
+  background: linear-gradient(145deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
 }
 
 .cx-profile-reward-card-label {
@@ -23837,13 +23872,14 @@ a.cx-profile-reward-card:hover {
   background: rgba(0, 0, 0, 0.2);
 }
 
-@media (max-width: 420px) {
+@media (max-width: 640px) {
   .cx-profile-engage-grid {
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
   .cx-profile-reward-card {
-    min-height: 200px;
-    padding: 12px 10px;
+    min-height: 160px;
+    padding: 12px 12px 12px;
   }
   .cx-profile-reward-card-value {
     font-size: 1.65rem;
@@ -23853,4 +23889,71 @@ a.cx-profile-reward-card:hover {
     height: 44px;
     font-size: 1.35rem;
   }
+}
+
+.cx-profile-engage-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--ig-border);
+  background: var(--ig-card);
+}
+
+.cx-profile-engage-actions-input {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ig-border);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--ig-surface);
+  color: var(--ig-text);
+}
+
+.cx-profile-engage-actions-redeem,
+.cx-profile-engage-actions-invite {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 0;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cx-profile-engage-actions-redeem {
+  background: var(--cx-accent-mid, #6366f1);
+  color: #fff;
+}
+
+.cx-profile-engage-actions-redeem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cx-profile-engage-actions-invite {
+  background: transparent;
+  border: 1px solid var(--ig-border);
+  color: var(--ig-text);
+}
+
+.cx-profile-engage-actions-invite:hover {
+  border-color: var(--cx-accent);
+  color: var(--cx-accent);
+}
+
+.cx-profile-engage-actions-msg {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ig-muted);
 }

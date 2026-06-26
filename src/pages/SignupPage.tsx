@@ -1,9 +1,10 @@
-import { useMutation } from "@apollo/client";
-import { useState } from "react";
+import { useMutation, useQuery } from "@apollo/client";
+import { useEffect, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GOOGLE_LOGIN, SIGNUP } from "../graphql/auth";
+import { INVITATION_SIGNUP_INFO } from "../graphql/referrals";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { PasswordField } from "../components/PasswordField";
 import {
@@ -20,17 +21,47 @@ function formatAuthError(message: string | undefined): string {
 export function SignupPage() {
   const { isAuthenticated, setSession } = useAuth(); // setSession used by Google login path
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("token");
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
   const canUseNativeGoogle = isNativeGoogleAuthAvailable(googleClientId);
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => searchParams.get("email")?.trim().toLowerCase() ?? "");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [referralCode, setReferralCode] = useState(
+    () => (searchParams.get("referralCode") ?? "").trim().toUpperCase(),
+  );
   const [formError, setFormError] = useState<string | null>(null);
+  const [inviteBanner, setInviteBanner] = useState(() => Boolean(searchParams.get("email")));
 
   const [signup, { loading: signupLoading }] = useMutation(SIGNUP);
   const [googleLogin, { loading: googleLoading }] = useMutation(GOOGLE_LOGIN);
+  const { data: inviteInfo, loading: loadingInvite, error: inviteError } = useQuery<{
+    invitationSignupInfo: { email: string; referralCode: string; role: string };
+  }>(INVITATION_SIGNUP_INFO, {
+    variables: { token: inviteToken! },
+    skip: !inviteToken || Boolean(searchParams.get("email")),
+  });
+
+  useEffect(() => {
+    const info = inviteInfo?.invitationSignupInfo;
+    if (!info) return;
+    if (info.role === "admin") {
+      navigate(`/accept-invitation?token=${encodeURIComponent(inviteToken!)}`, { replace: true });
+      return;
+    }
+    setEmail(info.email);
+    setReferralCode(info.referralCode.toUpperCase());
+    setInviteBanner(true);
+  }, [inviteInfo, inviteToken, navigate]);
+
+  useEffect(() => {
+    if (inviteError) {
+      setFormError("This invitation link has expired or is no longer valid.");
+    }
+  }, [inviteError]);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -51,7 +82,13 @@ export function SignupPage() {
           displayName: displayName.trim() || undefined,
         },
       });
-      navigate("/verify-email", { replace: true, state: { email: email.trim() } });
+      navigate("/verify-email", {
+        replace: true,
+        state: {
+          email: email.trim(),
+          referralCode: referralCode.trim().toUpperCase() || undefined,
+        },
+      });
     } catch (err: unknown) {
       setFormError(formatAuthError(getApolloErrorMessage(err)));
     }
@@ -84,6 +121,10 @@ export function SignupPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Sign up</h1>
+        {inviteBanner ? (
+          <p className="muted">You&apos;ve been invited to Ke Jitbe — finish creating your account below.</p>
+        ) : null}
+        {loadingInvite ? <p className="muted small">Loading your invitation…</p> : null}
         <p className="muted">
           Already have an account? <Link to="/login">Log in</Link>
         </p>
@@ -126,6 +167,17 @@ export function SignupPage() {
               onChange={(e) => setConfirm(e.target.value)}
               required
               minLength={8}
+            />
+          </label>
+          <label className="field">
+            <span>Referral code (optional)</span>
+            <input
+              type="text"
+              autoComplete="off"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              placeholder="From your invite email"
+              maxLength={12}
             />
           </label>
           {signupLoading && <p className="muted small">Creating account…</p>}

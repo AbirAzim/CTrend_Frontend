@@ -761,6 +761,7 @@ export function ProfilePage() {
           coins={balance ?? 0}
           isSelf
           displayName={displayName}
+          onInviteFriend={() => openInviteModal("user")}
         />
       ) : null}
 
@@ -819,15 +820,8 @@ export function ProfilePage() {
         </div>
       )}
 
-      <div className="cx-profile-invite-row">
-        <button
-          type="button"
-          className="cx-invite-btn"
-          onClick={() => openInviteModal("user")}
-        >
-          + Invite a friend
-        </button>
-        {isAdmin && (
+      {isAdmin ? (
+        <div className="cx-profile-invite-row">
           <button
             type="button"
             className="cx-invite-btn cx-invite-btn--admin"
@@ -835,8 +829,8 @@ export function ProfilePage() {
           >
             + Invite admin
           </button>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       <NavLink to="/profile/sounds" className="cx-profile-quick-link">
         <span className="cx-profile-quick-link-icon" aria-hidden>🔊</span>

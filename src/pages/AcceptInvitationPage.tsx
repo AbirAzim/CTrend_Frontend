@@ -1,8 +1,9 @@
-import { useMutation } from "@apollo/client";
-import { useState } from "react";
+import { useMutation, useQuery } from "@apollo/client";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ACCEPT_INVITATION } from "../graphql/auth";
+import { INVITATION_SIGNUP_INFO } from "../graphql/referrals";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 
 export function AcceptInvitationPage() {
@@ -16,7 +17,22 @@ export function AcceptInvitationPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
+  const { data: inviteInfo, loading: loadingInfo } = useQuery(INVITATION_SIGNUP_INFO, {
+    variables: { token: token! },
+    skip: !token,
+  });
+
   const [acceptInvitation, { loading }] = useMutation(ACCEPT_INVITATION);
+
+  useEffect(() => {
+    const info = inviteInfo?.invitationSignupInfo;
+    if (!info || info.role === "admin") return;
+    const params = new URLSearchParams({
+      email: info.email,
+      referralCode: info.referralCode,
+    });
+    navigate(`/signup?${params.toString()}`, { replace: true });
+  }, [inviteInfo, navigate]);
 
   if (!token) {
     return (
@@ -26,6 +42,27 @@ export function AcceptInvitationPage() {
           <p className="error" role="alert">
             Invalid invitation link. Please ask your inviter to resend the invitation.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingInfo) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <p className="muted">Loading invitation…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const role = inviteInfo?.invitationSignupInfo?.role;
+  if (role && role !== "admin") {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <p className="muted">Redirecting to sign up…</p>
         </div>
       </div>
     );
@@ -77,7 +114,7 @@ export function AcceptInvitationPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Set up your account</h1>
-        <p className="muted">You've been invited to join Ke Jitbe. Create a password to get started.</p>
+        <p className="muted">You've been invited as an admin. Create a password to get started.</p>
 
         <form onSubmit={(ev) => void onSubmit(ev)} className="auth-form">
           <label className="field">

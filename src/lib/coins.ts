@@ -21,7 +21,8 @@ export const COIN_AMOUNTS = {
   CAMPAIGN_WINNER: 25,
   VOTE_WINNER: 15,
   DAILY_STREAK: 5,
-  INVITE: 50,
+  INVITE: 10,
+  REFERRAL_INVITEE: 5,
 } as const;
 
 export type CoinType = keyof typeof COIN_AMOUNTS;
@@ -39,7 +40,8 @@ export const COIN_META: Record<CoinType, { label: string; icon: string }> = {
   CAMPAIGN_WINNER: { label: "Won a campaign", icon: "👑" },
   VOTE_WINNER: { label: "Won a vote draw", icon: "🎁" },
   DAILY_STREAK: { label: "Daily streak bonus", icon: "📅" },
-  INVITE: { label: "Friend joined", icon: "🤝" },
+  INVITE: { label: "Friend joined via your invite", icon: "🤝" },
+  REFERRAL_INVITEE: { label: "Joined with a referral code", icon: "🎟️" },
 };
 
 export const COIN_EARNED_EVENT = "ctrend:coin-earned";
