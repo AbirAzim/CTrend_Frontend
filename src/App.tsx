@@ -29,6 +29,7 @@ import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/TermsOfServicePage";
 import { CreditsPage } from "./pages/CreditsPage";
 import { ChildSafetyPage } from "./pages/ChildSafetyPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 
 function AuthExpiredWatcher() {
   const { logout } = useAuth();
@@ -100,6 +101,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SoundPreferencesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           }
         />
