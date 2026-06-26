@@ -234,6 +234,12 @@ function compareLabel(post: FeedPostView, idx: number): string {
 	return post.postOptions?.[idx]?.label?.trim() ?? `Side ${idx + 1}`;
 }
 
+function matchTeamLabel(post: FeedPostView, idx: number): string {
+	const opt = post.postOptions?.[idx]?.label?.trim();
+	if (opt) return opt;
+	return compareLabel(post, idx);
+}
+
 type OptionStat = NonNullable<FeedPostView['optionStats']>[number];
 
 function viewerVoteForIntent(
@@ -3240,8 +3246,9 @@ function FeedPostCardComponent({
 			{isMatchPost ? (
 				<MatchPrediction
 					postId={post.id}
-					homeTeam={compareLabel(post, 0)}
-					awayTeam={compareLabel(post, 1)}
+					fixtureId={post.fixtureId ?? null}
+					homeTeam={matchTeamLabel(post, 0)}
+					awayTeam={matchTeamLabel(post, 1)}
 					enabled
 				/>
 			) : null}

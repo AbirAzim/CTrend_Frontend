@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { useMutation, useQuery, useSubscription } from "@apollo/client";
 import {
@@ -9,6 +10,7 @@ import {
   MATCH_PREDICTIONS,
   SUBMIT_MATCH_PREDICTION,
 } from "../graphql/predictions";
+import { WORLD_CUP_FIXTURE_DETAILS } from "../graphql/worldcup";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
@@ -44,11 +46,13 @@ function predName(u?: PredUser | null): string {
 
 export function MatchPrediction({
   postId,
+  fixtureId,
   homeTeam,
   awayTeam,
   enabled,
 }: {
   postId: string;
+  fixtureId?: string | null;
   homeTeam: string;
   awayTeam: string;
   enabled: boolean;
@@ -58,6 +62,16 @@ export function MatchPrediction({
     variables: { postId },
     skip: !enabled,
     fetchPolicy: "cache-and-network",
+  });
+  const { data: fixtureData } = useQuery<{
+    worldCupFixture?: {
+      homeTeam?: { name?: string | null } | null;
+      awayTeam?: { name?: string | null } | null;
+    } | null;
+  }>(WORLD_CUP_FIXTURE_DETAILS, {
+    variables: { id: fixtureId! },
+    skip: !enabled || !fixtureId,
+    fetchPolicy: "cache-first",
   });
 
   useSubscription(MATCH_PREDICTION_UPDATED, {
@@ -70,12 +84,17 @@ export function MatchPrediction({
   const [remove, { loading: removing }] = useMutation(DELETE_MATCH_PREDICTION);
 
   const [editing, setEditing] = useState(false);
-  const [home, setHome] = useState("");
-  const [away, setAway] = useState("");
+  const [home, setHome] = useState("0");
+  const [away, setAway] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
   const [showWinners, setShowWinners] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const homeLabel =
+    fixtureData?.worldCupFixture?.homeTeam?.name?.trim() || homeTeam;
+  const awayLabel =
+    fixtureData?.worldCupFixture?.awayTeam?.name?.trim() || awayTeam;
 
   const state = data?.matchPredictionState;
   const mine = state?.myPrediction ?? null;
@@ -87,8 +106,8 @@ export function MatchPrediction({
   const formOpen = open && (editing || !mine);
 
   function startEdit() {
-    setHome(mine ? String(mine.homeScore) : "");
-    setAway(mine ? String(mine.awayScore) : "");
+    setHome(mine ? String(mine.homeScore) : "0");
+    setAway(mine ? String(mine.awayScore) : "0");
     setError(null);
     setEditing(true);
   }
@@ -117,6 +136,8 @@ export function MatchPrediction({
     try {
       await remove({ variables: { postId } });
       setEditing(false);
+      setHome("0");
+      setAway("0");
       void refetch();
     } catch (err) {
       setError(getApolloErrorMessage(err));
@@ -125,96 +146,133 @@ export function MatchPrediction({
 
   if (!enabled || !state) return null;
 
+  const countBtn =
+    count > 0 ? (
+      <button
+        type="button"
+        className="cx-pred-count"
+        onClick={() => setShowList(true)}
+        aria-label={`View ${count} ${count === 1 ? "prediction" : "predictions"}`}
+      >
+        {count} {count === 1 ? "prediction" : "predictions"}
+      </button>
+    ) : null;
+
+  const optionsMenu =
+    open && !resolved ? (
+      <span className="cx-pred-menu-wrap">
+        <button
+          type="button"
+          className="cx-pred-dots"
+          aria-label="Prediction options"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          ⋯
+        </button>
+        {menuOpen ? (
+          <>
+            <span className="cx-pred-menu-backdrop" onClick={() => setMenuOpen(false)} />
+            <span className="cx-pred-menu" role="menu">
+              <button type="button" className="cx-pred-menu-item" role="menuitem" onClick={() => { setMenuOpen(false); startEdit(); }}>Edit</button>
+              <button type="button" className="cx-pred-menu-item cx-pred-menu-item--danger" role="menuitem" disabled={removing} onClick={() => { setMenuOpen(false); void onDelete(); }}>Delete</button>
+            </span>
+          </>
+        ) : null}
+      </span>
+    ) : null;
+
   return (
     <div className="cx-pred">
-      <div className="cx-pred-head">
-        <span className="cx-pred-title">🎯 Score prediction</span>
-        {count > 0 ? (
-          <button type="button" className="cx-pred-count" onClick={() => setShowList(true)}>
-            {count} {count === 1 ? "prediction" : "predictions"}
-          </button>
-        ) : null}
-      </div>
-
-      {/* Your prediction (saved) */}
       {mine && !formOpen ? (
-        <div className="cx-pred-mine">
-          <span className="cx-pred-score">
-            {homeTeam} <strong>{mine.homeScore}</strong> – <strong>{mine.awayScore}</strong> {awayTeam}
-          </span>
+        <div className="cx-pred-row">
+          <div className="cx-pred-core">
+            <span className="cx-pred-team cx-pred-team--home">{homeLabel}</span>
+            <span
+              className="cx-pred-scorebox"
+              aria-label={`Your predicted score: ${homeLabel} ${mine.homeScore}, ${awayLabel} ${mine.awayScore}`}
+            >
+              <strong>{mine.homeScore}</strong>
+              <span className="cx-pred-line-sep" aria-hidden>–</span>
+              <strong>{mine.awayScore}</strong>
+            </span>
+            <span className="cx-pred-team cx-pred-team--away">{awayLabel}</span>
+          </div>
           {resolved ? (
-            <span className={`cx-pred-tag ${mine.isWinner ? "cx-pred-tag--win" : "cx-pred-tag--miss"}`}>
+            <span className={`cx-pred-badge${mine.isWinner ? " cx-pred-badge--win" : " cx-pred-badge--miss"}`}>
               {mine.isWinner ? "✓ Correct" : "Missed"}
             </span>
-          ) : open ? (
-            <span className="cx-pred-menu-wrap">
-              <button
-                type="button"
-                className="cx-pred-dots"
-                aria-label="Prediction options"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((v) => !v)}
-              >
-                ⋯
-              </button>
-              {menuOpen ? (
-                <>
-                  <span className="cx-pred-menu-backdrop" onClick={() => setMenuOpen(false)} />
-                  <span className="cx-pred-menu" role="menu">
-                    <button type="button" className="cx-pred-menu-item" role="menuitem" onClick={() => { setMenuOpen(false); startEdit(); }}>Edit</button>
-                    <button type="button" className="cx-pred-menu-item cx-pred-menu-item--danger" role="menuitem" disabled={removing} onClick={() => { setMenuOpen(false); void onDelete(); }}>Delete</button>
-                  </span>
-                </>
-              ) : null}
-            </span>
-          ) : (
-            <span className="cx-pred-locked">Locked</span>
-          )}
+          ) : null}
+          <div className="cx-pred-row-tail">
+            {countBtn}
+            {!resolved ? (optionsMenu ?? <span className="cx-pred-locked">Locked</span>) : null}
+          </div>
         </div>
       ) : null}
 
-      {/* Inline predict / edit form */}
       {formOpen ? (
         isAuthenticated ? (
-          <div className="cx-pred-form">
-            <span className="cx-pred-team">{homeTeam}</span>
-            <input
-              className="cx-pred-input"
-              inputMode="numeric"
-              value={home}
-              onChange={(e) => setHome(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
-              aria-label={`${homeTeam} score`}
-            />
-            <span className="cx-pred-dash">–</span>
-            <input
-              className="cx-pred-input"
-              inputMode="numeric"
-              value={away}
-              onChange={(e) => setAway(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
-              aria-label={`${awayTeam} score`}
-            />
-            <span className="cx-pred-team">{awayTeam}</span>
-            <button type="button" className="cx-pred-submit" onClick={() => void onSubmit()} disabled={submitting}>
-              {mine ? "Save" : "Predict"}
-            </button>
-            {editing ? (
-              <button type="button" className="cx-pred-link" onClick={() => setEditing(false)}>Cancel</button>
-            ) : null}
+          <div className="cx-pred-row cx-pred-row--form">
+            <div className="cx-pred-core">
+              <span className="cx-pred-team cx-pred-team--home">{homeLabel}</span>
+              <div className="cx-pred-scorebox">
+                <input
+                  className="cx-pred-input"
+                  inputMode="numeric"
+                  value={home}
+                  onChange={(e) => setHome(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                  aria-label={`${homeLabel} score`}
+                />
+                <span className="cx-pred-dash" aria-hidden>–</span>
+                <input
+                  className="cx-pred-input"
+                  inputMode="numeric"
+                  value={away}
+                  onChange={(e) => setAway(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+                  aria-label={`${awayLabel} score`}
+                />
+              </div>
+              <span className="cx-pred-team cx-pred-team--away">{awayLabel}</span>
+            </div>
+            <div className="cx-pred-actions">
+              <button type="button" className="cx-pred-submit" onClick={() => void onSubmit()} disabled={submitting}>
+                {mine ? "Save" : "Predict"}
+              </button>
+              {editing ? (
+                <button type="button" className="cx-pred-link" onClick={() => setEditing(false)}>Cancel</button>
+              ) : null}
+            </div>
+            {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
           </div>
         ) : (
-          <p className="cx-pred-hint muted small">Log in to predict the score.</p>
+          <div className="cx-pred-row cx-pred-row--hint">
+            <p className="cx-pred-hint">Log in to predict the score.</p>
+            {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
+          </div>
         )
       ) : null}
 
-      {/* Predict CTA when open and no prediction yet handled by formOpen above.
-          When match in progress (locked, no prediction) show a note. */}
       {!open && !resolved && !mine ? (
-        <p className="cx-pred-hint muted small">Predictions are locked (match started).</p>
+        <div className="cx-pred-row cx-pred-row--hint">
+          <p className="cx-pred-hint">Predictions are locked (match started).</p>
+          {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
+        </div>
+      ) : null}
+
+      {resolved && !mine && !formOpen ? (
+        <div className="cx-pred-row cx-pred-row--hint">
+          <p className="cx-pred-hint">Results are in</p>
+          {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
+        </div>
       ) : null}
 
       {resolved ? (
-        <button type="button" className="cx-pred-winners-btn" onClick={() => setShowWinners(true)}>
+        <button
+          type="button"
+          className="cx-pred-winners-btn"
+          onClick={() => setShowWinners(true)}
+        >
           🏆 Prediction winners
         </button>
       ) : null}
@@ -224,8 +282,8 @@ export function MatchPrediction({
       {showList ? (
         <PredictionListModal
           postId={postId}
-          homeTeam={homeTeam}
-          awayTeam={awayTeam}
+          homeTeam={homeLabel}
+          awayTeam={awayLabel}
           title="Predictions"
           winnersOnly={false}
           onClose={() => setShowList(false)}
@@ -234,8 +292,8 @@ export function MatchPrediction({
       {showWinners ? (
         <PredictionListModal
           postId={postId}
-          homeTeam={homeTeam}
-          awayTeam={awayTeam}
+          homeTeam={homeLabel}
+          awayTeam={awayLabel}
           title="Prediction winners"
           winnersOnly
           onClose={() => setShowWinners(false)}
@@ -260,6 +318,7 @@ function PredictionListModal({
   winnersOnly: boolean;
   onClose: () => void;
 }) {
+  const cardRef = useRef<HTMLElement | null>(null);
   const { data, loading, refetch } = useQuery<{ matchPredictions?: Prediction[]; matchPredictionWinners?: Prediction[] }>(
     winnersOnly ? MATCH_PREDICTION_WINNERS : MATCH_PREDICTIONS,
     {
@@ -279,9 +338,40 @@ function PredictionListModal({
     [data, winnersOnly],
   );
 
-  return (
-    <div className="ig-modal-overlay cx-voters-overlay" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
-      <section className="ig-modal-card cx-voters-card" onClick={(e) => e.stopPropagation()}>
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Node && cardRef.current?.contains(target)) {
+        return;
+      }
+      onClose();
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    const attachId = setTimeout(() => {
+      document.addEventListener("click", handleOutsideClick);
+    }, 0);
+
+    return () => {
+      clearTimeout(attachId);
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("click", handleOutsideClick);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="ig-modal-overlay cx-voters-overlay cx-pred-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <section ref={cardRef} className="ig-modal-card cx-voters-card">
         <div className="ig-post-comments-head cx-voters-head">
           <div className="cx-voters-head-titles">
             <h3 className="ig-post-comments-title">{title}</h3>
@@ -321,6 +411,7 @@ function PredictionListModal({
           </div>
         )}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -118,6 +118,15 @@ function compareOptionLabel(post: FeedPostView, index: number): string {
   return `Side ${index + 1}`;
 }
 
+/** Match posts store full country names on `postOptions`; prefer those over vote stats. */
+function matchTeamLabel(post: FeedPostView, index: number): string {
+  const opt = post.postOptions?.[index]?.label?.trim();
+  if (opt) {
+    return opt;
+  }
+  return compareOptionLabel(post, index);
+}
+
 // Per-count compare grid recipes — images per row, top → bottom. Cells are all
 // the same square size (sized to the widest row), short rows are centered, and
 // nothing ever scrolls. Mirrors the mobile FeedPostCard layout.
@@ -2482,8 +2491,9 @@ function FeedPostCardComponent({
       {isMatchPost ? (
         <MatchPrediction
           postId={post.id}
-          homeTeam={compareOptionLabel(post, 0)}
-          awayTeam={compareOptionLabel(post, 1)}
+          fixtureId={post.fixtureId ?? null}
+          homeTeam={matchTeamLabel(post, 0)}
+          awayTeam={matchTeamLabel(post, 1)}
           enabled={voteMode === "api"}
         />
       ) : null}

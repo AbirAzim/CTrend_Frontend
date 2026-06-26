@@ -20,6 +20,7 @@ import {
   MATCH_PREDICTIONS,
   SUBMIT_MATCH_PREDICTION,
 } from "@ctrend/shared/graphql/predictions";
+import { WORLD_CUP_FIXTURE_DETAILS } from "@ctrend/shared/graphql/worldcup";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../context/AuthContext";
 import { useCoins } from "../context/CoinsContext";
@@ -45,11 +46,13 @@ function predName(u?: PredUser | null): string {
 
 export function MatchPrediction({
   postId,
+  fixtureId,
   homeTeam,
   awayTeam,
   enabled,
 }: {
   postId: string;
+  fixtureId?: string | null;
   homeTeam: string;
   awayTeam: string;
   enabled: boolean;
@@ -64,6 +67,16 @@ export function MatchPrediction({
     skip: !enabled,
     fetchPolicy: "cache-and-network",
   });
+  const { data: fixtureData } = useQuery<{
+    worldCupFixture?: {
+      homeTeam?: { name?: string | null } | null;
+      awayTeam?: { name?: string | null } | null;
+    } | null;
+  }>(WORLD_CUP_FIXTURE_DETAILS, {
+    variables: { id: fixtureId! },
+    skip: !enabled || !fixtureId,
+    fetchPolicy: "cache-first",
+  });
   useSubscription(MATCH_PREDICTION_UPDATED, {
     variables: { postId },
     skip: !enabled,
@@ -74,11 +87,14 @@ export function MatchPrediction({
   const [remove, { loading: removing }] = useMutation(DELETE_MATCH_PREDICTION);
 
   const [editing, setEditing] = useState(false);
-  const [home, setHome] = useState("");
-  const [away, setAway] = useState("");
+  const [home, setHome] = useState("0");
+  const [away, setAway] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [listMode, setListMode] = useState<null | "all" | "winners">(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const homeLabel = fixtureData?.worldCupFixture?.homeTeam?.name?.trim() || homeTeam;
+  const awayLabel = fixtureData?.worldCupFixture?.awayTeam?.name?.trim() || awayTeam;
 
   const state = data?.matchPredictionState;
   if (!enabled || !state) return null;
@@ -90,8 +106,8 @@ export function MatchPrediction({
   const formOpen = open && (editing || !mine);
 
   function startEdit() {
-    setHome(mine ? String(mine.homeScore) : "");
-    setAway(mine ? String(mine.awayScore) : "");
+    setHome(mine ? String(mine.homeScore) : "0");
+    setAway(mine ? String(mine.awayScore) : "0");
     setError(null);
     setEditing(true);
   }
@@ -109,7 +125,6 @@ export function MatchPrediction({
       await submit({ variables: { postId, homeScore: h, awayScore: a } });
       setEditing(false);
       void refetch();
-      // Coins: earn for predicting (only the first time, not on edits).
       if (isFirstPrediction) awardCoins(COIN_AMOUNTS.PREDICTION);
     } catch {
       setError("Couldn't save your prediction.");
@@ -120,92 +135,127 @@ export function MatchPrediction({
     try {
       await remove({ variables: { postId } });
       setEditing(false);
+      setHome("0");
+      setAway("0");
       void refetch();
     } catch {
       setError("Couldn't delete your prediction.");
     }
   }
 
-  return (
-    <View style={st.wrap}>
-      <View style={st.head}>
-        <Text style={st.title}>🎯 Score prediction</Text>
-        {count > 0 ? (
-          <Pressable onPress={() => setListMode("all")} hitSlop={8}>
-            <Text style={st.count}>{count} {count === 1 ? "prediction" : "predictions"}</Text>
-          </Pressable>
+  const countBtn =
+    count > 0 ? (
+      <Pressable style={st.countBtn} onPress={() => setListMode("all")} hitSlop={6}>
+        <Text style={st.countBtnText}>
+          {count} {count === 1 ? "prediction" : "predictions"}
+        </Text>
+      </Pressable>
+    ) : null;
+
+  const optionsMenu =
+    open && !resolved ? (
+      <View style={st.menuWrap}>
+        <Pressable onPress={() => setMenuOpen((v) => !v)} hitSlop={8} style={st.dotsBtn}>
+          <Text style={st.dots}>⋯</Text>
+        </Pressable>
+        {menuOpen ? (
+          <View style={st.menu}>
+            <Pressable style={st.menuItem} onPress={() => { setMenuOpen(false); startEdit(); }}>
+              <Text style={st.menuItemText}>Edit</Text>
+            </Pressable>
+            <Pressable style={st.menuItem} onPress={() => { setMenuOpen(false); void onDelete(); }} disabled={removing}>
+              <Text style={[st.menuItemText, { color: "#ef4444" }]}>Delete</Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
+    ) : null;
 
+  return (
+    <View style={st.wrap}>
       {mine && !formOpen ? (
-        <View style={st.mine}>
-          <Text style={st.score}>
-            {homeTeam} <Text style={st.scoreNum}>{mine.homeScore}</Text> – <Text style={st.scoreNum}>{mine.awayScore}</Text> {awayTeam}
-          </Text>
+        <View style={st.row}>
+          <View style={st.matchCore}>
+            <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+            <View style={st.scoreCluster}>
+              <Text style={st.scoreNum}>{mine.homeScore}</Text>
+              <Text style={st.dash}>–</Text>
+              <Text style={st.scoreNum}>{mine.awayScore}</Text>
+            </View>
+            <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
+          </View>
           {resolved ? (
             <View style={[st.tag, mine.isWinner ? st.tagWin : st.tagMiss]}>
-              <Text style={[st.tagText, { color: mine.isWinner ? "#16a34a" : colors.muted }]}>{mine.isWinner ? "✓ Correct" : "Missed"}</Text>
+              <Text style={[st.tagText, { color: mine.isWinner ? "#16a34a" : colors.muted }]}>
+                {mine.isWinner ? "✓ Correct" : "Missed"}
+              </Text>
             </View>
-          ) : open ? (
-            <View style={st.menuWrap}>
-              <Pressable onPress={() => setMenuOpen((v) => !v)} hitSlop={8} style={st.dotsBtn}>
-                <Text style={st.dots}>⋯</Text>
-              </Pressable>
-              {menuOpen ? (
-                <View style={st.menu}>
-                  <Pressable style={st.menuItem} onPress={() => { setMenuOpen(false); startEdit(); }}>
-                    <Text style={st.menuItemText}>Edit</Text>
-                  </Pressable>
-                  <Pressable style={st.menuItem} onPress={() => { setMenuOpen(false); void onDelete(); }} disabled={removing}>
-                    <Text style={[st.menuItemText, { color: "#ef4444" }]}>Delete</Text>
-                  </Pressable>
-                </View>
-              ) : null}
+          ) : null}
+          {(countBtn || (!resolved && (optionsMenu || !open))) ? (
+            <View style={st.rowTail}>
+              {countBtn}
+              {!resolved ? (optionsMenu ?? <Text style={st.locked}>Locked</Text>) : null}
             </View>
-          ) : (
-            <Text style={st.locked}>Locked</Text>
-          )}
+          ) : null}
         </View>
       ) : null}
 
       {formOpen ? (
         isAuthenticated ? (
-          <View style={st.form}>
-            <Text style={st.team} numberOfLines={1}>{homeTeam}</Text>
-            <TextInput
-              style={st.input}
-              keyboardType="number-pad"
-              maxLength={2}
-              value={home}
-              onChangeText={(v) => setHome(v.replace(/[^0-9]/g, ""))}
-              placeholder="0"
-              placeholderTextColor={colors.muted}
-            />
-            <Text style={st.dash}>–</Text>
-            <TextInput
-              style={st.input}
-              keyboardType="number-pad"
-              maxLength={2}
-              value={away}
-              onChangeText={(v) => setAway(v.replace(/[^0-9]/g, ""))}
-              placeholder="0"
-              placeholderTextColor={colors.muted}
-            />
-            <Text style={st.team} numberOfLines={1}>{awayTeam}</Text>
-            <Pressable style={st.submitBtn} onPress={() => void onSubmit()} disabled={submitting}>
-              <Text style={st.submitText}>{mine ? "Save" : "Predict"}</Text>
-            </Pressable>
-            {editing ? (
-              <Pressable onPress={() => setEditing(false)} hitSlop={6}><Text style={st.link}>Cancel</Text></Pressable>
-            ) : null}
+          <View style={st.row}>
+            <View style={st.matchCore}>
+              <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+              <View style={st.scoreCluster}>
+                <TextInput
+                  style={st.input}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  value={home}
+                  onChangeText={(v) => setHome(v.replace(/[^0-9]/g, ""))}
+                />
+                <Text style={st.dash}>–</Text>
+                <TextInput
+                  style={st.input}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  value={away}
+                  onChangeText={(v) => setAway(v.replace(/[^0-9]/g, ""))}
+                />
+              </View>
+              <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
+            </View>
+            <View style={st.actions}>
+              <Pressable style={st.submitBtn} onPress={() => void onSubmit()} disabled={submitting}>
+                <Text style={st.submitText}>{mine ? "Save" : "Predict"}</Text>
+              </Pressable>
+              {editing ? (
+                <Pressable onPress={() => setEditing(false)} hitSlop={6}>
+                  <Text style={st.link}>Cancel</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
           </View>
         ) : (
-          <Text style={st.hint}>Log in to predict the score.</Text>
+          <View style={[st.row, st.rowHint]}>
+            <Text style={st.hint}>Log in to predict the score.</Text>
+            {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
+          </View>
         )
       ) : null}
 
       {!open && !resolved && !mine ? (
-        <Text style={st.hint}>Predictions are locked (match started).</Text>
+        <View style={[st.row, st.rowHint]}>
+          <Text style={st.hint}>Predictions are locked (match started).</Text>
+          {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
+        </View>
+      ) : null}
+
+      {resolved && !mine && !formOpen ? (
+        <View style={[st.row, st.rowHint]}>
+          <Text style={st.hint}>Results are in</Text>
+          {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
+        </View>
       ) : null}
 
       {resolved ? (
@@ -220,8 +270,8 @@ export function MatchPrediction({
         visible={listMode !== null}
         winnersOnly={listMode === "winners"}
         postId={postId}
-        homeTeam={homeTeam}
-        awayTeam={awayTeam}
+        homeTeam={homeLabel}
+        awayTeam={awayLabel}
         colors={colors}
         st={st}
         onClose={() => setListMode(null)}
@@ -266,7 +316,10 @@ function PredictionListModal({
         <View style={st.sheet} onStartShouldSetResponder={() => true}>
           <View style={st.handle} />
           <View style={st.sheetHead}>
-            <Text style={st.sheetTitle}>{winnersOnly ? "Prediction winners" : "Predictions"} {rows.length ? `(${rows.length})` : ""}</Text>
+            <Text style={st.sheetTitle}>
+              {winnersOnly ? "Prediction winners" : "Predictions"}
+              {rows.length ? ` (${rows.length})` : ""}
+            </Text>
             <Pressable onPress={onClose} hitSlop={8}><Text style={st.sheetClose}>✕</Text></Pressable>
           </View>
           <FlatList
@@ -282,12 +335,14 @@ function PredictionListModal({
               const img = normalizeProfileImageUrl(p.user?.profileImageUrl);
               const name = predName(p.user);
               return (
-                <Pressable style={st.row} onPress={() => { onClose(); if (p.user) router.push(`/profile/${p.user.id}` as `/${string}`); }}>
+                <Pressable style={st.rowItem} onPress={() => { onClose(); if (p.user) router.push(`/profile/${p.user.id}` as `/${string}`); }}>
                   <View style={st.avatar}>
                     {img ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Text style={st.avatarText}>{name.replace(/^@/, "").slice(0, 1).toUpperCase()}</Text>}
                   </View>
                   <Text style={st.rowName} numberOfLines={1}>{name}</Text>
-                  <Text style={[st.rowScore, p.isWinner && { color: "#16a34a", fontWeight: "800" }]}>{homeTeam} {p.homeScore}–{p.awayScore} {awayTeam}</Text>
+                  <Text style={[st.rowScore, p.isWinner && { color: "#16a34a", fontWeight: "800" }]}>
+                    {homeTeam} {p.homeScore}–{p.awayScore} {awayTeam}
+                  </Text>
                 </Pressable>
               );
             }}
@@ -299,48 +354,191 @@ function PredictionListModal({
 }
 
 function makeStyles(c: ColorPalette) {
+  const accentSoft = `${c.accent}1a`;
+  const accentBorder = `${c.accent}24`;
   return StyleSheet.create({
-    wrap: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
-    head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    title: { fontSize: 13, fontWeight: "800", color: c.text },
-    count: { fontSize: 12, fontWeight: "700", color: c.accent },
-    mine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, backgroundColor: c.section, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-    score: { fontSize: 13, color: c.text, flexShrink: 1 },
-    scoreNum: { fontWeight: "800", color: c.text },
-    tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, marginLeft: "auto" },
+    wrap: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      gap: 6,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      minHeight: 44,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: accentSoft,
+      borderWidth: 1,
+      borderColor: accentBorder,
+    },
+    rowHint: {
+      backgroundColor: c.section,
+      borderColor: c.border,
+    },
+    matchCore: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      minWidth: 0,
+    },
+    teamHome: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: "700",
+      color: c.text,
+      textAlign: "right",
+    },
+    teamAway: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: "700",
+      color: c.text,
+      textAlign: "left",
+    },
+    scoreCluster: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      flexShrink: 0,
+    },
+    scoreNum: {
+      fontSize: 17,
+      fontWeight: "900",
+      color: c.accent,
+      minWidth: 18,
+      textAlign: "center",
+    },
+    dash: { color: c.muted, fontWeight: "800", fontSize: 14 },
+    input: {
+      width: 36,
+      textAlign: "center",
+      fontSize: 16,
+      fontWeight: "800",
+      color: c.text,
+      backgroundColor: c.inputBg,
+      borderWidth: 1,
+      borderColor: accentBorder,
+      borderRadius: 8,
+      paddingVertical: 5,
+    },
+    actions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+    },
+    submitBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    submitText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+    link: { fontSize: 13, fontWeight: "700", color: c.accent },
+    rowTail: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+      paddingLeft: 10,
+      borderLeftWidth: 1,
+      borderLeftColor: `${c.text}1a`,
+    },
+    countBtn: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: accentBorder,
+      backgroundColor: accentSoft,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    countBtnText: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: c.accent,
+    },
+    tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
     tagWin: { backgroundColor: "rgba(34,197,94,0.18)" },
     tagMiss: { backgroundColor: c.section },
     tagText: { fontSize: 11, fontWeight: "800" },
-    locked: { marginLeft: "auto", fontSize: 12, color: c.muted },
-    menuWrap: { marginLeft: "auto", position: "relative" },
-    dotsBtn: { paddingHorizontal: 8, paddingVertical: 2 },
+    locked: { fontSize: 12, fontWeight: "700", color: c.muted },
+    menuWrap: { position: "relative" },
+    dotsBtn: { paddingHorizontal: 6, paddingVertical: 2 },
     dots: { fontSize: 20, fontWeight: "800", color: c.muted, lineHeight: 20 },
-    menu: { position: "absolute", top: 26, right: 0, minWidth: 130, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingVertical: 4, zIndex: 50, elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+    menu: {
+      position: "absolute",
+      top: 26,
+      right: 0,
+      minWidth: 130,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 10,
+      paddingVertical: 4,
+      zIndex: 50,
+      elevation: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+    },
     menuItem: { paddingHorizontal: 14, paddingVertical: 9 },
     menuItemText: { fontSize: 14, fontWeight: "600", color: c.text },
-    link: { fontSize: 13, fontWeight: "700", color: c.accent },
-    form: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
-    team: { fontSize: 13, fontWeight: "600", color: c.text, maxWidth: 90 },
-    input: { width: 46, textAlign: "center", fontSize: 16, fontWeight: "800", color: c.text, backgroundColor: c.inputBg, borderWidth: 1, borderColor: c.border, borderRadius: 8, paddingVertical: 5 },
-    dash: { color: c.muted, fontWeight: "800" },
-    submitBtn: { backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
-    submitText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-    hint: { fontSize: 12, color: c.muted },
-    winnersBtn: { alignSelf: "flex-start", backgroundColor: "rgba(245,158,11,0.16)", borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+    hint: { fontSize: 12, color: c.muted, flexShrink: 1 },
+    winnersBtn: {
+      alignSelf: "flex-start",
+      backgroundColor: "rgba(245,158,11,0.16)",
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
     winnersText: { color: "#d97706", fontSize: 13, fontWeight: "800" },
     error: { color: "#ef4444", fontSize: 12 },
-    // modal
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    sheet: { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28 },
-    handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: 10 },
-    sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+    sheet: {
+      backgroundColor: c.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 28,
+    },
+    handle: {
+      alignSelf: "center",
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.border,
+      marginBottom: 10,
+    },
+    sheetHead: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
     sheetTitle: { fontSize: 15, fontWeight: "800", color: c.text },
     sheetClose: { fontSize: 16, color: c.muted, fontWeight: "700" },
     empty: { textAlign: "center", color: c.muted, paddingVertical: 24, fontSize: 13 },
-    row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
-    avatar: { width: 34, height: 34, borderRadius: 17, overflow: "hidden", backgroundColor: c.section, alignItems: "center", justifyContent: "center" },
+    rowItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+    avatar: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      overflow: "hidden",
+      backgroundColor: c.section,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     avatarText: { fontSize: 13, fontWeight: "800", color: c.subtext },
     rowName: { fontSize: 14, color: c.text, flexShrink: 1 },
-    rowScore: { fontSize: 12, color: c.muted, marginLeft: "auto" },
+    rowScore: { fontSize: 12, color: c.muted, marginLeft: "auto", flexShrink: 1 },
   });
 }
