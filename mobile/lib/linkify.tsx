@@ -1,4 +1,13 @@
-import { Linking, Text, TextProps } from 'react-native';
+import {
+	Linking,
+	Pressable,
+	StyleSheet,
+	Text,
+	TextProps,
+	TextStyle,
+	View,
+	ViewProps,
+} from 'react-native';
 
 // Common TLDs we treat as clickable when a link is written bare (no scheme and
 // no `www.`), e.g. `youtu.be/abc` or `kejitbe.app`. Kept curated to avoid
@@ -19,11 +28,6 @@ interface LinkifyNode {
 	key: string;
 }
 
-/**
- * Parses `text` into plain strings and link URLs, returning structured data
- * for rendering with React Native Text components. Links like `youtu.be/x`
- * are detected as clickable. Trailing sentence punctuation is excluded.
- */
 export function parseLinks(text: string): LinkifyNode[] {
 	const nodes: LinkifyNode[] = [];
 	let last = 0;
@@ -31,7 +35,6 @@ export function parseLinks(text: string): LinkifyNode[] {
 	for (const m of text.matchAll(URL_RE)) {
 		const idx = m.index ?? 0;
 		let raw = m[0];
-		// Don't swallow trailing sentence punctuation / closing brackets.
 		const trail = /[.,;:!?)\]}'"]+$/.exec(raw);
 		const trailing = trail ? trail[0] : '';
 		if (trailing) {
@@ -61,50 +64,82 @@ export function parseLinks(text: string): LinkifyNode[] {
 	return nodes;
 }
 
-interface LinkifyTextProps extends Omit<TextProps, 'children'> {
+function openLink(href: string) {
+	void Linking.openURL(href).catch((err) => {
+		console.error('Error opening link:', err);
+	});
+}
+
+interface LinkifyTextProps extends Omit<ViewProps, 'children'> {
 	text: string;
-	linkStyle?: TextProps['style'];
+	linkStyle?: TextStyle;
+	/** Passed to plain text segments and as base for links. */
+	style?: TextStyle | TextStyle[];
 }
 
 /**
- * React Native component that renders text with clickable links.
- * Links are opened using Linking.openURL().
+ * Renders text with tappable links. Uses Pressable per link (not nested Text
+ * onPress) so taps work inside FlatList/ScrollView on Android.
  */
 export function LinkifyText({ text, linkStyle, style, ...props }: LinkifyTextProps) {
 	const nodes = parseLinks(text);
+	const flat = StyleSheet.flatten(style) ?? {};
+	const hasLinks = nodes.some((n) => n.type === 'link');
 
-	const handleLinkPress = async (href: string) => {
-		try {
-			const supported = await Linking.canOpenURL(href);
-			if (supported) {
-				await Linking.openURL(href);
-			}
-		} catch (err) {
-			console.error('Error opening link:', err);
-		}
+	const textStyle: TextStyle = {
+		fontSize: flat.fontSize,
+		lineHeight: flat.lineHeight,
+		color: flat.color,
+		fontWeight: flat.fontWeight,
+		letterSpacing: flat.letterSpacing,
 	};
 
+	const containerStyle: ViewProps['style'] = {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		alignItems: 'flex-start',
+		paddingHorizontal: flat.paddingHorizontal,
+		paddingVertical: flat.paddingVertical,
+		paddingTop: flat.paddingTop,
+		paddingBottom: flat.paddingBottom,
+		paddingLeft: flat.paddingLeft,
+		paddingRight: flat.paddingRight,
+	};
+
+	if (!hasLinks) {
+		return (
+			<Text style={style} {...(props as TextProps)}>
+				{text}
+			</Text>
+		);
+	}
+
 	return (
-		<Text style={style} {...props}>
-			{nodes.map((node) => {
-				if (node.type === 'text') {
-					return (
-						<Text key={node.key}>
+		<View style={containerStyle} {...props}>
+			{nodes.map((node) =>
+				node.type === 'link' ? (
+					<Pressable
+						key={node.key}
+						onPress={() => node.href && openLink(node.href)}
+						hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+						accessibilityRole="link"
+					>
+						<Text
+							style={[
+								textStyle,
+								{ color: '#3b82f6', fontWeight: '600', textDecorationLine: 'underline' },
+								linkStyle,
+							]}
+						>
 							{node.content}
 						</Text>
-					);
-				}
-				return (
-					<Text
-						key={node.key}
-						style={[{ color: '#0a66c2', fontWeight: '600' }, linkStyle]}
-						onPress={() => node.href && handleLinkPress(node.href)}
-						suppressHighlighting={false}
-					>
+					</Pressable>
+				) : (
+					<Text key={node.key} style={textStyle}>
 						{node.content}
 					</Text>
-				);
-			})}
-		</Text>
+				),
+			)}
+		</View>
 	);
 }

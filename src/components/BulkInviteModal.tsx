@@ -9,6 +9,12 @@ import {
   PROMOTE_TO_ADMIN,
 } from "../graphql/admin";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { COIN_AMOUNTS } from "../lib/coins";
+import {
+  INVITE_MODAL_SUBTITLE,
+  INVITE_MODAL_TIPS,
+  inviteModalDescription,
+} from "@ctrend/shared/lib/referralInvite";
 
 type PreviewUser = {
   id: string;
@@ -293,13 +299,39 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
     <div className="admin-modal-overlay" onClick={onClose} role="dialog" aria-modal>
       <div className="admin-modal bim-modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="admin-modal-title">
-          {inviteType === "admin" ? "Invite Admins" : "Invite People"}
+          {inviteType === "admin" ? "Invite Admins" : "Invite a friend"}
         </h2>
-        <p className="muted small" style={{ marginBottom: 14 }}>
-          {inviteType === "admin"
-            ? "Existing Ke Jitbe users will be promoted to admin. New emails will receive an invitation."
-            : "Add emails below. Existing Ke Jitbe users won't be re-invited — send a friend request instead."}
-        </p>
+        {inviteType === "user" ? (
+          <>
+            <p className="bim-invite-sub muted small">{INVITE_MODAL_SUBTITLE}</p>
+            <div className="bim-invite-info">
+              <p className="bim-invite-info-text">{inviteModalDescription()}</p>
+              <ul className="bim-invite-tips">
+                {INVITE_MODAL_TIPS.map((tip) => (
+                  <li key={tip}>{tip}</li>
+                ))}
+              </ul>
+              <div className="bim-invite-rewards" aria-hidden>
+                <span className="bim-invite-reward-pill bim-invite-reward-pill--you">
+                  You +{COIN_AMOUNTS.INVITE} pts
+                </span>
+                <span className="bim-invite-reward-pill bim-invite-reward-pill--friend">
+                  Friend +{COIN_AMOUNTS.REFERRAL_INVITEE} pts
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="muted small" style={{ marginBottom: 14 }}>
+            Existing Ke Jitbe users will be promoted to admin. New emails will receive an invitation.
+          </p>
+        )}
+
+        {inviteType === "user" ? (
+          <p className="muted small bim-invite-hint">
+            Add emails below. Existing Ke Jitbe users won&apos;t be re-invited — send a friend request instead.
+          </p>
+        ) : null}
 
         {sendStatus === "done" ? (
           <div className="bim-done">

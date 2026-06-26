@@ -24,9 +24,10 @@ export function LinkText({
           <Text
             key={i}
             style={{ color: linkColor, textDecorationLine: "underline" }}
-            onPress={() => {
+            onPressIn={() => {
               void Linking.openURL(seg.href).catch(() => {});
             }}
+            accessibilityRole="link"
           >
             {seg.value}
           </Text>

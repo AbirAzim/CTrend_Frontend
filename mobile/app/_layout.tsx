@@ -29,6 +29,8 @@ import { useForceUpdateRequired } from "../hooks/useForceUpdateRequired";
 import { InAppNotificationBanner } from "../components/InAppNotificationBanner";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { MY_NOTIFICATIONS, NEW_NOTIFICATION_SUB, UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
+import { REFERRAL_POINTS } from "@ctrend/shared/graphql/coins";
+import { REFERRAL_POINTS_HISTORY } from "@ctrend/shared/graphql/referrals";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { MESSAGE_RECEIVED, MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { FRIEND_REQUESTS, FRIEND_SUGGESTIONS, GET_USER_PROFILE, MY_FRIENDS } from "@ctrend/shared/graphql/friends";
@@ -222,6 +224,12 @@ function GlobalNotificationSubscription() {
 
       // Refresh bell badge count
       void client.refetchQueries({ include: [UNREAD_NOTIFICATION_COUNT] });
+
+      if (n.type === "REFERRAL_JOINED" || n.type === "REFERRAL_REDEEMED") {
+        void client.refetchQueries({
+          include: [REFERRAL_POINTS, REFERRAL_POINTS_HISTORY],
+        });
+      }
 
       // Friend graph changed → refresh any friend lists that are on screen
       // (Received/Sent/Friends/Suggestions on the Friends + Profile screens).

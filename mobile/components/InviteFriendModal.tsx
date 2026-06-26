@@ -13,6 +13,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { INVITE_USER } from "@ctrend/shared/graphql/admin";
+import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
+import {
+  INVITE_MODAL_SUBTITLE,
+  INVITE_MODAL_TIPS,
+  inviteModalDescription,
+} from "@ctrend/shared/lib/referralInvite";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useTheme } from "../context/ThemeContext";
 
@@ -45,19 +51,24 @@ export function InviteFriendModal({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight(visible);
-  const keyboardOpen = kbHeight > 0;
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [invite, { loading }] = useMutation<{ inviteUser: boolean }>(INVITE_USER);
 
-  function reset() {
-    setEmail("");
-    setMsg(null);
-  }
+  useEffect(() => {
+    if (!visible) {
+      setSent(false);
+      setMsg(null);
+      setEmail("");
+    }
+  }, [visible]);
 
   function handleClose() {
     Keyboard.dismiss();
-    reset();
+    setEmail("");
+    setMsg(null);
+    setSent(false);
     onClose();
   }
 
@@ -67,122 +78,199 @@ export function InviteFriendModal({
     setMsg(null);
     try {
       await invite({ variables: { email: trimmed } });
-      setMsg(`Invitation sent to ${trimmed} with a referral code.`);
+      setSent(true);
+      setMsg(`Invitation sent to ${trimmed}`);
       setEmail("");
       Keyboard.dismiss();
     } catch (err) {
+      setSent(false);
       setMsg(getApolloErrorMessage(err));
     }
   }
 
-  const sheetBottom = keyboardOpen ? kbHeight + 12 : Math.max(insets.bottom, 16);
+  const sheetBottom = kbHeight > 0 ? kbHeight + 8 : Math.max(insets.bottom, 12);
   const canSend = Boolean(email.trim()) && !loading;
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <View style={st.root}>
-        <Pressable style={st.backdrop} onPress={handleClose} accessibilityLabel="Close invite panel" />
-        <View style={[st.sheetWrap, { paddingBottom: sheetBottom }]} pointerEvents="box-none">
-          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[st.title, { color: colors.text }]}>Invite a friend</Text>
-            {!keyboardOpen ? (
-              <Text style={[st.sub, { color: colors.subtext }]}>
-                We&apos;ll email a referral code. You earn 10 coins when they join; they get 5.
+      {/* Parent Pressable = dim overlay; tap empty area above the sheet to close */}
+      <Pressable style={st.root} onPress={handleClose} accessibilityLabel="Close invite panel">
+        <Pressable
+          style={[st.sheet, { paddingBottom: sheetBottom, backgroundColor: colors.card }]}
+          onPress={() => {}}
+        >
+          <View style={[st.handle, { backgroundColor: colors.border }]} />
+          <View style={st.headerRow}>
+            <View style={st.headerTextCol}>
+              <Text style={[st.title, { color: colors.text }]}>Invite a friend</Text>
+              <Text style={[st.sub, { color: colors.subtext }]}>{INVITE_MODAL_SUBTITLE}</Text>
+            </View>
+            <Pressable
+              onPress={handleClose}
+              hitSlop={12}
+              style={[st.closeBtn, { backgroundColor: colors.section }]}
+              accessibilityLabel="Close"
+            >
+              <Text style={[st.closeBtnText, { color: colors.subtext }]}>✕</Text>
+            </Pressable>
+          </View>
+
+          <View style={st.rewardRow}>
+            <View style={[st.rewardPill, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "40" }]}>
+              <Text style={[st.rewardPillText, { color: colors.accent }]}>
+                You +{COIN_AMOUNTS.INVITE} points
               </Text>
-            ) : null}
-            <Text style={[st.label, { color: colors.subtext }]}>Friend&apos;s email</Text>
-            <TextInput
-              style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="friend@example.com"
-              placeholderTextColor={colors.muted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="send"
-              blurOnSubmit={false}
-              onSubmitEditing={() => void handleSend()}
-            />
-            {msg ? <Text style={[st.msg, { color: colors.text }]}>{msg}</Text> : null}
-            <View style={st.actions}>
-              <Pressable style={[st.btnGhost, { borderColor: colors.border }]} onPress={handleClose}>
-                <Text style={{ color: colors.subtext, fontWeight: "700" }}>Close</Text>
-              </Pressable>
-              <Pressable
-                style={[st.btnPrimary, { backgroundColor: colors.accent }, !canSend && { opacity: 0.5 }]}
-                onPressIn={() => void handleSend()}
-                disabled={!canSend}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={st.btnPrimaryText}>Send invite</Text>
-                )}
-              </Pressable>
+            </View>
+            <View style={[st.rewardPill, { backgroundColor: "#22c55e18", borderColor: "#22c55e40" }]}>
+              <Text style={[st.rewardPillText, { color: "#22c55e" }]}>
+                Friend +{COIN_AMOUNTS.REFERRAL_INVITEE} points
+              </Text>
             </View>
           </View>
-        </View>
-      </View>
+
+          <View style={[st.infoBox, { backgroundColor: colors.section, borderColor: colors.border }]}>
+            <Text style={[st.infoText, { color: colors.subtext }]}>{inviteModalDescription()}</Text>
+            <View style={st.tipList}>
+              {INVITE_MODAL_TIPS.map((tip) => (
+                <View key={tip} style={st.tipRow}>
+                  <Text style={[st.tipDot, { color: colors.accent }]}>•</Text>
+                  <Text style={[st.tipText, { color: colors.text }]}>{tip}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <Text style={[st.label, { color: colors.subtext }]}>Friend&apos;s email</Text>
+          <TextInput
+            style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+            value={email}
+            onChangeText={(v) => {
+              setSent(false);
+              setEmail(v);
+            }}
+            placeholder="friend@example.com"
+            placeholderTextColor={colors.muted}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={() => void handleSend()}
+          />
+
+          {msg ? (
+            <View style={[st.msgBox, sent ? st.msgBoxOk : st.msgBoxErr]}>
+              <Text style={[st.msg, { color: sent ? "#166534" : "#b91c1c" }]}>{msg}</Text>
+            </View>
+          ) : null}
+
+          <Pressable
+            style={[st.btnPrimary, { backgroundColor: colors.accent }, !canSend && { opacity: 0.45 }]}
+            onPressIn={() => void handleSend()}
+            disabled={!canSend}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={st.btnPrimaryText}>{sent ? "Send another" : "Send invite"}</Text>
+            )}
+          </Pressable>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
 const st = StyleSheet.create({
-  root: { flex: 1 },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  sheetWrap: {
+  root: {
     flex: 1,
     justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
+  sheet: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     paddingHorizontal: 20,
-  },
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 18,
-    gap: 10,
-    maxWidth: 480,
-    width: "100%",
-    alignSelf: "center",
+    paddingTop: 10,
+    gap: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  title: { fontSize: 18, fontWeight: "800" },
-  sub: { fontSize: 13, lineHeight: 19 },
-  label: { fontSize: 12, fontWeight: "700", marginTop: 2 },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 4,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  headerTextCol: { flex: 1, gap: 2 },
+  title: { fontSize: 20, fontWeight: "800" },
+  sub: { fontSize: 13, lineHeight: 18 },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeBtnText: { fontSize: 16, fontWeight: "600" },
+  rewardRow: { flexDirection: "row", gap: 8 },
+  rewardPill: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  rewardPillText: { fontSize: 12, fontWeight: "700" },
+  infoBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  infoText: { fontSize: 13, lineHeight: 19 },
+  tipList: { gap: 6 },
+  tipRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  tipDot: { fontSize: 14, fontWeight: "800", lineHeight: 18 },
+  tipText: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 17 },
+  label: { fontSize: 12, fontWeight: "700" },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     fontSize: 16,
   },
-  msg: { fontSize: 12, fontWeight: "600" },
-  actions: { flexDirection: "row", gap: 10, marginTop: 4 },
-  btnGhost: {
-    flex: 1,
-    borderWidth: 1,
+  msgBox: {
     borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
+  msgBoxOk: { backgroundColor: "rgba(34,197,94,0.12)" },
+  msgBoxErr: { backgroundColor: "rgba(239,68,68,0.1)" },
+  msg: { fontSize: 13, fontWeight: "600", textAlign: "center" },
   btnPrimary: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: "center",
+    marginTop: 2,
+    marginBottom: 4,
   },
-  btnPrimaryText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  btnPrimaryText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });

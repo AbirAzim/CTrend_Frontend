@@ -19,3 +19,17 @@ export const REDEEM_REFERRAL_CODE = gql`
     }
   }
 `;
+
+/** Paginated referral-point history (INVITE + REFERRAL_INVITEE). */
+export const REFERRAL_POINTS_HISTORY = gql`
+  query ReferralPointsHistory($userId: ID, $skip: Int, $take: Int) {
+    referralPointsHistory(userId: $userId, skip: $skip, take: $take) {
+      id
+      type
+      amount
+      createdAt
+      relatedUserId
+      relatedUserName
+    }
+  }
+`;

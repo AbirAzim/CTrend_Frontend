@@ -100,6 +100,8 @@ function notifIcon(type: string, referenceType?: string | null): string {
     case "ANNOUNCEMENT":
     case "ADMIN_BROADCAST": return "📢";
     case "USER_GLOBAL_POST": return "🌍";
+    case "REFERRAL_JOINED":
+    case "REFERRAL_REDEEMED": return "✦";
     case "SYSTEM": return "ℹ";
     default: return "🔔";
   }
@@ -145,6 +147,10 @@ function navigateFromNotif(notif: GqlNotification) {
   }
   if (notif.type === "FRIEND_REQUEST" || notif.type === "FRIEND_REQUEST_ACCEPTED" || notif.type === "NEW_FOLLOWER") {
     if (notif.referenceId) router.push(`/profile/${notif.referenceId}` as `/${string}`);
+    return;
+  }
+  if (notif.type === "REFERRAL_JOINED" || notif.type === "REFERRAL_REDEEMED") {
+    router.push("/points" as `/${string}`);
     return;
   }
   if (!notif.referenceId) return;

@@ -15277,6 +15277,74 @@ a.cx-profile-btn-accent {
   overflow-y: auto;
 }
 
+.bim-invite-sub {
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
+.bim-invite-info {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ig-border);
+  background: var(--ig-surface, #f8fafc);
+}
+
+.bim-invite-info-text {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ig-text);
+}
+
+.bim-invite-tips {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bim-invite-tips li {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+  line-height: 1.35;
+}
+
+.bim-invite-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bim-invite-reward-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.bim-invite-reward-pill--you {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: var(--cx-accent-mid, #6366f1);
+}
+
+.bim-invite-reward-pill--friend {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #15803d;
+}
+
+.bim-invite-hint {
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
 .bim-tag-input {
   display: flex;
   flex-wrap: wrap;
@@ -23652,6 +23720,31 @@ a.cx-profile-reward-card:hover {
   box-shadow: 0 12px 32px rgb(245 197 24 / 0.18);
 }
 
+.cx-profile-reward-card-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cx-profile-reward-card--wins:hover,
+.cx-profile-reward-card--points:hover {
+  transform: translateY(-2px);
+}
+
+.cx-profile-reward-card--wins:hover {
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.18);
+}
+
+.cx-profile-reward-card--points:hover {
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.2);
+}
+
 .cx-profile-reward-card--coins {
   background: linear-gradient(155deg, rgba(255, 232, 138, 0.28) 0%, rgba(245, 197, 24, 0.12) 45%, rgba(217, 148, 17, 0.08) 100%);
   border-color: rgba(245, 197, 24, 0.38);
@@ -23894,22 +23987,37 @@ a.cx-profile-reward-card:hover {
 .cx-profile-engage-actions {
   margin-top: 12px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cx-profile-actions-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 8px;
-  align-items: center;
-  padding: 10px 12px;
+  padding: 8px;
   border-radius: 14px;
   border: 1px solid var(--ig-border);
   background: var(--ig-card);
 }
 
-.cx-profile-engage-actions-input {
-  flex: 1 1 120px;
+.cx-profile-redeem-zone {
+  flex: 1;
   min-width: 0;
-  padding: 9px 12px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.cx-profile-code-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
   border-radius: 10px;
   border: 1px solid var(--ig-border);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -23917,43 +24025,230 @@ a.cx-profile-reward-card:hover {
   color: var(--ig-text);
 }
 
-.cx-profile-engage-actions-redeem,
-.cx-profile-engage-actions-invite {
+.cx-profile-redeem-btn {
   flex-shrink: 0;
-  padding: 9px 14px;
+  padding: 9px 12px;
   border-radius: 10px;
-  border: 0;
+  border: 1px solid var(--ig-border);
   font-weight: 800;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
+  background: transparent;
+  color: var(--ig-text);
 }
 
-.cx-profile-engage-actions-redeem {
-  background: var(--cx-accent-mid, #6366f1);
-  color: #fff;
+.cx-profile-redeem-btn:hover:not(:disabled) {
+  border-color: var(--cx-accent-mid, #6366f1);
+  color: var(--cx-accent-mid, #6366f1);
 }
 
-.cx-profile-engage-actions-redeem:disabled {
+.cx-profile-redeem-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.cx-profile-engage-actions-invite {
-  background: transparent;
-  border: 1px solid var(--ig-border);
-  color: var(--ig-text);
+.cx-profile-actions-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+  background: var(--ig-border);
+  flex-shrink: 0;
 }
 
-.cx-profile-engage-actions-invite:hover {
-  border-color: var(--cx-accent);
-  color: var(--cx-accent);
+.cx-profile-invite-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 76px;
+  flex-shrink: 0;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 0;
+  cursor: pointer;
+  background: var(--cx-accent-mid, #6366f1);
+  color: #fff;
+  transition: filter 0.15s ease, transform 0.15s ease;
 }
 
-.cx-profile-engage-actions-msg {
-  flex: 1 1 100%;
+.cx-profile-invite-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.cx-profile-invite-btn strong {
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.cx-profile-invite-btn span {
+  font-size: 0.65rem;
+  font-weight: 700;
+  opacity: 0.88;
+  line-height: 1.1;
+}
+
+.cx-profile-actions-feedback {
   margin: 0;
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ig-muted);
+  text-align: center;
+}
+
+/* ── Referral Points Page ─────────────────────────── */
+.cx-points-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 14px 80px;
+}
+.cx-points-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.2), rgba(99, 102, 241, 0.08));
+  border: 1px solid rgba(129, 140, 248, 0.35);
+}
+.cx-points-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #818cf8, #6366f1);
+  color: #e0e7ff;
+  font-weight: 900;
+  font-size: 1.6rem;
+  flex: 0 0 auto;
+}
+.cx-points-hero-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ig-muted, #65676b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cx-points-hero-balance {
+  font-size: 2.2rem;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--ig-text, #1c1e21);
+  font-variant-numeric: tabular-nums;
+}
+.cx-points-hero-bdt {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #6366f1;
+  margin-top: 4px;
+}
+.cx-points-hero-note {
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+.cx-points-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 18px 0 12px;
+}
+.cx-points-tab {
+  flex: 1;
+  border: none;
+  background: var(--ig-surface, #f0f2f5);
+  color: var(--ig-muted, #65676b);
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.cx-points-tab--active {
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.22), rgba(99, 102, 241, 0.12));
+  color: var(--ig-text, #1c1e21);
+}
+.cx-points-list { display: flex; flex-direction: column; gap: 6px; }
+.cx-points-empty {
+  text-align: center;
+  color: var(--ig-muted, #65676b);
+  padding: 32px 12px;
+  font-size: 0.9rem;
+}
+.cx-points-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--ig-card, #fff);
+  border: 1px solid var(--ig-border, rgba(0, 0, 0, 0.06));
+}
+.cx-points-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--ig-surface, #f0f2f5);
+  font-size: 1.15rem;
+  flex: 0 0 auto;
+}
+.cx-points-row-body { flex: 1; min-width: 0; }
+.cx-points-row-label { font-weight: 700; font-size: 0.9rem; }
+.cx-points-row-time { font-size: 0.78rem; color: var(--ig-muted, #65676b); }
+.cx-points-row-amounts { text-align: right; }
+.cx-points-row-amount {
+  font-weight: 900;
+  font-size: 0.95rem;
+  color: #6366f1;
+  font-variant-numeric: tabular-nums;
+}
+.cx-points-row-bdt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ig-muted, #65676b);
+}
+.cx-points-more {
+  margin-top: 8px;
+  align-self: center;
+  border: 1px solid var(--ig-border);
+  background: var(--ig-card);
+  border-radius: 999px;
+  padding: 8px 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.cx-points-earn { display: flex; flex-direction: column; gap: 6px; }
+.cx-points-earn-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--ig-card);
+  border: 1px solid var(--ig-border);
+}
+.cx-points-earn-label { flex: 1; font-weight: 700; font-size: 0.9rem; }
+.cx-points-earn-amount { font-weight: 900; color: #6366f1; }
+.cx-points-withdraw-note {
+  margin: 12px 4px 0;
+  font-size: 0.85rem;
+  color: var(--ig-muted);
+  text-align: center;
+  line-height: 1.45;
+}
+.cx-points-profile-link {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: #6366f1;
+  text-decoration: none;
 }

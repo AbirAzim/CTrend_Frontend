@@ -29,6 +29,8 @@
     "./lib/moderatorBrand": "./src/lib/moderatorBrand.ts",
     "./lib/parseTextLinks": "./src/lib/parseTextLinks.ts",
     "./lib/profileImageUrl": "./src/lib/profileImageUrl.ts",
+    "./lib/referralInvite": "./src/lib/referralInvite.ts",
+    "./lib/referralHistory": "./src/lib/referralHistory.ts",
     "./lib/submitContentReport": "./src/lib/submitContentReport.ts",
     "./lib/teamCredits": "./src/lib/teamCredits.ts",
     "./types/feed": "./src/types/feed.ts",

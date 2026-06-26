@@ -50,6 +50,8 @@ function typeIcon(type: string, referenceType?: string | null): string {
     case "VOTE_WINNER":      return "🏆";
     case "VOTE_PRIZE_CLAIMED": return "🎁";
     case "LINEUP_AVAILABLE":  return "⚽";
+    case "REFERRAL_JOINED":
+    case "REFERRAL_REDEEMED": return "✦";
     default:                 return "🔔";
   }
 }
@@ -198,6 +200,10 @@ export function NotificationBell() {
     }
     if (n.type === "LINEUP_AVAILABLE" && n.referenceId) {
       navigate(`/world-cup/match/${n.referenceId}?tab=lineup`);
+      return;
+    }
+    if (n.type === "REFERRAL_JOINED" || n.type === "REFERRAL_REDEEMED") {
+      navigate("/points");
       return;
     }
     if (

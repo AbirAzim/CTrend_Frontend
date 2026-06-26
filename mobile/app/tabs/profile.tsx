@@ -446,6 +446,7 @@ export default function ProfileScreen() {
       style={st.scroll}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
       onScroll={handleScroll}
       scrollEventThrottle={16}
       scrollEnabled={!openContent && !openPeople}

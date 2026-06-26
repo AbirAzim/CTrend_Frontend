@@ -261,6 +261,8 @@ const POST_NOTIF_TYPES = new Set([
 const PROFILE_NOTIF_TYPES = new Set([
   "FRIEND_REQUEST", "FRIEND_REQUEST_ACCEPTED", "NEW_FOLLOWER",
 ]);
+// Referral-point notifications → open the points hub.
+const POINTS_NOTIF_TYPES = new Set(["REFERRAL_JOINED", "REFERRAL_REDEEMED"]);
 // Platform notifications → open the linked post if any, else the notifications list.
 const ANNOUNCEMENT_NOTIF_TYPES = new Set([
   "ANNOUNCEMENT", "ADMIN_BROADCAST", "SYSTEM",
@@ -320,6 +322,7 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
     return postRoute(`/comments/${postTarget}`);
   }
   if (POST_NOTIF_TYPES.has(nt) && postTarget) return `/post/${postTarget}`;
+  if (POINTS_NOTIF_TYPES.has(nt)) return "/points";
   if (PROFILE_NOTIF_TYPES.has(nt) && data.referenceId) return `/profile/${data.referenceId}`;
   if (ANNOUNCEMENT_NOTIF_TYPES.has(nt)) {
     return postTarget ? `/post/${postTarget}` : "/notifications";

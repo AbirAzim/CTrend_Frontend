@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useMutation, useQuery, useSubscription } from "@apollo/client";
+import { useMutation, useQuery, useSubscription, useApolloClient } from "@apollo/client";
 import {
   MY_NOTIFICATIONS,
   MARK_NOTIFICATION_READ,
@@ -16,6 +16,8 @@ import {
   NEW_NOTIFICATION_SUB,
 } from "../graphql/notifications";
 import { onWsConnected, reconnectWs } from "../lib/apolloClient";
+import { REFERRAL_POINTS } from "../graphql/coins";
+import { REFERRAL_POINTS_HISTORY } from "../graphql/referrals";
 import { useAuth } from "./AuthContext";
 import { playNotificationChime } from "../lib/notificationSound";
 
@@ -52,6 +54,7 @@ const NotificationContext = createContext<NotificationContextValue | null>(null)
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
+  const client = useApolloClient();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const { loading, refetch } = useQuery(MY_NOTIFICATIONS, {
@@ -124,6 +127,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return [n, ...prev];
       });
       if (!skipChime) playNotificationChime();
+      if (n.type === "REFERRAL_JOINED" || n.type === "REFERRAL_REDEEMED") {
+        void client.refetchQueries({
+          include: [REFERRAL_POINTS, REFERRAL_POINTS_HISTORY],
+        });
+      }
     },
   });
 

@@ -49,6 +49,11 @@ export function ProfileEngagementPanel({
   const totalWins = wins.reduce((n, w) => n + w.wins, 0);
   const referralPoints = pointsData?.referralPoints ?? 0;
   const coinsHref = isSelf ? "/coins" : `/coins/${userId}`;
+  const pointsHref = isSelf ? "/points" : `/points/${userId}`;
+  const campaignHref =
+    wins.find((w) => w.campaignSlug)?.campaignSlug
+      ? `/campaign/${wins.find((w) => w.campaignSlug)!.campaignSlug}`
+      : "/world-cup";
 
   async function onClaim(e: React.MouseEvent) {
     e.preventDefault();
@@ -118,95 +123,109 @@ export function ProfileEngagementPanel({
         </Link>
 
         <div className="cx-profile-reward-card cx-profile-reward-card--wins">
-          <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--wins" aria-hidden />
-          <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--trophy" aria-hidden>🏆</span>
-          <span className="cx-profile-reward-card-label">Campaign wins</span>
-          <span className="cx-profile-reward-card-value">{totalWins > 0 ? totalWins : "—"}</span>
-          <span className="cx-profile-reward-card-sub">
-            {totalWins > 0
-              ? `${totalWins} ${totalWins === 1 ? "victory" : "victories"}`
-              : isSelf
-                ? "Vote in match posts"
-                : "No victories yet"}
-          </span>
-          <div className="cx-profile-reward-wins-body">
-            {loading && wins.length === 0 ? (
-              <p className="cx-profile-reward-wins-loading muted small">Loading…</p>
-            ) : wins.length === 0 ? null : (
-              <ul className="cx-profile-reward-wins-list">
-                {wins.slice(0, 2).map((row) => {
-                  const href = row.campaignSlug ? `/campaign/${row.campaignSlug}` : null;
-                  const rowInner = (
-                    <>
-                      <span className="cx-profile-reward-win-name">{row.campaignName}</span>
-                      <span className="cx-profile-reward-win-badge">
-                        {row.wins}w
-                      </span>
-                    </>
-                  );
-                  return (
-                    <li key={row.campaignId ?? row.campaignName}>
-                      {href ? (
-                        <Link to={href} className="cx-profile-reward-win-row">{rowInner}</Link>
-                      ) : (
-                        <div className="cx-profile-reward-win-row">{rowInner}</div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <Link to={campaignHref} className="cx-profile-reward-card-link">
+            <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--wins" aria-hidden />
+            <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--trophy" aria-hidden>🏆</span>
+            <span className="cx-profile-reward-card-label">Campaign wins</span>
+            <span className="cx-profile-reward-card-value">{totalWins > 0 ? totalWins : "—"}</span>
+            <span className="cx-profile-reward-card-sub">
+              {totalWins > 0
+                ? `${totalWins} ${totalWins === 1 ? "victory" : "victories"}`
+                : isSelf
+                  ? "Vote in match posts"
+                  : "No victories yet"}
+            </span>
+            <div className="cx-profile-reward-wins-body">
+              {loading && wins.length === 0 ? (
+                <p className="cx-profile-reward-wins-loading muted small">Loading…</p>
+              ) : wins.length === 0 ? null : (
+                <ul className="cx-profile-reward-wins-list">
+                  {wins.slice(0, 2).map((row) => {
+                    const href = row.campaignSlug ? `/campaign/${row.campaignSlug}` : null;
+                    const rowInner = (
+                      <>
+                        <span className="cx-profile-reward-win-name">{row.campaignName}</span>
+                        <span className="cx-profile-reward-win-badge">
+                          {row.wins}w
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={row.campaignId ?? row.campaignName}>
+                        {href ? (
+                          <Link to={href} className="cx-profile-reward-win-row" onClick={(e) => e.stopPropagation()}>{rowInner}</Link>
+                        ) : (
+                          <div className="cx-profile-reward-win-row">{rowInner}</div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            <span className="cx-profile-reward-card-cta">View campaigns ›</span>
+          </Link>
         </div>
 
         <div className="cx-profile-reward-card cx-profile-reward-card--points">
-          <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
-          <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
-          <span className="cx-profile-reward-card-label">Referral points</span>
-          <span className="cx-profile-reward-card-value">{referralPoints > 0 ? referralPoints : "—"}</span>
-          <span className="cx-profile-reward-card-sub">
-            {referralPoints > 0
-              ? isSelf
-                ? "From invites & codes"
-                : "Invite rewards earned"
-              : isSelf
-                ? "Invite friends to earn"
-                : "No invite points yet"}
-          </span>
+          <Link to={pointsHref} className="cx-profile-reward-card-link">
+            <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
+            <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
+            <span className="cx-profile-reward-card-label">Referral points</span>
+            <span className="cx-profile-reward-card-value">{referralPoints > 0 ? referralPoints : "—"}</span>
+            <span className="cx-profile-reward-card-sub">
+              {referralPoints > 0
+                ? isSelf
+                  ? "From invites & codes · 10 pts = 10 BDT"
+                  : "Invite rewards earned"
+                : isSelf
+                  ? "Invite friends to earn"
+                  : "No invite points yet"}
+            </span>
+            <span className="cx-profile-reward-card-cta">View history ›</span>
+          </Link>
         </div>
       </div>
 
       {isSelf ? (
-        <form className="cx-profile-engage-actions" onSubmit={(e) => void onRedeem(e)}>
-          <input
-            type="text"
-            className="cx-profile-engage-actions-input"
-            placeholder="Referral code"
-            aria-label="Referral code"
-            value={redeemCode}
-            onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
-            autoCapitalize="characters"
-            autoComplete="off"
-            maxLength={12}
-          />
-          <button
-            type="submit"
-            className="cx-profile-engage-actions-redeem"
-            disabled={redeeming || !redeemCode.trim()}
-          >
-            {redeeming ? "…" : "Redeem"}
-          </button>
-          {onInviteFriend ? (
-            <button
-              type="button"
-              className="cx-profile-engage-actions-invite"
-              onClick={onInviteFriend}
-            >
-              + Invite
-            </button>
-          ) : null}
-          {redeemMsg ? <p className="cx-profile-engage-actions-msg" role="status">{redeemMsg}</p> : null}
-        </form>
+        <div className="cx-profile-engage-actions">
+          <form className="cx-profile-actions-bar" onSubmit={(e) => void onRedeem(e)}>
+            <div className="cx-profile-redeem-zone">
+              <input
+                type="text"
+                className="cx-profile-code-input"
+                placeholder="Code"
+                aria-label="Referral code"
+                value={redeemCode}
+                onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
+                autoCapitalize="characters"
+                autoComplete="off"
+                maxLength={12}
+              />
+              <button
+                type="submit"
+                className="cx-profile-redeem-btn"
+                disabled={redeeming || !redeemCode.trim()}
+              >
+                {redeeming ? "…" : "Redeem"}
+              </button>
+            </div>
+            {onInviteFriend ? (
+              <>
+                <span className="cx-profile-actions-divider" aria-hidden />
+                <button
+                  type="button"
+                  className="cx-profile-invite-btn"
+                  onClick={onInviteFriend}
+                >
+                  <strong>Invite</strong>
+                  <span>+{COIN_AMOUNTS.INVITE} pts</span>
+                </button>
+              </>
+            ) : null}
+          </form>
+          {redeemMsg ? <p className="cx-profile-actions-feedback" role="status">{redeemMsg}</p> : null}
+        </div>
       ) : null}
     </section>
   );
