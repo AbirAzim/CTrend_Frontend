@@ -51,8 +51,11 @@ export function useNotificationActions() {
     fetchPolicy: "cache-and-network",
   });
 
-  const friendIdSet = useMemo(
-    () => new Set((friendsData?.myFriends ?? []).map((f: { id: string }) => f.id)),
+  const friendIdSet = useMemo<Set<string>>(
+    () =>
+      new Set<string>(
+        (friendsData?.myFriends ?? []).map((f: { id: string }) => f.id),
+      ),
     [friendsData],
   );
 

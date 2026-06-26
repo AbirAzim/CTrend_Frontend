@@ -71,19 +71,21 @@ export function NotificationList({
         const isAdminMsg = isOfficialAdminMessage(n);
         const isLoading = actionLoadingIds.has(n.id);
         const alreadyFriends =
-          isFriendReq && Boolean(n.referenceId) && friendIdSet.has(n.referenceId);
+          isFriendReq &&
+          n.referenceId != null &&
+          friendIdSet.has(n.referenceId);
         const showFriendReqActions =
           isFriendReq &&
           isPendingFriendRequestNotification(n) &&
           !alreadyFriends &&
           Boolean(n.referenceId);
-        const claimPostId = n.postId ?? n.referenceId;
+        const claimPostId = n.postId ?? n.referenceId ?? null;
         const canClaimPrize =
           n.type === "VOTE_WINNER" &&
           n.title.trim() !== "Prize claim submitted" &&
           !n.body.toLowerCase().includes("claim is received") &&
-          Boolean(claimPostId) &&
-          !claimedPostIds.has(claimPostId!);
+          claimPostId != null &&
+          !claimedPostIds.has(claimPostId);
         const rawAvatar = notificationAvatarUrl(n, PLATFORM_BRAND_LOGO_URL);
         const avatarUrl = rawAvatar ? normalizeProfileImageUrl(rawAvatar) : null;
 
