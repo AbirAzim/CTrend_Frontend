@@ -23772,6 +23772,30 @@ a.cx-profile-reward-card:hover {
   background: linear-gradient(155deg, rgba(129, 140, 248, 0.2) 0%, rgba(67, 56, 202, 0.1) 100%);
 }
 
+.cx-profile-reward-card--disabled {
+  opacity: 0.72;
+  filter: grayscale(0.35);
+  pointer-events: none;
+  cursor: not-allowed;
+  background: var(--ig-section, #f4f4f5) !important;
+  border-color: var(--ig-border, #e4e4e7) !important;
+}
+
+.cx-profile-reward-card-link--static {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  padding: inherit;
+}
+
+.cx-profile-reward-card-cta--muted {
+  opacity: 0.65;
+}
+
 .cx-profile-reward-card-glow {
   position: absolute;
   top: -30px;

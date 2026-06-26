@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@apollo/client/react";
 import { REFERRAL_POINTS } from "@ctrend/shared/graphql/coins";
 import { REFERRAL_POINTS_HISTORY } from "@ctrend/shared/graphql/referrals";
+import { PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { COIN_AMOUNTS, COIN_META, type CoinType } from "@ctrend/shared/lib/coins";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { formatPointsBdt } from "@ctrend/shared/lib/referralInvite";
@@ -48,6 +49,12 @@ export function PointsHub({ userId }: { userId?: string }) {
 
   const [tab, setTab] = useState<Tab>("history");
 
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-first" },
+  );
+  const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
+
   const { data: pointsData } = useQuery<{ referralPoints: number }>(REFERRAL_POINTS, {
     variables: { userId: targetId },
     skip: !targetId,
@@ -70,6 +77,30 @@ export function PointsHub({ userId }: { userId?: string }) {
     [history],
   );
   const displayBalance = isSelf ? balance : earnedTotal;
+
+  if (!referralEnabled) {
+    return (
+      <View style={[st.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        <Stack.Screen options={{ title: "Points", headerShown: false }} />
+        <View style={st.hero}>
+          <View style={[st.heroIcon, { opacity: 0.5 }]}>
+            <Text style={st.heroIconGlyph}>✦</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.heroLabel}>REFERRAL POINTS</Text>
+            <Text style={st.heroBalance}>—</Text>
+            <Text style={st.heroNote}>
+              The referral program is currently disabled.
+            </Text>
+            <Pressable onPress={() => router.back()} style={{ marginTop: 12 }}>
+              <Text style={{ color: colors.accent, fontWeight: "700" }}>← Back</Text>
+            </Pressable>
+          </View>
+        </View>
+        <BottomNav />
+      </View>
+    );
+  }
 
   const header = (
     <View>

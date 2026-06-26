@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { USER_CAMPAIGN_WIN_SUMMARY } from "../graphql/campaigns";
 import { CLAIM_DAILY_COINS, REFERRAL_POINTS } from "../graphql/coins";
 import { REDEEM_REFERRAL_CODE } from "../graphql/referrals";
+import { PLATFORM_SETTINGS } from "../graphql/admin";
 import { useCoins } from "../context/CoinsContext";
 import { COIN_AMOUNTS } from "../lib/coins";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -42,6 +43,11 @@ export function ProfileEngagementPanel({
     REFERRAL_POINTS,
     { variables: { userId }, fetchPolicy: "cache-and-network" },
   );
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-first" },
+  );
+  const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
   const [redeem, { loading: redeeming }] = useMutation(REDEEM_REFERRAL_CODE);
 
@@ -167,59 +173,86 @@ export function ProfileEngagementPanel({
           </Link>
         </div>
 
-        <div className="cx-profile-reward-card cx-profile-reward-card--points">
-          <Link to={pointsHref} className="cx-profile-reward-card-link">
-            <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
-            <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
-            <span className="cx-profile-reward-card-label">Referral points</span>
-            <span className="cx-profile-reward-card-value">{referralPoints > 0 ? referralPoints : "—"}</span>
-            <span className="cx-profile-reward-card-sub">
-              {referralPoints > 0
-                ? isSelf
-                  ? "From invites & codes · 10 pts = 10 BDT"
-                  : "Invite rewards earned"
-                : isSelf
-                  ? "Invite friends to earn"
-                  : "No invite points yet"}
-            </span>
-            <span className="cx-profile-reward-card-cta">View history ›</span>
-          </Link>
+        <div
+          className={`cx-profile-reward-card cx-profile-reward-card--points${referralEnabled ? "" : " cx-profile-reward-card--disabled"}`}
+          aria-disabled={!referralEnabled}
+        >
+          {referralEnabled ? (
+            <Link to={pointsHref} className="cx-profile-reward-card-link">
+              <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
+              <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
+              <span className="cx-profile-reward-card-label">Referral points</span>
+              <span className="cx-profile-reward-card-value">{referralPoints > 0 ? referralPoints : "—"}</span>
+              <span className="cx-profile-reward-card-sub">
+                {referralPoints > 0
+                  ? isSelf
+                    ? "From invites & codes · 10 pts = 10 BDT"
+                    : "Invite rewards earned"
+                  : isSelf
+                    ? "Invite friends to earn"
+                    : "No invite points yet"}
+              </span>
+              <span className="cx-profile-reward-card-cta">View history ›</span>
+            </Link>
+          ) : (
+            <div className="cx-profile-reward-card-link cx-profile-reward-card-link--static">
+              <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
+              <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
+              <span className="cx-profile-reward-card-label">Referral points</span>
+              <span className="cx-profile-reward-card-value">—</span>
+              <span className="cx-profile-reward-card-sub">
+                {isSelf ? "Program disabled by admin" : "Not available"}
+              </span>
+              <span className="cx-profile-reward-card-cta cx-profile-reward-card-cta--muted">Disabled</span>
+            </div>
+          )}
         </div>
       </div>
 
       {isSelf ? (
         <div className="cx-profile-engage-actions">
-          <form className="cx-profile-actions-bar" onSubmit={(e) => void onRedeem(e)}>
-            <div className="cx-profile-redeem-zone">
-              <input
-                type="text"
-                className="cx-profile-code-input"
-                placeholder="Code"
-                aria-label="Referral code"
-                value={redeemCode}
-                onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
-                autoCapitalize="characters"
-                autoComplete="off"
-                maxLength={12}
-              />
-              <button
-                type="submit"
-                className="cx-profile-redeem-btn"
-                disabled={redeeming || !redeemCode.trim()}
-              >
-                {redeeming ? "…" : "Redeem"}
-              </button>
-            </div>
+          <form
+            className="cx-profile-actions-bar"
+            onSubmit={(e) => {
+              if (!referralEnabled) {
+                e.preventDefault();
+                return;
+              }
+              void onRedeem(e);
+            }}
+          >
+            {referralEnabled ? (
+              <div className="cx-profile-redeem-zone">
+                <input
+                  type="text"
+                  className="cx-profile-code-input"
+                  placeholder="Code"
+                  aria-label="Referral code"
+                  value={redeemCode}
+                  onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  maxLength={12}
+                />
+                <button
+                  type="submit"
+                  className="cx-profile-redeem-btn"
+                  disabled={redeeming || !redeemCode.trim()}
+                >
+                  {redeeming ? "…" : "Redeem"}
+                </button>
+              </div>
+            ) : null}
             {onInviteFriend ? (
               <>
-                <span className="cx-profile-actions-divider" aria-hidden />
+                {referralEnabled ? <span className="cx-profile-actions-divider" aria-hidden /> : null}
                 <button
                   type="button"
                   className="cx-profile-invite-btn"
                   onClick={onInviteFriend}
                 >
                   <strong>Invite</strong>
-                  <span>+{COIN_AMOUNTS.INVITE} pts</span>
+                  {referralEnabled ? <span>+{COIN_AMOUNTS.INVITE} pts</span> : null}
                 </button>
               </>
             ) : null}

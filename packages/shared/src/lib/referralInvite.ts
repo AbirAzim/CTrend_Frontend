@@ -15,9 +15,16 @@ export function formatPointsBdt(points: number): string {
 export const INVITE_MODAL_SUBTITLE =
   "Earn referral points you can withdraw as cash — invite friends or redeem a code from your profile.";
 
+export const INVITE_MODAL_SUBTITLE_NO_POINTS =
+  "Invite friends by email — they'll get a personal signup link. Referral points are currently paused.";
+
 /** Body copy explaining how invite + redeem + withdrawal work. */
 export function inviteModalDescription(): string {
   return `Send an invite and we email your friend a personal referral code. When they sign up, you earn +${COIN_AMOUNTS.INVITE} referral points and they get +${COIN_AMOUNTS.REFERRAL_INVITEE}. Redeem codes from your profile anytime. Withdraw your points as money — 10 points = 10 BDT.`;
+}
+
+export function inviteModalDescriptionNoPoints(): string {
+  return "Send an invite and we email your friend a personal signup link. They can join Ke Jitbe from that email — no referral points are awarded while the program is paused.";
 }
 
 export const INVITE_MODAL_TIPS = [
@@ -25,4 +32,10 @@ export const INVITE_MODAL_TIPS = [
   `+${COIN_AMOUNTS.REFERRAL_INVITEE} points for your friend`,
   "10 points = 10 BDT when you withdraw",
   "Redeem referral codes from your profile",
+] as const;
+
+export const INVITE_MODAL_TIPS_NO_POINTS = [
+  "We email your friend a personal signup link",
+  "They must use the invited email address",
+  "Referral points are paused — invites still work",
 ] as const;

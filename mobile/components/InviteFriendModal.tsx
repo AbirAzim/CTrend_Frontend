@@ -12,12 +12,16 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { INVITE_USER } from "@ctrend/shared/graphql/admin";
+import { INVITE_USER, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
+import { useQuery } from "@apollo/client/react";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import {
   INVITE_MODAL_SUBTITLE,
+  INVITE_MODAL_SUBTITLE_NO_POINTS,
   INVITE_MODAL_TIPS,
+  INVITE_MODAL_TIPS_NO_POINTS,
   inviteModalDescription,
+  inviteModalDescriptionNoPoints,
 } from "@ctrend/shared/lib/referralInvite";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useTheme } from "../context/ThemeContext";
@@ -55,6 +59,11 @@ export function InviteFriendModal({
   const [msg, setMsg] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [invite, { loading }] = useMutation<{ inviteUser: boolean }>(INVITE_USER);
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-first", skip: !visible },
+  );
+  const pointsEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
 
   useEffect(() => {
     if (!visible) {
@@ -109,7 +118,9 @@ export function InviteFriendModal({
           <View style={st.headerRow}>
             <View style={st.headerTextCol}>
               <Text style={[st.title, { color: colors.text }]}>Invite a friend</Text>
-              <Text style={[st.sub, { color: colors.subtext }]}>{INVITE_MODAL_SUBTITLE}</Text>
+              <Text style={[st.sub, { color: colors.subtext }]}>
+                {pointsEnabled ? INVITE_MODAL_SUBTITLE : INVITE_MODAL_SUBTITLE_NO_POINTS}
+              </Text>
             </View>
             <Pressable
               onPress={handleClose}
@@ -121,23 +132,27 @@ export function InviteFriendModal({
             </Pressable>
           </View>
 
-          <View style={st.rewardRow}>
-            <View style={[st.rewardPill, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "40" }]}>
-              <Text style={[st.rewardPillText, { color: colors.accent }]}>
-                You +{COIN_AMOUNTS.INVITE} points
-              </Text>
+          {pointsEnabled ? (
+            <View style={st.rewardRow}>
+              <View style={[st.rewardPill, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "40" }]}>
+                <Text style={[st.rewardPillText, { color: colors.accent }]}>
+                  You +{COIN_AMOUNTS.INVITE} points
+                </Text>
+              </View>
+              <View style={[st.rewardPill, { backgroundColor: "#22c55e18", borderColor: "#22c55e40" }]}>
+                <Text style={[st.rewardPillText, { color: "#22c55e" }]}>
+                  Friend +{COIN_AMOUNTS.REFERRAL_INVITEE} points
+                </Text>
+              </View>
             </View>
-            <View style={[st.rewardPill, { backgroundColor: "#22c55e18", borderColor: "#22c55e40" }]}>
-              <Text style={[st.rewardPillText, { color: "#22c55e" }]}>
-                Friend +{COIN_AMOUNTS.REFERRAL_INVITEE} points
-              </Text>
-            </View>
-          </View>
+          ) : null}
 
           <View style={[st.infoBox, { backgroundColor: colors.section, borderColor: colors.border }]}>
-            <Text style={[st.infoText, { color: colors.subtext }]}>{inviteModalDescription()}</Text>
+            <Text style={[st.infoText, { color: colors.subtext }]}>
+              {pointsEnabled ? inviteModalDescription() : inviteModalDescriptionNoPoints()}
+            </Text>
             <View style={st.tipList}>
-              {INVITE_MODAL_TIPS.map((tip) => (
+              {(pointsEnabled ? INVITE_MODAL_TIPS : INVITE_MODAL_TIPS_NO_POINTS).map((tip) => (
                 <View key={tip} style={st.tipRow}>
                   <Text style={[st.tipDot, { color: colors.accent }]}>•</Text>
                   <Text style={[st.tipText, { color: colors.text }]}>{tip}</Text>

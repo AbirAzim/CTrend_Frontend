@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@apollo/client";
 import { REFERRAL_POINTS } from "../graphql/coins";
 import { REFERRAL_POINTS_HISTORY } from "../graphql/referrals";
+import { PLATFORM_SETTINGS } from "../graphql/admin";
 import { useAuth } from "../context/AuthContext";
 import { COIN_AMOUNTS, COIN_META, type CoinType } from "../lib/coins";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -29,6 +30,12 @@ export function PointsPage() {
 
   const [tab, setTab] = useState<"history" | "earn">("history");
 
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-first" },
+  );
+  const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
+
   const { data: pointsData } = useQuery<{ referralPoints: number }>(REFERRAL_POINTS, {
     variables: { userId: targetId },
     skip: !targetId,
@@ -51,6 +58,26 @@ export function PointsPage() {
     [history],
   );
   const displayBalance = isSelf ? balance : earnedTotal;
+
+  if (!referralEnabled) {
+    return (
+      <div className="cx-points-page">
+        <div className="cx-points-hero cx-points-hero--disabled">
+          <div className="cx-points-hero-icon" aria-hidden>✦</div>
+          <div className="cx-points-hero-body">
+            <div className="cx-points-hero-label">Referral points</div>
+            <div className="cx-points-hero-balance">—</div>
+            <p className="cx-points-hero-note muted small">
+              The referral program is currently disabled. Check back later or contact support.
+            </p>
+            <Link to={isSelf ? "/profile" : `/profile/${targetId}`} className="cx-points-back-link">
+              ← Back to profile
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="cx-points-page">

@@ -21,6 +21,7 @@ import {
   UPDATE_CATEGORY,
   PLATFORM_SETTINGS,
   SET_ALLOW_USER_GLOBAL_POSTS,
+  SET_REFERRAL_SYSTEM_ENABLED,
 } from "../graphql/admin";
 import { CATEGORIES, DELETE_POST } from "../graphql/feed";
 import { USER_POSTS } from "../graphql/profile";
@@ -2909,6 +2910,93 @@ function AdminUserGlobalPostsControl() {
   );
 }
 
+function AdminReferralSystemControl() {
+  const { data, refetch } = useQuery(PLATFORM_SETTINGS);
+  const [setEnabled] = useMutation(SET_REFERRAL_SYSTEM_ENABLED);
+  const [error, setError] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [enabled, setEnabledLocal] = useState(false);
+
+  useEffect(() => {
+    if (data?.platformSettings) {
+      setEnabledLocal(Boolean(data.platformSettings.referralSystemEnabled));
+    }
+  }, [data?.platformSettings?.referralSystemEnabled]);
+
+  function setEnabledOptimistic(next: boolean) {
+    if (next === enabled) return;
+    const previous = enabled;
+    setEnabledLocal(next);
+    setError(null);
+    void setEnabled({ variables: { enabled: next } })
+      .then(() => {
+        void refetch();
+      })
+      .catch((err: unknown) => {
+        setEnabledLocal(previous);
+        setError(getApolloErrorMessage(err));
+      });
+  }
+
+  return (
+    <section
+      className={`admin-global-posts-bar${enabled ? " admin-global-posts-bar--safe" : " admin-global-posts-bar--danger"}`}
+      aria-label="Referral program setting"
+      style={{ marginTop: 12 }}
+    >
+      <div className="admin-global-posts-bar__row">
+        <span className="admin-global-posts-bar__label" id="admin-referral-system-title">
+          Referral & points program
+          {enabled ? (
+            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--safe">
+              Active
+            </span>
+          ) : (
+            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--danger">
+              Disabled
+            </span>
+          )}
+        </span>
+        <div className="admin-global-posts-bar__controls">
+          <label
+            className="ig-toggle-switch-wrap admin-global-posts-toggle"
+            title={enabled ? "Disable referral program" : "Enable referral program"}
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              aria-labelledby="admin-referral-system-title"
+              aria-checked={enabled}
+              checked={enabled}
+              onChange={(e) => setEnabledOptimistic(e.target.checked)}
+            />
+            <span className="ig-toggle-switch" aria-hidden />
+          </label>
+          <button
+            type="button"
+            className="admin-global-posts-details-btn"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((o) => !o)}
+          >
+            {detailsOpen ? "Hide details" : "Details"}
+          </button>
+        </div>
+      </div>
+      {detailsOpen ? (
+        <div className="admin-global-posts-bar__details" id="admin-referral-system-details">
+          <p className="muted small">
+            When ON, users can invite friends, redeem referral codes, and earn referral points
+            (withdrawable as BDT). When OFF (default), invites still work but no points are
+            awarded or redeemed — the Points card is disabled. Engagement coins from voting
+            are unaffected.
+          </p>
+        </div>
+      ) : null}
+      {error ? <p className="admin-error small admin-global-posts-bar__error">{error}</p> : null}
+    </section>
+  );
+}
+
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
@@ -2935,6 +3023,7 @@ export function AdminPage() {
       </div>
 
       <AdminUserGlobalPostsControl />
+      <AdminReferralSystemControl />
 
       <AdminTabNav activeTab={activeTab} onChange={setActiveTab} />
 

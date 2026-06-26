@@ -14,6 +14,7 @@ import {
 import { USER_CAMPAIGN_WIN_SUMMARY } from "@ctrend/shared/graphql/campaigns";
 import { CLAIM_DAILY_COINS, REFERRAL_POINTS } from "@ctrend/shared/graphql/coins";
 import { REDEEM_REFERRAL_CODE } from "@ctrend/shared/graphql/referrals";
+import { PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useCoins } from "../context/CoinsContext";
@@ -56,6 +57,11 @@ export function ProfileEngagementPanel({
     REFERRAL_POINTS,
     { variables: { userId }, fetchPolicy: "cache-and-network" },
   );
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+    PLATFORM_SETTINGS,
+    { fetchPolicy: "cache-first" },
+  );
+  const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
   const [redeem, { loading: redeeming }] = useMutation(REDEEM_REFERRAL_CODE);
 
@@ -144,53 +150,71 @@ export function ProfileEngagementPanel({
           <Text style={st.cardCta}>View ›</Text>
         </Pressable>
 
-        <Pressable style={[st.card, st.cardPoints]} onPress={() => router.push(pointsRoute)}>
-          <View style={st.iconPoints}>
-            <Text style={st.iconPointsGlyph}>✦</Text>
+        {referralEnabled ? (
+          <Pressable style={[st.card, st.cardPoints]} onPress={() => router.push(pointsRoute)}>
+            <View style={st.iconPoints}>
+              <Text style={st.iconPointsGlyph}>✦</Text>
+            </View>
+            <Text style={st.cardLabel}>Points</Text>
+            <Text style={st.cardValue}>{referralPoints > 0 ? String(referralPoints) : "—"}</Text>
+            <Text style={st.cardSub} numberOfLines={2}>
+              {referralPoints > 0
+                ? isSelf
+                  ? "10 pts = 10 BDT"
+                  : "Invite rewards"
+                : isSelf
+                  ? "Invite friends"
+                  : "No points"}
+            </Text>
+            <Text style={st.cardCta}>History ›</Text>
+          </Pressable>
+        ) : (
+          <View style={[st.card, st.cardPoints, st.cardPointsDisabled]} accessibilityState={{ disabled: true }}>
+            <View style={[st.iconPoints, st.iconPointsDisabled]}>
+              <Text style={st.iconPointsGlyph}>✦</Text>
+            </View>
+            <Text style={st.cardLabel}>Points</Text>
+            <Text style={st.cardValue}>—</Text>
+            <Text style={st.cardSub} numberOfLines={2}>
+              {isSelf ? "Disabled by admin" : "Unavailable"}
+            </Text>
+            <Text style={[st.cardCta, st.cardCtaDisabled]}>Disabled</Text>
           </View>
-          <Text style={st.cardLabel}>Points</Text>
-          <Text style={st.cardValue}>{referralPoints > 0 ? String(referralPoints) : "—"}</Text>
-          <Text style={st.cardSub} numberOfLines={2}>
-            {referralPoints > 0
-              ? isSelf
-                ? "10 pts = 10 BDT"
-                : "Invite rewards"
-              : isSelf
-                ? "Invite friends"
-                : "No points"}
-          </Text>
-          <Text style={st.cardCta}>History ›</Text>
-        </Pressable>
+        )}
       </ScrollView>
 
       {isSelf ? (
         <View style={[st.actionsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={st.redeemZone}>
-            <TextInput
-              style={[st.codeInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-              placeholder="Code"
-              placeholderTextColor={colors.muted}
-              value={redeemCode}
-              onChangeText={(t) => setRedeemCode(t.toUpperCase())}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={12}
-              returnKeyType="done"
-              onSubmitEditing={() => void onRedeem()}
-            />
-            <Pressable
-              style={[st.redeemBtn, { borderColor: colors.border }, (redeeming || !redeemCode.trim()) && st.btnDisabled]}
-              onPress={() => void onRedeem()}
-              disabled={redeeming || !redeemCode.trim()}
-            >
-              <Text style={[st.redeemBtnText, { color: colors.text }]}>{redeeming ? "…" : "Redeem"}</Text>
-            </Pressable>
-          </View>
+          {referralEnabled ? (
+            <View style={st.redeemZone}>
+              <TextInput
+                style={[st.codeInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+                placeholder="Code"
+                placeholderTextColor={colors.muted}
+                value={redeemCode}
+                onChangeText={(t) => setRedeemCode(t.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={12}
+                returnKeyType="done"
+                onSubmitEditing={() => void onRedeem()}
+              />
+              <Pressable
+                style={[st.redeemBtn, { borderColor: colors.border }, (redeeming || !redeemCode.trim()) && st.btnDisabled]}
+                onPress={() => void onRedeem()}
+                disabled={redeeming || !redeemCode.trim()}
+              >
+                <Text style={[st.redeemBtnText, { color: colors.text }]}>{redeeming ? "…" : "Redeem"}</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
-          <View style={[st.vDivider, { backgroundColor: colors.border }]} />
+          {referralEnabled ? (
+            <View style={[st.vDivider, { backgroundColor: colors.border }]} />
+          ) : null}
 
           <Pressable
-            style={[st.inviteBtn, { backgroundColor: colors.accent }]}
+            style={[st.inviteBtn, { backgroundColor: colors.accent }, !referralEnabled && st.inviteBtnFull]}
             onPressIn={() => {
               Keyboard.dismiss();
               setShowInvite(true);
@@ -199,11 +223,13 @@ export function ProfileEngagementPanel({
             accessibilityLabel="Invite a friend"
           >
             <Text style={st.inviteBtnLabel}>Invite</Text>
-            <Text style={st.inviteBtnPts}>+{COIN_AMOUNTS.INVITE} pts</Text>
+            {referralEnabled ? (
+              <Text style={st.inviteBtnPts}>+{COIN_AMOUNTS.INVITE} pts</Text>
+            ) : null}
           </Pressable>
         </View>
       ) : null}
-      {isSelf && redeemMsg ? (
+      {isSelf && referralEnabled && redeemMsg ? (
         <Text style={[st.feedbackMsg, { color: colors.subtext }]} numberOfLines={2}>
           {redeemMsg}
         </Text>
@@ -245,6 +271,11 @@ function makeStyles(c: ColorPalette) {
       borderColor: "rgba(129,140,248,0.4)",
       backgroundColor: "rgba(99,102,241,0.14)",
     },
+    cardPointsDisabled: {
+      borderColor: c.border,
+      backgroundColor: c.section,
+      opacity: 0.72,
+    },
     iconCoin: {
       width: 40,
       height: 40,
@@ -266,6 +297,7 @@ function makeStyles(c: ColorPalette) {
       marginBottom: 6,
     },
     iconPointsGlyph: { color: "#e0e7ff", fontWeight: "900", fontSize: 18 },
+    iconPointsDisabled: { backgroundColor: c.muted },
     cardLabel: {
       fontSize: 9,
       fontWeight: "800",
@@ -306,6 +338,7 @@ function makeStyles(c: ColorPalette) {
       marginTop: 8,
       letterSpacing: 0.3,
     },
+    cardCtaDisabled: { color: c.muted, opacity: 0.7 },
     actionsBar: {
       marginHorizontal: 16,
       marginTop: 10,
@@ -353,6 +386,7 @@ function makeStyles(c: ColorPalette) {
       paddingHorizontal: 6,
       gap: 1,
     },
+    inviteBtnFull: { flex: 1, width: undefined },
     inviteBtnLabel: { color: "#fff", fontWeight: "800", fontSize: 14 },
     inviteBtnPts: { color: "rgba(255,255,255,0.85)", fontWeight: "700", fontSize: 10 },
     feedbackMsg: {

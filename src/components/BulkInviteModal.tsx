@@ -7,13 +7,17 @@ import {
   LIST_USERS,
   PREVIEW_INVITES,
   PROMOTE_TO_ADMIN,
+  PLATFORM_SETTINGS,
 } from "../graphql/admin";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { COIN_AMOUNTS } from "../lib/coins";
 import {
   INVITE_MODAL_SUBTITLE,
+  INVITE_MODAL_SUBTITLE_NO_POINTS,
   INVITE_MODAL_TIPS,
+  INVITE_MODAL_TIPS_NO_POINTS,
   inviteModalDescription,
+  inviteModalDescriptionNoPoints,
 } from "@ctrend/shared/lib/referralInvite";
 
 type PreviewUser = {
@@ -122,6 +126,9 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
   const [inviteAdminMut, { loading: invitingAdmin }] = useMutation(INVITE_ADMIN);
   const [promoteToAdminMut, { loading: promoting }] = useMutation(PROMOTE_TO_ADMIN);
   const [addFriend, { loading: addingFriend }] = useMutation(ADD_FRIEND);
+
+  const { data: settingsData } = useQuery(PLATFORM_SETTINGS, { fetchPolicy: "cache-first" });
+  const pointsEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
 
   const busy = inviting || invitingAdmin || promoting || addingFriend;
 
@@ -303,22 +310,28 @@ export function BulkInviteModal({ inviteType, onClose }: Props) {
         </h2>
         {inviteType === "user" ? (
           <>
-            <p className="bim-invite-sub muted small">{INVITE_MODAL_SUBTITLE}</p>
+            <p className="bim-invite-sub muted small">
+              {pointsEnabled ? INVITE_MODAL_SUBTITLE : INVITE_MODAL_SUBTITLE_NO_POINTS}
+            </p>
             <div className="bim-invite-info">
-              <p className="bim-invite-info-text">{inviteModalDescription()}</p>
+              <p className="bim-invite-info-text">
+                {pointsEnabled ? inviteModalDescription() : inviteModalDescriptionNoPoints()}
+              </p>
               <ul className="bim-invite-tips">
-                {INVITE_MODAL_TIPS.map((tip) => (
+                {(pointsEnabled ? INVITE_MODAL_TIPS : INVITE_MODAL_TIPS_NO_POINTS).map((tip) => (
                   <li key={tip}>{tip}</li>
                 ))}
               </ul>
-              <div className="bim-invite-rewards" aria-hidden>
-                <span className="bim-invite-reward-pill bim-invite-reward-pill--you">
-                  You +{COIN_AMOUNTS.INVITE} pts
-                </span>
-                <span className="bim-invite-reward-pill bim-invite-reward-pill--friend">
-                  Friend +{COIN_AMOUNTS.REFERRAL_INVITEE} pts
-                </span>
-              </div>
+              {pointsEnabled ? (
+                <div className="bim-invite-rewards" aria-hidden>
+                  <span className="bim-invite-reward-pill bim-invite-reward-pill--you">
+                    You +{COIN_AMOUNTS.INVITE} pts
+                  </span>
+                  <span className="bim-invite-reward-pill bim-invite-reward-pill--friend">
+                    Friend +{COIN_AMOUNTS.REFERRAL_INVITEE} pts
+                  </span>
+                </div>
+              ) : null}
             </div>
           </>
         ) : (

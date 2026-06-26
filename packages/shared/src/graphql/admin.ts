@@ -377,6 +377,7 @@ export const PLATFORM_SETTINGS = gql`
   query PlatformSettings {
     platformSettings {
       allowUserGlobalPosts
+      referralSystemEnabled
       minAndroidVersionCode
       androidUpdateTitle
       androidUpdateBody
@@ -388,6 +389,19 @@ export const SET_ALLOW_USER_GLOBAL_POSTS = gql`
   mutation SetAllowUserGlobalPosts($enabled: Boolean!) {
     setAllowUserGlobalPosts(enabled: $enabled) {
       allowUserGlobalPosts
+      referralSystemEnabled
+      minAndroidVersionCode
+      androidUpdateTitle
+      androidUpdateBody
+    }
+  }
+`;
+
+export const SET_REFERRAL_SYSTEM_ENABLED = gql`
+  mutation SetReferralSystemEnabled($enabled: Boolean!) {
+    setReferralSystemEnabled(enabled: $enabled) {
+      allowUserGlobalPosts
+      referralSystemEnabled
       minAndroidVersionCode
       androidUpdateTitle
       androidUpdateBody
@@ -399,6 +413,7 @@ export const SET_MIN_ANDROID_VERSION_CODE = gql`
   mutation SetMinAndroidVersionCode($versionCode: Int!) {
     setMinAndroidVersionCode(versionCode: $versionCode) {
       allowUserGlobalPosts
+      referralSystemEnabled
       minAndroidVersionCode
       androidUpdateTitle
       androidUpdateBody
