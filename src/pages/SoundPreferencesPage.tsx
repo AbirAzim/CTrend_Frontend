@@ -131,6 +131,8 @@ export function SoundPreferencesPage() {
                       className="cx-sounds-preview-btn"
                       onClick={() => previewCategorySound(activeCategory, preset.id)}
                       aria-label={`Preview ${preset.label}`}
+                      disabled={preset.id === "silent"}
+                      style={preset.id === "silent" ? { visibility: "hidden" } : undefined}
                     >
                       ▶ Preview
                     </button>

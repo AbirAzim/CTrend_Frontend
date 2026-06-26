@@ -178,6 +178,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function playTick() {
+    if (preferences.voteSoundId === "silent") return;
     playId(preferences.voteSoundId);
   }
 

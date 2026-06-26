@@ -46,7 +46,7 @@ export type SoundPresetMeta = {
   emoji: string;
 };
 
-export const DEFAULT_VOTE_SOUND_ID: VoteSoundId = "buzz-in";
+export const DEFAULT_VOTE_SOUND_ID: VoteSoundId = "silent";
 export const DEFAULT_NOTIFICATION_SOUND_ID: NotificationSoundId = "ascending-chime";
 export const DEFAULT_MESSAGE_SOUND_ID: MessageSoundId = "gentle-ping";
 
@@ -79,6 +79,7 @@ function meta(
 }
 
 export const VOTE_SOUND_PRESETS: SoundPresetMeta[] = [
+  meta("silent", "Silent (default)", "Vibration only — no sound when you vote.", "—", "📳"),
   meta("buzz-in", "Buzz-in", "Quiz-show button buzz.", "~130ms", "🔔"),
   meta("crowd-pop", "Crowd pop", "Stadium clap + thump.", "~260ms", "📣"),
   meta("soft-pop", "Soft pop", "Minimal bubble tap.", "~80ms", "🫧"),
@@ -87,7 +88,6 @@ export const VOTE_SOUND_PRESETS: SoundPresetMeta[] = [
   meta("thock", "Thock", "Keyboard confirm.", "~100ms", "⌨️"),
   meta("whistle-chirp", "Whistle chirp", "Short ref whistle.", "~180ms", "⚽"),
   meta("success-duo", "Success duo", "Two-note rise.", "~220ms", "✅"),
-  meta("silent", "Silent", "No sound when you vote.", "—", "🔇"),
 ];
 
 export const NOTIFICATION_SOUND_PRESETS: SoundPresetMeta[] = [
@@ -118,7 +118,7 @@ export const SOUND_PRESETS_BY_CATEGORY: Record<SoundCategory, SoundPresetMeta[]>
 };
 
 export const SOUND_CATEGORY_META: Record<SoundCategory, { title: string; emoji: string; hint: string }> = {
-  vote: { title: "Vote", emoji: "🗳️", hint: "Plays when you cast a vote." },
+  vote: { title: "Vote", emoji: "🗳️", hint: "Default is silent with vibration only. Pick a tone or keep Silent." },
   notification: { title: "Bell", emoji: "🔔", hint: "Plays for in-app notifications." },
   message: { title: "Messages", emoji: "💬", hint: "Plays on new chat messages." },
 };

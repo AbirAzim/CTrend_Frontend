@@ -314,6 +314,7 @@ const SOUND_PLAYERS: Record<string, SoundPlayer> = {
 };
 
 export type VoteSoundId =
+	| 'silent'
 	| 'buzz-in'
 	| 'crowd-pop'
 	| 'soft-pop'
@@ -356,12 +357,13 @@ export type SoundPreferences = {
 	messageSoundId: MessageSoundId;
 };
 
-export const DEFAULT_VOTE_SOUND_ID: VoteSoundId = 'buzz-in';
+export const DEFAULT_VOTE_SOUND_ID: VoteSoundId = 'silent';
 export const DEFAULT_NOTIFICATION_SOUND_ID: NotificationSoundId =
 	'ascending-chime';
 export const DEFAULT_MESSAGE_SOUND_ID: MessageSoundId = 'gentle-ping';
 
 const VOTE_IDS: VoteSoundId[] = [
+	'silent',
 	'buzz-in',
 	'crowd-pop',
 	'soft-pop',
@@ -412,6 +414,7 @@ function meta(
 }
 
 export const VOTE_SOUND_PRESETS: SoundPresetMeta[] = [
+	meta('silent', 'Silent (default)', 'No sound when you vote.', '—', '📳'),
 	meta('buzz-in', 'Buzz-in', 'Quiz-show button buzz.', '~130ms', '🔔'),
 	meta('crowd-pop', 'Crowd pop', 'Stadium clap + thump.', '~260ms', '📣'),
 	meta('soft-pop', 'Soft pop', 'Minimal bubble tap.', '~80ms', '🫧'),
@@ -460,7 +463,7 @@ export const SOUND_CATEGORY_LABELS: Record<
 	SoundCategory,
 	{ title: string; emoji: string; hint: string }
 > = {
-	vote: { title: 'Vote', emoji: '🗳️', hint: 'Plays when you cast a vote.' },
+	vote: { title: 'Vote', emoji: '🗳️', hint: 'Default is silent (no sound). Pick a tone if you want audio feedback.' },
 	notification: {
 		title: 'Bell',
 		emoji: '🔔',
@@ -556,6 +559,7 @@ export function playSoundById(id: string): void {
 }
 
 export function playVoteSoundPreview(id: VoteSoundId): void {
+	if (id === 'silent') return;
 	playSoundInUserGesture(id);
 }
 
@@ -568,6 +572,7 @@ export function playMessageSoundPreview(id: MessageSoundId): void {
 }
 
 export function playVoteSound(): void {
+	if (activePrefs.voteSoundId === 'silent') return;
 	playSoundInUserGesture(activePrefs.voteSoundId);
 }
 

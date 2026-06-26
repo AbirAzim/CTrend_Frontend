@@ -96,14 +96,18 @@ export default function SoundPreferencesScreen() {
       >
         {/* Lead text */}
         <Text style={[st.lead, { color: colors.muted }]}>
-          Choose sounds for votes, notifications, and messages. Saved on this device. Plays at your phone's media volume.
+          Choose sounds for votes, notifications, and messages. Saved on this device.
         </Text>
 
         {/* Vibration toggle */}
         <View style={[st.vibrationRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[st.vibrationTitle, { color: colors.text }]}>📳  Vibration</Text>
-            <Text style={[st.vibrationHint, { color: colors.muted }]}>Vibrate on notifications & messages.</Text>
+            <Text style={[st.vibrationHint, { color: colors.muted }]}>
+              {activeCategory === "vote"
+                ? "Vibrate when you vote (default with Silent). Also applies to notifications & messages."
+                : "Vibrate when you vote, and on notifications & messages."}
+            </Text>
           </View>
           <Switch
             value={preferences.vibrationEnabled}
