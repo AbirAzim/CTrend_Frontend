@@ -159,22 +159,31 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Prime every player (muted) shortly after launch so the FIRST preview/tap
-  // plays instantly — expo-audio players are silent until they've loaded once.
+  // Prime players one at a time (muted) so devices that ignore volume=0
+  // don't blast every preset simultaneously on cold start.
   useEffect(() => {
-    const t = setTimeout(() => {
-      Object.values(players).forEach((p) => {
+    let cancelled = false;
+    const prime = async () => {
+      await new Promise((r) => setTimeout(r, 700));
+      if (cancelled) return;
+      for (const p of Object.values(players)) {
+        if (cancelled) return;
         try {
+          const prevVol = p.volume ?? 1;
           p.volume = 0;
           p.play();
-          setTimeout(() => {
-            try { p.pause(); p.seekTo(0).catch(() => {}); p.volume = 1; } catch { /* ignore */ }
-          }, 90);
+          await new Promise((r) => setTimeout(r, 60));
+          try {
+            p.pause();
+            await p.seekTo(0).catch(() => {});
+          } catch { /* ignore */ }
+          p.volume = prevVol;
         } catch { /* ignore */ }
-      });
-      setSoundsReady(true);
-    }, 700);
-    return () => clearTimeout(t);
+      }
+      if (!cancelled) setSoundsReady(true);
+    };
+    void prime();
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function playTick() {

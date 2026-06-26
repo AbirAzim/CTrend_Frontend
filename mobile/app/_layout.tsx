@@ -2,6 +2,7 @@ import { ApolloProvider, useApolloClient, useQuery, useSubscription } from "@apo
 import notifee, { EventType } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { router, Stack, usePathname } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, type ReactNode } from "react";
 import { AppState, View } from "react-native";
@@ -58,6 +59,12 @@ import {
   getActiveConversationId,
   setActiveConversationId,
 } from "../lib/activeConversation";
+import {
+  shouldPlayLiveMessageSound,
+  shouldPlayLiveNotificationSound,
+} from "../lib/notificationSoundGate";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Background event handler — must be registered at module level (runs when app is killed/bg)
 notifee.onBackgroundEvent(async ({ type, detail }) => {
@@ -193,7 +200,9 @@ function GlobalNotificationSubscription() {
 
       // Foreground only — background/killed delivery is native FCM (CtrendMessagingService).
       if (AppState.currentState === "active") {
-        playNotification();
+        if (shouldPlayLiveNotificationSound(n.id)) {
+          playNotification();
+        }
         void initMessageNotifications();
         void resolveActorAvatar(
           client,
@@ -321,7 +330,9 @@ function GlobalMessageSubscription() {
       if (!alreadyInChat) {
         // Foreground only — background/killed delivery is native FCM (CtrendMessagingService).
         if (AppState.currentState === "active") {
-          playMessage();
+          if (shouldPlayLiveMessageSound(msg.id)) {
+            playMessage();
+          }
           void initMessageNotifications();
           void postOrUpdateMessageNotification(
             msg.conversationId,
@@ -468,6 +479,16 @@ function NotificationResponseHandler() {
   return null;
 }
 
+function SplashGate() {
+  const { hydrated } = useAuth();
+  useEffect(() => {
+    if (hydrated) {
+      void SplashScreen.hideAsync();
+    }
+  }, [hydrated]);
+  return null;
+}
+
 function AuthExpiredGate() {
   const { logout, isAuthenticated } = useAuth();
   useEffect(() => {
@@ -510,6 +531,7 @@ export default function RootLayout() {
                       <ThemedRoot>
                         <CoinsProvider>
                           <AppServices />
+                          <SplashGate />
                           <AppStatusBar />
                           <NotificationResponseHandler />
                           <BadgeSync />
