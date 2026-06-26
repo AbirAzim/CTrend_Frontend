@@ -36,6 +36,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useBackToFeed } from "../../hooks/useBackToFeed";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
+import { ProfileEngagementPanel } from "../../components/ProfileEngagementPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -489,6 +490,13 @@ export default function UserProfileScreen() {
             </View>
           ) : null}
 
+          <ProfileEngagementPanel
+            userId={profile.id}
+            coins={profile.coins ?? 0}
+            isSelf={false}
+            displayName={name}
+          />
+
           {/* Action buttons */}
           {isAuthenticated && (
             <View style={styles.actionsRow}>
@@ -530,11 +538,6 @@ export default function UserProfileScreen() {
               <Pressable style={styles.stat} onPress={() => jumpTo("friends")} android_ripple={{ color: colors.accent + "18" }}>
                 <Text style={[styles.statValue, { color: colors.accent }]}>{userFriends.length}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>friends ›</Text>
-              </Pressable>
-              <View style={[styles.statSep, { backgroundColor: colors.border }]} />
-              <Pressable style={styles.stat} onPress={() => router.push(`/coins/${profile.id}` as `/${string}`)} android_ripple={{ color: colors.accent + "18" }}>
-                <Text style={[styles.statValue, { color: "#f5c518" }]}>{profile.coins ?? 0}</Text>
-                <Text style={[styles.statLabel, { color: colors.muted }]}>¢ coins ›</Text>
               </Pressable>
             </View>
           )}

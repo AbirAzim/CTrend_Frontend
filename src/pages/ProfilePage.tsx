@@ -22,8 +22,10 @@ import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "../gr
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
 import { ProfileCompareCard } from "../components/ProfileCompareCard";
+import { ProfileEngagementPanel } from "../components/ProfileEngagementPanel";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { useCoins } from "../context/CoinsContext";
 import type { FeedPostView } from "../types/feed";
 
 function initialFromUser(name: string | undefined, email: string): string {
@@ -155,6 +157,7 @@ function ContactAdminLink() {
 
 export function ProfilePage() {
   const { user, patchUser } = useAuth();
+  const { balance } = useCoins();
   const { onlineUserIds } = useMessenger();
   const location = useLocation();
   const navigate = useNavigate();
@@ -751,6 +754,15 @@ export function ProfilePage() {
           <span>kept ›</span>
         </button>
       </div>
+
+      {user?.id ? (
+        <ProfileEngagementPanel
+          userId={user.id}
+          coins={balance ?? 0}
+          isSelf
+          displayName={displayName}
+        />
+      ) : null}
 
       {editing && (
         <div className="cx-profile-edit-card">

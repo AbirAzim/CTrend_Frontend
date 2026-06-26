@@ -126,3 +126,16 @@ export const CAMPAIGN_WIN_LEADERBOARD = gql`
     }
   }
 `;
+
+/** Per-campaign win totals for a user's public profile. */
+export const USER_CAMPAIGN_WIN_SUMMARY = gql`
+  query UserCampaignWinSummary($userId: ID!) {
+    userCampaignWinSummary(userId: $userId) {
+      campaignId
+      campaignName
+      campaignSlug
+      wins
+      totalPrize
+    }
+  }
+`;

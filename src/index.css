@@ -23610,3 +23610,247 @@ html[data-minimal-chrome="true"] .ig-topbar {
 }
 .cx-coins-earn-label { flex: 1; font-weight: 700; font-size: 0.9rem; }
 .cx-coins-earn-amount { font-weight: 900; color: #d99411; font-variant-numeric: tabular-nums; }
+
+/* Profile engagement — side-by-side reward cards */
+.cx-profile-engage {
+  margin: 0 12px 16px;
+}
+
+.cx-profile-engage-kicker {
+  margin: 0 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.cx-profile-engage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.cx-profile-reward-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 220px;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+a.cx-profile-reward-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgb(245 197 24 / 0.18);
+}
+
+.cx-profile-reward-card--coins {
+  background: linear-gradient(155deg, rgba(255, 232, 138, 0.28) 0%, rgba(245, 197, 24, 0.12) 45%, rgba(217, 148, 17, 0.08) 100%);
+  border-color: rgba(245, 197, 24, 0.38);
+}
+
+.cx-profile-reward-card--wins {
+  background: linear-gradient(155deg, rgba(255, 214, 120, 0.2) 0%, rgba(245, 158, 11, 0.1) 50%, rgba(180, 83, 9, 0.06) 100%);
+  border-color: rgba(245, 158, 11, 0.32);
+}
+
+.cx-profile-reward-card-glow {
+  position: absolute;
+  top: -30px;
+  right: -20px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 232, 138, 0.45) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.cx-profile-reward-card-glow--wins {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.35) 0%, transparent 70%);
+}
+
+.cx-profile-reward-card-icon {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 8px;
+}
+
+.cx-profile-reward-card-icon--coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe88a 0%, #f5c518 50%, #d99411 100%);
+  color: #7a4a05;
+  font-weight: 900;
+  font-size: 1.55rem;
+  box-shadow:
+    0 4px 14px rgba(217, 148, 17, 0.35),
+    inset 0 -2px 4px rgba(120, 72, 5, 0.35),
+    inset 0 2px 2px rgba(255, 255, 255, 0.55);
+}
+
+.cx-profile-reward-card-icon--trophy {
+  font-size: 2.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(245, 158, 11, 0.35));
+}
+
+.cx-profile-reward-card-label {
+  position: relative;
+  z-index: 1;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.cx-profile-reward-card-value {
+  position: relative;
+  z-index: 1;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1.05;
+  color: var(--cx-ink);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.cx-profile-reward-card-sub {
+  position: relative;
+  z-index: 1;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+.cx-profile-reward-claim {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #f5c518;
+  color: #7a4a05;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cx-profile-reward-claim:disabled { opacity: 0.65; }
+
+.cx-profile-reward-claim-msg {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--cx-ink);
+}
+
+.cx-profile-reward-card-cta {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--cx-accent);
+}
+
+.cx-profile-reward-wins-body {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  flex: 1;
+  margin-top: 6px;
+  min-height: 0;
+}
+
+.cx-profile-reward-wins-loading {
+  margin: 8px 0 0;
+}
+
+.cx-profile-reward-wins-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.cx-profile-reward-wins-list li + li .cx-profile-reward-win-row {
+  border-top: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.cx-profile-reward-win-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cx-profile-reward-win-row:hover .cx-profile-reward-win-name {
+  color: var(--cx-accent);
+}
+
+.cx-profile-reward-win-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--cx-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-profile-reward-win-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 197, 24, 0.5);
+  background: rgba(255, 255, 255, 0.35);
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #b45309;
+  white-space: nowrap;
+}
+
+:root[data-theme="dark"] .cx-profile-reward-win-badge {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 420px) {
+  .cx-profile-engage-grid {
+    gap: 8px;
+  }
+  .cx-profile-reward-card {
+    min-height: 200px;
+    padding: 12px 10px;
+  }
+  .cx-profile-reward-card-value {
+    font-size: 1.65rem;
+  }
+  .cx-profile-reward-card-icon--coin {
+    width: 44px;
+    height: 44px;
+    font-size: 1.35rem;
+  }
+}

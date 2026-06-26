@@ -39,6 +39,8 @@ import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "@ctre
 import { START_DIRECT_CONVERSATION, CONTACT_ADMIN } from "@ctrend/shared/graphql/messages";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../../context/AuthContext";
+import { useCoinsBalance } from "../../context/CoinsContext";
+import { ProfileEngagementPanel } from "../../components/ProfileEngagementPanel";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
 import ProfileCompareCard from "../../components/ProfileCompareCard";
@@ -201,6 +203,7 @@ function Section({
 
 export default function ProfileScreen() {
   const { logout, isAuthenticated, hydrated, user: storedUser, setSession } = useAuth();
+  const balance = useCoinsBalance();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -550,6 +553,15 @@ export default function ProfileScreen() {
               </View>
             ))}
           </View>
+
+          {me?.id ? (
+            <ProfileEngagementPanel
+              userId={me.id}
+              coins={balance ?? 0}
+              isSelf
+              displayName={name}
+            />
+          ) : null}
 
           {/* ── Admin quick links ── */}
           {isAdmin ? (

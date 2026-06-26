@@ -19,6 +19,7 @@ import {
 import { START_DIRECT_CONVERSATION } from "../graphql/messages";
 import { USER_POSTS } from "../graphql/profile";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
+import { ProfileEngagementPanel } from "../components/ProfileEngagementPanel";
 
 type UserProfile = {
   id: string;
@@ -402,6 +403,13 @@ export function UserProfilePage() {
         </div>
       </header>
 
+      <ProfileEngagementPanel
+        userId={profile.id}
+        coins={profile.coins ?? 0}
+        isSelf={false}
+        displayName={name}
+      />
+
       {isLoggedIn && (
         <div className="cx-profile-stats-row">
           <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => scrollToRef(comparesRef)}>
@@ -416,10 +424,6 @@ export function UserProfilePage() {
             <strong>{userFriends.length.toLocaleString()}</strong>
             <span>friends ›</span>
           </button>
-          <Link to={`/coins/${profile.id}`} className="cx-profile-stat cx-profile-stat--btn">
-            <strong>{(profile.coins ?? 0).toLocaleString()}</strong>
-            <span>¢ coins ›</span>
-          </Link>
         </div>
       )}
 
