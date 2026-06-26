@@ -27,6 +27,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     const val EXTRA_CONVERSATION_ID = "conversationId"
     const val EXTRA_MESSAGE_ID = "messageId"
     const val EXTRA_NOTIFICATION_ID = "notificationId"
+    const val EXTRA_NOTIFICATION_TAG = "notificationTag"
     const val KEY_REPLY_TEXT = "key_reply_text"
     private const val LIKE_EMOJI = "👍" // 👍
 
@@ -40,6 +41,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     val conversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID).orEmpty()
     val messageId = intent.getStringExtra(EXTRA_MESSAGE_ID).orEmpty()
     val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
+    val notificationTag = intent.getStringExtra(EXTRA_NOTIFICATION_TAG)
     val appContext = context.applicationContext
 
     val replyText = RemoteInput.getResultsFromIntent(intent)
@@ -63,9 +65,11 @@ class NotificationActionReceiver : BroadcastReceiver() {
       } catch (_: Exception) {
         // Best-effort — a failed reply/like should never crash the receiver.
       } finally {
-        if (notificationId != -1) {
-          (appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
-            ?.cancel(notificationId)
+        val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        if (!notificationTag.isNullOrEmpty()) {
+          nm?.cancel(notificationTag, 0)
+        } else if (notificationId != -1) {
+          nm?.cancel(notificationId)
         }
         pending.finish()
       }

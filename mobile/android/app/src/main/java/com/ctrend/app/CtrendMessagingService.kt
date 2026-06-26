@@ -1,6 +1,5 @@
 package com.ctrend.app
 
-import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -59,8 +58,8 @@ class CtrendMessagingService : FirebaseMessagingService() {
     val type = data["type"] ?: ""
     if (type != "BELL" && type != "MESSAGE") return
 
-    // Foreground is handled in-app by the WebSocket subscription — avoid duplicates.
-    if (isAppInForeground()) return
+    // Foreground UI is handled by the WebSocket + Notifee path — avoid duplicates.
+    if (AppForeground.isInForeground) return
 
     val isMessage = type == "MESSAGE"
     val rawTitle = (if (isMessage) data["senderName"] else data["title"]) ?: ""
@@ -88,7 +87,15 @@ class CtrendMessagingService : FirebaseMessagingService() {
       (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
     val contentIntent = PendingIntent.getActivity(this, Random.nextInt(), intent, piFlags)
 
-    val notificationId = Random.nextInt()
+    val postId = data["postId"] ?: ""
+    val refId = data["referenceId"] ?: ""
+    val notifType = data["notifType"] ?: type
+    val conversationId = data["conversationId"] ?: ""
+    val notificationTag = when {
+      isMessage && conversationId.isNotEmpty() -> "msg_$conversationId"
+      !isMessage -> "bell_${if (postId.isNotEmpty()) postId else refId}_$notifType"
+      else -> "ctrend_${System.currentTimeMillis()}"
+    }
 
     val builder = NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(R.mipmap.ic_launcher_monochrome)
@@ -103,11 +110,11 @@ class CtrendMessagingService : FirebaseMessagingService() {
     // Chat notifications get inline Reply + 👍 Like actions, handled natively
     // by NotificationActionReceiver so they work even with the app killed.
     if (isMessage) {
-      addMessageActions(builder, data, notificationId)
+      addMessageActions(builder, data, notificationTag)
     }
 
     try {
-      NotificationManagerCompat.from(this).notify(notificationId, builder.build())
+      NotificationManagerCompat.from(this).notify(notificationTag, 0, builder.build())
     } catch (_: SecurityException) {
       // POST_NOTIFICATIONS not granted — nothing we can do here.
     }
@@ -117,7 +124,7 @@ class CtrendMessagingService : FirebaseMessagingService() {
   private fun addMessageActions(
     builder: NotificationCompat.Builder,
     data: Map<String, String>,
-    notificationId: Int,
+    notificationTag: String,
   ) {
     val conversationId = data["conversationId"] ?: ""
     val messageId = data["messageId"] ?: ""
@@ -132,7 +139,7 @@ class CtrendMessagingService : FirebaseMessagingService() {
     val replyIntent = Intent(this, NotificationActionReceiver::class.java).apply {
       action = NotificationActionReceiver.ACTION_REPLY
       putExtra(NotificationActionReceiver.EXTRA_CONVERSATION_ID, conversationId)
-      putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+      putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_TAG, notificationTag)
     }
     val replyPi = PendingIntent.getBroadcast(this, Random.nextInt(), replyIntent, mutableFlags)
     val remoteInput = RemoteInput.Builder(NotificationActionReceiver.KEY_REPLY_TEXT)
@@ -150,7 +157,7 @@ class CtrendMessagingService : FirebaseMessagingService() {
       val likeIntent = Intent(this, NotificationActionReceiver::class.java).apply {
         action = NotificationActionReceiver.ACTION_LIKE
         putExtra(NotificationActionReceiver.EXTRA_MESSAGE_ID, messageId)
-        putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_TAG, notificationTag)
       }
       val likePi = PendingIntent.getBroadcast(this, Random.nextInt(), likeIntent, immutableFlags)
       builder.addAction(NotificationCompat.Action.Builder(0, "👍 Like", likePi).build())
@@ -211,15 +218,6 @@ class CtrendMessagingService : FirebaseMessagingService() {
           NotificationChannel(CHANNEL_ID, "Ke Jitbe", NotificationManager.IMPORTANCE_HIGH)
         )
       }
-    }
-  }
-
-  private fun isAppInForeground(): Boolean {
-    val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
-    val procs = am.runningAppProcesses ?: return false
-    return procs.any {
-      it.processName == packageName &&
-        it.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
   }
 

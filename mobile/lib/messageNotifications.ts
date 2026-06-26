@@ -185,7 +185,7 @@ export async function postBellNotification(opts: {
   postId?: string | null;
   commentId?: string | null;
 }) {
-  const id = `bell_${Date.now()}_${++_notifSeq}`;
+  const id = `bell_${opts.postId || opts.referenceId || "general"}_${opts.notifType || "BELL"}`;
   const data = {
     type: "BELL",
     notifType: opts.notifType ?? "",

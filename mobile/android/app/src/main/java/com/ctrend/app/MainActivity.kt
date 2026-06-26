@@ -11,6 +11,21 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  override fun onResume() {
+    super.onResume()
+    AppForeground.isInForeground = true
+  }
+
+  override fun onPause() {
+    AppForeground.isInForeground = false
+    super.onPause()
+  }
+
+  override fun onStop() {
+    AppForeground.isInForeground = false
+    super.onStop()
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.

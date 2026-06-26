@@ -36,6 +36,17 @@ Notifications.setNotificationHandler({
 });
 
 async function getPushToken(): Promise<{ token: string; type: "expo" | "device" } | null> {
+  // CtrendMessagingService needs the raw FCM device token on Android — Expo push
+  // tokens (ExponentPushToken[…]) are not valid for Firebase Admin multicast.
+  if (Platform.OS === "android") {
+    try {
+      const tokenData = await Notifications.getDevicePushTokenAsync();
+      return { token: tokenData.data as string, type: "device" };
+    } catch {
+      /* fall through */
+    }
+  }
+
   try {
     const projectId =
       (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.eas?.projectId as string | undefined ??

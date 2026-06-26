@@ -191,11 +191,9 @@ function GlobalNotificationSubscription() {
       const { title, body } = buildBellText(actorName, n.title, n.body);
       console.warn("[bell] received:", n.type, "actorAvatar?", !!raw.latestActorAvatar);
 
-      playNotification();
-
-      // Foreground: system tray via Notifee (native FCM is skipped while app is open).
-      // Background/killed: CtrendMessagingService renders the push — no JS post here.
+      // Foreground only — background/killed delivery is native FCM (CtrendMessagingService).
       if (AppState.currentState === "active") {
+        playNotification();
         void initMessageNotifications();
         void resolveActorAvatar(
           client,
@@ -321,14 +319,10 @@ function GlobalMessageSubscription() {
       const senderAvatar = msg.senderAvatar || null;
 
       if (!alreadyInChat) {
-        // Only render from JS while the app is foreground. When backgrounded or
-        // killed the native CtrendMessagingService renders the push itself (same
-        // Reply/👍 Like actions), so posting here too would be a duplicate.
+        // Foreground only — background/killed delivery is native FCM (CtrendMessagingService).
         if (AppState.currentState === "active") {
           playMessage();
           void initMessageNotifications();
-
-          // Notifee notification with sender avatar + Reply/👍 Like actions.
           void postOrUpdateMessageNotification(
             msg.conversationId,
             senderName,
@@ -337,8 +331,6 @@ function GlobalMessageSubscription() {
             msg.id,
           );
         }
-
-        // No in-app envelope banner / no duplicate toast — one notification only.
 
         void client.refetchQueries({ include: [MY_CONVERSATIONS] });
       }
