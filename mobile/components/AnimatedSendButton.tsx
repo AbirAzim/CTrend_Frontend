@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
