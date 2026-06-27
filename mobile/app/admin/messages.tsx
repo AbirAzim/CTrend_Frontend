@@ -6,6 +6,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   Image,
   Keyboard,
@@ -19,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -306,6 +308,23 @@ function ChatView({
   const st = chatStyles(colors);
   const isBusy = sending || uploading;
   const kbHeight = useKeyboardHeight();
+
+  // Android system back: dismiss inline overlays before leaving the thread.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (activeReactMsgId) {
+        setActiveReactMsgId(null);
+        return true;
+      }
+      if (replyTarget) {
+        setReplyTarget(null);
+        return true;
+      }
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [activeReactMsgId, replyTarget, onBack]);
 
   return (
     <View style={st.screen}>
@@ -637,6 +656,25 @@ export default function AdminMessagesScreen() {
     setSelectedRecipients(new Set());
   }
 
+  const closeThread = useCallback(() => {
+    setActiveThread(null);
+    void refetchThreads();
+  }, [refetchThreads]);
+
+  // Android system back: close recipient picker before exiting admin.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (pickerVisible) {
+          setPickerVisible(false);
+          return true;
+        }
+        return false;
+      });
+      return () => sub.remove();
+    }, [pickerVisible]),
+  );
+
   const st = mainStyles(colors);
   const isBusy = sending || uploading;
   const kbHeight = useKeyboardHeight();
@@ -646,7 +684,7 @@ export default function AdminMessagesScreen() {
     return (
       <ChatView
         thread={activeThread}
-        onBack={() => { setActiveThread(null); void refetchThreads(); }}
+        onBack={closeThread}
         colors={colors}
         insets={insets}
       />
