@@ -85,6 +85,7 @@ import {
 } from '@ctrend/shared/lib/knockoutFixture';
 import { matchVoteWinnerPendingHint } from '@ctrend/shared/lib/matchPredictionCopy';
 import {
+  formatKnockoutLivePrefix,
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
 } from '@ctrend/shared/lib/matchScoreCopy';
@@ -436,13 +437,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 					}),
 		},
 		cardLive: {
-			borderColor: 'rgba(34,197,94,0.45)',
-			borderWidth: 2,
-		},
-		liveBorderOverlay: {
-			borderRadius: 18,
-			borderWidth: 2,
-			borderColor: 'rgba(34,197,94,0.45)',
+			borderColor: isDark ? 'rgba(129,140,248,0.38)' : 'rgba(99,102,241,0.3)',
+			borderWidth: 1.5,
 		},
 		header: {
 			flexDirection: 'row' as const,
@@ -1508,18 +1504,26 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 	};
 }
 
-function LiveDot() {
+function LiveDot({ light = false, color }: { light?: boolean; color?: string }) {
 	const pulse = useRef(new Animated.Value(1)).current;
 	useEffect(() => {
 		Animated.loop(
 			Animated.sequence([
-				Animated.timing(pulse, { toValue: 0.2, duration: 600, useNativeDriver: true }),
+				Animated.timing(pulse, { toValue: 0.25, duration: 600, useNativeDriver: true }),
 				Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
 			])
 		).start();
 	}, [pulse]);
 	return (
-		<Animated.View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: '#f97316', opacity: pulse }} />
+		<Animated.View
+			style={{
+				width: 6,
+				height: 6,
+				borderRadius: 3,
+				backgroundColor: color ?? (light ? '#fff' : '#22c55e'),
+				opacity: pulse,
+			}}
+		/>
 	);
 }
 
@@ -1660,7 +1664,6 @@ function FeedPostCardComponent({
 	const [winnerCountdown, setWinnerCountdown] = useState(() =>
 		calcWinnerCountdown(post.fixtureWinnerAt),
 	);
-	const livePulse = useRef(new Animated.Value(1)).current;
 	const voteInFlight = useRef(false);
 	const voteGuardUntil = useRef(0);
 	// intent >= 0 = vote that option; intent < 0 = withdraw
@@ -1922,19 +1925,7 @@ function FeedPostCardComponent({
 	}, [post.id, post.matchScore?.status, post.matchScore?.home, post.matchScore?.away, post.matchScore?.minute]);
 	const matchScore = liveMatchScore ?? post.matchScore;
 
-	// Pulse animation for live matches
 	const isLiveMatch = matchScore?.status === 'IN_PLAY' || matchScore?.status === 'PAUSED';
-	useEffect(() => {
-		if (!isViewable || !isLiveMatch) { livePulse.setValue(1); return; }
-		const loop = Animated.loop(
-			Animated.sequence([
-				Animated.timing(livePulse, { toValue: 0.3, duration: 800, useNativeDriver: true }),
-				Animated.timing(livePulse, { toValue: 1, duration: 800, useNativeDriver: true }),
-			]),
-		);
-		loop.start();
-		return () => loop.stop();
-	}, [isViewable, isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const liveMinute = matchScore?.status === 'IN_PLAY' ? (matchScore?.minute ?? null) : null;
 
@@ -2640,14 +2631,13 @@ function FeedPostCardComponent({
 		(isExtraTimeLiveStatus(matchStatus, matchScore?.phase) ||
 			isShootoutLiveStatus(matchStatus, matchScore?.phase));
 
+	const livePhaseLabel =
+		matchScore?.status === 'IN_PLAY' ? formatKnockoutLivePrefix(matchScore) : null;
+	const liveStatusPill =
+		matchScore?.status === 'PAUSED' ? 'HT' : livePhaseLabel ?? 'LIVE';
+
 	return (
 		<View style={[st.card, isLiveMatch && st.cardLive]}>
-			{isLiveMatch && (
-				<Animated.View
-					style={[StyleSheet.absoluteFill, st.liveBorderOverlay, { opacity: livePulse }]}
-					pointerEvents="none"
-				/>
-			)}
 			{/* Ending-soon urgency banner */}
 			{isEndingSoon ? (
 				<View style={st.endingSoonBanner}>
@@ -3523,6 +3513,7 @@ function FeedPostCardComponent({
 						post.postOptions?.[1]?.label?.trim() ?? null,
 					]}
 					effectiveMinute={liveMinute}
+					liveStatusPill={liveStatusPill}
 				/>
 			) : null}
 
@@ -4633,68 +4624,202 @@ const matchInProgressStyles = StyleSheet.create({
 	},
 });
 
-type MatchScore = { status: string | null; home: number | null; away: number | null; minute?: number | null } | null;
+type MatchScore = {
+	status: string | null;
+	home: number | null;
+	away: number | null;
+	minute?: number | null;
+	phase?: string | null;
+} | null;
 
 function MatchDetailRow({
 	fixtureId,
 	matchScore,
 	teams,
 	effectiveMinute,
+	liveStatusPill,
 }: {
 	fixtureId: string;
 	matchScore: MatchScore;
 	teams: [string | null, string | null];
 	effectiveMinute: number | null;
+	liveStatusPill: string;
 }) {
+	const { colors, isDark } = useTheme();
 	const isLive = matchScore?.status === 'IN_PLAY';
 	const isPaused = matchScore?.status === 'PAUSED';
-	const isFinished = matchScore?.status === 'FT' || matchScore?.status === 'AET' || matchScore?.status === 'PEN' || matchScore?.status === 'FINISHED';
+	const isFinished =
+		matchScore?.status === 'FT' ||
+		matchScore?.status === 'AET' ||
+		matchScore?.status === 'PEN' ||
+		matchScore?.status === 'FINISHED';
 
-	const displayMin = effectiveMinute ?? matchScore?.minute ?? 0;
-	const statusLabel = isLive
-		? `${displayMin}'`
-		: isPaused ? 'HT'
-		: isFinished ? 'FT'
-		: null;
+	const teamA = teams[0] ?? 'Home';
+	const teamB = teams[1] ?? 'Away';
+	const home = matchScore?.home ?? 0;
+	const away = matchScore?.away ?? 0;
 
-	const scoreText = matchScore && matchScore.home != null && matchScore.away != null
-		? `${matchScore.home}–${matchScore.away}`
-		: null;
+	if (isLive || isPaused) {
+		const isHt = isPaused;
+		const dotColor = isHt ? '#f59e0b' : '#22c55e';
+		const footBg = isHt
+			? isDark
+				? 'rgba(245,158,11,0.12)'
+				: 'rgba(245,158,11,0.08)'
+			: isDark
+				? 'rgba(99,102,241,0.14)'
+				: 'rgba(99,102,241,0.07)';
+		const footTitleColor = isHt ? '#d97706' : colors.accent;
 
-	const teamA = teams[0];
-	const teamB = teams[1];
+		return (
+			<Pressable
+				style={({ pressed }) => [
+					mdrStyles.livePanel,
+					{
+						backgroundColor: colors.card,
+						borderColor: colors.border,
+						opacity: pressed ? 0.94 : 1,
+						transform: [{ scale: pressed ? 0.99 : 1 }],
+					},
+				]}
+				onPress={() =>
+					router.push(`/world-cup/match/${fixtureId}` as `/${string}`)
+				}
+			>
+				<View style={mdrStyles.livePanelHead}>
+					<LiveDot color={dotColor} />
+					<Text style={[mdrStyles.livePanelStatus, { color: colors.subtext }]}>
+						{liveStatusPill}
+						{isLive && effectiveMinute != null ? ` · ${effectiveMinute}'` : ''}
+					</Text>
+				</View>
+				<View style={mdrStyles.livePanelBody}>
+					<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
+						{teamA}
+					</Text>
+					<Text style={[mdrStyles.livePanelScore, { color: colors.text }]}>
+						{home}
+						<Text style={[mdrStyles.livePanelScoreDash, { color: colors.muted }]}> – </Text>
+						{away}
+					</Text>
+					<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
+						{teamB}
+					</Text>
+				</View>
+				<View style={[mdrStyles.livePanelFoot, { backgroundColor: footBg, borderTopColor: colors.border }]}>
+					<Text style={[mdrStyles.livePanelFootTitle, { color: footTitleColor }]}>
+						Match center
+					</Text>
+					<Text style={[mdrStyles.livePanelFootSub, { color: colors.muted }]} numberOfLines={1}>
+						Stats · lineups · events
+					</Text>
+					<Text style={[mdrStyles.livePanelChevron, { color: footTitleColor }]}>›</Text>
+				</View>
+			</Pressable>
+		);
+	}
 
-	const dotColor = isLive ? '#ef4444' : isPaused ? '#f59e0b' : '#64748b';
-	const barBg = isLive ? 'rgba(239,68,68,0.07)' : isPaused ? 'rgba(245,158,11,0.07)' : 'rgba(100,116,139,0.07)';
-	const barBorder = isLive ? 'rgba(239,68,68,0.2)' : isPaused ? 'rgba(245,158,11,0.2)' : 'rgba(100,116,139,0.18)';
+	const dotColor = isFinished ? '#64748b' : colors.muted;
+	const barBg = isDark ? 'rgba(100,116,139,0.12)' : 'rgba(100,116,139,0.07)';
+	const barBorder = isDark ? 'rgba(148,163,184,0.22)' : 'rgba(100,116,139,0.18)';
 
 	return (
 		<Pressable
-			style={({ pressed }) => [mdrStyles.row, { backgroundColor: pressed ? 'rgba(100,116,139,0.1)' : barBg, borderColor: barBorder }]}
-			onPress={() => router.push(`/world-cup/match/${fixtureId}${!isLive && !isFinished ? '?tab=lineup' : ''}` as `/${string}`)}
+			style={({ pressed }) => [
+				mdrStyles.row,
+				{
+					backgroundColor: pressed ? (isDark ? 'rgba(100,116,139,0.18)' : 'rgba(100,116,139,0.1)') : barBg,
+					borderColor: barBorder,
+				},
+			]}
+			onPress={() =>
+				router.push(
+					`/world-cup/match/${fixtureId}${!isFinished ? '?tab=lineup' : ''}` as `/${string}`,
+				)
+			}
 		>
-			{/* Live/status dot */}
 			<View style={[mdrStyles.dot, { backgroundColor: dotColor }]} />
-
-			{/* Status badge */}
-			{statusLabel ? (
-				<View style={[mdrStyles.badge, { backgroundColor: dotColor + '22' }]}>
-					<Text style={[mdrStyles.badgeText, { color: dotColor }]}>{statusLabel}</Text>
-				</View>
-			) : null}
-
-			{/* Score + teams */}
-			<Text style={mdrStyles.scoreText} numberOfLines={1}>
-				{teamA ?? 'Home'}{scoreText ? ` ${scoreText} ` : '  '}{teamB ?? 'Away'}
+			<Text style={[mdrStyles.scoreText, { color: colors.text }]} numberOfLines={1}>
+				{teamA} {home}–{away} {teamB}
 			</Text>
-
-			{/* CTA */}
-			<Text style={mdrStyles.cta}>See Match Details →</Text>
+			<Text style={[mdrStyles.cta, { color: colors.accent }]}>
+				See details →
+			</Text>
 		</Pressable>
 	);
 }
 
 const mdrStyles = StyleSheet.create({
+	livePanel: {
+		marginHorizontal: 12,
+		marginTop: 4,
+		marginBottom: 10,
+		borderRadius: 16,
+		borderWidth: 1,
+		overflow: 'hidden',
+	},
+	livePanelHead: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 6,
+		paddingTop: 10,
+		paddingHorizontal: 14,
+	},
+	livePanelStatus: {
+		fontSize: 11,
+		fontWeight: '800',
+		letterSpacing: 1,
+		textTransform: 'uppercase',
+	},
+	livePanelBody: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 8,
+		paddingHorizontal: 16,
+		paddingTop: 8,
+		paddingBottom: 14,
+	},
+	livePanelTeam: {
+		flex: 1,
+		fontSize: 12,
+		fontWeight: '700',
+		textAlign: 'center',
+		lineHeight: 16,
+	},
+	livePanelScore: {
+		fontSize: 32,
+		fontWeight: '900',
+		fontVariant: ['tabular-nums'],
+	},
+	livePanelScoreDash: {
+		fontSize: 24,
+		fontWeight: '300',
+	},
+	livePanelFoot: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		paddingHorizontal: 14,
+		paddingVertical: 11,
+		borderTopWidth: StyleSheet.hairlineWidth,
+	},
+	livePanelFootTitle: {
+		fontSize: 13,
+		fontWeight: '800',
+		flexShrink: 0,
+	},
+	livePanelFootSub: {
+		flex: 1,
+		fontSize: 11,
+		fontWeight: '500',
+	},
+	livePanelChevron: {
+		fontSize: 20,
+		fontWeight: '700',
+		flexShrink: 0,
+	},
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',

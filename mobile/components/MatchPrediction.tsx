@@ -35,7 +35,6 @@ import {
   knockoutRoundBadgeText,
   predictionKnockoutHint,
   predictionPendingExtraTimeMessage,
-  predictionPendingResultMessage,
   predictionPendingShootoutMessage,
   predictionResolvedAfterShootoutNote,
   predictionScoringRuleHint,
@@ -137,10 +136,12 @@ export function MatchPrediction({
     matchStatus,
     state.predictionsPendingResult,
     matchPhase,
+    fixtureStage,
   );
   const inExtraTime = isExtraTimeLiveStatus(matchStatus, matchPhase);
   const inShootout = isShootoutLiveStatus(matchStatus, matchPhase);
-  const showResolvedPenNote = resolved && Boolean(state.wentToPenalties);
+  const showResolvedPenNote =
+    isKnockoutStage(fixtureStage) && resolved && Boolean(state.wentToPenalties);
 
   function startEdit() {
     setHome(mine ? String(mine.homeScore) : "0");
@@ -225,11 +226,6 @@ export function MatchPrediction({
       {pendingResult && inShootout ? (
         <View style={st.pendingBanner}>
           <Text style={st.pendingBannerText}>{predictionPendingShootoutMessage()}</Text>
-        </View>
-      ) : null}
-      {pendingResult && !inExtraTime && !inShootout ? (
-        <View style={st.pendingBanner}>
-          <Text style={st.pendingBannerText}>{predictionPendingResultMessage()}</Text>
         </View>
       ) : null}
 

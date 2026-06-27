@@ -64,6 +64,7 @@ import {
 } from "@ctrend/shared/lib/knockoutFixture";
 import { matchVoteWinnerPendingHint } from "@ctrend/shared/lib/matchPredictionCopy";
 import {
+  formatKnockoutLivePrefix,
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
 } from "@ctrend/shared/lib/matchScoreCopy";
@@ -1887,6 +1888,11 @@ function FeedPostCardComponent({
     return `${m}:${String(s).padStart(2, "0")}`;
   })();
 
+  const livePhaseLabel =
+    ms && ms.status === "IN_PLAY" ? formatKnockoutLivePrefix(ms) : null;
+  const liveStatusPill =
+    ms?.status === "PAUSED" ? "HT" : livePhaseLabel ?? "LIVE";
+
   return (
     <article
       className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}${isLiveMatch ? " ig-post--live" : ""}`}
@@ -2487,29 +2493,38 @@ function FeedPostCardComponent({
         />
       ) : showMatchLive ? (
         <div
-          className={`cx-live-match-bar${ms?.status === "PAUSED" ? " cx-live-match-bar--ht" : ""}`}
+          className={`cx-live-panel${ms?.status === "PAUSED" ? " cx-live-panel--ht" : ""}`}
           role="button"
           tabIndex={0}
           onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); } }}
-          aria-label="Watch live match"
+          aria-label="Open match center"
         >
-          <div className="cx-live-match-bar-left">
-            <span className="cx-live-dot" aria-hidden />
-            <span className="cx-live-match-bar-badge">
-              {ms?.status === "PAUSED"
-                ? "HT"
-                : liveMinute != null
-                ? `${liveMinute}'`
-                : "LIVE"}
+          <div className="cx-live-panel-head">
+            <span className="cx-live-panel-status">
+              <span className="cx-live-panel-dot" aria-hidden />
+              {liveStatusPill}
+              {ms?.status === "IN_PLAY" && liveMinute != null ? ` · ${liveMinute}'` : ""}
             </span>
-            <div className="cx-live-match-bar-teams">
-              <span className="cx-live-match-bar-team">{msTeamA ?? "Home"}</span>
-              <span className="cx-live-match-bar-score">{ms?.home ?? 0}–{ms?.away ?? 0}</span>
-              <span className="cx-live-match-bar-team">{msTeamB ?? "Away"}</span>
+          </div>
+          <div className="cx-live-panel-body">
+            <div className="cx-live-panel-team">
+              <span className="cx-live-panel-name">{msTeamA ?? "Home"}</span>
+            </div>
+            <div className="cx-live-panel-score" aria-label={`Score ${ms?.home ?? 0} to ${ms?.away ?? 0}`}>
+              {ms?.home ?? 0}
+              <span className="cx-live-panel-score-sep" aria-hidden>–</span>
+              {ms?.away ?? 0}
+            </div>
+            <div className="cx-live-panel-team cx-live-panel-team--away">
+              <span className="cx-live-panel-name">{msTeamB ?? "Away"}</span>
             </div>
           </div>
-          <span className="cx-live-match-bar-cta">See Match Details →</span>
+          <div className="cx-live-panel-foot">
+            <span className="cx-live-panel-foot-title">Match center</span>
+            <span className="cx-live-panel-foot-sub">Stats · lineups · events</span>
+            <span className="cx-live-panel-chevron" aria-hidden>›</span>
+          </div>
         </div>
       ) : showMatchStartsSoon ? (
         <div className="cx-match-in-progress" role="status" aria-live="polite">

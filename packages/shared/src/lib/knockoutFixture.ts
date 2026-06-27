@@ -61,13 +61,15 @@ export function isShootoutLiveStatus(
   return false;
 }
 
-/** True while the final 90+ET score is not yet locked for prediction scoring. */
+/** True while the final 90+ET score is not yet locked for prediction scoring (knockout only). */
 export function isPredictionResultPending(
   resolved: boolean,
   matchStatus: string | null | undefined,
   serverPending?: boolean | null,
   phase?: string | null,
+  fixtureStage?: string | null,
 ): boolean {
+  if (!isKnockoutStage(fixtureStage)) return false;
   if (resolved) return false;
   if (serverPending === true) return true;
   if (serverPending === false) return false;
