@@ -4,6 +4,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
 import { AdminTabNav, type AdminTabId } from "../components/admin/AdminTabNav";
+import { AdminOverviewTab } from "../components/admin/AdminOverviewTab";
 import { AdminMessagesTab } from "./AdminMessagesTab";
 import { AdminReportedTab } from "./AdminReportedTab";
 import {
@@ -3000,7 +3001,7 @@ function AdminReferralSystemControl() {
 // ─── Admin Page (root) ────────────────────────────────────────────────────────
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<AdminTabId>("users");
+  const [activeTab, setActiveTab] = useState<AdminTabId>("overview");
   const [messagesTargetUserId, setMessagesTargetUserId] = useState<string | null>(null);
 
   function openAdminMessagesForUser(userId: string) {
@@ -3017,7 +3018,7 @@ export function AdminPage() {
       <div className="admin-header">
         <div>
           <h1 className="admin-title">Admin Dashboard</h1>
-          <p className="muted small">Manage users and admin access</p>
+          <p className="muted small">Users, engagement, campaigns & platform settings</p>
         </div>
         <span className="admin-role-badge admin-role-badge--admin">admin</span>
       </div>
@@ -3028,6 +3029,9 @@ export function AdminPage() {
       <AdminTabNav activeTab={activeTab} onChange={setActiveTab} />
 
       <div className="admin-section">
+        {activeTab === "overview" && (
+          <AdminOverviewTab onNavigate={(tab) => setActiveTab(tab as AdminTabId)} />
+        )}
         {activeTab === "users" && <UsersTab onComposeMessage={openAdminMessagesForUser} />}
         {activeTab === "admins" && <AdminsTab onComposeMessage={openAdminMessagesForUser} />}
         {activeTab === "invitations" && <InvitationsTab />}

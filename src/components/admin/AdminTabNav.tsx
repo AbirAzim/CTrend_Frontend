@@ -1,4 +1,5 @@
 export type AdminTabId =
+  | "overview"
   | "users"
   | "admins"
   | "invitations"
@@ -10,6 +11,7 @@ export type AdminTabId =
   | "admin-messages";
 
 const ADMIN_TABS: { id: AdminTabId; label: string; short: string }[] = [
+  { id: "overview", label: "Overview", short: "Overview" },
   { id: "users", label: "Users", short: "Users" },
   { id: "admins", label: "Admin management", short: "Admins" },
   { id: "invitations", label: "Invitations", short: "Invites" },

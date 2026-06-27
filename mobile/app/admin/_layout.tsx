@@ -1,15 +1,37 @@
-import { router, Tabs } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { router, Tabs, useFocusEffect } from "expo-router";
+import { useCallback, useEffect } from "react";
+import { BackHandler, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
-import { useEffect } from "react";
+
+function useExitAdmin() {
+  const exitAdmin = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/tabs" as never);
+  }, []);
+
+  // Tab navigators reset to the first tab (Overview) on Android back by default.
+  // Intercept hardware back so one press returns to the screen before admin.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        exitAdmin();
+        return true;
+      });
+      return () => sub.remove();
+    }, [exitAdmin]),
+  );
+
+  return exitAdmin;
+}
 
 export default function AdminLayout() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const isAdmin = user?.role?.toLowerCase() === "admin";
+  const exitAdmin = useExitAdmin();
 
   useEffect(() => {
     if (!isAdmin) router.replace("/tabs" as never);
@@ -36,6 +58,7 @@ export default function AdminLayout() {
 
   return (
     <Tabs
+      backBehavior="none"
       screenOptions={{
         headerShown: true,
         tabBarHideOnKeyboard: true,
@@ -43,7 +66,7 @@ export default function AdminLayout() {
         headerTitleStyle: { color: colors.text, fontWeight: "800" },
         headerTintColor: colors.accent,
         headerLeft: () => (
-          <Pressable onPress={() => router.back()} style={{ paddingHorizontal: 12 }}>
+          <Pressable onPress={exitAdmin} style={{ paddingHorizontal: 12 }}>
             <Text style={{ color: colors.accent, fontSize: 22, fontWeight: "300" }}>‹</Text>
           </Pressable>
         ),
@@ -60,6 +83,10 @@ export default function AdminLayout() {
     >
       <Tabs.Screen
         name="index"
+        options={{ title: "Overview", tabBarLabel: "Overview", tabBarIcon: renderIcon("📊") }}
+      />
+      <Tabs.Screen
+        name="users"
         options={{ title: "Users", tabBarLabel: "Users", tabBarIcon: renderIcon("👥") }}
       />
       <Tabs.Screen

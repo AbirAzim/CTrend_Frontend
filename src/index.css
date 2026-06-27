@@ -13325,6 +13325,115 @@ a.cx-profile-btn-accent {
   overflow: visible;
 }
 
+.admin-overview { display: flex; flex-direction: column; gap: 20px; }
+.admin-overview-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.admin-overview-loading, .admin-overview-error {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 48px 16px; text-align: center;
+}
+.admin-btn-ghost-sm {
+  padding: 0.45rem 0.85rem; font-size: 0.78rem; font-weight: 700;
+  border: 1px solid var(--ig-border, #e2e8f0); border-radius: 999px;
+  background: transparent; color: var(--ig-text-secondary, #64748b); cursor: pointer;
+}
+.admin-stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px;
+}
+.admin-stat-card {
+  position: relative; border-radius: 14px; border: 1px solid var(--ig-border, #e2e8f0);
+  padding: 14px 14px 12px; background: var(--ig-card, #fff); overflow: hidden;
+}
+.admin-stat-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #64748b;
+}
+.admin-stat-card--blue::before { background: #3b82f6; }
+.admin-stat-card--green::before { background: #22c55e; }
+.admin-stat-card--amber::before { background: #f59e0b; }
+.admin-stat-card--violet::before { background: #8b5cf6; }
+.admin-stat-card--rose::before { background: #f43f5e; }
+.admin-stat-label {
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ig-text-secondary, #64748b);
+}
+.admin-stat-value {
+  display: block; margin-top: 6px; font-size: 1.65rem; font-weight: 900;
+  font-variant-numeric: tabular-nums; color: var(--ig-text, #0f172a);
+}
+.admin-stat-hint { display: block; margin-top: 4px; font-size: 0.75rem; font-weight: 600; color: var(--ig-text-secondary, #64748b); }
+.admin-chart-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;
+}
+.admin-chart-card {
+  border: 1px solid var(--ig-border, #e2e8f0); border-radius: 14px;
+  padding: 14px; background: var(--ig-card, #fff);
+}
+.admin-chart-title { margin: 0; font-size: 0.92rem; font-weight: 800; color: var(--ig-text, #0f172a); }
+.admin-chart-sub { margin: 4px 0 0; color: var(--ig-text-secondary, #64748b); }
+.admin-chart-bars {
+  display: flex; align-items: flex-end; gap: 6px; height: 120px; margin-top: 14px;
+}
+.admin-chart-bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
+.admin-chart-bar-track {
+  flex: 1; width: 100%; display: flex; align-items: flex-end;
+  background: var(--ig-surface, #f1f5f9); border-radius: 6px; overflow: hidden;
+}
+.admin-chart-bar-fill { width: 100%; border-radius: 6px 6px 0 0; min-height: 2px; transition: height 0.3s ease; }
+.admin-chart-bar-label { font-size: 0.62rem; font-weight: 700; color: var(--ig-text-secondary, #64748b); text-align: center; }
+.admin-quick-links-title { margin: 0 0 10px; font-size: 0.85rem; font-weight: 800; color: var(--ig-text, #0f172a); }
+.admin-quick-links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.admin-quick-link {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+  border: 1px solid var(--ig-border, #e2e8f0); border-radius: 12px;
+  background: var(--ig-card, #fff); cursor: pointer;
+  font-size: 0.82rem; font-weight: 700; color: var(--ig-text, #0f172a);
+  transition: border-color 0.15s, transform 0.15s, background 0.15s;
+}
+.admin-quick-link:hover { border-color: var(--cx-accent, #6366f1); transform: translateY(-1px); background: var(--ig-surface, #f1f5f9); }
+.admin-quick-link-emoji { font-size: 1.1rem; }
+
+:root[data-theme="dark"] .admin-stat-card,
+:root[data-theme="dark"] .admin-chart-card,
+:root[data-theme="dark"] .admin-quick-link {
+  background: var(--ig-surface);
+  border-color: var(--ig-border);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .admin-stat-value,
+:root[data-theme="dark"] .admin-chart-title,
+:root[data-theme="dark"] .admin-quick-links-title,
+:root[data-theme="dark"] .admin-quick-link {
+  color: var(--ig-text);
+}
+
+:root[data-theme="dark"] .admin-stat-label,
+:root[data-theme="dark"] .admin-stat-hint,
+:root[data-theme="dark"] .admin-chart-sub,
+:root[data-theme="dark"] .admin-chart-bar-label {
+  color: var(--ig-muted);
+}
+
+:root[data-theme="dark"] .admin-chart-bar-track {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="dark"] .admin-quick-link:hover {
+  background: rgb(129 140 248 / 0.12);
+  border-color: var(--cx-accent);
+}
+
+:root[data-theme="dark"] .admin-btn-ghost-sm {
+  color: var(--ig-muted);
+  border-color: var(--ig-border);
+}
+
+:root[data-theme="dark"] .admin-btn-ghost-sm:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ig-text);
+}
+
 .admin-section-head {
   display: flex;
   align-items: center;

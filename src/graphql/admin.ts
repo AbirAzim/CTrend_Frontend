@@ -1,5 +1,33 @@
 import { gql } from "@apollo/client";
 
+export const ADMIN_PLATFORM_STATS = gql`
+  query AdminPlatformStats {
+    adminPlatformStats {
+      totalUsers
+      totalAdmins
+      verifiedUsers
+      onlineUsers
+      newUsersLast7Days
+      totalPosts
+      totalVotes
+      totalComments
+      activeVotersLast7Days
+      postsLast7Days
+      votesLast7Days
+      pendingInvitations
+      reportedPosts
+      campaignWinners
+      dailyActivity {
+        date
+        signups
+        posts
+        votes
+        comments
+      }
+    }
+  }
+`;
+
 // ── Categories (admin-only mutations) ─────────────────────────
 export const CREATE_CATEGORY = gql`
   mutation CreateCategory($name: String!) {
