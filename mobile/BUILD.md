@@ -100,7 +100,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 38;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.10.0 release: **versionCode 37** across all three files.
+Current version after 1.11.0 release: **versionCode 38** across all three files.
 
 ---
 
@@ -207,9 +207,35 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.11.0 | 38 | 2026-06-27 | Admin overview redesign (stats, charts, online users), platform settings UX, notifications page, profile/rewards polish |
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.11.0 (38)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.11.0 (38)
+```
+
+**What's new** (user-facing release notes)
+```
+• Redesigned admin dashboard — live stats, activity charts, and online user list
+• Smarter platform settings — clearer controls for global posts and referral program
+• New notifications page — see all alerts in one place
+• Profile and rewards UI polish
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Admin overview overhaul (web + mobile): clickable stats, 14-day activity charts/tables,
+online users API, platform settings card UI. Notifications page added. Requires backend
+deploy with adminOnlineUsers + adminPlatformStats APIs.
+```
 
 ### Play Console copy — 1.10.0 (37)
 
@@ -307,7 +333,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.10.0 (versionCode 37) |
+| Current version | 1.11.0 (versionCode 38) |
 
 ---
 
