@@ -1987,10 +1987,9 @@ body.capacitor .ig-bottom-nav {
   margin: 4px 4px 0;
 }
 
-/* ── Feed filter bar — sticky, always accessible ─────────────────────────────
-   Separate from the navbar. Sits at top: 74px when the navbar is visible.
-   When the navbar hides on scroll (html[data-topbar-hidden="true"]), it slides
-   up to top: 0 so it's always reachable without scrolling back up.             */
+/* ── Feed filter bar — sticky, hides with chrome on scroll down ──────────────
+   Sits below the topbar while visible. When the user scrolls down (same signal
+   as the bottom nav / topbar hide), it slides away to maximize feed space.     */
 
 .ff-bar-outer {
   position: sticky;
@@ -1999,7 +1998,14 @@ body.capacitor .ig-bottom-nav {
   background: var(--ig-bg);
   padding: 6px 0 5px;
   border-bottom: 1.5px solid rgb(var(--cx-ink-rgb) / 0.09);
-  transition: top 0.22s ease-out, max-height 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease-out, padding 0.25s ease-out;
+  transition:
+    top 0.22s ease-out,
+    max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease-out,
+    padding 0.25s ease-out,
+    transform 0.22s ease-out,
+    margin 0.22s ease-out,
+    border-color 0.22s ease-out;
   max-height: 120px;
   overflow: hidden;
   /* match post card horizontal margins so widths align */
@@ -2007,8 +2013,15 @@ body.capacitor .ig-bottom-nav {
   border-radius: 16px 16px 0 0;
 }
 html[data-topbar-hidden="true"] .ff-bar-outer {
-  top: 0;
-  border-radius: 0;
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  border-bottom-width: 0;
+  pointer-events: none;
+  transform: translateY(calc(-100% - 8px));
 }
 :root[data-theme="dark"] .ff-bar-outer {
   background: #1c1c1f;

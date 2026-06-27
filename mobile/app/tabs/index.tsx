@@ -154,8 +154,8 @@ export default function FeedScreen() {
   const [filterBarHeight, setFilterBarHeight] = useState(50);
   const filterBarHeightRef = useRef(50);
 
-  // Direction-based filter animation — same mechanism as bottom nav but inverted:
-  // scroll DOWN → filter shows, scroll UP → filter hides.
+  // Direction-based filter animation — same as bottom nav:
+  // scroll DOWN → filter hides, scroll UP → filter shows.
   const filterTranslateY = useRef(new Animated.Value(0)).current;
   // Infinite scroll: guard against overlapping/needless page fetches.
   const loadingMoreRef = useRef(false);
@@ -229,18 +229,17 @@ export default function FeedScreen() {
       });
     }
 
-    // Filter bar: inverted — shows on scroll down, hides on scroll up.
-    // Guard with filterAnimating to prevent rapid oscillation on short lists.
-    if (diff > 4 && !filterVisible.current && !filterAnimating.current) {
-      filterVisible.current = true;
-      filterAnimating.current = true;
-      Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        filterAnimating.current = false;
-      });
-    } else if (diff < -4 && filterVisible.current && !filterAnimating.current) {
+    // Filter bar: same as bottom nav — hides on scroll down, shows on scroll up.
+    if (diff > 4 && filterVisible.current && !filterAnimating.current) {
       filterVisible.current = false;
       filterAnimating.current = true;
       Animated.timing(filterTranslateY, { toValue: -filterBarHeightRef.current, duration: 200, useNativeDriver: true }).start(() => {
+        filterAnimating.current = false;
+      });
+    } else if (diff < -4 && !filterVisible.current && !filterAnimating.current) {
+      filterVisible.current = true;
+      filterAnimating.current = true;
+      Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
         filterAnimating.current = false;
       });
     }
@@ -286,7 +285,8 @@ export default function FeedScreen() {
     lastScrollY.current = 0;
     tabBarVisible.current = true;
     tabBarAnimating.current = false;
-  }, [feedFilter, filterTranslateY]);
+    translateY.setValue(0);
+  }, [feedFilter, filterTranslateY, translateY]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
   // always feels like it has more — no visible "loading" at the end.

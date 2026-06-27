@@ -1,20 +1,16 @@
 import { useMutation } from "@apollo/client/react";
-import { Image } from "expo-image";
-import logoAsset from "../../assets/logo.png";
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { LOGIN } from "@ctrend/shared/graphql/auth";
+import { AuthFormCard, AuthScreenLayout } from "../../components/AuthScreenLayout";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -60,77 +56,65 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.flex, { backgroundColor: colors.bg }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Image source={logoAsset} style={styles.logoImg} contentFit="contain" />
-          <Text style={[styles.tagline, { color: colors.subtext }]}>Compare · vote · vibe</Text>
+    <AuthScreenLayout>
+      <AuthFormCard>
+        <Text style={[styles.formTitle, { color: colors.text }]}>Log in</Text>
+        <View style={styles.formSubRow}>
+          <Text style={[styles.formSubText, { color: colors.subtext }]}>New here? </Text>
+          <Link href="/auth/signup" replace style={[styles.formSubLink, { color: colors.accent }]}>
+            Create an account
+          </Link>
         </View>
 
-        <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.formTitle, { color: colors.text }]}>Log in</Text>
-          <View style={styles.formSubRow}>
-            <Text style={[styles.formSubText, { color: colors.subtext }]}>New here? </Text>
-            <Link href="/auth/signup" style={[styles.formSubLink, { color: colors.accent }]}>Create an account</Link>
-          </View>
+        <Text style={[styles.label, { color: colors.subtext }]}>Email</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoCorrect={false}
+          returnKeyType="next"
+        />
 
-          <Text style={[styles.label, { color: colors.subtext }]}>Email</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            returnKeyType="next"
-          />
+        <Text style={[styles.label, { color: colors.subtext }]}>Password</Text>
+        <PasswordInput
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Your password"
+          placeholderTextColor={colors.muted}
+          returnKeyType="done"
+          onSubmitEditing={() => void handleLogin()}
+        />
 
-          <Text style={[styles.label, { color: colors.subtext }]}>Password</Text>
-          <PasswordInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Your password"
-            placeholderTextColor={colors.muted}
-            returnKeyType="done"
-            onSubmitEditing={() => void handleLogin()}
-          />
-
-          <View style={styles.forgotRow}>
-            <Link href="/auth/forgot-password" style={[styles.forgotLink, { color: colors.accent }]}>Forgot password?</Link>
-          </View>
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Pressable
-            style={[styles.btn, { backgroundColor: colors.accent }, loading && styles.btnDisabled]}
-            onPress={() => void handleLogin()}
-            disabled={loading}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Continue</Text>}
-          </Pressable>
-
-          <AuthDivider />
-          <GoogleSignInButton onError={setError} disabled={loading} />
-          <LegalLinksFooter />
+        <View style={styles.forgotRow}>
+          <Link href="/auth/forgot-password" style={[styles.forgotLink, { color: colors.accent }]}>
+            Forgot password?
+          </Link>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Pressable
+          style={[styles.btn, { backgroundColor: colors.accent }, loading && styles.btnDisabled]}
+          onPress={() => void handleLogin()}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Continue</Text>}
+        </Pressable>
+
+        <AuthDivider />
+        <GoogleSignInButton onError={setError} disabled={loading} />
+        <LegalLinksFooter />
+      </AuthFormCard>
+    </AuthScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 40 },
-  header: { alignItems: "center", marginBottom: 36 },
-  logoImg: { width: 160, height: 138, marginBottom: 6 },
-  tagline: { fontSize: 14, marginTop: 2 },
-  form: { borderRadius: 20, padding: 24, gap: 8, borderWidth: 1 },
   formTitle: { fontSize: 26, fontWeight: "800", marginBottom: 2 },
   formSubRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   formSubText: { fontSize: 14 },

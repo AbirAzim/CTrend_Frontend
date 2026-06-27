@@ -1,14 +1,9 @@
 import { useMutation, useQuery } from "@apollo/client/react";
-import { Image } from "expo-image";
-import logoAsset from "../../assets/logo.png";
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +11,7 @@ import {
 } from "react-native";
 import { SIGNUP } from "@ctrend/shared/graphql/auth";
 import { INVITATION_SIGNUP_INFO } from "@ctrend/shared/graphql/referrals";
+import { AuthFormCard, AuthScreenLayout } from "../../components/AuthScreenLayout";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { AuthDivider, GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { LegalLinksFooter } from "../../components/LegalLinksFooter";
@@ -80,104 +76,87 @@ export default function SignupScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.flex, { backgroundColor: colors.bg }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.header}>
-          <Image source={logoAsset} style={styles.logoImg} contentFit="contain" />
-          <Text style={[styles.tagline, { color: colors.subtext }]}>Compare · vote · vibe</Text>
+    <AuthScreenLayout>
+      <AuthFormCard>
+        <Text style={[styles.formTitle, { color: colors.text }]}>Create account</Text>
+        {invited ? (
+          <Text style={[styles.inviteNote, { color: colors.subtext }]}>
+            You&apos;ve been invited — your email and referral code are ready below.
+          </Text>
+        ) : null}
+        {loadingInvite ? <ActivityIndicator color={colors.accent} style={{ marginBottom: 4 }} /> : null}
+        <View style={styles.formSubRow}>
+          <Text style={[styles.formSubText, { color: colors.subtext }]}>Already have one? </Text>
+          <Link href="/auth/login" replace style={[styles.formSubLink, { color: colors.accent }]}>
+            Log in
+          </Link>
         </View>
 
-        <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.formTitle, { color: colors.text }]}>Create account</Text>
-          {invited ? (
-            <Text style={[styles.inviteNote, { color: colors.subtext }]}>
-              You&apos;ve been invited — your email and referral code are ready below.
-            </Text>
-          ) : null}
-          {loadingInvite ? <ActivityIndicator color={colors.accent} style={{ marginBottom: 4 }} /> : null}
-          <View style={styles.formSubRow}>
-            <Text style={[styles.formSubText, { color: colors.subtext }]}>Already have one? </Text>
-            <Link href="/auth/login" style={[styles.formSubLink, { color: colors.accent }]}>Log in</Link>
-          </View>
+        <Text style={[styles.label, { color: colors.subtext }]}>Display name (optional)</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+          value={displayName}
+          onChangeText={setDisplayName}
+          placeholder="Your name"
+          placeholderTextColor={colors.muted}
+          returnKeyType="next"
+        />
 
-          <Text style={[styles.label, { color: colors.subtext }]}>Display name (optional)</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Your name"
-            placeholderTextColor={colors.muted}
-            returnKeyType="next"
-          />
+        <Text style={[styles.label, { color: colors.subtext }]}>Email</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoCorrect={false}
+          returnKeyType="next"
+        />
 
-          <Text style={[styles.label, { color: colors.subtext }]}>Email</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            returnKeyType="next"
-          />
+        <Text style={[styles.label, { color: colors.subtext }]}>Password</Text>
+        <PasswordInput
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="At least 8 characters"
+          placeholderTextColor={colors.muted}
+          returnKeyType="next"
+          onSubmitEditing={() => void handleSignup()}
+        />
 
-          <Text style={[styles.label, { color: colors.subtext }]}>Password</Text>
-          <PasswordInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="At least 8 characters"
-            placeholderTextColor={colors.muted}
-            returnKeyType="next"
-            onSubmitEditing={() => void handleSignup()}
-          />
+        <Text style={[styles.label, { color: colors.subtext }]}>Referral code (optional)</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+          value={referralCode}
+          onChangeText={(t) => setReferralCode(t.toUpperCase())}
+          placeholder="From your invite email"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          maxLength={12}
+        />
 
-          <Text style={[styles.label, { color: colors.subtext }]}>Referral code (optional)</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-            value={referralCode}
-            onChangeText={(t) => setReferralCode(t.toUpperCase())}
-            placeholder="From your invite email"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={12}
-          />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Pressable
+          style={[styles.btn, { backgroundColor: colors.accent }, loading && styles.btnDisabled]}
+          onPress={() => void handleSignup()}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create account</Text>}
+        </Pressable>
 
-          <Pressable
-            style={[styles.btn, { backgroundColor: colors.accent }, loading && styles.btnDisabled]}
-            onPress={() => void handleSignup()}
-            disabled={loading}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create account</Text>}
-          </Pressable>
-
-          <AuthDivider />
-          <GoogleSignInButton onError={setError} disabled={loading} />
-          <LegalLinksFooter />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <AuthDivider />
+        <GoogleSignInButton onError={setError} disabled={loading} />
+        <LegalLinksFooter />
+      </AuthFormCard>
+    </AuthScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 40 },
-  header: { alignItems: "center", marginBottom: 32 },
-  logoImg: { width: 120, height: 104, marginBottom: 6 },
-  tagline: { fontSize: 14, marginTop: 2 },
-  form: { borderRadius: 20, padding: 24, gap: 8, borderWidth: 1 },
   formTitle: { fontSize: 26, fontWeight: "800", marginBottom: 2 },
   inviteNote: { fontSize: 13, lineHeight: 19, marginBottom: 4 },
   formSubRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
