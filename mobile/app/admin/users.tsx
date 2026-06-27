@@ -8,7 +8,6 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -22,8 +21,6 @@ import {
   INVITE_USER,
   INVITE_USERS_BULK,
   PLATFORM_SETTINGS,
-  SET_ALLOW_USER_GLOBAL_POSTS,
-  SET_REFERRAL_SYSTEM_ENABLED,
   SET_MIN_ANDROID_VERSION_CODE,
   PUBLISH_ANDROID_UPDATE_NOTICE,
 } from "@ctrend/shared/graphql/admin";
@@ -105,24 +102,16 @@ export default function AdminUsersScreen() {
   const [bulkMut, { loading: bulkInviting }] = useMutation(INVITE_USERS_BULK);
   const [broadcastMut, { loading: broadcasting }] = useMutation(BROADCAST);
 
-  // Platform setting: allow normal users to broadcast posts globally (Phase 36)
   const { data: settingsData } = useQuery<{
     platformSettings: {
-      allowUserGlobalPosts: boolean;
-      referralSystemEnabled: boolean;
       minAndroidVersionCode: number;
       androidUpdateTitle: string;
       androidUpdateBody: string;
     };
   }>(PLATFORM_SETTINGS, { fetchPolicy: "cache-and-network" });
-  const allowGlobal = Boolean(settingsData?.platformSettings?.allowUserGlobalPosts);
-  const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
   const minAndroidVersion = settingsData?.platformSettings?.minAndroidVersionCode ?? 0;
-  const [setAllowGlobal, { loading: savingGlobal }] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
-  const [setReferralEnabled, { loading: savingReferral }] = useMutation(SET_REFERRAL_SYSTEM_ENABLED);
   const [setMinAndroidVersion, { loading: disablingUpdate }] = useMutation(SET_MIN_ANDROID_VERSION_CODE);
   const [publishUpdate, { loading: publishingUpdate }] = useMutation(PUBLISH_ANDROID_UPDATE_NOTICE);
-  const [globalDetails, setGlobalDetails] = useState(false);
   // Android update notice is a rarely-used admin tool — collapsed by default so
   // the user list stays prominent.
   const [updateNoticeOpen, setUpdateNoticeOpen] = useState(false);
@@ -174,30 +163,6 @@ export default function AdminUsersScreen() {
       showToast("Force update disabled", "success");
     } catch {
       showToast("Could not disable force update", "error");
-    }
-  }
-
-  async function handleToggleReferral(next: boolean) {
-    try {
-      await setReferralEnabled({
-        variables: { enabled: next },
-        refetchQueries: [{ query: PLATFORM_SETTINGS }],
-      });
-      showToast(next ? "Referral program enabled" : "Referral program disabled", "success");
-    } catch {
-      showToast("Could not update referral setting", "error");
-    }
-  }
-
-  async function handleToggleGlobal(next: boolean) {
-    try {
-      await setAllowGlobal({
-        variables: { enabled: next },
-        refetchQueries: [{ query: PLATFORM_SETTINGS }],
-      });
-      showToast(next ? "Global user posts enabled" : "Global user posts disabled", "success");
-    } catch {
-      showToast("Could not update setting", "error");
     }
   }
 
@@ -292,74 +257,6 @@ export default function AdminUsersScreen() {
           <Pressable style={[st.chip, { borderColor: "#f59e0b" }]} onPress={() => setBroadcastModal(true)}>
             <Text style={[st.chipText, { color: "#f59e0b" }]}>📢 Broadcast</Text>
           </Pressable>
-        </View>
-
-        {/* Referral / points program toggle */}
-        <View
-          style={[
-            st.globalCard,
-            {
-              borderColor: referralEnabled ? "#6366f1" : colors.border,
-              backgroundColor: referralEnabled ? "#6366f114" : colors.inputBg,
-            },
-          ]}
-        >
-          <View style={st.globalCardTop}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={[st.globalTitle, { color: colors.text }]}>✦ Referral & points</Text>
-              <Text style={[st.globalStatus, { color: referralEnabled ? "#6366f1" : colors.muted }]}>
-                {referralEnabled
-                  ? "ON — invites, codes & referral points active"
-                  : "OFF — invites work, no points earned or redeemed"}
-              </Text>
-            </View>
-            <Switch
-              value={referralEnabled}
-              onValueChange={handleToggleReferral}
-              disabled={savingReferral}
-              trackColor={{ false: colors.section, true: "#6366f1" }}
-              thumbColor="#fff"
-            />
-          </View>
-        </View>
-
-        {/* Global user posts toggle (Phase 36) */}
-        <View
-          style={[
-            st.globalCard,
-            {
-              borderColor: allowGlobal ? "#16a34a" : colors.border,
-              backgroundColor: allowGlobal ? "#16a34a14" : colors.inputBg,
-            },
-          ]}
-        >
-          <View style={st.globalCardTop}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={[st.globalTitle, { color: colors.text }]}>🌍 Global user posts</Text>
-              <Text style={[st.globalStatus, { color: allowGlobal ? "#16a34a" : colors.muted }]}>
-                {allowGlobal ? "ON — users can post to everyone" : "OFF — only admin platform posts reach everyone"}
-              </Text>
-            </View>
-            <Switch
-              value={allowGlobal}
-              onValueChange={handleToggleGlobal}
-              disabled={savingGlobal}
-              trackColor={{ false: colors.section, true: "#16a34a" }}
-              thumbColor="#fff"
-            />
-          </View>
-          <Pressable onPress={() => setGlobalDetails((v) => !v)} hitSlop={6}>
-            <Text style={[st.globalDetailsToggle, { color: colors.accent }]}>
-              {globalDetails ? "Hide details ▴" : "Details ▾"}
-            </Text>
-          </Pressable>
-          {globalDetails && (
-            <Text style={[st.globalDetailsText, { color: colors.muted }]}>
-              When ON, any user can opt to broadcast a post platform-wide. Their name and photo appear
-              in the feed and in everyone&apos;s notifications (🌍), distinct from admin Ke Jitbe
-              Platform posts (📢). Default is OFF — turning it off blocks new global user posts.
-            </Text>
-          )}
         </View>
 
         <View style={[st.globalCard, { borderColor: colors.border, backgroundColor: colors.inputBg }]}>

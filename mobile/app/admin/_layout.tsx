@@ -82,6 +82,10 @@ export default function AdminLayout() {
       }}
     >
       <Tabs.Screen
+        name="online-users"
+        options={{ href: null, headerShown: false }}
+      />
+      <Tabs.Screen
         name="index"
         options={{ title: "Overview", tabBarLabel: "Overview", tabBarIcon: renderIcon("📊") }}
       />
