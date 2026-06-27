@@ -37,21 +37,28 @@ export function postHasDrawVoteOption(post: PostVoteMeta): boolean {
 
 /** Group-stage draw vote hint — intentionally omitted (knockout-only UX). */
 export function matchVoteSpecialOptionHint(_post: PostVoteMeta): string | null {
+  void _post;
   return null;
 }
 
 /** Live extra time (30 min after a draw at 90'). */
-export function isExtraTimeLiveStatus(status: string | null | undefined): boolean {
-  if (!status) return false;
-  const s = status.toUpperCase();
-  return s === "EXTRA_TIME" || s === "ET";
+export function isExtraTimeLiveStatus(
+  status: string | null | undefined,
+  phase?: string | null,
+): boolean {
+  const p = (phase ?? status ?? "").toUpperCase();
+  if (p === "ET" || p === "BT" || p === "EXTRA_TIME") return true;
+  return false;
 }
 
 /** Live penalty shootout — predictions still use the pre-shootout score. */
-export function isShootoutLiveStatus(status: string | null | undefined): boolean {
-  if (!status) return false;
-  const s = status.toUpperCase();
-  return s === "PEN" || s === "PENALTY" || s === "PENALTIES";
+export function isShootoutLiveStatus(
+  status: string | null | undefined,
+  phase?: string | null,
+): boolean {
+  const p = (phase ?? status ?? "").toUpperCase();
+  if (p === "P" || p === "PEN" || p === "PENALTY" || p === "PENALTIES") return true;
+  return false;
 }
 
 /** True while the final 90+ET score is not yet locked for prediction scoring. */
@@ -59,9 +66,13 @@ export function isPredictionResultPending(
   resolved: boolean,
   matchStatus: string | null | undefined,
   serverPending?: boolean | null,
+  phase?: string | null,
 ): boolean {
   if (resolved) return false;
   if (serverPending === true) return true;
   if (serverPending === false) return false;
-  return isExtraTimeLiveStatus(matchStatus) || isShootoutLiveStatus(matchStatus);
+  return (
+    isExtraTimeLiveStatus(matchStatus, phase) ||
+    isShootoutLiveStatus(matchStatus, phase)
+  );
 }

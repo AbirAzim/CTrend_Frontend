@@ -45,6 +45,12 @@ export const POST_VOTE_WINNER_FIELDS = `
     away
     status
     minute
+    phase
+    fullTime { home away }
+    extraTime { home away }
+    penalty { home away }
+    wentToExtraTime
+    wentToPenalties
   }
   fixtureId
   lineupAvailable
@@ -384,6 +390,12 @@ export const POST_VOTE_UPDATED = gql`
         home
         away
         minute
+        phase
+        fullTime { home away }
+        extraTime { home away }
+        penalty { home away }
+        wentToExtraTime
+        wentToPenalties
       }
       optionStats {
         index

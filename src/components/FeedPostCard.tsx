@@ -59,9 +59,14 @@ import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coin
 import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaignWinner";
 import {
   isExtraTimeLiveStatus,
+  isKnockoutStage,
   isShootoutLiveStatus,
 } from "@ctrend/shared/lib/knockoutFixture";
 import { matchVoteWinnerPendingHint } from "@ctrend/shared/lib/matchPredictionCopy";
+import {
+  formatKnockoutScoreChip,
+  hasKnockoutScoreBreakdown,
+} from "@ctrend/shared/lib/matchScoreCopy";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -1112,11 +1117,25 @@ function FeedPostCardComponent({
           className="cx-match-score-chip cx-match-score-chip--ft cx-match-score-chip--link"
           onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
         >
-          {`FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
+          {(() => {
+            const knockoutLine =
+              isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(ms)
+                ? formatKnockoutScoreChip(ms)
+                : null;
+            const scoreLine = knockoutLine ?? `FT  ${ms.home ?? 0}–${ms.away ?? 0}`;
+            return `${scoreLine}${msTeamLine ? `  ${msTeamLine}` : ""}`;
+          })()}
         </button>
       ) : (
         <span className="cx-match-score-chip cx-match-score-chip--ft">
-          {`FT  ${ms.home ?? 0}–${ms.away ?? 0}${msTeamLine ? `  ${msTeamLine}` : ""}`}
+          {(() => {
+            const knockoutLine =
+              isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(ms)
+                ? formatKnockoutScoreChip(ms)
+                : null;
+            const scoreLine = knockoutLine ?? `FT  ${ms.home ?? 0}–${ms.away ?? 0}`;
+            return `${scoreLine}${msTeamLine ? `  ${msTeamLine}` : ""}`;
+          })()}
         </span>
       )
     ) : null;
@@ -1853,7 +1872,8 @@ function FeedPostCardComponent({
     isLiveMatch &&
     !showCampaignWinner &&
     Boolean(matchWinnerPendingHint) &&
-    (isExtraTimeLiveStatus(matchStatus) || isShootoutLiveStatus(matchStatus));
+    (isExtraTimeLiveStatus(matchStatus, post.matchScore?.phase) ||
+      isShootoutLiveStatus(matchStatus, post.matchScore?.phase));
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)

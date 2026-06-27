@@ -9,6 +9,11 @@ import {
   isScoredGoal as isScoredGoalEvent,
   normalizePlayerName,
 } from "../../packages/shared/src/lib/matchEvents";
+import {
+  formatKnockoutScoreLines,
+  hasKnockoutScoreBreakdown,
+} from "@ctrend/shared/lib/matchScoreCopy";
+import { isKnockoutStage } from "@ctrend/shared/lib/knockoutFixture";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,10 +98,16 @@ type FixtureDetails = {
   awayTeam: { name: string; shortName: string; crest: string };
   kickoff: string;
   status: string;
+  rawStatus?: string | null;
   minute?: number | null;
   stage: string;
   group?: string | null;
   score: { home?: number | null; away?: number | null; winner?: string | null };
+  fullTime?: { home?: number | null; away?: number | null } | null;
+  extraTime?: { home?: number | null; away?: number | null } | null;
+  penalty?: { home?: number | null; away?: number | null } | null;
+  wentToExtraTime?: boolean | null;
+  wentToPenalties?: boolean | null;
   venue?: { name: string; city: string } | null;
   campaignPostId?: string | null;
   matchEndedAt?: string | null;
@@ -997,6 +1008,10 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
   const hasScore = live || finished;
   const homeWon = score.winner === "home";
   const awayWon = score.winner === "away";
+  const scoreBreakdown =
+    isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
+      ? formatKnockoutScoreLines(fixture)
+      : [];
 
   const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
 
@@ -1043,9 +1058,16 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
         {/* Score */}
         {hasScore ? (
           <div className="md-hdr-score">
-            <span className={homeWon ? "md-sc md-sc--w" : "md-sc"}>{score.home ?? 0}</span>
-            <span className="md-sc-sep">–</span>
-            <span className={awayWon ? "md-sc md-sc--w" : "md-sc"}>{score.away ?? 0}</span>
+            <div className="md-hdr-score-main">
+              <span className={homeWon ? "md-sc md-sc--w" : "md-sc"}>{score.home ?? 0}</span>
+              <span className="md-sc-sep">–</span>
+              <span className={awayWon ? "md-sc md-sc--w" : "md-sc"}>{score.away ?? 0}</span>
+            </div>
+            {scoreBreakdown.length > 0 ? (
+              <div className="md-hdr-score-breakdown">
+                {scoreBreakdown.join(" · ")}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="md-hdr-vs">VS</div>

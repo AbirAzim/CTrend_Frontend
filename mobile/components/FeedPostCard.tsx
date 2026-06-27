@@ -80,9 +80,14 @@ import { categoryChipColors } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
 import {
   isExtraTimeLiveStatus,
+  isKnockoutStage,
   isShootoutLiveStatus,
 } from '@ctrend/shared/lib/knockoutFixture';
 import { matchVoteWinnerPendingHint } from '@ctrend/shared/lib/matchPredictionCopy';
+import {
+  formatKnockoutScoreChip,
+  hasKnockoutScoreBreakdown,
+} from '@ctrend/shared/lib/matchScoreCopy';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -2632,7 +2637,8 @@ function FeedPostCardComponent({
 		isLiveMatch &&
 		!showCampaignWinner &&
 		Boolean(matchWinnerPendingHint) &&
-		(isExtraTimeLiveStatus(matchStatus) || isShootoutLiveStatus(matchStatus));
+		(isExtraTimeLiveStatus(matchStatus, matchScore?.phase) ||
+			isShootoutLiveStatus(matchStatus, matchScore?.phase));
 
 	return (
 		<View style={[st.card, isLiveMatch && st.cardLive]}>
@@ -2767,9 +2773,14 @@ function FeedPostCardComponent({
 											const teamB = post.postOptions?.[1]?.label?.trim() || null;
 											const teams = teamA && teamB ? `  ${teamA} vs ${teamB}` : '';
 											const sc = matchScore!;
+											const knockoutLine =
+												isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(sc)
+													? formatKnockoutScoreChip(sc)
+													: null;
 											if (sc.status === 'IN_PLAY') return `${liveMinute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
-											return `FT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											const scoreLine = knockoutLine ?? `FT  ${sc.home ?? 0}–${sc.away ?? 0}`;
+											return `${scoreLine}${teams}`;
 										})()}
 									</Text>
 								</>

@@ -25,6 +25,11 @@ import {
 	isScoredGoal,
 	normalizePlayerName,
 } from '@ctrend/shared/lib/matchEvents';
+import {
+	formatKnockoutScoreLines,
+	hasKnockoutScoreBreakdown,
+} from '@ctrend/shared/lib/matchScoreCopy';
+import { isKnockoutStage } from '@ctrend/shared/lib/knockoutFixture';
 import { useTheme } from '../../../context/ThemeContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,9 +72,14 @@ type FixtureDetails = {
 	id: string;
 	homeTeam: { name: string; shortName: string; crest: string };
 	awayTeam: { name: string; shortName: string; crest: string };
-	kickoff: string; status: string; minute?: number | null;
+	kickoff: string; status: string; rawStatus?: string | null; minute?: number | null;
 	stage: string; group?: string | null;
 	score: { home?: number | null; away?: number | null; winner?: string | null };
+	fullTime?: { home?: number | null; away?: number | null } | null;
+	extraTime?: { home?: number | null; away?: number | null } | null;
+	penalty?: { home?: number | null; away?: number | null } | null;
+	wentToExtraTime?: boolean | null;
+	wentToPenalties?: boolean | null;
 	venue?: { name: string; city: string } | null;
 	campaignPostId?: string | null;
 	events: MatchEvent[]; lineups: MatchLineup[];
@@ -277,6 +287,10 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 	const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
 	const shownHome = scorersExpanded ? homeScorers : homeScorers.slice(0, SCORER_LIMIT);
 	const shownAway = scorersExpanded ? awayScorers : awayScorers.slice(0, SCORER_LIMIT);
+	const scoreBreakdown =
+		isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
+			? formatKnockoutScoreLines(fixture)
+			: [];
 
 	const bg = isDark ? '#111827' : '#fff';
 	const borderC = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
@@ -322,11 +336,18 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 				{/* Score */}
 				<View style={mh.scoreBlock}>
 					{hasScore ? (
-						<Text style={mh.score}>
-							<Text style={{ color: homeWon ? winColor : textPrimary }}>{score.home ?? 0}</Text>
-							<Text style={[mh.scoreDash, { color: textMuted }]}> – </Text>
-							<Text style={{ color: awayWon ? winColor : textPrimary }}>{score.away ?? 0}</Text>
-						</Text>
+						<>
+							<Text style={mh.score}>
+								<Text style={{ color: homeWon ? winColor : textPrimary }}>{score.home ?? 0}</Text>
+								<Text style={[mh.scoreDash, { color: textMuted }]}> – </Text>
+								<Text style={{ color: awayWon ? winColor : textPrimary }}>{score.away ?? 0}</Text>
+							</Text>
+							{scoreBreakdown.length > 0 ? (
+								<Text style={[mh.scoreBreakdown, { color: textSub }]}>
+									{scoreBreakdown.join(' · ')}
+								</Text>
+							) : null}
+						</>
 					) : (
 						<Text style={[mh.scoreVs, { color: textMuted }]}>vs</Text>
 					)}
@@ -411,6 +432,7 @@ const mh = StyleSheet.create({
 	scoreBlock: { width: 84, alignItems: 'center', justifyContent: 'center', paddingTop: 8 },
 	score: { fontSize: 38, fontWeight: '900', letterSpacing: -1 },
 	scoreDash: { fontSize: 30, fontWeight: '300' },
+	scoreBreakdown: { marginTop: 4, fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 },
 	scoreVs: { fontSize: 18, fontWeight: '600' },
 	motm: {
 		flexDirection: 'row', alignItems: 'center', gap: 12,

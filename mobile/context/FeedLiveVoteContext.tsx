@@ -29,6 +29,12 @@ export type LiveVotePatch = {
     away: number | null;
     winner: string | null;
     minute?: number | null;
+    phase?: string | null;
+    fullTime?: { home: number | null; away: number | null } | null;
+    extraTime?: { home: number | null; away: number | null } | null;
+    penalty?: { home: number | null; away: number | null } | null;
+    wentToExtraTime?: boolean | null;
+    wentToPenalties?: boolean | null;
   } | null;
 };
 

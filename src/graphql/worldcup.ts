@@ -44,10 +44,16 @@ export const WORLD_CUP_FIXTURE_DETAILS = gql`
       awayTeam { name shortName crest }
       kickoff
       status
+      rawStatus
       minute
       stage
       group
       score { home away winner }
+      fullTime { home away }
+      extraTime { home away }
+      penalty { home away }
+      wentToExtraTime
+      wentToPenalties
       venue { name city }
       campaignPostId
       hasDrawOption

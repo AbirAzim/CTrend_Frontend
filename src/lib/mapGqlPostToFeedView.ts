@@ -122,6 +122,12 @@ export function mapGqlPostToFeedView(p: {
     away?: number | null;
     status?: string | null;
     minute?: number | null;
+    phase?: string | null;
+    fullTime?: { home?: number | null; away?: number | null } | null;
+    extraTime?: { home?: number | null; away?: number | null } | null;
+    penalty?: { home?: number | null; away?: number | null } | null;
+    wentToExtraTime?: boolean | null;
+    wentToPenalties?: boolean | null;
   } | null;
   fixtureWinnerAt?: string | null;
   fixtureId?: string | null;
@@ -248,6 +254,27 @@ export function mapGqlPostToFeedView(p: {
           away: p.matchScore.away ?? null,
           status: p.matchScore.status ?? null,
           minute: p.matchScore.minute ?? null,
+          phase: p.matchScore.phase ?? null,
+          fullTime: p.matchScore.fullTime
+            ? {
+                home: p.matchScore.fullTime.home ?? null,
+                away: p.matchScore.fullTime.away ?? null,
+              }
+            : null,
+          extraTime: p.matchScore.extraTime
+            ? {
+                home: p.matchScore.extraTime.home ?? null,
+                away: p.matchScore.extraTime.away ?? null,
+              }
+            : null,
+          penalty: p.matchScore.penalty
+            ? {
+                home: p.matchScore.penalty.home ?? null,
+                away: p.matchScore.penalty.away ?? null,
+              }
+            : null,
+          wentToExtraTime: p.matchScore.wentToExtraTime ?? null,
+          wentToPenalties: p.matchScore.wentToPenalties ?? null,
         }
       : null,
     fixtureWinnerAt: p.fixtureWinnerAt ?? null,

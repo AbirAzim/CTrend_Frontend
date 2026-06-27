@@ -86,6 +86,7 @@ export function MatchPrediction({
     worldCupFixture?: {
       stage?: string | null;
       status?: string | null;
+      rawStatus?: string | null;
       homeTeam?: { name?: string | null } | null;
       awayTeam?: { name?: string | null } | null;
     } | null;
@@ -127,6 +128,7 @@ export function MatchPrediction({
   const formOpen = open && (editing || !mine);
   const fixtureStage = state?.fixtureStage ?? fixtureData?.worldCupFixture?.stage ?? null;
   const matchStatus = fixtureData?.worldCupFixture?.status ?? null;
+  const matchPhase = fixtureData?.worldCupFixture?.rawStatus ?? null;
   const roundBadge = isKnockoutStage(fixtureStage) ? knockoutRoundBadgeText(fixtureStage) : null;
   const knockoutHint = predictionKnockoutHint(fixtureStage);
   const scoringRule = predictionScoringRuleHint(fixtureStage);
@@ -134,9 +136,10 @@ export function MatchPrediction({
     resolved,
     matchStatus,
     state?.predictionsPendingResult,
+    matchPhase,
   );
-  const inExtraTime = isExtraTimeLiveStatus(matchStatus);
-  const inShootout = isShootoutLiveStatus(matchStatus);
+  const inExtraTime = isExtraTimeLiveStatus(matchStatus, matchPhase);
+  const inShootout = isShootoutLiveStatus(matchStatus, matchPhase);
   const showResolvedPenNote = resolved && Boolean(state?.wentToPenalties);
 
   function startEdit() {
