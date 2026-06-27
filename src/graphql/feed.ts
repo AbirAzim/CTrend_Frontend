@@ -56,6 +56,8 @@ export const POST_CAMPAIGN_WINNER_FIELDS = `
   fixtureWinnerAt
   fixtureId
   lineupAvailable
+  fixtureStage
+  hasDrawOption
   pinned
 `;
 

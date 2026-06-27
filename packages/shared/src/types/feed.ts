@@ -103,6 +103,10 @@ export type FeedPostView = {
   fixtureId?: string | null;
   /** True once lineups have been published for this fixture. */
   lineupAvailable?: boolean | null;
+  /** World Cup stage slug (e.g. LAST_16, QUARTER_FINALS). */
+  fixtureStage?: string | null;
+  /** Group-stage posts include Draw as option index 2. */
+  hasDrawOption?: boolean | null;
   /** True when an admin has pinned this post to the top of the feed. */
   pinned?: boolean | null;
 };

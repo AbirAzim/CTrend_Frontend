@@ -21,6 +21,10 @@ export const MATCH_PREDICTION_STATE = gql`
       count
       predictionsOpen
       predictionsResolved
+      fixtureStage
+      predictionsPendingResult
+      wentToExtraTime
+      wentToPenalties
       myPrediction {
         ${PREDICTION_FIELDS}
       }

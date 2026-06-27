@@ -78,6 +78,15 @@ import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 import { categoryChipColors } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
+import {
+  isExtraTimeLiveStatus,
+  isShootoutLiveStatus,
+  matchVoteSpecialOptionHint,
+} from '@ctrend/shared/lib/knockoutFixture';
+import {
+  knockoutRoundBadgeText,
+  matchVoteWinnerPendingHint,
+} from '@ctrend/shared/lib/matchPredictionCopy';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -527,6 +536,19 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: isDark ? '#fcd34d' : '#b45309',
 		},
 		endingSoonStrong: { fontWeight: '800' as const },
+		knockoutStrip: {
+			marginHorizontal: 12,
+			marginBottom: 8,
+			paddingHorizontal: 12,
+			paddingVertical: 8,
+			borderRadius: 10,
+			backgroundColor: isDark ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.12)',
+			borderWidth: 1,
+			borderColor: isDark ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.35)',
+			gap: 4,
+		},
+		knockoutRound: { fontSize: 11, fontWeight: '800' as const, color: '#d97706' },
+		knockoutVoteHint: { fontSize: 11, color: c.subtext, lineHeight: 15 },
 		moreBtn: { padding: 8 },
 		moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
 		caption: {
@@ -2614,6 +2636,15 @@ function FeedPostCardComponent({
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
 	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
+	const matchVoteHint = isMatchPost && isPoll && !isVotingClosed ? matchVoteSpecialOptionHint(post) : null;
+	const knockoutRoundLabel = isMatchPost ? knockoutRoundBadgeText(post.fixtureStage) : null;
+	const matchWinnerPendingHint = matchVoteWinnerPendingHint(post.fixtureStage);
+	const showLiveEtBanner =
+		isMatchPost &&
+		isLiveMatch &&
+		!showCampaignWinner &&
+		Boolean(matchWinnerPendingHint) &&
+		(isExtraTimeLiveStatus(matchStatus) || isShootoutLiveStatus(matchStatus));
 
 	return (
 		<View style={[st.card, isLiveMatch && st.cardLive]}>
@@ -2780,6 +2811,20 @@ function FeedPostCardComponent({
 
 			{/* Campaign ribbon */}
 			{campaign ? <PostCampaignBadge campaign={campaign} /> : null}
+
+			{isMatchPost && (knockoutRoundLabel || matchVoteHint || showLiveEtBanner) ? (
+				<View style={st.knockoutStrip}>
+					{knockoutRoundLabel ? (
+						<Text style={st.knockoutRound}>{knockoutRoundLabel}</Text>
+					) : null}
+					{matchVoteHint ? (
+						<Text style={st.knockoutVoteHint}>{matchVoteHint}</Text>
+					) : null}
+					{showLiveEtBanner && matchWinnerPendingHint ? (
+						<Text style={st.knockoutVoteHint}>{matchWinnerPendingHint}</Text>
+					) : null}
+				</View>
+			) : null}
 
 			{/* Announcement header strip */}
 			{isAnnouncement && (
@@ -3470,7 +3515,7 @@ function FeedPostCardComponent({
 					<Text style={matchInProgressStyles.text}>
 						{winnerCountdown
 							? `🏆 Winner reveals in ${winnerCountdown}`
-							: '🏆 Revealing winner…'}
+							: (matchWinnerPendingHint ?? '🏆 Revealing winner…')}
 					</Text>
 				</View>
 			) : null}

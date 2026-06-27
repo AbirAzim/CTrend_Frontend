@@ -25,6 +25,19 @@ import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../context/AuthContext";
 import { useCoins } from "../context/CoinsContext";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
+import {
+  isExtraTimeLiveStatus,
+  isPredictionResultPending,
+  isShootoutLiveStatus,
+} from "@ctrend/shared/lib/knockoutFixture";
+import {
+  knockoutRoundBadgeText,
+  predictionKnockoutHint,
+  predictionPendingExtraTimeMessage,
+  predictionPendingShootoutMessage,
+  predictionResolvedAfterShootoutNote,
+  predictionScoringRuleHint,
+} from "@ctrend/shared/lib/matchPredictionCopy";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 
@@ -35,6 +48,10 @@ type StateData = {
     count: number;
     predictionsOpen: boolean;
     predictionsResolved: boolean;
+    fixtureStage?: string | null;
+    predictionsPendingResult?: boolean | null;
+    wentToExtraTime?: boolean | null;
+    wentToPenalties?: boolean | null;
     myPrediction: Prediction | null;
   };
 };
@@ -69,6 +86,8 @@ export function MatchPrediction({
   });
   const { data: fixtureData } = useQuery<{
     worldCupFixture?: {
+      stage?: string | null;
+      status?: string | null;
       homeTeam?: { name?: string | null } | null;
       awayTeam?: { name?: string | null } | null;
     } | null;
@@ -104,6 +123,19 @@ export function MatchPrediction({
   const resolved = state.predictionsResolved;
   const count = state.count;
   const formOpen = open && (editing || !mine);
+  const fixtureStage = state.fixtureStage ?? fixtureData?.worldCupFixture?.stage ?? null;
+  const matchStatus = fixtureData?.worldCupFixture?.status ?? null;
+  const roundBadge = knockoutRoundBadgeText(fixtureStage);
+  const knockoutHint = predictionKnockoutHint(fixtureStage);
+  const scoringRule = predictionScoringRuleHint(fixtureStage);
+  const pendingResult = isPredictionResultPending(
+    resolved,
+    matchStatus,
+    state.predictionsPendingResult,
+  );
+  const inExtraTime = isExtraTimeLiveStatus(matchStatus);
+  const inShootout = isShootoutLiveStatus(matchStatus);
+  const showResolvedPenNote = resolved && Boolean(state.wentToPenalties);
 
   function startEdit() {
     setHome(mine ? String(mine.homeScore) : "0");
@@ -173,6 +205,29 @@ export function MatchPrediction({
 
   return (
     <View style={st.wrap}>
+      {roundBadge ? (
+        <View style={st.roundBadge}>
+          <Text style={st.roundBadgeText}>{roundBadge}</Text>
+        </View>
+      ) : null}
+      {knockoutHint ? <Text style={st.roundHint}>{knockoutHint}</Text> : null}
+      {scoringRule ? <Text style={st.ruleHint}>{scoringRule}</Text> : null}
+      {pendingResult && inExtraTime ? (
+        <View style={st.pendingBanner}>
+          <Text style={st.pendingBannerText}>{predictionPendingExtraTimeMessage()}</Text>
+        </View>
+      ) : null}
+      {pendingResult && inShootout ? (
+        <View style={st.pendingBanner}>
+          <Text style={st.pendingBannerText}>{predictionPendingShootoutMessage()}</Text>
+        </View>
+      ) : null}
+      {pendingResult && !inExtraTime && !inShootout ? (
+        <View style={st.pendingBanner}>
+          <Text style={st.pendingBannerText}>Waiting for the final 90+ET score before grading predictions…</Text>
+        </View>
+      ) : null}
+
       {mine && !formOpen ? (
         <View style={st.row}>
           <View style={st.matchCore}>
@@ -259,9 +314,14 @@ export function MatchPrediction({
       ) : null}
 
       {resolved ? (
-        <Pressable style={st.winnersBtn} onPress={() => setListMode("winners")}>
-          <Text style={st.winnersText}>🏆 Prediction winners</Text>
-        </Pressable>
+        <>
+          {showResolvedPenNote ? (
+            <Text style={st.penNote}>{predictionResolvedAfterShootoutNote()}</Text>
+          ) : null}
+          <Pressable style={st.winnersBtn} onPress={() => setListMode("winners")}>
+            <Text style={st.winnersText}>🏆 Prediction winners</Text>
+          </Pressable>
+        </>
       ) : null}
 
       {error ? <Text style={st.error}>{error}</Text> : null}
@@ -364,6 +424,28 @@ function makeStyles(c: ColorPalette) {
       paddingVertical: 10,
       gap: 6,
     },
+    roundBadge: {
+      alignSelf: "flex-start",
+      backgroundColor: "rgba(245,158,11,0.16)",
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: "rgba(245,158,11,0.35)",
+    },
+    roundBadgeText: { fontSize: 11, fontWeight: "800", color: "#d97706" },
+    roundHint: { fontSize: 11, color: c.muted, lineHeight: 15 },
+    ruleHint: { fontSize: 11, color: c.subtext, lineHeight: 15 },
+    pendingBanner: {
+      backgroundColor: "rgba(99,102,241,0.12)",
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: "rgba(99,102,241,0.25)",
+    },
+    pendingBannerText: { fontSize: 11, color: c.subtext, lineHeight: 15 },
+    penNote: { fontSize: 11, color: c.muted, lineHeight: 15 },
     row: {
       flexDirection: "row",
       alignItems: "center",

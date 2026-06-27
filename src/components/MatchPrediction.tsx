@@ -15,6 +15,19 @@ import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
+import {
+  isExtraTimeLiveStatus,
+  isPredictionResultPending,
+  isShootoutLiveStatus,
+} from "@ctrend/shared/lib/knockoutFixture";
+import {
+  knockoutRoundBadgeText,
+  predictionKnockoutHint,
+  predictionPendingExtraTimeMessage,
+  predictionPendingShootoutMessage,
+  predictionResolvedAfterShootoutNote,
+  predictionScoringRuleHint,
+} from "@ctrend/shared/lib/matchPredictionCopy";
 
 type PredUser = {
   id: string;
@@ -35,6 +48,10 @@ type StateData = {
     count: number;
     predictionsOpen: boolean;
     predictionsResolved: boolean;
+    fixtureStage?: string | null;
+    predictionsPendingResult?: boolean | null;
+    wentToExtraTime?: boolean | null;
+    wentToPenalties?: boolean | null;
     myPrediction: Prediction | null;
   };
 };
@@ -65,6 +82,8 @@ export function MatchPrediction({
   });
   const { data: fixtureData } = useQuery<{
     worldCupFixture?: {
+      stage?: string | null;
+      status?: string | null;
       homeTeam?: { name?: string | null } | null;
       awayTeam?: { name?: string | null } | null;
     } | null;
@@ -104,6 +123,19 @@ export function MatchPrediction({
 
   // Whether the inline score form is showing (new prediction or editing).
   const formOpen = open && (editing || !mine);
+  const fixtureStage = state?.fixtureStage ?? fixtureData?.worldCupFixture?.stage ?? null;
+  const matchStatus = fixtureData?.worldCupFixture?.status ?? null;
+  const roundBadge = knockoutRoundBadgeText(fixtureStage);
+  const knockoutHint = predictionKnockoutHint(fixtureStage);
+  const scoringRule = predictionScoringRuleHint(fixtureStage);
+  const pendingResult = isPredictionResultPending(
+    resolved,
+    matchStatus,
+    state?.predictionsPendingResult,
+  );
+  const inExtraTime = isExtraTimeLiveStatus(matchStatus);
+  const inShootout = isShootoutLiveStatus(matchStatus);
+  const showResolvedPenNote = resolved && Boolean(state?.wentToPenalties);
 
   function startEdit() {
     setHome(mine ? String(mine.homeScore) : "0");
@@ -185,6 +217,19 @@ export function MatchPrediction({
 
   return (
     <div className="cx-pred">
+      {roundBadge ? <p className="cx-pred-round-badge">{roundBadge}</p> : null}
+      {knockoutHint ? <p className="cx-pred-round-hint">{knockoutHint}</p> : null}
+      {scoringRule ? <p className="cx-pred-scoring-rule">{scoringRule}</p> : null}
+      {pendingResult && inExtraTime ? (
+        <p className="cx-pred-pending-result" role="status">{predictionPendingExtraTimeMessage()}</p>
+      ) : null}
+      {pendingResult && inShootout ? (
+        <p className="cx-pred-pending-result" role="status">{predictionPendingShootoutMessage()}</p>
+      ) : null}
+      {pendingResult && !inExtraTime && !inShootout ? (
+        <p className="cx-pred-pending-result" role="status">Waiting for the final 90+ET score before grading predictions…</p>
+      ) : null}
+
       {mine && !formOpen ? (
         <div className="cx-pred-row">
           <div className="cx-pred-core">
@@ -268,13 +313,18 @@ export function MatchPrediction({
       ) : null}
 
       {resolved ? (
-        <button
-          type="button"
-          className="cx-pred-winners-btn"
-          onClick={() => setShowWinners(true)}
-        >
-          🏆 Prediction winners
-        </button>
+        <>
+          {showResolvedPenNote ? (
+            <p className="cx-pred-pen-note">{predictionResolvedAfterShootoutNote()}</p>
+          ) : null}
+          <button
+            type="button"
+            className="cx-pred-winners-btn"
+            onClick={() => setShowWinners(true)}
+          >
+            🏆 Prediction winners
+          </button>
+        </>
       ) : null}
 
       {error ? <p className="cx-pred-error" role="alert">{error}</p> : null}

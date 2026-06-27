@@ -48,6 +48,8 @@ export const POST_VOTE_WINNER_FIELDS = `
   }
   fixtureId
   lineupAvailable
+  fixtureStage
+  hasDrawOption
   fixtureWinnerAt
   pinned
 `;
