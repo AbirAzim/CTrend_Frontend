@@ -45,6 +45,16 @@
               "scheme": "https",
               "host": "www.kejitbe.app",
               "pathPrefix": "/post"
+            },
+            {
+              "scheme": "https",
+              "host": "kejitbe.app",
+              "pathPrefix": "/reset-password"
+            },
+            {
+              "scheme": "https",
+              "host": "www.kejitbe.app",
+              "pathPrefix": "/reset-password"
             }
           ],
           "category": [

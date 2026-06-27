@@ -122,12 +122,17 @@ export function SignupPage() {
       <div className="auth-card">
         <h1>Sign up</h1>
         {inviteBanner ? (
-          <p className="muted">You&apos;ve been invited to Ke Jitbe — finish creating your account below.</p>
+          <div className="auth-callout">
+            You&apos;ve been invited to Ke Jitbe — finish creating your account below.
+          </div>
         ) : null}
         {loadingInvite ? <p className="muted small">Loading your invitation…</p> : null}
-        <p className="muted">
-          Already have an account? <Link to="/login">Log in</Link>
-        </p>
+        <div className="auth-switch-row">
+          <p className="muted">Already have an account?</p>
+          <Link to="/login" className="btn-ghost auth-switch-btn">
+            Log in
+          </Link>
+        </div>
 
         <form onSubmit={onSignup} className="auth-form">
           <label className="field">
@@ -186,11 +191,19 @@ export function SignupPage() {
               {formError}
             </p>
           )}
-          <p className="muted small">
-            By creating an account, you agree to our{" "}
-            <Link to="/terms">Terms of Service</Link> and{" "}
-            <Link to="/privacy">Privacy Policy</Link>.
-          </p>
+          <div className="auth-legal">
+            <p className="auth-legal-text muted small">
+              By creating an account, you agree to:
+            </p>
+            <div className="auth-legal-actions">
+              <Link to="/terms" className="btn-ghost auth-legal-btn">
+                Terms of Service
+              </Link>
+              <Link to="/privacy" className="btn-ghost auth-legal-btn">
+                Privacy Policy
+              </Link>
+            </div>
+          </div>
           <button
             type="submit"
             className="btn-primary"

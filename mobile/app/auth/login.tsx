@@ -25,6 +25,10 @@ import { PasswordInput } from "../../components/PasswordInput";
 
 type LoginData = { login: { accessToken: string; user: StoredUser } };
 
+function isUnverifiedEmailError(message: string | undefined): boolean {
+  return (message ?? "").toLowerCase().includes("verify your email");
+}
+
 export default function LoginScreen() {
   const { setSession } = useAuth();
   const { colors } = useTheme();
@@ -43,7 +47,15 @@ export default function LoginScreen() {
       await setSession(data.login.accessToken, data.login.user);
       router.replace("/");
     } catch (err: unknown) {
-      setError(getApolloErrorMessage(err));
+      const msg = getApolloErrorMessage(err);
+      if (isUnverifiedEmailError(msg)) {
+        router.push({
+          pathname: "/auth/verify-email",
+          params: { email: e },
+        });
+        return;
+      }
+      setError(msg);
     }
   }
 

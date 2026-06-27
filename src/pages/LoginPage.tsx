@@ -17,6 +17,10 @@ function formatAuthError(message: string | undefined): string {
   return message;
 }
 
+function isUnverifiedEmailError(message: string | undefined): boolean {
+  return (message ?? "").toLowerCase().includes("verify your email");
+}
+
 export function LoginPage() {
   const { isAuthenticated, setSession } = useAuth();
   const navigate = useNavigate();
@@ -53,7 +57,14 @@ export function LoginPage() {
       setSession(payload.accessToken, payload.user);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      setFormError(formatAuthError(getApolloErrorMessage(err)));
+      const msg = getApolloErrorMessage(err);
+      if (isUnverifiedEmailError(msg)) {
+        navigate("/verify-email", {
+          state: { email: email.trim().toLowerCase() },
+        });
+        return;
+      }
+      setFormError(formatAuthError(msg));
     }
   }
 
@@ -84,9 +95,12 @@ export function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Log in</h1>
-        <p className="muted">
-          New here? <Link to="/signup">Create an account</Link>
-        </p>
+        <div className="auth-switch-row">
+          <p className="muted">New here?</p>
+          <Link to="/signup" className="btn-ghost auth-switch-btn">
+            Create an account
+          </Link>
+        </div>
 
         <form onSubmit={onEmailLogin} className="auth-form">
           <label className="field">
@@ -109,9 +123,9 @@ export function LoginPage() {
               minLength={8}
             />
           </label>
-          <p className="auth-forgot">
-            <Link to="/forgot-password">Forgot password?</Link>
-          </p>
+          <Link to="/forgot-password" className="btn-ghost auth-forgot-btn">
+            Forgot password?
+          </Link>
           {loginLoading && <p className="muted small">Signing in…</p>}
           {formError != null && !loginLoading && (
             <p className="error" role="alert">

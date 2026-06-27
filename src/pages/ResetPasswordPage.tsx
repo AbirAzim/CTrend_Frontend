@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { RESET_PASSWORD } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { PasswordField } from "../components/PasswordField";
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -34,7 +35,9 @@ export function ResetPasswordPage() {
       <div className="auth-page">
         <div className="auth-card">
           <h1>Password updated</h1>
-          <p className="muted">Your password has been reset successfully.</p>
+          <p className="auth-lead muted">
+            Your password has been reset and your email is verified. You can log in now.
+          </p>
           <p className="muted small" style={{ marginTop: "1.5rem", textAlign: "center" }}>
             <Link to="/login">Log in with your new password</Link>
           </p>
@@ -67,8 +70,7 @@ export function ResetPasswordPage() {
         <form onSubmit={onSubmit} className="auth-form">
           <label className="field">
             <span>New password</span>
-            <input
-              type="password"
+            <PasswordField
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -78,8 +80,7 @@ export function ResetPasswordPage() {
           </label>
           <label className="field">
             <span>Confirm new password</span>
-            <input
-              type="password"
+            <PasswordField
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}

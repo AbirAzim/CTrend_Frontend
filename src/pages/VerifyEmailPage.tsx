@@ -1,6 +1,6 @@
 import { useMutation } from "@apollo/client";
 import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { RESEND_VERIFICATION_EMAIL, VERIFY_EMAIL } from "../graphql/auth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -12,7 +12,11 @@ export function VerifyEmailPage() {
   const { isAuthenticated, setSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const email = (location.state as { email?: string; referralCode?: string } | null)?.email ?? "";
+  const [searchParams] = useSearchParams();
+  const email =
+    (location.state as { email?: string; referralCode?: string } | null)?.email?.trim().toLowerCase() ??
+    searchParams.get("email")?.trim().toLowerCase() ??
+    "";
   const referralCode =
     (location.state as { email?: string; referralCode?: string } | null)?.referralCode ?? "";
 

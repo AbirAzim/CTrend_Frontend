@@ -55,13 +55,35 @@ export default function ResetPasswordScreen() {
     }
   }
 
+  if (!token) {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.flex, { backgroundColor: colors.bg }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={[styles.centered, { paddingTop: insets.top }]}>
+          <Text style={[styles.title, { color: colors.text }]}>Invalid link</Text>
+          <Text style={[styles.sub, { color: colors.subtext }]}>
+            This reset link is missing or expired.
+          </Text>
+          <Pressable
+            style={[styles.btn, { backgroundColor: colors.accent }]}
+            onPress={() => router.replace("/auth/forgot-password")}
+          >
+            <Text style={styles.btnText}>Request a new link</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
   if (done) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <Image source={logoAsset} style={styles.logo} contentFit="contain" />
         <Text style={[styles.doneTitle, { color: colors.text }]}>Password updated!</Text>
         <Text style={[styles.doneSub, { color: colors.subtext }]}>
-          Your password has been reset. You can now log in with your new password.
+          Your password has been reset and your email is verified. You can log in with your new password.
         </Text>
         <Pressable
           style={[styles.btn, { backgroundColor: colors.accent }]}
