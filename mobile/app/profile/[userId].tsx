@@ -782,7 +782,10 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
+    alignSelf: "stretch",
+    justifyContent: "center",
     marginBottom: 20,
+    paddingHorizontal: 20,
   },
   friendBtn: {
     borderRadius: 12,

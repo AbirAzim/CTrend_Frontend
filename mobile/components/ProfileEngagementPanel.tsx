@@ -252,7 +252,7 @@ export function ProfileEngagementPanel({
 
 function makeStyles(c: ColorPalette) {
   return StyleSheet.create({
-    wrap: { marginBottom: 14 },
+    wrap: { marginBottom: 14, alignSelf: "stretch", width: "100%" },
     kicker: {
       fontSize: 11,
       fontWeight: "800",
@@ -263,6 +263,8 @@ function makeStyles(c: ColorPalette) {
     },
     grid: {
       flexDirection: "row",
+      alignSelf: "stretch",
+      width: "100%",
       paddingHorizontal: 16,
       gap: 8,
       alignItems: "stretch",
@@ -337,6 +339,7 @@ function makeStyles(c: ColorPalette) {
       letterSpacing: 0.4,
       textTransform: "uppercase",
       color: c.muted,
+      alignSelf: "stretch",
     },
     cardValue: {
       fontSize: 20,
@@ -345,6 +348,7 @@ function makeStyles(c: ColorPalette) {
       lineHeight: 24,
       marginTop: 2,
       fontVariant: ["tabular-nums"],
+      alignSelf: "stretch",
     },
     cardValuePaused: { color: c.muted, opacity: 0.85 },
     cardSub: {
