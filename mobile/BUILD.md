@@ -82,25 +82,26 @@ Every Play Store upload needs a higher `versionCode` than the previous one. Edit
 
 **`mobile/android/app/build.gradle`**
 ```gradle
-versionCode 38          ← increment by 1
-versionName "1.11.0"   ← bump semver (major.minor.patch)
+versionCode 39          ← increment by 1
+versionName "1.11.1"   ← bump semver (major.minor.patch)
 ```
 
 **`mobile/app.json`**
 ```json
-"version": "1.11.0",
+"version": "1.11.1",
 "android": {
-  "versionCode": 38,
+  "versionCode": 39
+}
 ```
 
 **`packages/shared/src/lib/appUpdate.ts`**
 ```ts
-export const BUNDLED_ANDROID_VERSION_CODE = 38;
+export const BUNDLED_ANDROID_VERSION_CODE = 39;
 ```
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.11.0 release: **versionCode 38** across all three files.
+Current version after 1.11.1 release: **versionCode 39** across all three files.
 
 ---
 
@@ -207,10 +208,35 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.11.1 | 39 | 2026-06-27 | Chat composer redesign, animated send button, Gboard GIF/emoji keyboard support, image attach fixes |
 | 1.11.0 | 38 | 2026-06-27 | Admin overview redesign (stats, charts, online users), platform settings UX, notifications page, profile/rewards polish |
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.11.1 (39)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.11.1 (39)
+```
+
+**What's new** (user-facing release notes)
+```
+• Redesigned chat composer — cleaner message box and animated send button
+• Send GIFs from your keyboard (Gboard) or attach from gallery
+• Emoji picker fixes — tap emoji once, send reliably
+• Admin chat gets the same messaging improvements
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Chat UX release: ChatComposer pill UI, AnimatedSendButton, expo-paste-input + RN patch for
+Gboard GIF commitContent, emoji textRef sync fix, presigned GIF upload MIME fix.
+```
 
 ### Play Console copy — 1.11.0 (38)
 
@@ -333,7 +359,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.11.0 (versionCode 38) |
+| Current version | 1.11.1 (versionCode 39) |
 
 ---
 

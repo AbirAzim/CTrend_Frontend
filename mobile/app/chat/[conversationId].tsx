@@ -55,7 +55,6 @@ import {
   uploadPresignedImage,
   type UploadUrlData,
 } from "../../lib/presignedImageUpload";
-import { keyboardImagePayload, type KeyboardImageEvent } from "../../lib/chatKeyboardImage";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useBackToFeed } from "../../hooks/useBackToFeed";
@@ -888,9 +887,7 @@ export default function ChatScreen() {
     setShowEmoji(true);
   }
 
-  function handleKeyboardImage(event: KeyboardImageEvent) {
-    const payload = keyboardImagePayload(event);
-    if (!payload) return;
+  function handleKeyboardImage(payload: { uri: string; mimeType: string }) {
     setPendingImage(payload);
     setShowEmoji(false);
   }
@@ -1265,7 +1262,7 @@ export default function ChatScreen() {
           showEmojiPicker={showEmoji}
           onToggleEmoji={toggleEmojiPicker}
           onFocus={() => setShowEmoji(false)}
-          onImageChange={handleKeyboardImage}
+          onKeyboardImage={handleKeyboardImage}
         />
       </KeyboardAvoidingView>
 

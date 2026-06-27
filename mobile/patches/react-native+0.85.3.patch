@@ -1,0 +1,66 @@
+diff --git a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/textinput/ReactEditText.kt b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/textinput/ReactEditText.kt
+index ff410da..c4373ec 100644
+--- a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/textinput/ReactEditText.kt
++++ b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/views/textinput/ReactEditText.kt
+@@ -41,7 +41,11 @@ import android.view.inputmethod.InputConnection
+ import android.view.inputmethod.InputMethodManager
+ import androidx.appcompat.widget.AppCompatEditText
+ import androidx.core.util.Predicate
++import androidx.core.view.ContentInfoCompat
+ import androidx.core.view.ViewCompat
++import androidx.core.view.inputmethod.EditorInfoCompat
++import androidx.core.view.inputmethod.InputConnectionCompat
++import androidx.core.view.inputmethod.InputContentInfoCompat
+ import com.facebook.common.logging.FLog
+ import com.facebook.react.bridge.ReactSoftExceptionLogger.logSoftException
+ import com.facebook.react.common.ReactConstants
+@@ -341,6 +345,10 @@ public open class ReactEditText public constructor(context: Context) : AppCompat
+   }
+ 
+   override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
++    EditorInfoCompat.setContentMimeTypes(
++        outAttrs,
++        arrayOf("image/png", "image/gif", "image/jpeg", "image/jpg", "image/webp"),
++    )
+     val reactContext = UIManagerHelper.getReactContext(this)
+     var inputConnection = super.onCreateInputConnection(outAttrs)
+     if (inputConnection != null && onKeyPress) {
+@@ -353,6 +361,38 @@ public open class ReactEditText public constructor(context: Context) : AppCompat
+           )
+     }
+ 
++    if (inputConnection != null) {
++      inputConnection =
++          InputConnectionCompat.createWrapper(
++              inputConnection,
++              outAttrs,
++          ) { inputContentInfo, flags, _ ->
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1 &&
++                (flags and InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION) != 0) {
++              try {
++                inputContentInfo.requestPermission()
++              } catch (_: Exception) {
++                return@createWrapper false
++              }
++            }
++
++            val description = inputContentInfo.description
++            val mime =
++                if (description.mimeTypeCount > 0) description.getMimeType(0) else "image/*"
++            if (inputContentInfo.contentUri == null) return@createWrapper false
++
++            ViewCompat.performReceiveContent(
++                this,
++                ContentInfoCompat.Builder(ContentInfoCompat.SOURCE_INPUT_METHOD, arrayOf(mime))
++                    .setUri(inputContentInfo.contentUri)
++                    .setLinkUri(inputContentInfo.linkUri)
++                    .build(),
++            )
++            inputContentInfo.releasePermission()
++            true
++          }
++    }
++
+     if (isMultiline && (shouldBlurOnReturn() || shouldSubmitOnReturn())) {
+       // Remove IME_FLAG_NO_ENTER_ACTION to keep the original IME_OPTION
+       outAttrs.imeOptions = outAttrs.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION.inv()

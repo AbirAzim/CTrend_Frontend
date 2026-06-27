@@ -10,7 +10,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
-import "react-native-image-keyboard";
 import { apolloClient, onWsConnected } from "../lib/apolloClient";
 
 // Freeze off-screen screens so background routes (the feed, World Cup, etc.) stop

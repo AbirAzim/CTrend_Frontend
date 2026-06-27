@@ -10,7 +10,9 @@ import {
   type TextInputProps,
 } from "react-native";
 import { AnimatedSendButton } from "./AnimatedSendButton";
-import type { KeyboardImageEvent } from "../lib/chatKeyboardImage";
+import type { KeyboardImagePayload } from "../lib/chatKeyboardImage";
+import { inferImageMimeType } from "../lib/presignedImageUpload";
+import { TextInputWrapper, type PasteEventPayload } from "expo-paste-input";
 
 type ThemeColors = {
   bg: string;
@@ -38,7 +40,7 @@ type Props = {
   showEmojiPicker?: boolean;
   onToggleEmoji?: () => void;
   onFocus?: TextInputProps["onFocus"];
-  onImageChange?: (event: KeyboardImageEvent) => void;
+  onKeyboardImage?: (payload: KeyboardImagePayload) => void;
   inputRef?: RefObject<TextInput | null>;
 };
 
@@ -58,10 +60,19 @@ export function ChatComposer({
   showEmojiPicker = false,
   onToggleEmoji,
   onFocus,
-  onImageChange,
+  onKeyboardImage,
   inputRef,
 }: Props) {
   const hasText = value.trim().length > 0;
+
+  function handlePaste(payload: PasteEventPayload) {
+    if (payload.type !== "images" || payload.uris.length === 0) return;
+    const uri = payload.uris[0];
+    onKeyboardImage?.({
+      uri,
+      mimeType: inferImageMimeType(uri),
+    });
+  }
 
   return (
     <View
@@ -116,22 +127,23 @@ export function ChatComposer({
           </Pressable>
         ) : null}
 
-        <TextInput
-          ref={inputRef}
-          style={[st.input, { color: colors.text }]}
-          placeholder={placeholder}
-          placeholderTextColor={colors.muted}
-          value={value}
-          onChangeText={onChangeText}
-          onImageChange={onImageChange}
-          onFocus={onFocus}
-          multiline
-          maxLength={maxLength}
-          returnKeyType="default"
-          blurOnSubmit={false}
-          textAlignVertical="center"
-          scrollEnabled
-        />
+        <TextInputWrapper style={st.inputWrap} onPaste={handlePaste}>
+          <TextInput
+            ref={inputRef}
+            style={[st.input, { color: colors.text }]}
+            placeholder={placeholder}
+            placeholderTextColor={colors.muted}
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={onFocus}
+            multiline
+            maxLength={maxLength}
+            returnKeyType="default"
+            blurOnSubmit={false}
+            textAlignVertical="center"
+            scrollEnabled
+          />
+        </TextInputWrapper>
       </View>
 
       <AnimatedSendButton
@@ -191,6 +203,10 @@ const st = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 1,
+  },
+  inputWrap: {
+    flex: 1,
+    minHeight: 36,
   },
   input: {
     flex: 1,

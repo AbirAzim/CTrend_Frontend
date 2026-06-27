@@ -41,7 +41,6 @@ import {
   uploadPresignedImage,
   type UploadUrlData,
 } from "../../lib/presignedImageUpload";
-import { keyboardImagePayload, type KeyboardImageEvent } from "../../lib/chatKeyboardImage";
 import logoAsset from "../../assets/logo.png";
 
 function replySnippet(text?: string | null, imageUrl?: string | null): string {
@@ -231,9 +230,7 @@ function ChatView({
     }
   }, [messages.length]);
 
-  async function handleKeyboardImage(event: KeyboardImageEvent) {
-    const payload = keyboardImagePayload(event);
-    if (!payload) return;
+  async function handleKeyboardImage(payload: { uri: string; mimeType: string }) {
     setUploading(true);
     try {
       const url = await uploadPresignedImage(getUploadUrl, payload.uri, payload.mimeType);
@@ -527,7 +524,7 @@ function ChatView({
           bottomInset={insets.bottom}
           onPickImage={() => void handlePickImage()}
           pickImageBusy={uploading}
-          onImageChange={(event) => void handleKeyboardImage(event)}
+          onKeyboardImage={(payload) => void handleKeyboardImage(payload)}
         />
       </View>
     </View>
@@ -587,9 +584,7 @@ export default function AdminMessagesScreen() {
   const threads = threadsData?.adminModeratorThreads ?? [];
   const recipientUsers = usersData?.listUsers ?? [];
 
-  async function handleKeyboardImage(event: KeyboardImageEvent) {
-    const payload = keyboardImagePayload(event);
-    if (!payload) return;
+  async function handleKeyboardImage(payload: { uri: string; mimeType: string }) {
     setUploading(true);
     try {
       const url = await uploadPresignedImage(getUploadUrl, payload.uri, payload.mimeType);
@@ -845,7 +840,7 @@ export default function AdminMessagesScreen() {
               bottomInset={insets.bottom}
               onPickImage={() => void handlePickImage()}
               pickImageBusy={uploading}
-              onImageChange={(event) => void handleKeyboardImage(event)}
+              onKeyboardImage={(payload) => void handleKeyboardImage(payload)}
             />
           </View>
         </View>

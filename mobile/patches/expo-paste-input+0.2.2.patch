@@ -1,0 +1,440 @@
+diff --git a/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+index daa1970..1c09748 100644
+--- a/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
++++ b/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+@@ -1 +1 @@
+-#Sun Mar 29 01:33:17 IST 2026
++#Sat Jun 27 13:11:10 BDT 2026
+diff --git a/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+index f677214..4ae7150 100644
+--- a/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
++++ b/node_modules/expo-paste-input/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+@@ -1,2 +1,2 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/build/generated/res/resValues/debug"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
++<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/build/generated/res/resValues/debug"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab
+deleted file mode 100644
+index 4c29c43..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream
+deleted file mode 100644
+index 66860fc..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len
+deleted file mode 100644
+index b31f54b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len
+deleted file mode 100644
+index 01bdaa1..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at
+deleted file mode 100644
+index 11d0261..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i
+deleted file mode 100644
+index 6cd7573..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab
+deleted file mode 100644
+index 7ca8c3e..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream
+deleted file mode 100644
+index ff2371b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len
+deleted file mode 100644
+index a61023e..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len
+deleted file mode 100644
+index a9f80ae..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at
+deleted file mode 100644
+index 63c4975..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i
+deleted file mode 100644
+index 8a28d53..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab
+deleted file mode 100644
+index 0359139..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream
+deleted file mode 100644
+index ff2371b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len
+deleted file mode 100644
+index a61023e..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len
+deleted file mode 100644
+index a9f80ae..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at
+deleted file mode 100644
+index 9a489e7..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i
+deleted file mode 100644
+index 8a28d53..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab
+deleted file mode 100644
+index 03aed62..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream
+deleted file mode 100644
+index 5105b47..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len
+deleted file mode 100644
+index c9ec9a4..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len
+deleted file mode 100644
+index fa606b6..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at
+deleted file mode 100644
+index 24b69de..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i
+deleted file mode 100644
+index 1892d4d..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab
+deleted file mode 100644
+index 8a88fd1..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream
+deleted file mode 100644
+index 13bb039..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len
+deleted file mode 100644
+index b740c76..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len
+deleted file mode 100644
+index 93a595b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at
+deleted file mode 100644
+index cca0475..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i
+deleted file mode 100644
+index 0d9c795..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab
+deleted file mode 100644
+index a80f812..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream
+deleted file mode 100644
+index 66860fc..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len
+deleted file mode 100644
+index b31f54b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len
+deleted file mode 100644
+index 01bdaa1..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at
+deleted file mode 100644
+index bd54165..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i
+deleted file mode 100644
+index 6cd7573..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab
+deleted file mode 100644
+index 6a34650..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream
+deleted file mode 100644
+index 22aee01..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len
+deleted file mode 100644
+index b9d571f..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len
+deleted file mode 100644
+index 01bdaa1..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at
+deleted file mode 100644
+index 6bb3402..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i
+deleted file mode 100644
+index 45c0882..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab
+deleted file mode 100644
+index 7e1e3a6..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream
+deleted file mode 100644
+index b1e1c72..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len
+deleted file mode 100644
+index 798082e..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len
+deleted file mode 100644
+index 01bdaa1..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at
+deleted file mode 100644
+index ebba30e..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i
+deleted file mode 100644
+index a2d78b0..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/counters.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/counters.tab
+deleted file mode 100644
+index 0737472..0000000
+--- a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/counters.tab
++++ /dev/null
+@@ -1,2 +0,0 @@
+-10
+-0
+\ No newline at end of file
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab
+deleted file mode 100644
+index a571c88..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream
+deleted file mode 100644
+index 66860fc..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len
+deleted file mode 100644
+index b31f54b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len
+deleted file mode 100644
+index 01bdaa1..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at
+deleted file mode 100644
+index 263bcd3..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i
+deleted file mode 100644
+index 6cd7573..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab
+deleted file mode 100644
+index 8445af3..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream
+deleted file mode 100644
+index 8ad02ff..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len
+deleted file mode 100644
+index c15663d..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len
+deleted file mode 100644
+index fd5292d..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at
+deleted file mode 100644
+index 7859392..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i
+deleted file mode 100644
+index 5f2acb4..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab
+deleted file mode 100644
+index 4a830df..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream
+deleted file mode 100644
+index 3519c73..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len
+deleted file mode 100644
+index 5a9168b..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.len
+deleted file mode 100644
+index cbfd11c..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at
+deleted file mode 100644
+index 937f171..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i
+deleted file mode 100644
+index f18b904..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len
+deleted file mode 100644
+index 131e265..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/dirty-sources.txt b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/dirty-sources.txt
+new file mode 100644
+index 0000000..4377209
+--- /dev/null
++++ b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/dirty-sources.txt
+@@ -0,0 +1,2 @@
++/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/java/expo/modules/pasteinput/ExpoPasteInputView.kt
++/Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/java/expo/modules/pasteinput/ExpoPasteInputModule.kt
+\ No newline at end of file
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/last-build.bin b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/last-build.bin
+deleted file mode 100644
+index 33c6f7c..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/cacheable/last-build.bin and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin
+deleted file mode 100644
+index 08c7e68..0000000
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/local-state/build-history.bin b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/local-state/build-history.bin
+index a087055..d87e8be 100644
+Binary files a/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/local-state/build-history.bin and b/node_modules/expo-paste-input/android/build/kotlin/compileDebugKotlin/local-state/build-history.bin differ
+diff --git a/node_modules/expo-paste-input/android/build/outputs/logs/manifest-merger-debug-report.txt b/node_modules/expo-paste-input/android/build/outputs/logs/manifest-merger-debug-report.txt
+index ab6ff21..859b039 100644
+--- a/node_modules/expo-paste-input/android/build/outputs/logs/manifest-merger-debug-report.txt
++++ b/node_modules/expo-paste-input/android/build/outputs/logs/manifest-merger-debug-report.txt
+@@ -1,14 +1,14 @@
+ -- Merging decision tree log ---
+ manifest
+-ADDED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml:1:1-2:12
+-INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml:1:1-2:12
++ADDED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml:1:1-2:12
++INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml:1:1-2:12
+ 	package
+-		INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml
++		INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml
+ uses-sdk
+-INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+-INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml
+-INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml
++INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
++INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml
++INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml
+ 	android:targetSdkVersion
+-		INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml
++		INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml
+ 	android:minSdkVersion
+-		INJECTED from /Users/arunabhverma/React_Native/expo/my_lib/expo-paste-input/android/src/main/AndroidManifest.xml
++		INJECTED from /Users/abirazimbadhon/Documents/code/CTrend_frontend/mobile/node_modules/expo-paste-input/android/src/main/AndroidManifest.xml
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/META-INF/expo-paste-input_debug.kotlin_module b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/META-INF/expo-paste-input_debug.kotlin_module
+deleted file mode 100644
+index 9dbc290..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/META-INF/expo-paste-input_debug.kotlin_module and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputModule$definition$lambda$1$$inlined$View$1.class b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputModule$definition$lambda$1$$inlined$View$1.class
+deleted file mode 100644
+index 88a2967..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputModule$definition$lambda$1$$inlined$View$1.class and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputModule.class b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputModule.class
+deleted file mode 100644
+index 84514f3..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputModule.class and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$1.class b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$1.class
+deleted file mode 100644
+index a38ebc9..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$1.class and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$ClipboardPayload.class b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$ClipboardPayload.class
+deleted file mode 100644
+index 2f972dd..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$ClipboardPayload.class and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$createActionModeCallback$1.class b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$createActionModeCallback$1.class
+deleted file mode 100644
+index 2faacc2..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView$createActionModeCallback$1.class and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView.class b/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView.class
+deleted file mode 100644
+index 01c3877..0000000
+Binary files a/node_modules/expo-paste-input/android/build/tmp/kotlin-classes/debug/expo/modules/pasteinput/ExpoPasteInputView.class and /dev/null differ
+diff --git a/node_modules/expo-paste-input/android/src/main/java/expo/modules/pasteinput/ExpoPasteInputView.kt b/node_modules/expo-paste-input/android/src/main/java/expo/modules/pasteinput/ExpoPasteInputView.kt
+index 99b0fa6..1cfc1ce 100644
+--- a/node_modules/expo-paste-input/android/src/main/java/expo/modules/pasteinput/ExpoPasteInputView.kt
++++ b/node_modules/expo-paste-input/android/src/main/java/expo/modules/pasteinput/ExpoPasteInputView.kt
+@@ -7,9 +7,10 @@ import android.graphics.BitmapFactory
+ import android.net.Uri
+ import android.os.Build
+ import android.os.SystemClock
++import android.view.inputmethod.InputMethodManager
++import android.view.ActionMode
+ import android.view.View
+ import android.view.ViewGroup
+-import android.view.ActionMode
+ import android.widget.EditText
+ import androidx.core.view.ContentInfoCompat
+ import androidx.core.view.OnReceiveContentListener
+@@ -157,6 +158,14 @@ class ExpoPasteInputView(context: Context, appContext: AppContext) : ExpoView(co
+     
+     // Intercept paste from context menu to prevent toast
+     enhanceOnTextContextMenuItem(editText)
++
++    // Refresh IME so Gboard picks up image/* support immediately
++    editText.post {
++      if (editText.isFocused) {
++        val imm = editText.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
++        imm.restartInput(editText)
++      }
++    }
+   }
+   
+   private fun cleanupPasteHandling(editText: EditText) {
