@@ -2,7 +2,6 @@ import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import {
   ActivityIndicator,
   Alert,
@@ -33,9 +32,16 @@ import {
 } from "@ctrend/shared/graphql/admin";
 import { REACT_MESSAGE, DELETE_MESSAGE, MESSAGE_REACTION_EMOJIS } from "@ctrend/shared/graphql/messages";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
+import { ChatComposer } from "../../components/ChatComposer";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
+import {
+  mimeTypeFromAsset,
+  uploadPresignedImage,
+  type UploadUrlData,
+} from "../../lib/presignedImageUpload";
+import { keyboardImagePayload, type KeyboardImageEvent } from "../../lib/chatKeyboardImage";
 import logoAsset from "../../assets/logo.png";
 
 function replySnippet(text?: string | null, imageUrl?: string | null): string {
@@ -82,7 +88,6 @@ type RecipientUser = {
   profileImageUrl?: string | null;
 };
 
-type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 type ThreadsData = { adminModeratorThreads: Thread[] };
 type MessagesData = { adminModeratorThreadMessages: ThreadMessage[] };
 type UsersData = { listUsers: RecipientUser[] };
@@ -149,31 +154,22 @@ async function pickAndUploadImage(
 
   const result = choice === "camera"
     ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.85, allowsEditing: true })
-    : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85, allowsEditing: true });
+    : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] });
 
   if (result.canceled || !result.assets[0]) return null;
 
   const asset = result.assets[0];
-  const mimeType = asset.mimeType ?? "image/jpeg";
-  const ext = mimeType.split("/")[1] ?? "jpg";
-  const filename = asset.fileName ?? `photo_${Date.now()}.${ext}`;
+  const mimeType = mimeTypeFromAsset(asset);
+  const filename = asset.fileName ?? `photo_${Date.now()}.${mimeType.split("/")[1] ?? "jpg"}`;
 
   onUploading(true);
   try {
-    const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
-    if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL");
-    const { uploadUrl, publicUrl } = data.getImageUploadUrl;
-    let uploadUri = asset.uri;
-    if (Platform.OS === "android" && !asset.uri.startsWith("file://")) {
-      uploadUri = `${FileSystem.cacheDirectory}upload_${Date.now()}.${ext}`;
-      await FileSystem.copyAsync({ from: asset.uri, to: uploadUri });
-    }
-    const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
-      httpMethod: "PUT",
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-      headers: { "Content-Type": mimeType },
-    });
-    if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
+    const publicUrl = await uploadPresignedImage(
+      getUploadUrl,
+      asset.uri,
+      mimeType,
+      filename,
+    );
     onUploading(false);
     return publicUrl;
   } catch (err: unknown) {
@@ -234,6 +230,20 @@ function ChatView({
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
     }
   }, [messages.length]);
+
+  async function handleKeyboardImage(event: KeyboardImageEvent) {
+    const payload = keyboardImagePayload(event);
+    if (!payload) return;
+    setUploading(true);
+    try {
+      const url = await uploadPresignedImage(getUploadUrl, payload.uri, payload.mimeType);
+      setPendingImageUrl(url);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Upload failed", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handlePickImage() {
     const url = await pickAndUploadImage(
@@ -504,31 +514,21 @@ function ChatView({
         )}
 
         {/* Input bar */}
-        <View style={[st.inputRow, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 6 }]}>
-          <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={[st.attachBtn, { backgroundColor: colors.section }]}>
-            {uploading
-              ? <ActivityIndicator size="small" color={colors.accent} />
-              : <Ionicons name="image-outline" size={19} color={colors.accent} />}
-          </Pressable>
-          <TextInput
-            style={[st.inputField, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-            placeholder="Type a moderator message…"
-            placeholderTextColor={colors.muted}
-            value={messageText}
-            onChangeText={handleTextChange}
-            multiline
-            maxLength={2000}
-          />
-          <Pressable
-            style={[st.sendBtn, { backgroundColor: colors.accent }, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
-            onPressIn={() => {
-              if (!isBusy && (messageTextRef.current.trim() || pendingImageUrl)) void handleSend();
-            }}
-            disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
-          >
-            {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={16} color="#fff" />}
-          </Pressable>
-        </View>
+        <ChatComposer
+          value={messageText}
+          onChangeText={handleTextChange}
+          placeholder="Type a moderator message…"
+          maxLength={2000}
+          canSend={!isBusy && !!(messageText.trim() || pendingImageUrl)}
+          sending={sending}
+          onSend={() => void handleSend()}
+          colors={colors}
+          surfaceColor={colors.card}
+          bottomInset={insets.bottom}
+          onPickImage={() => void handlePickImage()}
+          pickImageBusy={uploading}
+          onImageChange={(event) => void handleKeyboardImage(event)}
+        />
       </View>
     </View>
   );
@@ -586,6 +586,20 @@ export default function AdminMessagesScreen() {
 
   const threads = threadsData?.adminModeratorThreads ?? [];
   const recipientUsers = usersData?.listUsers ?? [];
+
+  async function handleKeyboardImage(event: KeyboardImageEvent) {
+    const payload = keyboardImagePayload(event);
+    if (!payload) return;
+    setUploading(true);
+    try {
+      const url = await uploadPresignedImage(getUploadUrl, payload.uri, payload.mimeType);
+      setPendingImageUrl(url);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Upload failed", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handlePickImage() {
     const url = await pickAndUploadImage(
@@ -818,31 +832,21 @@ export default function AdminMessagesScreen() {
                 <Text style={[st.composeToClear, { color: colors.muted }]}>Clear</Text>
               </Pressable>
             </View>
-            <View style={st.composeRow}>
-              <Pressable onPress={() => void handlePickImage()} disabled={isBusy} style={[st.attachBtn, { backgroundColor: colors.section }]}>
-                {uploading
-                  ? <ActivityIndicator size="small" color={colors.accent} />
-                  : <Ionicons name="image-outline" size={19} color={colors.accent} />}
-              </Pressable>
-              <TextInput
-                style={[st.composeInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-                placeholder="Type a moderator message…"
-                placeholderTextColor={colors.muted}
-                value={messageText}
-                onChangeText={setMessageText}
-                multiline
-                maxLength={2000}
-              />
-              <Pressable
-                style={[st.sendBtn, { backgroundColor: colors.accent }, (isBusy || (!messageText.trim() && !pendingImageUrl)) && { opacity: 0.5 }]}
-                onPressIn={() => {
-                  if (!isBusy && (messageText.trim() || pendingImageUrl)) void handleSendNew();
-                }}
-                disabled={isBusy || (!messageText.trim() && !pendingImageUrl)}
-              >
-                {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={16} color="#fff" />}
-              </Pressable>
-            </View>
+            <ChatComposer
+              value={messageText}
+              onChangeText={setMessageText}
+              placeholder="Type a moderator message…"
+              maxLength={2000}
+              canSend={!isBusy && !!(messageText.trim() || pendingImageUrl)}
+              sending={sending}
+              onSend={() => void handleSendNew()}
+              colors={colors}
+              surfaceColor={colors.card}
+              bottomInset={insets.bottom}
+              onPickImage={() => void handlePickImage()}
+              pickImageBusy={uploading}
+              onImageChange={(event) => void handleKeyboardImage(event)}
+            />
           </View>
         </View>
       ) : null}
@@ -977,8 +981,6 @@ function mainStyles(c: ReturnType<typeof useTheme>["colors"]) {
     composeTo: { fontSize: 12, fontWeight: "700", flex: 1 },
     composeToClear: { fontSize: 11, fontWeight: "600" },
     composeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    attachBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-    composeInput: { flex: 1, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 90 },
     sendBtn: { borderRadius: 20, width: 40, height: 40, alignItems: "center", justifyContent: "center" },
     sheetRoot: { flex: 1, justifyContent: "flex-end" },
     sheetOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.55)" },
@@ -1050,8 +1052,6 @@ function chatStyles(c: ReturnType<typeof useTheme>["colors"]) {
     pendingImgThumb: { width: 48, height: 48, borderRadius: 8 },
     pendingImgRemove: { padding: 4 },
     inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingTop: 10, gap: 6 },
-    attachBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-    inputField: { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
     sendBtn: { borderRadius: 20, width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   });
 }

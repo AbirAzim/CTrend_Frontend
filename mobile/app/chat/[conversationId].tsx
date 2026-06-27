@@ -1,6 +1,5 @@
 import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,6 +9,7 @@ import {
   Animated,
   AppState,
   FlatList,
+  Keyboard,
   Modal,
   PanResponder,
   Platform,
@@ -45,17 +45,27 @@ import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { MODERATOR_BRAND_NAME } from "@ctrend/shared/lib/moderatorBrand";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { ChatComposer } from "../../components/ChatComposer";
 import { LinkText } from "../../components/LinkText";
 import { useToast } from "../../components/useToast";
 import logoAsset from "../../assets/logo.png";
-
-// Official platform sender id used for moderator/admin broadcast messages.
-const MODERATOR_SENDER_ID = "moderator";
+import {
+  inferImageMimeType,
+  mimeTypeFromAsset,
+  uploadPresignedImage,
+  type UploadUrlData,
+} from "../../lib/presignedImageUpload";
+import { keyboardImagePayload, type KeyboardImageEvent } from "../../lib/chatKeyboardImage";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useBackToFeed } from "../../hooks/useBackToFeed";
 import { useSounds } from "../../context/SoundContext";
 import { clearConversationNotification } from "../../lib/messageNotifications";
+
+// Official platform sender id used for moderator/admin broadcast messages.
+const MODERATOR_SENDER_ID = "moderator";
+
+type PendingImage = { uri: string; mimeType: string; fileName?: string };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,15 +98,16 @@ type Message = {
   status?: "sending" | "failed";
 };
 
-/** Snippet text for a quoted message: trimmed text, else "📷 Photo". */
+/** Snippet text for a quoted message: trimmed text, else photo/GIF label. */
 function replySnippet(text?: string | null, imageUrl?: string | null): string {
   if (text && text.trim()) return text.trim();
-  if (imageUrl) return "📷 Photo";
+  if (imageUrl) {
+    return imageUrl.toLowerCase().includes(".gif") ? "🎞 GIF" : "📷 Photo";
+  }
   return "";
 }
 
 type MessagesData = { messages: Message[] };
-type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string } };
 
 type Participant = {
   id: string;
@@ -128,10 +139,10 @@ type ReactionChangedData = {
 const PAGE_SIZE = 30;
 
 const EMOJI_PRESETS = [
-  "😂", "❤️", "🔥", "👍", "😍",
-  "🥺", "😭", "✨", "🎉", "😎",
-  "🤔", "💯", "🙏", "😅", "🤣",
-  "😊", "💪", "👀", "🫡", "🤝",
+  "😂", "❤️", "🔥", "👍", "😍", "🥺", "😭", "✨", "🎉", "😎",
+  "🤔", "💯", "🙏", "😅", "🤣", "😊", "💪", "👀", "🫡", "🤝",
+  "😘", "🥰", "😡", "🤯", "👏", "💀", "🫶", "😴", "🤷", "💕",
+  "🙌", "😬", "🤗", "😤", "🥳", "👋", "💔", "😇", "🤩", "🫂",
 ];
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
@@ -484,7 +495,7 @@ export default function ChatScreen() {
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [activeReactMsgId, setActiveReactMsgId] = useState<string | null>(null);
   const [activeReplyMsgId, setActiveReplyMsgId] = useState<string | null>(null);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
@@ -863,39 +874,52 @@ export default function ChatScreen() {
     }, 2000);
   }
 
+  function insertEmoji(emoji: string) {
+    handleTextChange(textRef.current + emoji);
+  }
+
+  function toggleEmojiPicker() {
+    if (showEmoji) {
+      setShowEmoji(false);
+      requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+    Keyboard.dismiss();
+    setShowEmoji(true);
+  }
+
+  function handleKeyboardImage(event: KeyboardImageEvent) {
+    const payload = keyboardImagePayload(event);
+    if (!payload) return;
+    setPendingImage(payload);
+    setShowEmoji(false);
+  }
+
   // ── Pick image ──────────────────────────────────────────────────────────────
   async function handlePickImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: 0.85,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setPendingImage({
+        uri: asset.uri,
+        mimeType: mimeTypeFromAsset(asset),
+        fileName: asset.fileName ?? undefined,
+      });
       setShowEmoji(false);
     }
   }
 
-  // ── Upload image ────────────────────────────────────────────────────────────
-  async function uploadImage(uri: string): Promise<string> {
-    const mimeType = "image/jpeg";
-    const filename = `chat_${Date.now()}.jpg`;
-    const { data: urlData } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
-    if (!urlData?.getImageUploadUrl) throw new Error("Could not get upload URL");
-    const { uploadUrl, publicUrl } = urlData.getImageUploadUrl;
-    let uploadUri = uri;
-    if (Platform.OS === "android" && !uri.startsWith("file://")) {
-      uploadUri = `${FileSystem.cacheDirectory}chat_upload_${Date.now()}.jpg`;
-      await FileSystem.copyAsync({ from: uri, to: uploadUri });
-    }
-    const res = await FileSystem.uploadAsync(uploadUrl, uploadUri, {
-      httpMethod: "PUT",
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-      headers: { "Content-Type": mimeType },
-    });
-    if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed: ${res.status}`);
-    return publicUrl;
+  async function uploadImage(image: PendingImage): Promise<string> {
+    return uploadPresignedImage(
+      getUploadUrl,
+      image.uri,
+      image.mimeType,
+      image.fileName,
+    );
   }
 
   // ── Send ────────────────────────────────────────────────────────────────────
@@ -904,12 +928,12 @@ export default function ChatScreen() {
   // the message is on screen immediately and reconciled when the server confirms.
   async function dispatchSend(opts: {
     text: string;
-    imageUri: string | null;
+    image: PendingImage | null;
     replyTo: ReplyPreview | null;
   }) {
     if (!conversationId || !user) return;
     const msgText = opts.text.trim();
-    const pendingImageUri = opts.imageUri;
+    const pendingImageUri = opts.image?.uri ?? null;
     if (!msgText && !pendingImageUri) return;
     const replyTo = opts.replyTo;
     const replyToId = replyTo?.messageId;
@@ -939,7 +963,7 @@ export default function ChatScreen() {
 
     try {
       let uploadedUrl: string | undefined;
-      if (pendingImageUri) uploadedUrl = await uploadImage(pendingImageUri);
+      if (opts.image) uploadedUrl = await uploadImage(opts.image);
       const res = await sendMessage({
         variables: {
           conversationId,
@@ -969,26 +993,33 @@ export default function ChatScreen() {
 
   function handleSend() {
     const msgText = textRef.current.trim();
-    if (!msgText && !imageUri) return;
+    if (!msgText && !pendingImage) return;
     if (!conversationId) return;
 
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
     void setTypingMut({ variables: { conversationId, isTyping: false } }).catch(() => {});
 
-    const opts = { text: msgText, imageUri, replyTo: replyTarget };
+    const opts = { text: msgText, image: pendingImage, replyTo: replyTarget };
     // Clear the composer immediately so it feels instant.
     textRef.current = "";
     setText("");
-    setImageUri(null);
+    setPendingImage(null);
     setReplyTarget(null);
     void dispatchSend(opts);
   }
 
   function retrySend(failed: Message) {
     setMessages((prev) => prev.filter((m) => m.id !== failed.id));
+    const image =
+      failed.imageUrl
+        ? {
+            uri: failed.imageUrl,
+            mimeType: inferImageMimeType(failed.imageUrl),
+          }
+        : null;
     void dispatchSend({
       text: failed.text,
-      imageUri: failed.imageUrl ?? null,
+      image,
       replyTo: failed.replyTo ?? null,
     });
   }
@@ -996,7 +1027,8 @@ export default function ChatScreen() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const typingLabel = Array.from(typingUsers.values()).join(", ");
-  const canSend = text.trim().length > 0 || imageUri !== null;
+  const canSend = text.trim().length > 0 || pendingImage !== null;
+  const sending = messages.some((m) => m.senderId === user?.id && m.status === "sending");
 
   const handleLoadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMore || !conversationId || messages.length === 0) return;
@@ -1165,15 +1197,19 @@ export default function ChatScreen() {
         {/* Emoji picker (insert into message text) */}
         {showEmoji && (
           <View style={[styles.emojiPicker, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiRow}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.emojiGrid}
+              keyboardShouldPersistTaps="always"
+            >
               {EMOJI_PRESETS.map((e) => (
                 <Pressable
                   key={e}
-                  style={styles.emojiBtn}
-                  onPress={() => {
-                    setText((prev) => prev + e);
-                    inputRef.current?.focus();
-                  }}
+                  style={({ pressed }) => [
+                    styles.emojiBtn,
+                    pressed && { backgroundColor: colors.section },
+                  ]}
+                  onPress={() => insertEmoji(e)}
                 >
                   <Text style={styles.emojiChar}>{e}</Text>
                 </Pressable>
@@ -1204,67 +1240,33 @@ export default function ChatScreen() {
         )}
 
         {/* Image preview */}
-        {imageUri && (
+        {pendingImage && (
           <View style={[styles.imagePreviewBar, { backgroundColor: colors.section, borderTopColor: colors.border }]}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} contentFit="cover" />
-            <Pressable style={styles.imageRemoveBtn} onPress={() => setImageUri(null)}>
+            <Image source={{ uri: pendingImage.uri }} style={styles.imagePreview} contentFit="cover" />
+            <Pressable style={styles.imageRemoveBtn} onPress={() => setPendingImage(null)}>
               <Text style={styles.imageRemoveText}>✕</Text>
             </Pressable>
           </View>
         )}
 
         {/* Input bar */}
-        <View
-          style={[
-            styles.inputBar,
-            {
-              backgroundColor: colors.bg,
-              borderTopColor: colors.border,
-              paddingBottom: insets.bottom + 8,
-            },
-          ]}
-        >
-          <Pressable style={styles.inputIconBtn} onPress={() => { setShowEmoji((v) => !v); }}>
-            <Text style={styles.inputIconText}>😊</Text>
-          </Pressable>
-
-          <Pressable style={styles.inputIconBtn} onPress={() => void handlePickImage()}>
-            <Text style={styles.inputIconText}>📎</Text>
-          </Pressable>
-
-          <TextInput
-            ref={inputRef}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.inputBg,
-                borderColor: colors.border,
-                color: colors.text,
-              },
-            ]}
-            placeholder="Message…"
-            placeholderTextColor={colors.muted}
-            value={text}
-            onChangeText={handleTextChange}
-            multiline
-            maxLength={1000}
-            returnKeyType="default"
-            onFocus={() => setShowEmoji(false)}
-          />
-
-          <Pressable
-            style={[
-              styles.sendBtn,
-              { backgroundColor: canSend ? colors.accent : colors.section },
-            ]}
-            onPressIn={() => {
-              if (canSend) void handleSend();
-            }}
-            disabled={!canSend}
-          >
-            <Text style={[styles.sendBtnText, { color: canSend ? "#fff" : colors.muted }]}>↑</Text>
-          </Pressable>
-        </View>
+        <ChatComposer
+          inputRef={inputRef}
+          value={text}
+          onChangeText={handleTextChange}
+          placeholder="Message…"
+          maxLength={1000}
+          canSend={canSend}
+          sending={sending}
+          onSend={() => void handleSend()}
+          colors={colors}
+          bottomInset={insets.bottom}
+          onPickImage={() => void handlePickImage()}
+          showEmojiPicker={showEmoji}
+          onToggleEmoji={toggleEmojiPicker}
+          onFocus={() => setShowEmoji(false)}
+          onImageChange={handleKeyboardImage}
+        />
       </KeyboardAvoidingView>
 
       {/* Full-screen image viewer */}
@@ -1574,10 +1576,26 @@ const styles = StyleSheet.create({
   typingText: { fontSize: 12, fontStyle: "italic" },
 
   // Emoji picker (message compose)
-  emojiPicker: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 4 },
-  emojiRow: { paddingHorizontal: 8, gap: 2 },
-  emojiBtn: { padding: 8, borderRadius: 8 },
-  emojiChar: { fontSize: 24 },
+  emojiPicker: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+    maxHeight: 180,
+  },
+  emojiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 10,
+    gap: 4,
+    justifyContent: "center",
+  },
+  emojiBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emojiChar: { fontSize: 26 },
 
   // Image preview
   imagePreviewBar: {
@@ -1608,36 +1626,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   imageRemoveText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-
-  // Input
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 6,
-  },
-  inputIconBtn: { paddingBottom: 8, paddingHorizontal: 4 },
-  inputIconText: { fontSize: 22 },
-  input: {
-    flex: 1,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 15,
-    maxHeight: 110,
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 1,
-  },
-  sendBtnText: { fontSize: 18, fontWeight: "700" },
 
   // Full-screen image viewer
   viewerBackdrop: {
