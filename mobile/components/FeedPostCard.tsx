@@ -87,8 +87,6 @@ const CARD_MARGIN_H = 12;
 const CARD_CONTENT_W = SCREEN_W - CARD_MARGIN_H * 2;
 const MULTI_GRID_GAP = 3;
 const MULTI_GRID_GAP_DENSE = 5;
-const IMG_W = (SCREEN_W - 2) / 2;
-const IMG_H = IMG_W * 1.25;
 
 // Per-count compare grid recipes. Each entry is the number of images per row,
 // top → bottom. Cells are all the same square size (sized to the widest row),
@@ -548,8 +546,18 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			letterSpacing: 0.8,
 			color: isDark ? '#fb923c' : '#c2410c',
 		},
-		compareWrap: { flexDirection: 'row' as const, gap: 3, marginTop: 8 },
-		compareCell: { flex: 1, height: IMG_H, overflow: 'hidden' as const },
+		compareSection: {
+			paddingHorizontal: 10,
+			paddingTop: 8,
+			paddingBottom: 4,
+		},
+		compareWrap: { flexDirection: 'row' as const, gap: 6 },
+		compareCell: {
+			flex: 1,
+			aspectRatio: 4 / 5,
+			borderRadius: 14,
+			overflow: 'hidden' as const,
+		},
 		compareCellLoser: { opacity: 0.78 },
 		// Colored glow border on the cell the viewer picked (mirrors web's
 		// `box-shadow: inset 0 0 0 3px <optionColor>`).
@@ -560,10 +568,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			bottom: 0,
 			left: 0,
 			right: 0,
-			paddingTop: 16,
-			paddingBottom: 9,
+			paddingTop: 14,
+			paddingBottom: 10,
 			paddingHorizontal: 8,
 			alignItems: 'center' as const,
+			backgroundColor: 'rgba(0,0,0,0.42)',
+		},
+		pctOverlayPreview: {
+			paddingTop: 10,
+			paddingBottom: 8,
+			backgroundColor: 'rgba(0,0,0,0.36)',
 		},
 		// Percentage shown inside a glassy rounded pill (web `ig-compare-pct-main`).
 		pctMainPill: {
@@ -766,11 +780,19 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontSize: 11,
 			fontWeight: '800' as const,
 		},
-		splitBar: { flexDirection: 'row' as const, height: 5 },
-		splitBarLeft: { backgroundColor: GREEN },
-		splitBarRight: { backgroundColor: ORANGE },
-		voteHintRow: { paddingVertical: 10, alignItems: 'center' as const },
-		voteHintText: { fontSize: 12, color: c.subtext },
+		voteHintRow: {
+			marginHorizontal: 12,
+			marginTop: 6,
+			marginBottom: 2,
+			paddingVertical: 8,
+			paddingHorizontal: 12,
+			borderRadius: 12,
+			backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
+			borderWidth: 1,
+			borderColor: c.border,
+			alignItems: 'center' as const,
+		},
+		voteHintText: { fontSize: 12, fontWeight: '600' as const, color: c.subtext, textAlign: 'center' as const },
 		voteHintRecorded: { color: GREEN, fontWeight: '700' as const },
 		countdownRow: {
 			flexDirection: 'row' as const,
@@ -805,71 +827,165 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontWeight: '700' as const,
 			color: c.subtext,
 		},
-		liveSplit: { paddingHorizontal: 14, paddingBottom: 10 },
-		liveSplitHeader: {
-			flexDirection: 'row' as const,
-			justifyContent: 'space-between' as const,
-			alignItems: 'center' as const,
+		liveSplit: { paddingHorizontal: 10, paddingBottom: 10 },
+		splitPanel: {
+			marginHorizontal: 10,
 			marginBottom: 8,
-		},
-		liveSplitTitle: {
-			fontSize: 11,
-			fontWeight: '800' as const,
-			color: c.text,
-			letterSpacing: 0.8,
-		},
-		liveSplitTotal: { fontSize: 11, color: c.muted },
-		splitOptionRow: {
-			backgroundColor: c.section,
-			borderRadius: 10,
-			padding: 10,
-			marginBottom: 6,
+			padding: 12,
+			borderRadius: 14,
 			borderWidth: 1,
 			borderColor: c.border,
+			backgroundColor: c.section,
+			gap: 10,
 		},
-		splitOptionMeta: {
+		splitPanelFinal: {
+			borderColor: 'rgba(245,158,11,0.35)',
+		},
+		splitPanelHead: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
 			justifyContent: 'space-between' as const,
-			marginBottom: 6,
+			gap: 10,
 		},
-		splitOptionLabel: {
-			fontSize: 13,
-			fontWeight: '600' as const,
-			color: c.text,
-			flex: 1,
-		},
-		splitOptionRight: {
+		splitTitleWrap: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
 			gap: 8,
+			flex: 1,
+			minWidth: 0,
 		},
-		splitOptionCount: {
-			fontSize: 12,
-			color: c.subtext,
-			fontWeight: '600' as const,
-		},
-		seeVotersBtn: {
-			borderWidth: 1,
-			borderColor: c.border,
-			borderRadius: 6,
+		splitLiveBadge: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 5,
 			paddingHorizontal: 8,
 			paddingVertical: 3,
+			borderRadius: 99,
+			backgroundColor: isDark ? 'rgba(6,78,59,0.55)' : '#ecfdf5',
+			borderWidth: 1,
+			borderColor: 'rgba(16,185,129,0.35)',
 		},
-		seeVotersBtnText: {
+		splitLiveDot: {
+			width: 6,
+			height: 6,
+			borderRadius: 3,
+			backgroundColor: '#10b981',
+		},
+		splitLiveText: {
 			fontSize: 10,
-			color: c.subtext,
-			fontWeight: '700' as const,
+			fontWeight: '800' as const,
+			color: isDark ? '#6ee7b7' : '#047857',
+			letterSpacing: 0.8,
 		},
-		optionBarTrack: {
-			height: 4,
+		splitFinalBadge: {
+			paddingHorizontal: 8,
+			paddingVertical: 3,
+			borderRadius: 99,
+			backgroundColor: isDark ? 'rgba(120,53,15,0.45)' : '#fffbeb',
+			borderWidth: 1,
+			borderColor: 'rgba(245,158,11,0.45)',
+		},
+		splitFinalBadgeText: {
+			fontSize: 10,
+			fontWeight: '800' as const,
+			color: isDark ? '#fcd34d' : '#92400e',
+			letterSpacing: 0.8,
+		},
+		splitPanelTitle: {
+			fontSize: 14,
+			fontWeight: '800' as const,
+			color: c.text,
+			flexShrink: 1,
+		},
+		splitPanelMetric: {
+			fontSize: 12,
+			fontWeight: '700' as const,
+			color: c.muted,
+		},
+		splitDuel: {
 			flexDirection: 'row' as const,
-			borderRadius: 2,
+			height: 7,
+			borderRadius: 99,
 			overflow: 'hidden' as const,
 			backgroundColor: c.border,
+			gap: 2,
 		},
-		optionBarFill: { borderRadius: 2 },
-		optionBarEmpty: { backgroundColor: c.border },
+		splitDuelSeg: { minWidth: 2 },
+		splitRows: { gap: 8 },
+		splitRow: {
+			position: 'relative' as const,
+			borderWidth: 1,
+			borderColor: c.border,
+			borderRadius: 12,
+			backgroundColor: c.card,
+			overflow: 'hidden' as const,
+		},
+		splitRowLeader: {
+			borderColor: withAlpha(c.accent, 0.45),
+			shadowColor: '#000',
+			shadowOffset: { width: 0, height: 2 },
+			shadowOpacity: isDark ? 0.25 : 0.08,
+			shadowRadius: 6,
+			elevation: 2,
+		},
+		splitRowWinner: {
+			borderColor: 'rgba(245,158,11,0.45)',
+			borderLeftWidth: 3,
+		},
+		splitRowLoser: { opacity: 0.68 },
+		splitRowFill: {
+			position: 'absolute' as const,
+			left: 0,
+			top: 0,
+			bottom: 0,
+			opacity: 0.2,
+		},
+		splitRowInner: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 8,
+			paddingHorizontal: 12,
+			paddingVertical: 10,
+			minHeight: 46,
+		},
+		splitSwatch: {
+			width: 10,
+			height: 10,
+			borderRadius: 5,
+		},
+		splitRowLabel: {
+			flex: 1,
+			fontSize: 13.5,
+			fontWeight: '700' as const,
+			color: c.text,
+		},
+		splitRowStats: { alignItems: 'flex-end' as const, gap: 1 },
+		splitRowPct: {
+			fontSize: 15,
+			fontWeight: '800' as const,
+			color: c.text,
+		},
+		splitRowCount: {
+			fontSize: 11,
+			fontWeight: '700' as const,
+			color: c.muted,
+		},
+		splitVotersBtn: {
+			borderWidth: 1,
+			borderColor: c.border,
+			borderRadius: 99,
+			paddingHorizontal: 9,
+			paddingVertical: 5,
+			backgroundColor: c.section,
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 4,
+		},
+		splitVotersBtnText: {
+			fontSize: 11,
+			fontWeight: '700' as const,
+			color: c.subtext,
+		},
 		// ── Poll format — stacked option rows (per-option colour + voter chip) ──
 		pollBodyMedia: { paddingHorizontal: 14, paddingBottom: 6, gap: 6 },
 		pollBodyImage: { width: '100%' as const, height: 200, borderRadius: 10 },
@@ -946,16 +1062,21 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		anonRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
-			paddingHorizontal: 14,
-			paddingVertical: 6,
+			paddingHorizontal: 12,
+			paddingVertical: 8,
+			marginHorizontal: 10,
+			marginTop: 4,
 			gap: 8,
+			borderRadius: 12,
+			borderWidth: 1,
+			borderColor: c.border,
+			backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)',
 		},
-		anonIcon: { fontSize: 16 },
 		anonLabel: {
 			flex: 1,
 			fontSize: 12,
 			color: c.subtext,
-			fontWeight: '500' as const,
+			fontWeight: '600' as const,
 		},
 		// ── Two-zone action rail ──
 		// Flush, full-width row separated from the media/vote area by a single
@@ -1563,9 +1684,6 @@ function FeedPostCardComponent({
 	const badgeScale = useRef(
 		Array.from({ length: animSlots }, () => new Animated.Value(0)),
 	).current;
-	const splitLeftAnim = useRef(new Animated.Value(50)).current;
-	const splitRightAnim = useRef(new Animated.Value(50)).current;
-	const splitAnimMounted = useRef(false);
 	const badgeInit = useRef(false);
 	const prevViewer = useRef<FeedPostView['viewerVote'] | undefined>(undefined);
 	const chipScales = useRef(
@@ -1666,6 +1784,8 @@ function FeedPostCardComponent({
 	const leftPct = binaryTotal > 0 ? Math.round((100 * up) / binaryTotal) : 50;
 	const rightPct =
 		binaryTotal > 0 ? Math.round((100 * down) / binaryTotal) : 50;
+	const binaryLeaderPct = Math.max(leftPct, rightPct);
+	const binaryHasTie = binaryTotal > 0 && up === down;
 	// Tie-aware binary winner predicate: on a tie (up === down) BOTH sides win,
 	// so neither image gets the loser dim/scrim. Matches web FeedPostCard.
 	const isBinaryWinnerSide = (side: 0 | 1): boolean => {
@@ -1674,6 +1794,7 @@ function FeedPostCardComponent({
 		return side === 0 ? up > down : down > up;
 	};
 	const hasVoted = viewer !== null || activeMyIdx !== null;
+	const showCompareStats = hasVoted || isVotingClosed;
 
 	// First-run tap-to-vote coach mark — only over a still-votable compare post
 	// the viewer hasn't acted on yet. The feed decides which single card gets it.
@@ -1706,6 +1827,25 @@ function FeedPostCardComponent({
 		return { size, start };
 	});
 	const multiTotal = activeStats?.reduce((sum, s) => sum + s.count, 0) ?? 0;
+	const multiPercents =
+		activeStats?.map((s) => Math.round(s.percentage)) ?? [];
+	const multiLeaderPct =
+		multiPercents.length > 0 ? Math.max(...multiPercents) : null;
+	const multiLeaderCount =
+		multiLeaderPct == null
+			? 0
+			: multiPercents.filter((value) => value === multiLeaderPct).length;
+	const isMultiWinnerIndex = (idx: number): boolean => {
+		if (
+			!isVotingClosed ||
+			multiTotal <= 0 ||
+			multiLeaderPct == null ||
+			multiLeaderPct <= 0
+		) {
+			return false;
+		}
+		return (multiPercents[idx] ?? -1) === multiLeaderPct;
+	};
 
 	// ── Post format flags ──
 	const isAnnouncement = post.format === 'announcement';
@@ -1966,30 +2106,6 @@ function FeedPostCardComponent({
 			}
 		}
 	}, [activeMyIdx, isBinary]); // eslint-disable-line react-hooks/exhaustive-deps
-
-	// Animated split bar
-	useEffect(() => {
-		if (!splitAnimMounted.current) {
-			splitLeftAnim.setValue(leftPct || 50);
-			splitRightAnim.setValue(rightPct || 50);
-			splitAnimMounted.current = true;
-			return;
-		}
-		Animated.parallel([
-			Animated.timing(splitLeftAnim, {
-				toValue: leftPct || 50,
-				duration: 450,
-				easing: Easing.out(Easing.quad),
-				useNativeDriver: false,
-			}),
-			Animated.timing(splitRightAnim, {
-				toValue: rightPct || 50,
-				duration: 450,
-				easing: Easing.out(Easing.quad),
-				useNativeDriver: false,
-			}),
-		]).start();
-	}, [leftPct, rightPct]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const { awardCoins, spendCoins } = useCoins();
 	const [voteMut] = useMutation<VotePostData>(VOTE_POST);
@@ -2767,6 +2883,7 @@ function FeedPostCardComponent({
 				</View>
 			) : compareUrls && !isBinary ? (
 				/* ── Multi-option grid (3+ options) ── */
+				<View style={st.compareSection}>
 				<View style={styles.coachAnchor}>
 				<View style={[styles.multiGrid, { gap: multiGridGap }]}>
 					{compareRowsWithStart.map(({ size, start }, rowIdx) => (
@@ -2854,24 +2971,26 @@ function FeedPostCardComponent({
 													</View>
 												</View>
 											) : (
-												<View style={st.pctOverlay}>
+												<View style={[st.pctOverlay, !showCompareStats && st.pctOverlayPreview]}>
 													<View style={st.pctMainPill}>
 														<Text style={st.pctText}>{pct}%</Text>
 													</View>
 													<Text style={st.pctLabel} numberOfLines={1}>
 														{label}
 													</Text>
-													<View style={st.compareMeter}>
-														<View
-															style={[
-																st.compareMeterFill,
-																{
-																	width: `${Math.max(0, Math.min(100, pct))}%`,
-																	backgroundColor: optionColor,
-																},
-															]}
-														/>
-													</View>
+													{showCompareStats ? (
+														<View style={st.compareMeter}>
+															<View
+																style={[
+																	st.compareMeterFill,
+																	{
+																		width: `${Math.max(0, Math.min(100, pct))}%`,
+																		backgroundColor: optionColor,
+																	},
+																]}
+															/>
+														</View>
+													) : null}
 												</View>
 											)}
 											{useBorderState && isVoted && !isVotingClosed ? (
@@ -2966,7 +3085,9 @@ function FeedPostCardComponent({
 					<VoteCoachmark onDone={() => onCoachmarkDismiss?.('timeout')} />
 				) : null}
 				</View>
+				</View>
 			) : compareUrls ? (
+				<View style={st.compareSection}>
 				<>
 					<View style={styles.coachAnchor}>
 					<View style={st.compareWrap}>
@@ -3007,24 +3128,26 @@ function FeedPostCardComponent({
 											)}
 											cachePolicy='memory-disk'
 										/>
-										<View style={st.pctOverlay}>
+										<View style={[st.pctOverlay, !showCompareStats && st.pctOverlayPreview]}>
 											<View style={st.pctMainPill}>
 												<Text style={st.pctText}>{pct}%</Text>
 											</View>
 											<Text style={st.pctLabel} numberOfLines={1}>
 												{label}
 											</Text>
-											<View style={st.compareMeter}>
-												<View
-													style={[
-														st.compareMeterFill,
-														{
-															width: `${Math.max(0, Math.min(100, pct))}%`,
-															backgroundColor: optionColor,
-														},
-													]}
-												/>
-											</View>
+											{showCompareStats ? (
+												<View style={st.compareMeter}>
+													<View
+														style={[
+															st.compareMeterFill,
+															{
+																width: `${Math.max(0, Math.min(100, pct))}%`,
+																backgroundColor: optionColor,
+															},
+														]}
+													/>
+												</View>
+											) : null}
 										</View>
 										{/* Vote flash */}
 										<Animated.View
@@ -3065,14 +3188,8 @@ function FeedPostCardComponent({
 					) : null}
 					</View>
 
-					{/* Split bar — animated flex */}
-					<View style={st.splitBar}>
-						<Animated.View style={[st.splitBarLeft, { flex: splitLeftAnim }]} />
-						<Animated.View
-							style={[st.splitBarRight, { flex: splitRightAnim }]}
-						/>
-					</View>
 				</>
+				</View>
 			) : post.imageUrls[0] ? (
 				<AdaptiveImage
 					uri={post.imageUrls[0]}
@@ -3086,8 +3203,7 @@ function FeedPostCardComponent({
 			{/* Anonymous vote toggle — always visible while voting is open */}
 			{(compareUrls || isPoll) && !isVotingClosed && isAuthenticated && (
 				<View style={st.anonRow}>
-					<View style={{ flex: 1 }} />
-					<Text style={st.anonIcon}>🙈</Text>
+					<Text style={st.anonLabel}>Vote anonymously</Text>
 					<Switch
 						value={anon}
 						onValueChange={(val) => void handleAnonymousToggle(val)}
@@ -3102,102 +3218,210 @@ function FeedPostCardComponent({
 				<View style={st.voteHintRow}>
 					<Text style={[st.voteHintText, hasVoted && st.voteHintRecorded]}>
 						{hasVoted
-							? '✓ Voted — tap again to unvote · tap other to switch'
-							: isPoll
-								? '👆 Tap an option to cast your vote'
-								: '👆 Tap an image to cast your vote'}
+							? 'Voted — tap again to change or switch'
+							: 'Tap an option to cast your vote'}
 					</Text>
 				</View>
 			) : null}
 
 			{/* spacer removed — status now lives in action rail zone 2 */}
 
-			{/* Live Split — only shown when expanded */}
-			{detailsExpanded && isBinary && binaryTotal > 0 ? (
+			{/* Vote breakdown — only shown when expanded */}
+			{detailsExpanded && isBinary && compareUrls ? (
 				<View style={st.liveSplit}>
-					<View style={st.liveSplitHeader}>
-						<Text style={st.liveSplitTitle}>LIVE SPLIT</Text>
-						<Text style={st.liveSplitTotal}>{binaryTotal} votes</Text>
-					</View>
-					{([0, 1] as const).map((i) => {
-						const count = i === 0 ? up : down;
-						const pct = i === 0 ? leftPct : rightPct;
-						const label = compareLabel(post, i);
-						const barColor = i === 0 ? GREEN : ORANGE;
-						return (
-							<View key={i} style={st.splitOptionRow}>
-								<View style={st.splitOptionMeta}>
-									<Text style={st.splitOptionLabel} numberOfLines={1}>
-										{label}
-									</Text>
-									<View style={st.splitOptionRight}>
-										<Text style={st.splitOptionCount}>
-											{count} · {pct}%
-										</Text>
-										<Pressable
-											style={st.seeVotersBtn}
-											onPress={() => openVoters(i)}>
-											<Text style={st.seeVotersBtnText}>SEE VOTERS</Text>
-										</Pressable>
+					<View
+						style={[
+							st.splitPanel,
+							isVotingClosed ? st.splitPanelFinal : null,
+						]}>
+						<View style={st.splitPanelHead}>
+							<View style={st.splitTitleWrap}>
+								{isVotingClosed ? (
+									<View style={st.splitFinalBadge}>
+										<Text style={st.splitFinalBadgeText}>FINAL</Text>
 									</View>
-								</View>
-								<View style={st.optionBarTrack}>
-									<View
-										style={[
-											st.optionBarFill,
-											{ flex: pct, backgroundColor: barColor },
-										]}
-									/>
-									<View style={[st.optionBarEmpty, { flex: 100 - pct }]} />
-								</View>
+								) : (
+									<View style={st.splitLiveBadge}>
+										<View style={st.splitLiveDot} />
+										<Text style={st.splitLiveText}>LIVE</Text>
+									</View>
+								)}
+								<Text style={st.splitPanelTitle} numberOfLines={1}>
+									{isVotingClosed ? 'Results' : 'Vote breakdown'}
+								</Text>
 							</View>
-						);
-					})}
+							<Text style={st.splitPanelMetric}>
+								{binaryTotal > 0 ? `${binaryTotal} votes` : 'No votes yet'}
+							</Text>
+						</View>
+						{binaryTotal > 0 ? (
+							<View style={st.splitDuel}>
+								<View
+									style={[
+										st.splitDuelSeg,
+										{ flex: leftPct, backgroundColor: GREEN },
+									]}
+								/>
+								<View
+									style={[
+										st.splitDuelSeg,
+										{ flex: rightPct, backgroundColor: ORANGE },
+									]}
+								/>
+							</View>
+						) : null}
+						<View style={st.splitRows}>
+							{([0, 1] as const).map((i) => {
+								const count = i === 0 ? up : down;
+								const pct = i === 0 ? leftPct : rightPct;
+								const label = compareLabel(post, i);
+								const barColor = i === 0 ? GREEN : ORANGE;
+								const isLeader =
+									!binaryHasTie &&
+									binaryTotal > 0 &&
+									pct === binaryLeaderPct &&
+									pct > 0;
+								const isFinalWinner = isBinaryWinnerSide(i);
+								return (
+									<View
+										key={i}
+										style={[
+											st.splitRow,
+											isLeader ? st.splitRowLeader : null,
+											isFinalWinner ? st.splitRowWinner : null,
+											isVotingClosed && !isFinalWinner
+												? st.splitRowLoser
+												: null,
+										]}>
+										<View
+											pointerEvents='none'
+											style={[
+												st.splitRowFill,
+												{
+													width: `${pct}%`,
+													backgroundColor: barColor,
+													opacity: isLeader ? 0.28 : 0.2,
+												},
+											]}
+										/>
+										<View style={st.splitRowInner}>
+											<View
+												style={[
+													st.splitSwatch,
+													{ backgroundColor: barColor },
+												]}
+											/>
+											<Text style={st.splitRowLabel} numberOfLines={1}>
+												{isFinalWinner ? '🥇 ' : ''}
+												{label}
+											</Text>
+											<View style={st.splitRowStats}>
+												<Text style={st.splitRowPct}>{pct}%</Text>
+												<Text style={st.splitRowCount}>{count}</Text>
+											</View>
+											<Pressable
+												style={st.splitVotersBtn}
+												onPress={() => openVoters(i)}
+												hitSlop={6}>
+												<Text style={st.splitVotersBtnText}>👥 Voters</Text>
+											</Pressable>
+										</View>
+									</View>
+								);
+							})}
+						</View>
+					</View>
 				</View>
 			) : null}
 
-			{/* Multi-compare Live Split — only shown when expanded */}
-			{detailsExpanded && !isBinary && !isPoll && multiTotal > 0 ? (
+			{/* Multi-compare breakdown — only shown when expanded */}
+			{detailsExpanded && !isBinary && !isPoll && compareUrls ? (
 				<View style={st.liveSplit}>
-					<View style={st.liveSplitHeader}>
-						<Text style={st.liveSplitTitle}>LIVE SPLIT</Text>
-						<Text style={st.liveSplitTotal}>{multiTotal} votes</Text>
-					</View>
-					{(activeStats ?? []).map((stat) => {
-						const pct = Math.round(stat.percentage);
-						return (
-							<View key={stat.index} style={st.splitOptionRow}>
-								<View style={st.splitOptionMeta}>
-									<Text style={st.splitOptionLabel} numberOfLines={1}>
-										{stat.label}
-									</Text>
-									<View style={st.splitOptionRight}>
-										<Text style={st.splitOptionCount}>
-											{stat.count} · {pct}%
-										</Text>
-										<Pressable
-											style={st.seeVotersBtn}
-											onPress={() => openVoters(stat.index)}>
-											<Text style={st.seeVotersBtnText}>SEE VOTERS</Text>
-										</Pressable>
+					<View
+						style={[
+							st.splitPanel,
+							isVotingClosed ? st.splitPanelFinal : null,
+						]}>
+						<View style={st.splitPanelHead}>
+							<View style={st.splitTitleWrap}>
+								{isVotingClosed ? (
+									<View style={st.splitFinalBadge}>
+										<Text style={st.splitFinalBadgeText}>FINAL</Text>
 									</View>
-								</View>
-								<View style={st.optionBarTrack}>
-									<View
-										style={[
-											st.optionBarFill,
-											{
-													flex: pct || 1,
-													backgroundColor:
-														MULTI_SPLIT_COLORS[stat.index % 10],
-												},
-										]}
-									/>
-									<View style={[st.optionBarEmpty, { flex: 100 - pct || 1 }]} />
-								</View>
+								) : (
+									<View style={st.splitLiveBadge}>
+										<View style={st.splitLiveDot} />
+										<Text style={st.splitLiveText}>LIVE</Text>
+									</View>
+								)}
+								<Text style={st.splitPanelTitle} numberOfLines={1}>
+									{isVotingClosed ? 'Results' : 'Vote breakdown'}
+								</Text>
 							</View>
-						);
-					})}
+							<Text style={st.splitPanelMetric}>
+								{multiTotal > 0 ? `${multiTotal} votes` : 'No votes yet'}
+							</Text>
+						</View>
+						<View style={st.splitRows}>
+							{(activeStats ?? []).map((stat) => {
+								const pct = Math.round(stat.percentage);
+								const optColor =
+									MULTI_SPLIT_COLORS[stat.index % MULTI_SPLIT_COLORS.length];
+								const isLeader =
+									multiLeaderPct != null &&
+									multiLeaderPct > 0 &&
+									multiLeaderCount === 1 &&
+									pct === multiLeaderPct;
+								const isFinalWinner = isMultiWinnerIndex(stat.index);
+								return (
+									<View
+										key={stat.index}
+										style={[
+											st.splitRow,
+											isLeader ? st.splitRowLeader : null,
+											isFinalWinner ? st.splitRowWinner : null,
+											isVotingClosed && !isFinalWinner
+												? st.splitRowLoser
+												: null,
+										]}>
+										<View
+											pointerEvents='none'
+											style={[
+												st.splitRowFill,
+												{
+													width: `${pct}%`,
+													backgroundColor: optColor,
+													opacity: isLeader ? 0.28 : 0.2,
+												},
+											]}
+										/>
+										<View style={st.splitRowInner}>
+											<View
+												style={[
+													st.splitSwatch,
+													{ backgroundColor: optColor },
+												]}
+											/>
+											<Text style={st.splitRowLabel} numberOfLines={1}>
+												{isFinalWinner ? '🥇 ' : ''}
+												{stat.label}
+											</Text>
+											<View style={st.splitRowStats}>
+												<Text style={st.splitRowPct}>{pct}%</Text>
+												<Text style={st.splitRowCount}>{stat.count}</Text>
+											</View>
+											<Pressable
+												style={st.splitVotersBtn}
+												onPress={() => openVoters(stat.index)}
+												hitSlop={6}>
+												<Text style={st.splitVotersBtnText}>👥 Voters</Text>
+											</Pressable>
+										</View>
+									</View>
+								);
+							})}
+						</View>
+					</View>
 				</View>
 			) : null}
 
@@ -4194,6 +4418,7 @@ const styles = StyleSheet.create({
 	// Multi-option grid (3–4 options)
 	multiGrid: {
 		flexDirection: 'column',
+		paddingHorizontal: 2,
 	},
 	multiRow: {
 		flexDirection: 'row',

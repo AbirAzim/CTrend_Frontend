@@ -123,7 +123,7 @@ export function LoginPage() {
               minLength={8}
             />
           </label>
-          <Link to="/forgot-password" className="btn-ghost auth-forgot-btn">
+          <Link to="/forgot-password" className="auth-forgot-btn">
             Forgot password?
           </Link>
           {loginLoading && <p className="muted small">Signing in…</p>}
