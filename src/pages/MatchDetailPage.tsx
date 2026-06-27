@@ -12,6 +12,7 @@ import {
 import {
   formatKnockoutScoreLines,
   hasKnockoutScoreBreakdown,
+  matchTopPlayerLabel,
 } from "@ctrend/shared/lib/matchScoreCopy";
 import { isKnockoutStage } from "@ctrend/shared/lib/knockoutFixture";
 
@@ -1120,7 +1121,7 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
             </span>
           </div>
           <div className="md-motm-info">
-            <span className="md-motm-label">{live ? "Best Player So Far" : "Man of the Match"}</span>
+            <span className="md-motm-label">{matchTopPlayerLabel(live)}</span>
             <span className="md-motm-name">{star.name}</span>
             <span className="md-motm-team">{star.team === "home" ? homeTeam.name : awayTeam.name}</span>
           </div>

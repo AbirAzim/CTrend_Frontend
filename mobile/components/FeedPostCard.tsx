@@ -4664,12 +4664,19 @@ function MatchDetailRow({
 		const dotColor = isHt ? '#f59e0b' : '#22c55e';
 		const footBg = isHt
 			? isDark
-				? 'rgba(245,158,11,0.12)'
+				? 'rgba(245,158,11,0.2)'
 				: 'rgba(245,158,11,0.08)'
 			: isDark
-				? 'rgba(99,102,241,0.14)'
+				? 'rgba(0,149,246,0.16)'
 				: 'rgba(99,102,241,0.07)';
-		const footTitleColor = isHt ? '#d97706' : colors.accent;
+		const footTitleColor = isHt
+			? isDark
+				? '#fbbf24'
+				: '#d97706'
+			: isDark
+				? colors.accentLight
+				: colors.accent;
+		const footSubColor = isDark ? 'rgba(250,250,250,0.78)' : colors.subtext;
 
 		return (
 			<Pressable
@@ -4710,7 +4717,7 @@ function MatchDetailRow({
 					<Text style={[mdrStyles.livePanelFootTitle, { color: footTitleColor }]}>
 						Match center
 					</Text>
-					<Text style={[mdrStyles.livePanelFootSub, { color: colors.muted }]} numberOfLines={1}>
+					<Text style={[mdrStyles.livePanelFootSub, { color: footSubColor }]} numberOfLines={1}>
 						Stats · lineups · events
 					</Text>
 					<Text style={[mdrStyles.livePanelChevron, { color: footTitleColor }]}>›</Text>

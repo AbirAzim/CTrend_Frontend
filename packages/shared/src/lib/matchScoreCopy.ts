@@ -79,3 +79,8 @@ export function formatKnockoutScoreLines(ms: MatchScoreBreakdown): string[] {
   if (pens) lines.push(pens);
   return lines;
 }
+
+/** Top-rated player card label — MoTM only after full time. */
+export function matchTopPlayerLabel(isLiveMatch: boolean): string {
+  return isLiveMatch ? "Best Player So Far" : "Man of the Match";
+}

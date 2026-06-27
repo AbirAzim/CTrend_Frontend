@@ -28,6 +28,7 @@ import {
 import {
 	formatKnockoutScoreLines,
 	hasKnockoutScoreBreakdown,
+	matchTopPlayerLabel,
 } from '@ctrend/shared/lib/matchScoreCopy';
 import { isKnockoutStage } from '@ctrend/shared/lib/knockoutFixture';
 import { useTheme } from '../../../context/ThemeContext';
@@ -395,7 +396,7 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 						</View>
 					</View>
 					<View style={mh.motmInfo}>
-						<Text style={mh.motmLabel}>MAN OF THE MATCH</Text>
+						<Text style={mh.motmLabel}>{matchTopPlayerLabel(live).toUpperCase()}</Text>
 						<Text style={[mh.motmName, { color: textPrimary }]}>{star.name}</Text>
 						<Text style={[mh.motmTeam, { color: textMuted }]}>
 							{star.team === 'home' ? fixture.homeTeam.name : fixture.awayTeam.name}
