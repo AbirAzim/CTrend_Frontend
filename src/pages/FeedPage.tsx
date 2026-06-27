@@ -502,13 +502,35 @@ export function FeedPage() {
     setSearchParams(next, { replace: true });
   }
 
-  const activeTab = feedFilter === "community" ? "community" : "all";
+  const mainFeedFilters = ["all", "platform", "community", "friend"] as const;
+  type MainFeedFilter = (typeof mainFeedFilters)[number];
+  const activeTab: MainFeedFilter = mainFeedFilters.includes(feedFilter as MainFeedFilter)
+    ? (feedFilter as MainFeedFilter)
+    : "all";
+
+  const emptyFeedCopy: Record<MainFeedFilter, { title: string; desc: string }> = {
+    all: {
+      title: "Nothing here yet",
+      desc: "Follow people to see their posts here. Official platform polls from Ke Jitbe are mixed into your feed when available.",
+    },
+    platform: {
+      title: "No platform posts yet",
+      desc: "Official polls, campaigns, and announcements from Ke Jitbe will show up here.",
+    },
+    community: {
+      title: "No community posts yet",
+      desc: "Global broadcasts plus posts from you and people you follow appear here.",
+    },
+    friend: {
+      title: "No friend posts yet",
+      desc: "Posts from you and people you follow — without global broadcasts — show here.",
+    },
+  };
 
   const filterTabs = [
     {
-      id: "all",
+      id: "all" as const,
       label: "All",
-      tabKey: "all",
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -517,13 +539,30 @@ export function FeedPage() {
       ),
     },
     {
-      id: "community",
+      id: "platform" as const,
+      label: "Platform",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 2 L2 7 L12 12 L22 7 Z"/><path d="M2 17 L12 22 L22 17"/><path d="M2 12 L12 17 L22 12"/>
+        </svg>
+      ),
+    },
+    {
+      id: "community" as const,
       label: "Community",
-      tabKey: "community",
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="9" cy="7" r="3"/><path d="M3 20 C3 16.7 5.7 14 9 14"/><circle cx="17" cy="9" r="2.5"/>
           <path d="M12 20 C12 17 14.2 14.8 17 14.8 C19.8 14.8 22 17 22 20"/>
+        </svg>
+      ),
+    },
+    {
+      id: "friend" as const,
+      label: "Friend",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="8" r="4"/><path d="M4 20 C4 16.7 7.6 14 12 14 C16.4 14 20 16.7 20 20"/>
         </svg>
       ),
     },
@@ -596,10 +635,7 @@ export function FeedPage() {
                     type="button"
                     aria-selected={active}
                     className={`ff-tab${active ? " ff-tab--active" : ""}`}
-                    onClick={() => {
-                      if (id === "community") setFeedFilter("community");
-                      else setFeedFilter("all");
-                    }}
+                    onClick={() => setFeedFilter(id)}
                   >
                     <span className="ff-tab-icon">{icon}</span>
                     <span className="ff-tab-label">{label}</span>
@@ -637,12 +673,9 @@ export function FeedPage() {
 
         {showEmpty && (
           <div className="ig-feed-empty-state">
-            <p className="ig-feed-empty-title">Nothing here yet</p>
-            <p className="ig-feed-empty-desc">
-              Follow people to see their posts here. Official platform polls from
-              Ke Jitbe are mixed into your feed when available.
-            </p>
-            {isAuthenticated && (
+            <p className="ig-feed-empty-title">{emptyFeedCopy[activeTab].title}</p>
+            <p className="ig-feed-empty-desc">{emptyFeedCopy[activeTab].desc}</p>
+            {isAuthenticated && activeTab !== "platform" && (
               <p className="muted small">
                 Check the <strong>Suggestions</strong> panel to find people to follow.
               </p>

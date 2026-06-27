@@ -8,24 +8,23 @@ type Props = {
 	campaignOptions?: { id: string; name: string }[];
 };
 
-const TABS = [
-	{ key: 'all', label: 'All', icon: 'apps-outline' as keyof typeof Ionicons.glyphMap },
-	{ key: 'community', label: 'Community', icon: 'people-outline' as keyof typeof Ionicons.glyphMap },
+const MAIN_FILTERS = ['all', 'platform', 'community', 'friend'] as const;
+type MainFeedFilter = (typeof MAIN_FILTERS)[number];
+
+const TABS: { key: MainFeedFilter; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+	{ key: 'all', label: 'All', icon: 'apps-outline' },
+	{ key: 'platform', label: 'Platform', icon: 'layers-outline' },
+	{ key: 'community', label: 'Community', icon: 'people-outline' },
+	{ key: 'friend', label: 'Friend', icon: 'person-outline' },
 ];
 
-function getActiveTab(filter: string): string {
-	if (filter === 'community' || filter === 'friend') return 'community';
-	return 'all';
+function getActiveTab(filter: string): MainFeedFilter {
+	return MAIN_FILTERS.includes(filter as MainFeedFilter) ? (filter as MainFeedFilter) : 'all';
 }
 
 export function FeedCampaignFilter({ activeFilter, onFilterChange }: Props) {
 	const { colors, isDark } = useTheme();
 	const activeTab = getActiveTab(activeFilter);
-
-	function handleTabPress(key: string) {
-		if (key === 'community') onFilterChange('community');
-		else onFilterChange('all');
-	}
 
 	return (
 		<View style={[styles.container, { backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
@@ -36,14 +35,14 @@ export function FeedCampaignFilter({ activeFilter, onFilterChange }: Props) {
 						<TouchableOpacity
 							key={tab.key}
 							style={styles.tab}
-							onPress={() => handleTabPress(tab.key)}
+							onPress={() => onFilterChange(tab.key)}
 							activeOpacity={0.7}
 							accessibilityRole="tab"
 							accessibilityState={{ selected: isActive }}
 						>
 							<Ionicons
 								name={tab.icon}
-								size={17}
+								size={16}
 								color={isActive ? (isDark ? '#ffffff' : colors.text) : (isDark ? '#71717a' : colors.muted)}
 							/>
 							<Text
@@ -80,7 +79,7 @@ const styles = StyleSheet.create({
 	tabRow: {
 		flexDirection: 'row',
 		paddingVertical: 4,
-		paddingHorizontal: 8,
+		paddingHorizontal: 4,
 		alignItems: 'center',
 	},
 	tabDivider: {
@@ -93,22 +92,22 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		paddingVertical: 8,
-		paddingHorizontal: 2,
+		paddingHorizontal: 1,
 		gap: 3,
 		position: 'relative',
 	},
 	tabIndicator: {
 		position: 'absolute',
 		bottom: 0,
-		left: '20%',
-		right: '20%',
+		left: '16%',
+		right: '16%',
 		height: 2,
 		borderRadius: 999,
 	},
 	tabLabel: {
-		fontSize: 10,
+		fontSize: 9,
 		fontWeight: '600',
-		letterSpacing: 0.1,
+		letterSpacing: 0,
 	},
 	tabLabelActive: {
 		fontWeight: '800',

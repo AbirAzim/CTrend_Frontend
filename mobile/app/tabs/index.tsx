@@ -516,8 +516,24 @@ export default function FeedScreen() {
           ListEmptyComponent={
             !loading ? (
               <View style={styles.empty}>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>Nothing here yet</Text>
-                <Text style={[styles.emptySub, { color: colors.subtext }]}>Follow people to see posts here.</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  {feedFilter === "platform"
+                    ? "No platform posts yet"
+                    : feedFilter === "community"
+                      ? "No community posts yet"
+                      : feedFilter === "friend"
+                        ? "No friend posts yet"
+                        : "Nothing here yet"}
+                </Text>
+                <Text style={[styles.emptySub, { color: colors.subtext }]}>
+                  {feedFilter === "platform"
+                    ? "Official polls, campaigns, and announcements from Ke Jitbe will show up here."
+                    : feedFilter === "community"
+                      ? "Global broadcasts plus posts from you and people you follow appear here."
+                      : feedFilter === "friend"
+                        ? "Posts from you and people you follow — without global broadcasts — show here."
+                        : "Follow people to see posts here."}
+                </Text>
               </View>
             ) : null
           }

@@ -1857,6 +1857,18 @@ html[data-topbar-hidden="true"] .ff-bar-outer {
 .ff-tab--active .ff-tab-icon { opacity: 1; }
 .ff-tab-label { line-height: 1.2; }
 
+@media (max-width: 480px) {
+  .ff-tab {
+    padding: 8px 2px;
+    font-size: 0.68rem;
+    gap: 4px;
+  }
+  .ff-tab-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 /* Full-width sub-row below the tab bar */
 .ff-subrow {
   display: flex;
