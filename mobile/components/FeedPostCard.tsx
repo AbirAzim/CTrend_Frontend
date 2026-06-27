@@ -1527,6 +1527,169 @@ function LiveDot({ light = false, color }: { light?: boolean; color?: string }) 
 	);
 }
 
+function LiveMatchPanel({
+	fixtureId,
+	isLive,
+	isHt,
+	isDark,
+	animate,
+	colors,
+	dotColor,
+	footBg,
+	footTitleColor,
+	footSubColor,
+	liveStatusPill,
+	effectiveMinute,
+	teamA,
+	teamB,
+	home,
+	away,
+}: {
+	fixtureId: string;
+	isLive: boolean;
+	isHt: boolean;
+	isDark: boolean;
+	animate: boolean;
+	colors: ReturnType<typeof useTheme>['colors'];
+	dotColor: string;
+	footBg: string;
+	footTitleColor: string;
+	footSubColor: string;
+	liveStatusPill: string;
+	effectiveMinute: number | null;
+	teamA: string;
+	teamB: string;
+	home: number;
+	away: number;
+}) {
+	const glow = useRef(new Animated.Value(0.4)).current;
+	const footShimmer = useRef(new Animated.Value(0)).current;
+	const ringColor = isHt ? '#f59e0b' : isDark ? '#0095f6' : '#6366f1';
+
+	useEffect(() => {
+		if (!animate) {
+			glow.setValue(0.45);
+			footShimmer.setValue(0);
+			return;
+		}
+		const glowLoop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(glow, {
+					toValue: 1,
+					duration: 1300,
+					easing: Easing.inOut(Easing.sin),
+					useNativeDriver: true,
+				}),
+				Animated.timing(glow, {
+					toValue: 0.32,
+					duration: 1300,
+					easing: Easing.inOut(Easing.sin),
+					useNativeDriver: true,
+				}),
+			]),
+		);
+		const shimmerLoop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(footShimmer, {
+					toValue: 1,
+					duration: 2000,
+					easing: Easing.inOut(Easing.ease),
+					useNativeDriver: true,
+				}),
+				Animated.timing(footShimmer, {
+					toValue: 0,
+					duration: 2000,
+					easing: Easing.inOut(Easing.ease),
+					useNativeDriver: true,
+				}),
+			]),
+		);
+		glowLoop.start();
+		shimmerLoop.start();
+		return () => {
+			glowLoop.stop();
+			shimmerLoop.stop();
+		};
+	}, [animate, glow, footShimmer]);
+
+	const footHighlightOpacity = footShimmer.interpolate({
+		inputRange: [0, 1],
+		outputRange: [0, isDark ? 0.18 : 0.12],
+	});
+
+	return (
+		<View style={mdrStyles.livePanelWrap}>
+			<Animated.View
+				pointerEvents="none"
+				style={[
+					mdrStyles.livePanelGlow,
+					{
+						borderColor: ringColor,
+						opacity: glow,
+						shadowColor: ringColor,
+						shadowOpacity: glow,
+						shadowRadius: 14,
+						shadowOffset: { width: 0, height: 0 },
+						...(Platform.OS === 'android' ? { elevation: 6 } : {}),
+					},
+				]}
+			/>
+			<Pressable
+				style={({ pressed }) => [
+					mdrStyles.livePanel,
+					{
+						backgroundColor: colors.card,
+						borderColor: colors.border,
+						opacity: pressed ? 0.94 : 1,
+						transform: [{ scale: pressed ? 0.99 : 1 }],
+					},
+				]}
+				onPress={() =>
+					router.push(`/world-cup/match/${fixtureId}` as `/${string}`)
+				}
+			>
+				<View style={mdrStyles.livePanelHead}>
+					<LiveDot color={dotColor} />
+					<Text style={[mdrStyles.livePanelStatus, { color: colors.subtext }]}>
+						{liveStatusPill}
+						{isLive && effectiveMinute != null ? ` · ${effectiveMinute}'` : ''}
+					</Text>
+				</View>
+				<View style={mdrStyles.livePanelBody}>
+					<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
+						{teamA}
+					</Text>
+					<Text style={[mdrStyles.livePanelScore, { color: colors.text }]}>
+						{home}
+						<Text style={[mdrStyles.livePanelScoreDash, { color: colors.muted }]}> – </Text>
+						{away}
+					</Text>
+					<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
+						{teamB}
+					</Text>
+				</View>
+				<View style={[mdrStyles.livePanelFoot, { backgroundColor: footBg, borderTopColor: colors.border }]}>
+					<Animated.View
+						pointerEvents="none"
+						style={[
+							StyleSheet.absoluteFillObject,
+							mdrStyles.livePanelFootHighlight,
+							{ backgroundColor: footTitleColor, opacity: footHighlightOpacity },
+						]}
+					/>
+					<Text style={[mdrStyles.livePanelFootTitle, { color: footTitleColor }]}>
+						Match center
+					</Text>
+					<Text style={[mdrStyles.livePanelFootSub, { color: footSubColor }]} numberOfLines={1}>
+						Stats · lineups · events
+					</Text>
+					<Text style={[mdrStyles.livePanelChevron, { color: footTitleColor }]}>›</Text>
+				</View>
+			</Pressable>
+		</View>
+	);
+}
+
 // Sizes its container to the image's own aspect ratio (clamped) instead of a fixed
 // 16:9 box, so portrait/square images neither crop (cover) nor letterbox (contain).
 const MIN_IMG_RATIO = 0.66;
@@ -3514,6 +3677,7 @@ function FeedPostCardComponent({
 					]}
 					effectiveMinute={liveMinute}
 					liveStatusPill={liveStatusPill}
+					animateLive={isViewable && isLiveMatch}
 				/>
 			) : null}
 
@@ -4638,12 +4802,14 @@ function MatchDetailRow({
 	teams,
 	effectiveMinute,
 	liveStatusPill,
+	animateLive = true,
 }: {
 	fixtureId: string;
 	matchScore: MatchScore;
 	teams: [string | null, string | null];
 	effectiveMinute: number | null;
 	liveStatusPill: string;
+	animateLive?: boolean;
 }) {
 	const { colors, isDark } = useTheme();
 	const isLive = matchScore?.status === 'IN_PLAY';
@@ -4679,50 +4845,24 @@ function MatchDetailRow({
 		const footSubColor = isDark ? 'rgba(250,250,250,0.78)' : colors.subtext;
 
 		return (
-			<Pressable
-				style={({ pressed }) => [
-					mdrStyles.livePanel,
-					{
-						backgroundColor: colors.card,
-						borderColor: colors.border,
-						opacity: pressed ? 0.94 : 1,
-						transform: [{ scale: pressed ? 0.99 : 1 }],
-					},
-				]}
-				onPress={() =>
-					router.push(`/world-cup/match/${fixtureId}` as `/${string}`)
-				}
-			>
-				<View style={mdrStyles.livePanelHead}>
-					<LiveDot color={dotColor} />
-					<Text style={[mdrStyles.livePanelStatus, { color: colors.subtext }]}>
-						{liveStatusPill}
-						{isLive && effectiveMinute != null ? ` · ${effectiveMinute}'` : ''}
-					</Text>
-				</View>
-				<View style={mdrStyles.livePanelBody}>
-					<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
-						{teamA}
-					</Text>
-					<Text style={[mdrStyles.livePanelScore, { color: colors.text }]}>
-						{home}
-						<Text style={[mdrStyles.livePanelScoreDash, { color: colors.muted }]}> – </Text>
-						{away}
-					</Text>
-					<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
-						{teamB}
-					</Text>
-				</View>
-				<View style={[mdrStyles.livePanelFoot, { backgroundColor: footBg, borderTopColor: colors.border }]}>
-					<Text style={[mdrStyles.livePanelFootTitle, { color: footTitleColor }]}>
-						Match center
-					</Text>
-					<Text style={[mdrStyles.livePanelFootSub, { color: footSubColor }]} numberOfLines={1}>
-						Stats · lineups · events
-					</Text>
-					<Text style={[mdrStyles.livePanelChevron, { color: footTitleColor }]}>›</Text>
-				</View>
-			</Pressable>
+			<LiveMatchPanel
+				fixtureId={fixtureId}
+				isLive={isLive}
+				isHt={isHt}
+				isDark={isDark}
+				animate={animateLive}
+				colors={colors}
+				dotColor={dotColor}
+				footBg={footBg}
+				footTitleColor={footTitleColor}
+				footSubColor={footSubColor}
+				liveStatusPill={liveStatusPill}
+				effectiveMinute={effectiveMinute}
+				teamA={teamA}
+				teamB={teamB}
+				home={home}
+				away={away}
+			/>
 		);
 	}
 
@@ -4757,10 +4897,22 @@ function MatchDetailRow({
 }
 
 const mdrStyles = StyleSheet.create({
-	livePanel: {
+	livePanelWrap: {
+		position: 'relative',
 		marginHorizontal: 12,
 		marginTop: 4,
 		marginBottom: 10,
+	},
+	livePanelGlow: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		borderRadius: 16,
+		borderWidth: 2,
+	},
+	livePanel: {
 		borderRadius: 16,
 		borderWidth: 1,
 		overflow: 'hidden',
@@ -4811,6 +4963,12 @@ const mdrStyles = StyleSheet.create({
 		paddingHorizontal: 14,
 		paddingVertical: 11,
 		borderTopWidth: StyleSheet.hairlineWidth,
+		overflow: 'hidden',
+		position: 'relative',
+	},
+	livePanelFootHighlight: {
+		borderBottomLeftRadius: 16,
+		borderBottomRightRadius: 16,
 	},
 	livePanelFootTitle: {
 		fontSize: 13,
