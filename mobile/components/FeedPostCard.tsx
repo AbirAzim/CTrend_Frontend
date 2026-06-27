@@ -55,6 +55,7 @@ import type { FeedPostView } from '@ctrend/shared/types/feed';
 import { useAuth } from '../context/AuthContext';
 import { useCoins } from '../context/CoinsContext';
 import { COIN_AMOUNTS } from '@ctrend/shared/lib/coins';
+import { isResolvedCampaignWinner } from '@ctrend/shared/lib/campaignWinner';
 import { MatchPrediction } from './MatchPrediction';
 import { useTheme } from '../context/ThemeContext';
 import type { ColorPalette } from '../context/ThemeContext';
@@ -2466,7 +2467,10 @@ function FeedPostCardComponent({
 
 	// Campaign match lifecycle
 	const isMatchPost = Boolean(post.matchType);
-	const showCampaignWinner = Boolean(post.campaignWinner) && isMatchPost;
+	const showCampaignWinner =
+		Boolean(post.campaignWinner) &&
+		isResolvedCampaignWinner(post.campaignWinner) &&
+		isMatchPost;
 	const campaignWinnerOptionLabel =
 		post.campaignWinner?.winningOption != null
 			? compareLabel(post, post.campaignWinner.winningOption)

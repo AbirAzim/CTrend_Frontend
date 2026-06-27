@@ -2,6 +2,13 @@ import { useQuery } from "@apollo/client";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCallback, useState } from "react";
 import { WORLD_CUP_FIXTURE_DETAILS } from "../graphql/worldcup";
+import {
+  compareEventsByMinute,
+  effectiveEventMinute,
+  enrichEventMapFromPlayerStats,
+  isScoredGoal as isScoredGoalEvent,
+  normalizePlayerName,
+} from "../../packages/shared/src/lib/matchEvents";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,18 +143,14 @@ function buildPhotoMap(lineups: MatchLineup[]): Map<number, string> {
 /** A real scored goal — excludes disallowed goals, missed penalties, and
  * penalty-shootout goals (API-Football marks all of these as type "Goal"). */
 function isScoredGoal(e: { type: string; detail?: string | null }): boolean {
-  if (e.type !== "Goal") return false;
-  const d = (e.detail || "").toLowerCase();
-  return (
-    !d.includes("disallow") && !d.includes("missed") && !d.includes("shootout")
-  );
+  return isScoredGoalEvent(e);
 }
 
 // Goal scorers per team
 function goalScorers(events: MatchEvent[], team: "home" | "away") {
   return events
     .filter((e) => isScoredGoal(e) && e.team === team)
-    .sort((a, b) => a.time - b.time)
+    .sort(compareEventsByMinute)
     .map((e) => {
       const min = minuteLabel(e);
       const name = shortName(e.player.name);
@@ -173,7 +176,7 @@ function motm(
     const base = parseFloat(r.rating ?? "0");
     const ev =
       (r.playerId != null && evMap.get(`id:${r.playerId}`)) ||
-      (r.name && evMap.get(`nm:${r.name.toLowerCase().trim()}`)) ||
+      (r.name && evMap.get(`nm:${normalizePlayerName(r.name)}`)) ||
       null;
     if (!ev) return base;
     return base + ev.goals * 0.35 + ev.assists * 0.15 - ev.ownGoals * 0.5;
@@ -195,11 +198,11 @@ function deriveHalfScore(events: MatchEvent[]) {
 
 type PEvt = { goals: number; ownGoals: number; assists: number; card: "yellow" | "red" | null; subOff: boolean; subOn: boolean };
 
-function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
+function buildPlayerEventMap(events: MatchEvent[], playerMatchStats?: PlayerMatchStat[]): Map<string, PEvt> {
   const map = new Map<string, PEvt>();
   const ensure = (p: EventPlayer): PEvt => {
     const idKey = p.id != null ? `id:${p.id}` : null;
-    const nmKey = p.name ? `nm:${p.name.toLowerCase().trim()}` : null;
+    const nmKey = p.name ? `nm:${normalizePlayerName(p.name)}` : null;
     const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
     const pev: PEvt = existing ?? { goals: 0, ownGoals: 0, assists: 0, card: null, subOff: false, subOn: false };
     if (idKey) map.set(idKey, pev);
@@ -228,11 +231,12 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
       }
     }
   }
+  enrichEventMapFromPlayerStats(playerMatchStats, ensure);
   return map;
 }
 
 function pEvtKey(p: LineupPlayer): string {
-  return p.id != null ? `id:${p.id}` : `nm:${p.name.toLowerCase().trim()}`;
+  return p.id != null ? `id:${p.id}` : `nm:${normalizePlayerName(p.name)}`;
 }
 
 // ─── Goal bar ─────────────────────────────────────────────────────────────────
@@ -244,10 +248,10 @@ function GoalBar({ events, homeTeam, awayTeam }: {
 }) {
   const goals = events
     .filter(isScoredGoal)
-    .sort((a, b) => a.time - b.time);
+    .sort(compareEventsByMinute);
   if (!goals.length) return null;
 
-  const maxTime = Math.max(90, ...goals.map(e => e.time));
+  const maxTime = Math.max(90, ...goals.map(effectiveEventMinute));
   const homeGoals = goals.filter(g => g.team === "home");
   const awayGoals = goals.filter(g => g.team === "away");
 
@@ -270,7 +274,7 @@ function GoalBar({ events, homeTeam, awayTeam }: {
             <span
               key={i}
               className={`md-gbar-tick md-gbar-tick--${g.team}`}
-              style={{ left: `${(g.time / maxTime) * 100}%` }}
+              style={{ left: `${(effectiveEventMinute(g) / maxTime) * 100}%` }}
               title={`${g.player.name} ${minuteLabel(g)}`}
             />
           ))}
@@ -332,11 +336,7 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
     );
   }
 
-  const sorted = [...events].sort((a, b) => {
-    const at = a.time + (a.timeExtra ?? 0) * 0.1;
-    const bt = b.time + (b.timeExtra ?? 0) * 0.1;
-    return bt - at;
-  });
+  const sorted = [...events].sort((a, b) => compareEventsByMinute(b, a));
 
   const halfScore = finished ? deriveHalfScore(events) : null;
 
@@ -720,7 +720,7 @@ function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlay
       .filter((r) => r.rating != null)
       .map((r) => [r.playerId, r.rating as string])
   );
-  const evMap = buildPlayerEventMap(events);
+  const evMap = buildPlayerEventMap(events, fixture.playerMatchStats);
   const sortSubs = (subs: LineupPlayer[]) =>
     [...subs].sort((a, b) => (evMap.get(pEvtKey(b))?.subOn ? 1 : 0) - (evMap.get(pEvtKey(a))?.subOn ? 1 : 0));
   const homeSubs = sortSubs(homeL?.substitutes ?? []);
@@ -1008,7 +1008,7 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
   const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
   const shownHome = scorersExpanded ? homeScorers : homeScorers.slice(0, SCORER_LIMIT);
   const shownAway = scorersExpanded ? awayScorers : awayScorers.slice(0, SCORER_LIMIT);
-  const star = (finished || live) ? motm(playerRatings, buildPlayerEventMap(events)) : null;
+  const star = (finished || live) ? motm(playerRatings, buildPlayerEventMap(events, fixture.playerMatchStats)) : null;
 
   return (
     <div className="md-hdr">

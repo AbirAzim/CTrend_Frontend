@@ -18,6 +18,13 @@ import {
 	View,
 } from 'react-native';
 import { WORLD_CUP_FIXTURE_DETAILS } from '@ctrend/shared/graphql/worldcup';
+import {
+	compareEventsByMinute,
+	effectiveEventMinute,
+	enrichEventMapFromPlayerStats,
+	isScoredGoal,
+	normalizePlayerName,
+} from '@ctrend/shared/lib/matchEvents';
 import { useTheme } from '../../../context/ThemeContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -91,8 +98,8 @@ function shortName(full?: string | null) {
 }
 function goalScorers(events: MatchEvent[], team: 'home' | 'away') {
 	return events
-		.filter(e => { const d = (e.detail || '').toLowerCase(); return e.type === 'Goal' && e.team === team && !d.includes('disallow') && !d.includes('missed') && !d.includes('shootout'); })
-		.sort((a, b) => a.time - b.time)
+		.filter(e => isScoredGoal(e) && e.team === team)
+		.sort(compareEventsByMinute)
 		.map(e => {
 			const min = minuteLabel(e);
 			const nm = shortName(e.player.name);
@@ -108,7 +115,7 @@ function motmPlayer(ratings: PlayerRating[], evMap: Map<string, PEvt>): PlayerRa
 	if (!ratings.length) return null;
 	const impact = (r: PlayerRating): number => {
 		const base = parseFloat(r.rating ?? '0');
-		const ev = (r.playerId != null && evMap.get(`id:${r.playerId}`)) || (r.name && evMap.get(`nm:${r.name.toLowerCase().trim()}`)) || null;
+		const ev = (r.playerId != null && evMap.get(`id:${r.playerId}`)) || (r.name && evMap.get(`nm:${normalizePlayerName(r.name)}`)) || null;
 		if (!ev) return base;
 		return base + ev.goals * 0.35 + ev.assists * 0.15 - ev.ownGoals * 0.5;
 	};
@@ -130,11 +137,11 @@ function parseNum(v?: string | null) { return v ? parseFloat(v.replace('%', ''))
 
 type PEvt = { goals: number; ownGoals: number; assists: number; card: 'yellow' | 'red' | null; subOff: boolean; subOn: boolean };
 
-function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
+function buildPlayerEventMap(events: MatchEvent[], playerMatchStats?: PlayerMatchStat[]): Map<string, PEvt> {
 	const map = new Map<string, PEvt>();
 	const ensure = (p: EventPlayer): PEvt => {
 		const idKey = p.id != null ? `id:${p.id}` : null;
-		const nmKey = p.name ? `nm:${p.name.toLowerCase().trim()}` : null;
+		const nmKey = p.name ? `nm:${normalizePlayerName(p.name)}` : null;
 		const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
 		const pev: PEvt = existing ?? { goals: 0, ownGoals: 0, assists: 0, card: null, subOff: false, subOn: false };
 		if (idKey) map.set(idKey, pev);
@@ -145,7 +152,7 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
 		if (!e.player.name && e.player.id == null) continue;
 		const pev = ensure(e.player);
 		const gd = (e.detail || '').toLowerCase();
-		if (e.type === 'Goal' && !gd.includes('disallow') && !gd.includes('missed') && !gd.includes('shootout')) {
+		if (isScoredGoal(e)) {
 			if (gd.includes('own goal')) {
 				pev.ownGoals++;
 			} else {
@@ -164,11 +171,12 @@ function buildPlayerEventMap(events: MatchEvent[]): Map<string, PEvt> {
 			}
 		}
 	}
+	enrichEventMapFromPlayerStats(playerMatchStats, ensure);
 	return map;
 }
 
 function pEvtKey(p: LineupPlayer): string {
-	return p.id != null ? `id:${p.id}` : `nm:${p.name.toLowerCase().trim()}`;
+	return p.id != null ? `id:${p.id}` : `nm:${normalizePlayerName(p.name)}`;
 }
 
 // ─── Goal bar ─────────────────────────────────────────────────────────────────
@@ -180,11 +188,11 @@ function GoalBar({ events, homeTeam, awayTeam, isDark }: {
 	isDark: boolean;
 }) {
 	const goals = events
-		.filter(e => { const d = (e.detail || '').toLowerCase(); return e.type === 'Goal' && !d.includes('disallow') && !d.includes('missed') && !d.includes('shootout'); })
-		.sort((a, b) => a.time - b.time);
+		.filter(isScoredGoal)
+		.sort(compareEventsByMinute);
 	if (!goals.length) return null;
 
-	const maxTime = Math.max(90, ...goals.map(e => e.time));
+	const maxTime = Math.max(90, ...goals.map(effectiveEventMinute));
 	const homeGoals = goals.filter(g => g.team === 'home');
 	const awayGoals = goals.filter(g => g.team === 'away');
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
@@ -215,7 +223,7 @@ function GoalBar({ events, homeTeam, awayTeam, isDark }: {
 							key={i}
 							style={[
 								gb.tick,
-								{ left: `${(g.time / maxTime) * 100}%` as unknown as number,
+								{ left: `${(effectiveEventMinute(g) / maxTime) * 100}%` as unknown as number,
 								  backgroundColor: g.team === 'home' ? '#22c55e' : '#f97316',
 								  borderColor: bg },
 							]}
@@ -263,7 +271,7 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 	const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
 	const homeScorers = hasScore ? goalScorers(events, 'home') : [];
 	const awayScorers = hasScore ? goalScorers(events, 'away') : [];
-	const star = (finished || live) ? motmPlayer(playerRatings, buildPlayerEventMap(events)) : null;
+	const star = (finished || live) ? motmPlayer(playerRatings, buildPlayerEventMap(events, fixture.playerMatchStats)) : null;
 	const [scorersExpanded, setScorersExpanded] = useState(false);
 	const SCORER_LIMIT = 4;
 	const hasMoreScorers = homeScorers.length > SCORER_LIMIT || awayScorers.length > SCORER_LIMIT;
@@ -443,11 +451,7 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 		);
 	}
 
-	const sorted = [...events].sort((a, b) => {
-		const at = a.time + (a.timeExtra ?? 0) * 0.1;
-		const bt = b.time + (b.timeExtra ?? 0) * 0.1;
-		return bt - at;
-	});
+	const sorted = [...events].sort((a, b) => compareEventsByMinute(b, a));
 	const halfScore = finished ? deriveHalfScore(events) : null;
 
 	type Row = { kind: 'event'; event: MatchEvent } | { kind: 'divider'; label: string };
@@ -845,7 +849,7 @@ const pc = StyleSheet.create({
 
 
 function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails; isDark: boolean; onPlayerPress?: (id: number) => void }) {
-	const { lineups, playerRatings, homeTeam, awayTeam, events } = fixture;
+	const { lineups, playerRatings, homeTeam, awayTeam, events, playerMatchStats } = fixture;
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
 	const textSub = isDark ? '#cbd5e1' : '#475569';
 	const surface = isDark ? '#111827' : '#fff';
@@ -864,7 +868,7 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 	const ratingMap = new Map(
 		playerRatings.filter(r => r.rating != null).map(r => [r.playerId, r.rating as string])
 	);
-	const evMap = buildPlayerEventMap(events);
+	const evMap = buildPlayerEventMap(events, playerMatchStats);
 
 	const sortSubs = (subs: LineupPlayer[]) =>
 		[...subs].sort((a, b) => {

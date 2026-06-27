@@ -56,6 +56,7 @@ import { imageObjectPosition } from "../lib/imageFocal";
 import { categoryColorRgb } from "../lib/categoryColor";
 import { linkifyText } from "../lib/linkify";
 import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coins";
+import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaignWinner";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -1817,7 +1818,10 @@ function FeedPostCardComponent({
       : null;
 
   // Campaign match lifecycle
-  const showCampaignWinner = Boolean(post.campaignWinner) && isMatchPost;
+  const showCampaignWinner =
+    Boolean(post.campaignWinner) &&
+    isResolvedCampaignWinner(post.campaignWinner) &&
+    isMatchPost;
   const campaignWinnerOptionLabel =
     post.campaignWinner?.winningOption != null
       ? post.postOptions?.[post.campaignWinner.winningOption]?.label ??
