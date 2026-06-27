@@ -4,7 +4,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
 import { AdminTabNav, type AdminTabId } from "../components/admin/AdminTabNav";
-import { AdminOverviewTab } from "../components/admin/AdminOverviewTab";
+import { AdminOverviewTab, type AdminOverviewNavTarget } from "../components/admin/AdminOverviewTab";
 import { AdminMessagesTab } from "./AdminMessagesTab";
 import { AdminReportedTab } from "./AdminReportedTab";
 import {
@@ -16,6 +16,7 @@ import {
   ADMIN_PLATFORM_POSTS_COUNT,
   LIST_USERS,
   LIST_USERS_COUNT,
+  ADMIN_ONLINE_USERS,
   REMOVE_ADMIN,
   REMOVE_USER,
   RESEND_INVITATION,
@@ -474,7 +475,16 @@ function UserStats({ userId }: { userId: string }) {
 
 // ─── Users Tab ───────────────────────────────────────────────────────────────
 
-function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => void }) {
+function UsersTab({
+  onComposeMessage,
+  view = "all",
+  onViewChange,
+}: {
+  onComposeMessage: (userId: string) => void;
+  view?: "all" | "online";
+  onViewChange?: (view: "all" | "online") => void;
+}) {
+  const isOnlineView = view === "online";
   const [skip, setSkip] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchBy, setSearchBy] = useState<UserSearchBy>("all");
@@ -516,25 +526,42 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
   const { data, loading, error, refetch } = useQuery<{ listUsers: UserRow[] }>(LIST_USERS, {
     variables: listVariables,
     fetchPolicy: "network-only",
+    skip: isOnlineView,
+  });
+
+  const {
+    data: onlineData,
+    loading: onlineLoading,
+    error: onlineError,
+    refetch: refetchOnline,
+  } = useQuery<{ adminOnlineUsers: UserRow[] }>(ADMIN_ONLINE_USERS, {
+    fetchPolicy: "cache-and-network",
+    pollInterval: isOnlineView ? 30_000 : 0,
+    skip: !isOnlineView,
   });
 
   const { data: countData, refetch: refetchCount } = useQuery<{ listUsersCount: number }>(
     LIST_USERS_COUNT,
-    { variables: countVariables, fetchPolicy: "network-only" },
+    { variables: countVariables, fetchPolicy: "network-only", skip: isOnlineView },
   );
 
   const [removeUser, { loading: removing }] = useMutation(REMOVE_USER);
 
-  const users = data?.listUsers ?? [];
-  const totalCount = countData?.listUsersCount ?? 0;
+  const users = isOnlineView ? (onlineData?.adminOnlineUsers ?? []) : (data?.listUsers ?? []);
+  const totalCount = isOnlineView ? users.length : (countData?.listUsersCount ?? 0);
+  const listLoading = isOnlineView ? onlineLoading : loading;
+  const listError = isOnlineView ? onlineError : error;
 
   async function handleRemove(user: UserRow) {
     setRemoveError(null);
     try {
       await removeUser({ variables: { email: user.email } });
       setConfirmTarget(null);
-      void refetch();
-      void refetchCount();
+      if (isOnlineView) void refetchOnline();
+      else {
+        void refetch();
+        void refetchCount();
+      }
     } catch (err: unknown) {
       setRemoveError(getApolloErrorMessage(err));
       setConfirmTarget(null);
@@ -544,11 +571,22 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
   return (
     <div>
       <AdminSectionHead
-        title="All Users"
-        subtitle="Regular users on the platform"
-        action={<AdminCtaButton onClick={() => setInviteModal(true)}>Invite User</AdminCtaButton>}
+        title={isOnlineView ? "Online now" : "All Users"}
+        subtitle={
+          isOnlineView
+            ? `${users.length} user${users.length === 1 ? "" : "s"} connected via WebSocket · refreshes every 30s`
+            : "Regular users on the platform"
+        }
+        action={
+          isOnlineView ? (
+            <AdminCtaButton onClick={() => onViewChange?.("all")}>View all users</AdminCtaButton>
+          ) : (
+            <AdminCtaButton onClick={() => setInviteModal(true)}>Invite User</AdminCtaButton>
+          )
+        }
       />
 
+      {!isOnlineView ? (
       <div className="admin-toolbar">
         <AdminSearchInput
           value={searchTerm}
@@ -592,13 +630,14 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
           ) : null}
         </div>
       </div>
+      ) : null}
 
       {removeError && <p className="error" role="alert">{removeError}</p>}
-      {loading && <p className="muted small">Loading users…</p>}
-      {error && <p className="error">Failed to load users: {error.message}</p>}
+      {listLoading && <p className="muted small">{isOnlineView ? "Loading online users…" : "Loading users…"}</p>}
+      {listError && <p className="error">Failed to load users: {listError.message}</p>}
 
-      {!loading && users.length === 0 && !error && (
-        <p className="muted small">No users found.</p>
+      {!listLoading && users.length === 0 && !listError && (
+        <p className="muted small">{isOnlineView ? "No users online right now." : "No users found."}</p>
       )}
 
       {users.length > 0 && (
@@ -609,6 +648,7 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
                 <th>Name</th>
                 <th>Email</th>
                 <th>Status</th>
+                {isOnlineView ? <th>Presence</th> : null}
                 <th>Joined</th>
                 <th>Roles</th>
                 <th>Engagement</th>
@@ -626,6 +666,14 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
                   </td>
                   <td className="admin-table-email" data-label="Email">{user.email}</td>
                   <td data-label="Status"><UserStatusBadge user={user} /></td>
+                  {isOnlineView ? (
+                    <td data-label="Presence">
+                      <span className="admin-presence-live">
+                        <span className="admin-presence-dot" aria-hidden />
+                        Online
+                      </span>
+                    </td>
+                  ) : null}
                   <td className="admin-table-joined" data-label="Joined">
                     <span title={user.createdAt ?? undefined}>{formatJoinedAt(user.createdAt)}</span>
                     {user.createdAt ? (
@@ -667,14 +715,16 @@ function UsersTab({ onComposeMessage }: { onComposeMessage: (userId: string) => 
         </div>
       )}
 
+      {!isOnlineView ? (
       <AdminPaginationBar
         skip={skip}
         total={totalCount}
         shown={users.length}
-        loading={loading}
+        loading={listLoading}
         onPrev={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
         onNext={() => setSkip((s) => s + PAGE_SIZE)}
       />
+      ) : null}
 
       {inviteModal && (
         <BulkInviteModal
@@ -2823,177 +2873,173 @@ function PostsTab() {
   );
 }
 
-// ─── Platform: allow normal users to post globally ───────────────────────────
+// ─── Platform settings (global posts + referral) ───────────────────────────────
 
-function AdminUserGlobalPostsControl() {
-  const { data, refetch } = useQuery(PLATFORM_SETTINGS);
-  const [setAllow] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
-  const [error, setError] = useState<string | null>(null);
+type PlatformControlCardProps = {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  details: string;
+  enabled: boolean;
+  onToggle: (next: boolean) => void;
+  onLabel: string;
+  offLabel: string;
+  error: string | null;
+  tone: "neutral" | "warning" | "success";
+};
+
+function PlatformControlCard({
+  id,
+  icon,
+  title,
+  description,
+  details,
+  enabled,
+  onToggle,
+  onLabel,
+  offLabel,
+  error,
+  tone,
+}: PlatformControlCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    if (data?.platformSettings) {
-      setEnabled(Boolean(data.platformSettings.allowUserGlobalPosts));
-    }
-  }, [data?.platformSettings?.allowUserGlobalPosts]);
-
-  function setEnabledOptimistic(next: boolean) {
-    if (next === enabled) return;
-    const previous = enabled;
-    setEnabled(next);
-    setError(null);
-    void setAllow({ variables: { enabled: next } })
-      .then(() => {
-        void refetch();
-      })
-      .catch((err: unknown) => {
-        setEnabled(previous);
-        setError(getApolloErrorMessage(err));
-      });
-  }
+  const statusLabel = enabled ? onLabel : offLabel;
+  const statusClass = enabled
+    ? tone === "warning"
+      ? "admin-platform-card__status--warning"
+      : "admin-platform-card__status--on"
+    : "admin-platform-card__status--off";
 
   return (
-    <section
-      className={`admin-global-posts-bar${enabled ? " admin-global-posts-bar--danger" : " admin-global-posts-bar--safe"}`}
-      aria-label="Global user posts setting"
+    <article
+      className={`admin-platform-card admin-platform-card--${tone}${enabled ? " admin-platform-card--active" : ""}`}
+      aria-labelledby={id}
     >
-      <div className="admin-global-posts-bar__row">
-        <span className="admin-global-posts-bar__label" id="admin-global-posts-title">
-          Let normal users post globally
-          {enabled ? (
-            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--danger">
-              Risk active
-            </span>
-          ) : (
-            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--safe">
-              Restricted
-            </span>
-          )}
-        </span>
-        <div className="admin-global-posts-bar__controls">
-          <label
-            className="ig-toggle-switch-wrap admin-global-posts-toggle"
-            title={enabled ? "Turn off global user posts" : "Allow global user posts"}
-          >
-            <input
-              type="checkbox"
-              role="switch"
-              aria-labelledby="admin-global-posts-title"
-              aria-checked={enabled}
-              checked={enabled}
-              onChange={(e) => setEnabledOptimistic(e.target.checked)}
-            />
-            <span className="ig-toggle-switch" aria-hidden />
-          </label>
-          <button
-            type="button"
-            className="admin-global-posts-details-btn"
-            aria-expanded={detailsOpen}
-            onClick={() => setDetailsOpen((o) => !o)}
-          >
-            {detailsOpen ? "Hide details" : "Details"}
-          </button>
+      <div className="admin-platform-card__head">
+        <div className="admin-platform-card__meta">
+          <span className="admin-platform-card__icon" aria-hidden>{icon}</span>
+          <div>
+            <h3 className="admin-platform-card__title" id={id}>{title}</h3>
+            <span className={`admin-platform-card__status ${statusClass}`}>{statusLabel}</span>
+          </div>
         </div>
+        <label
+          className="ig-toggle-switch-wrap admin-platform-card__toggle"
+          title={enabled ? `Turn off: ${title}` : `Turn on: ${title}`}
+        >
+          <input
+            type="checkbox"
+            role="switch"
+            aria-labelledby={id}
+            aria-checked={enabled}
+            checked={enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+          />
+          <span className="ig-toggle-switch" aria-hidden />
+        </label>
       </div>
+      <p className="admin-platform-card__desc muted small">{description}</p>
+      <button
+        type="button"
+        className="admin-platform-card__more"
+        aria-expanded={detailsOpen}
+        onClick={() => setDetailsOpen((o) => !o)}
+      >
+        {detailsOpen ? "Hide details" : "Learn more"}
+      </button>
       {detailsOpen ? (
-        <div className="admin-global-posts-bar__details" id="admin-global-posts-details">
-          <p className="muted small">
-            <strong>Important platform control.</strong> When off (default), only admin{" "}
-            <strong>Platform-wide</strong> posts reach everyone with the <strong>Ke Jitbe</strong> brand.
-            When on, users can choose a global post — their name and photo appear on the feed and in
-            notifications for all members (not an official Ke Jitbe platform post).
-          </p>
-        </div>
+        <p className="admin-platform-card__details muted small">{details}</p>
       ) : null}
-      {error ? <p className="admin-error small admin-global-posts-bar__error">{error}</p> : null}
-    </section>
+      {error ? <p className="admin-error small admin-platform-card__error">{error}</p> : null}
+    </article>
   );
 }
 
-function AdminReferralSystemControl() {
+function AdminPlatformControls() {
   const { data, refetch } = useQuery(PLATFORM_SETTINGS);
-  const [setEnabled] = useMutation(SET_REFERRAL_SYSTEM_ENABLED);
-  const [error, setError] = useState<string | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [enabled, setEnabledLocal] = useState(false);
+  const [setAllowGlobal] = useMutation(SET_ALLOW_USER_GLOBAL_POSTS);
+  const [setReferralMut] = useMutation(SET_REFERRAL_SYSTEM_ENABLED);
+
+  const [globalEnabled, setGlobalEnabled] = useState(false);
+  const [referralEnabled, setReferralEnabled] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [referralError, setReferralError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.platformSettings) {
-      setEnabledLocal(Boolean(data.platformSettings.referralSystemEnabled));
+      setGlobalEnabled(Boolean(data.platformSettings.allowUserGlobalPosts));
+      setReferralEnabled(Boolean(data.platformSettings.referralSystemEnabled));
     }
-  }, [data?.platformSettings?.referralSystemEnabled]);
+  }, [data?.platformSettings?.allowUserGlobalPosts, data?.platformSettings?.referralSystemEnabled]);
 
-  function setEnabledOptimistic(next: boolean) {
-    if (next === enabled) return;
-    const previous = enabled;
-    setEnabledLocal(next);
-    setError(null);
-    void setEnabled({ variables: { enabled: next } })
-      .then(() => {
-        void refetch();
-      })
+  function toggleGlobal(next: boolean) {
+    if (next === globalEnabled) return;
+    const previous = globalEnabled;
+    setGlobalEnabled(next);
+    setGlobalError(null);
+    void setAllowGlobal({ variables: { enabled: next } })
+      .then(() => void refetch())
       .catch((err: unknown) => {
-        setEnabledLocal(previous);
-        setError(getApolloErrorMessage(err));
+        setGlobalEnabled(previous);
+        setGlobalError(getApolloErrorMessage(err));
+      });
+  }
+
+  function toggleReferral(next: boolean) {
+    if (next === referralEnabled) return;
+    const previous = referralEnabled;
+    setReferralEnabled(next);
+    setReferralError(null);
+    void setReferralMut({ variables: { enabled: next } })
+      .then(() => void refetch())
+      .catch((err: unknown) => {
+        setReferralEnabled(previous);
+        setReferralError(getApolloErrorMessage(err));
       });
   }
 
   return (
-    <section
-      className={`admin-global-posts-bar${enabled ? " admin-global-posts-bar--safe" : " admin-global-posts-bar--danger"}`}
-      aria-label="Referral program setting"
-      style={{ marginTop: 12 }}
-    >
-      <div className="admin-global-posts-bar__row">
-        <span className="admin-global-posts-bar__label" id="admin-referral-system-title">
-          Referral & points program
-          {enabled ? (
-            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--safe">
-              Active
-            </span>
-          ) : (
-            <span className="admin-global-posts-bar__pill admin-global-posts-bar__pill--danger">
-              Disabled
-            </span>
-          )}
-        </span>
-        <div className="admin-global-posts-bar__controls">
-          <label
-            className="ig-toggle-switch-wrap admin-global-posts-toggle"
-            title={enabled ? "Disable referral program" : "Enable referral program"}
-          >
-            <input
-              type="checkbox"
-              role="switch"
-              aria-labelledby="admin-referral-system-title"
-              aria-checked={enabled}
-              checked={enabled}
-              onChange={(e) => setEnabledOptimistic(e.target.checked)}
-            />
-            <span className="ig-toggle-switch" aria-hidden />
-          </label>
-          <button
-            type="button"
-            className="admin-global-posts-details-btn"
-            aria-expanded={detailsOpen}
-            onClick={() => setDetailsOpen((o) => !o)}
-          >
-            {detailsOpen ? "Hide details" : "Details"}
-          </button>
-        </div>
+    <section className="admin-platform-controls" aria-label="Platform settings">
+      <div className="admin-platform-controls__head">
+        <h2 className="admin-platform-controls__title">Platform settings</h2>
+        <p className="muted small">High-impact toggles — changes apply immediately for all users</p>
       </div>
-      {detailsOpen ? (
-        <div className="admin-global-posts-bar__details" id="admin-referral-system-details">
-          <p className="muted small">
-            When ON, users can invite friends, redeem referral codes, and earn referral points
-            (withdrawable as BDT). When OFF (default), invites still work but no points are
-            awarded or redeemed — the Points card is disabled. Engagement coins from voting
-            are unaffected.
-          </p>
-        </div>
-      ) : null}
-      {error ? <p className="admin-error small admin-global-posts-bar__error">{error}</p> : null}
+      <div className="admin-platform-controls__grid">
+        <PlatformControlCard
+          id="admin-global-posts-title"
+          icon="🌐"
+          title="Global user posts"
+          description={
+            globalEnabled
+              ? "Users can publish feed-wide posts under their own name."
+              : "Only admin Platform-wide posts reach everyone (recommended)."
+          }
+          details="When off (default), only admin Platform-wide posts reach everyone with the Ke Jitbe brand. When on, users can choose a global post — their name and photo appear on the feed and in notifications for all members."
+          enabled={globalEnabled}
+          onToggle={toggleGlobal}
+          onLabel="Public posting on"
+          offLabel="Restricted"
+          error={globalError}
+          tone="warning"
+        />
+        <PlatformControlCard
+          id="admin-referral-system-title"
+          icon="🎁"
+          title="Referral & points"
+          description={
+            referralEnabled
+              ? "Invite codes earn redeemable referral points (BDT)."
+              : "Invites still work — points earning and redemption are off."
+          }
+          details="When ON, users can invite friends, redeem referral codes, and earn referral points (withdrawable as BDT). When OFF (default), invites still work but no points are awarded or redeemed. Engagement coins from voting are unaffected."
+          enabled={referralEnabled}
+          onToggle={toggleReferral}
+          onLabel="Program active"
+          offLabel="Program off"
+          error={referralError}
+          tone="success"
+        />
+      </div>
     </section>
   );
 }
@@ -3002,6 +3048,7 @@ function AdminReferralSystemControl() {
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTabId>("overview");
+  const [usersView, setUsersView] = useState<"all" | "online">("all");
   const [messagesTargetUserId, setMessagesTargetUserId] = useState<string | null>(null);
 
   function openAdminMessagesForUser(userId: string) {
@@ -3011,6 +3058,21 @@ export function AdminPage() {
 
   function clearMessagesTargetUser() {
     setMessagesTargetUserId(null);
+  }
+
+  function handleTabChange(tab: AdminTabId) {
+    if (tab !== "users") setUsersView("all");
+    setActiveTab(tab);
+  }
+
+  function handleOverviewNavigate(target: AdminOverviewNavTarget) {
+    if (target === "users-online") {
+      setUsersView("online");
+      setActiveTab("users");
+      return;
+    }
+    if (target === "users") setUsersView("all");
+    setActiveTab(target as AdminTabId);
   }
 
   return (
@@ -3023,16 +3085,21 @@ export function AdminPage() {
         <span className="admin-role-badge admin-role-badge--admin">admin</span>
       </div>
 
-      <AdminUserGlobalPostsControl />
-      <AdminReferralSystemControl />
+      <AdminPlatformControls />
 
-      <AdminTabNav activeTab={activeTab} onChange={setActiveTab} />
+      <AdminTabNav activeTab={activeTab} onChange={handleTabChange} />
 
       <div className="admin-section">
         {activeTab === "overview" && (
-          <AdminOverviewTab onNavigate={(tab) => setActiveTab(tab as AdminTabId)} />
+          <AdminOverviewTab onNavigate={handleOverviewNavigate} />
         )}
-        {activeTab === "users" && <UsersTab onComposeMessage={openAdminMessagesForUser} />}
+        {activeTab === "users" && (
+          <UsersTab
+            view={usersView}
+            onViewChange={setUsersView}
+            onComposeMessage={openAdminMessagesForUser}
+          />
+        )}
         {activeTab === "admins" && <AdminsTab onComposeMessage={openAdminMessagesForUser} />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "campaigns" && <CampaignsTab />}

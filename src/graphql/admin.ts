@@ -28,6 +28,22 @@ export const ADMIN_PLATFORM_STATS = gql`
   }
 `;
 
+export const ADMIN_ONLINE_USERS = gql`
+  query AdminOnlineUsers {
+    adminOnlineUsers {
+      id
+      email
+      username
+      displayName
+      profileImageUrl
+      role
+      roles
+      emailVerified
+      createdAt
+    }
+  }
+`;
+
 // ── Categories (admin-only mutations) ─────────────────────────
 export const CREATE_CATEGORY = gql`
   mutation CreateCategory($name: String!) {
