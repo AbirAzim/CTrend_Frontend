@@ -6,20 +6,21 @@ import { PressableScale } from "../../components/PressableScale";
 import { CoinCounter } from "../../components/CoinCounter";
 import logoAsset from "../../assets/logo.png";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   ActivityIndicator,
   Animated,
-  FlatList,
   ListRenderItem,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "@ctrend/shared/graphql/feed";
@@ -37,6 +38,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useForceUpdateRequired } from "../../hooks/useForceUpdateRequired";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
+import { getFeedItemType } from "../../lib/feedItemLayout";
 
 type FeedData = { feedPosts: unknown[] };
 
@@ -132,8 +134,14 @@ function FeedTopBar() {
   );
 }
 
+const MemoFeedTopBar = memo(FeedTopBar);
+
 const TAB_BAR_H = 64 + 14; // pill height + bottom margin
+const FILTER_BAR_H = 54; // fixed — avoids list padding relayout on measure
 const PAGE_SIZE = 20; // posts per page (matches backend `take` default)
+const CHROME_SCROLL_THRESHOLD = 56; // accumulate dy before toggling chrome
+const CHROME_THROTTLE_MS = 120;
+const FEED_ITEM_EST_HEIGHT = 580; // average card height for FlashList recycling
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -151,8 +159,11 @@ export default function FeedScreen() {
   const tabBarAnimating = useRef(false);
   const filterVisible = useRef(true);
   const filterAnimating = useRef(false);
-  const [filterBarHeight, setFilterBarHeight] = useState(50);
-  const filterBarHeightRef = useRef(50);
+  const filterBarHeightRef = useRef(FILTER_BAR_H);
+  const scrollAccumRef = useRef(0);
+  const insetsBottomRef = useRef(insets.bottom);
+  const chromeThrottleRef = useRef(0);
+  insetsBottomRef.current = insets.bottom;
 
   // Direction-based filter animation — same as bottom nav:
   // scroll DOWN → filter hides, scroll UP → filter shows.
@@ -190,13 +201,9 @@ export default function FeedScreen() {
     }
   }, []);
 
-  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const y = e.nativeEvent.contentOffset.y;
-    const diff = y - lastScrollY.current;
-    lastScrollY.current = y;
-
+  const applyChrome = useCallback((scrollingDown: boolean, y: number) => {
     if (y < 60) {
-      // At top: restore both bars
+      scrollAccumRef.current = 0;
       if (!tabBarVisible.current) {
         tabBarVisible.current = true;
         tabBarAnimating.current = true;
@@ -212,36 +219,71 @@ export default function FeedScreen() {
       return;
     }
 
-    // Bottom nav: hides on scroll down, shows on scroll up.
-    // Guard with tabBarAnimating to prevent rapid hide/show oscillation
-    // (flicker) when the scroll direction jitters within the 200ms animation.
-    if (diff > 4 && tabBarVisible.current && !tabBarAnimating.current) {
-      tabBarVisible.current = false;
-      tabBarAnimating.current = true;
-      Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start(() => {
-        tabBarAnimating.current = false;
-      });
-    } else if (diff < -4 && !tabBarVisible.current && !tabBarAnimating.current) {
+    const bottomOffset = TAB_BAR_H + insetsBottomRef.current;
+    const filterOffset = filterBarHeightRef.current;
+
+    if (scrollingDown) {
+      if (tabBarVisible.current && !tabBarAnimating.current) {
+        tabBarVisible.current = false;
+        tabBarAnimating.current = true;
+        Animated.timing(translateY, { toValue: bottomOffset, duration: 200, useNativeDriver: true }).start(() => {
+          tabBarAnimating.current = false;
+        });
+      }
+      if (filterVisible.current && !filterAnimating.current) {
+        filterVisible.current = false;
+        filterAnimating.current = true;
+        Animated.timing(filterTranslateY, { toValue: -filterOffset, duration: 200, useNativeDriver: true }).start(() => {
+          filterAnimating.current = false;
+        });
+      }
+      return;
+    }
+
+    if (!tabBarVisible.current && !tabBarAnimating.current) {
       tabBarVisible.current = true;
       tabBarAnimating.current = true;
       Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
         tabBarAnimating.current = false;
       });
     }
-
-    // Filter bar: same as bottom nav — hides on scroll down, shows on scroll up.
-    if (diff > 4 && filterVisible.current && !filterAnimating.current) {
-      filterVisible.current = false;
-      filterAnimating.current = true;
-      Animated.timing(filterTranslateY, { toValue: -filterBarHeightRef.current, duration: 200, useNativeDriver: true }).start(() => {
-        filterAnimating.current = false;
-      });
-    } else if (diff < -4 && !filterVisible.current && !filterAnimating.current) {
+    if (!filterVisible.current && !filterAnimating.current) {
       filterVisible.current = true;
       filterAnimating.current = true;
       Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
         filterAnimating.current = false;
       });
+    }
+  }, [filterTranslateY, translateY]);
+
+  const handleScrollEnd = useCallback(() => {
+    if (Math.abs(scrollAccumRef.current) >= CHROME_SCROLL_THRESHOLD) {
+      applyChrome(scrollAccumRef.current > 0, lastScrollY.current);
+      scrollAccumRef.current = 0;
+    }
+  }, [applyChrome]);
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const y = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    lastScrollY.current = y;
+    scrollAccumRef.current += diff;
+
+    if (y < 60) {
+      applyChrome(false, y);
+      scrollAccumRef.current = 0;
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      Math.abs(scrollAccumRef.current) >= CHROME_SCROLL_THRESHOLD &&
+      now - chromeThrottleRef.current >= CHROME_THROTTLE_MS
+    ) {
+      chromeThrottleRef.current = now;
+      const scrollingDown = scrollAccumRef.current > 0;
+      scrollAccumRef.current = 0;
+      applyChrome(scrollingDown, y);
     }
   }
 
@@ -375,17 +417,14 @@ export default function FeedScreen() {
   serverCountRef.current = data?.feedPosts?.length ?? 0;
 
 
-  // Live-queue posts first, then the paged server list. Dedupe by id (offset
-  // paging + live/polled inserts can briefly surface the same post twice) and
-  // drop locally-removed ones.
-  const seenIds = new Set<string>();
-  const postsRaw: FeedPostView[] = [...liveQueue, ...apiPosts].filter((p) => {
-    if (removedIds.has(p.id) || seenIds.has(p.id)) return false;
-    seenIds.add(p.id);
-    return true;
-  });
-
-  const posts: FeedPostView[] = postsRaw;
+  const posts = useMemo(() => {
+    const seenIds = new Set<string>();
+    return [...liveQueue, ...apiPosts].filter((p) => {
+      if (removedIds.has(p.id) || seenIds.has(p.id)) return false;
+      seenIds.add(p.id);
+      return true;
+    });
+  }, [liveQueue, apiPosts, removedIds]);
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     skip: !isAuthenticated,
@@ -439,6 +478,9 @@ export default function FeedScreen() {
     void AsyncStorage.setItem(VOTE_COACH_SHOWN_KEY, String(coachStore.shown + 1));
   }, [coachPostId, coachStore]);
 
+  const listHeader = useMemo(() => <CampaignBanner />, []);
+  const keyExtractor = useCallback((item: FeedPostView) => item.id, []);
+
   const renderItem: ListRenderItem<FeedPostView> = useCallback(({ item }) => (
     <FeedPostCard
       post={item}
@@ -450,7 +492,7 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.bg }]}>
-      <FeedTopBar />
+      <MemoFeedTopBar />
       <View style={styles.feedArea}>
         {/* Filter bar is absolutely positioned so native-driver animation
             doesn't cause layout shifts in the FlatList below */}
@@ -463,7 +505,6 @@ export default function FeedScreen() {
             const h = e.nativeEvent.layout.height;
             if (Math.abs(h - filterBarHeightRef.current) > 2) {
               filterBarHeightRef.current = h;
-              setFilterBarHeight(h);
             }
           }}
         >
@@ -485,25 +526,28 @@ export default function FeedScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <FlashList
           data={posts}
           extraData={coachPostId}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           renderItem={renderItem}
+          estimatedItemSize={FEED_ITEM_EST_HEIGHT}
+          getItemType={getFeedItemType}
+          removeClippedSubviews={Platform.OS === "android"}
           // Let taps reach cards while the keyboard is open (e.g. submitting a
           // score prediction) instead of the first tap only dismissing it.
           keyboardShouldPersistTaps="handled"
           style={[styles.list, { backgroundColor: colors.bg }]}
-          contentContainerStyle={{ paddingTop: filterBarHeight + 8, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
+          contentContainerStyle={{ paddingTop: FILTER_BAR_H + 8, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
           onScroll={handleScroll}
+          onScrollEndDrag={handleScrollEnd}
+          onMomentumScrollEnd={handleScrollEnd}
           scrollEventThrottle={16}
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={10}
+          drawDistance={1000}
+          decelerationRate="normal"
+          overScrollMode="never"
           onEndReached={() => void loadMore()}
-          // Prefetch ~3.5 screens before the end so the next page is already in
-          // the cache by the time the user scrolls down to it.
-          onEndReachedThreshold={3.5}
+          onEndReachedThreshold={0.6}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -512,7 +556,7 @@ export default function FeedScreen() {
               tintColor={colors.accent}
             />
           }
-          ListHeaderComponent={<CampaignBanner />}
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={
             !loading ? (
               <View style={styles.empty}>
@@ -561,12 +605,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    // subtle elevation
-    elevation: 4,
-    shadowColor: "#6366f1",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    ...(Platform.OS === "android"
+      ? { elevation: 0 }
+      : {
+          elevation: 4,
+          shadowColor: "#6366f1",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+        }),
   },
   brand: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   brandText: { fontSize: 20, fontWeight: "800", letterSpacing: 0.3 },
@@ -603,7 +650,7 @@ const styles = StyleSheet.create({
     justifyContent: "center", alignItems: "center", paddingHorizontal: 3,
   },
   notifBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
-  list: {},
+  list: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { fontSize: 16, fontWeight: "700", color: "#ef4444", marginBottom: 8 },
   errorSub: { fontSize: 13, textAlign: "center", paddingHorizontal: 24 },

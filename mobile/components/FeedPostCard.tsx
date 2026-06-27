@@ -81,6 +81,14 @@ import { LinkifyText } from '../lib/linkify';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+
+function feedImageProps() {
+	return {
+		transition: 0,
+		cachePolicy: 'memory-disk' as const,
+	};
+}
+
 // Card has marginHorizontal:12 on each side, so its inner content is narrower
 // than the screen. Compare grids must size against this, not SCREEN_W.
 const CARD_MARGIN_H = 12;
@@ -174,6 +182,8 @@ type Props = {
 	post: FeedPostView;
 	/** "detail" = rendered on the full-page post screen (skips live sub, hides Full-page chip). */
 	variant?: 'feed' | 'detail';
+	/** False when off-screen in feed — pauses live subs and animations. */
+	isViewable?: boolean;
 	/** Open comments sheet on mount (e.g. comment deep-link). */
 	initialCommentsOpen?: boolean;
 	/** Scroll to / highlight this comment when the sheet opens. */
@@ -404,13 +414,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderWidth: StyleSheet.hairlineWidth,
 			borderColor: c.border,
 			overflow: 'hidden' as const,
-			// Light, diffuse depth — the card reads as a clean surface, not a heavy
-			// floating box. Softer than before for a calmer, more spacious feed.
-			elevation: 2,
-			shadowColor: '#000',
-			shadowOffset: { width: 0, height: 3 },
-			shadowOpacity: isDark ? 0.18 : 0.05,
-			shadowRadius: 10,
+			// Android elevation during scroll causes extra overdraw — border only.
+			...(Platform.OS === 'android'
+				? { elevation: 0 }
+				: {
+						elevation: 2,
+						shadowColor: '#000',
+						shadowOffset: { width: 0, height: 3 },
+						shadowOpacity: isDark ? 0.18 : 0.05,
+						shadowRadius: 10,
+					}),
 		},
 		cardLive: {
 			borderColor: 'rgba(34,197,94,0.45)',
@@ -1603,6 +1616,7 @@ function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImage
 function FeedPostCardComponent({
 	post,
 	variant = 'feed',
+	isViewable = true,
 	initialCommentsOpen = false,
 	highlightCommentId = null,
 	showVoteCoachmark = false,
@@ -1861,23 +1875,23 @@ function FeedPostCardComponent({
 	const pollMaxCount = Math.max(0, ...(activeStats?.map((s) => s.count) ?? []));
 
 	useEffect(() => {
-		if (!activeVotingEndsAt || isVotingClosed) return;
+		if (!isViewable || !activeVotingEndsAt || isVotingClosed) return;
 		const timer = setInterval(() => {
 			const r = calcCountdown(activeVotingEndsAt);
 			setCountdownStr(r);
 			if (!r) clearInterval(timer);
 		}, 1000);
 		return () => clearInterval(timer);
-	}, [activeVotingEndsAt, isVotingClosed]);
+	}, [isViewable, activeVotingEndsAt, isVotingClosed]);
 
 	// Winner reveal countdown (post-match)
 	useEffect(() => {
-		if (!post.fixtureWinnerAt) return;
+		if (!isViewable || !post.fixtureWinnerAt) return;
 		const timer = setInterval(() => {
 			setWinnerCountdown(calcWinnerCountdown(post.fixtureWinnerAt));
 		}, 1000);
 		return () => clearInterval(timer);
-	}, [post.fixtureWinnerAt]);
+	}, [isViewable, post.fixtureWinnerAt]);
 
 	// Live match score is pushed via POST_VOTE_UPDATED (same payload as the vote
 	// counts). FlatList doesn't reliably re-render rows on deep cache changes, so
@@ -1894,7 +1908,7 @@ function FeedPostCardComponent({
 	// Pulse animation for live matches
 	const isLiveMatch = matchScore?.status === 'IN_PLAY' || matchScore?.status === 'PAUSED';
 	useEffect(() => {
-		if (!isLiveMatch) { livePulse.setValue(1); return; }
+		if (!isViewable || !isLiveMatch) { livePulse.setValue(1); return; }
 		const loop = Animated.loop(
 			Animated.sequence([
 				Animated.timing(livePulse, { toValue: 0.3, duration: 800, useNativeDriver: true }),
@@ -1903,13 +1917,13 @@ function FeedPostCardComponent({
 		);
 		loop.start();
 		return () => loop.stop();
-	}, [isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [isViewable, isLiveMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const liveMinute = matchScore?.status === 'IN_PLAY' ? (matchScore?.minute ?? null) : null;
 
 	useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
 		variables: { postId: post.id },
-		skip: isDetail,
+		skip: isDetail || !isViewable,
 		onData: ({ data }) => {
 			const next = data.data?.postVoteUpdated;
 			if (!next || next.id !== post.id) return;
@@ -1945,6 +1959,7 @@ function FeedPostCardComponent({
 	// optimistic vote state so a vote-reset edit reflects server truth.
 	useSubscription<{ postUpdated?: { id: string } }>(POST_UPDATED, {
 		variables: { postId: post.id },
+		skip: !isViewable,
 		onData: ({ data }) => {
 			const next = data.data?.postUpdated;
 			if (!next || next.id !== post.id) return;
@@ -2934,8 +2949,8 @@ function FeedPostCardComponent({
 													post.postOptions?.[i]?.imageFocalX,
 													post.postOptions?.[i]?.imageFocalY,
 												)}
-												cachePolicy='memory-disk'
 												recyclingKey={`${post.id}-opt-${i}`}
+												{...feedImageProps()}
 											/>
 											{compareOverlayMode === 'minimal' ? (
 												<View style={st.minimalBar}>
@@ -3126,7 +3141,8 @@ function FeedPostCardComponent({
 												post.postOptions?.[i]?.imageFocalX,
 												post.postOptions?.[i]?.imageFocalY,
 											)}
-											cachePolicy='memory-disk'
+											recyclingKey={`${post.id}-bin-${i}`}
+											{...feedImageProps()}
 										/>
 										<View style={[st.pctOverlay, !showCompareStats && st.pctOverlayPreview]}>
 											<View style={st.pctMainPill}>
@@ -3724,6 +3740,7 @@ function FeedPostCardComponent({
 			})()}
 
 			{/* Comments open on /comments/[postId] screen (full-screen route) */}
+			{votersVisible ? (
 			<FeedVotersPanel
 				visible={votersVisible}
 				onClose={() => setVotersVisible(false)}
@@ -3734,7 +3751,9 @@ function FeedPostCardComponent({
 				st={st}
 				client={client}
 			/>
+			) : null}
 
+			{hypersVisible ? (
 			<FeedHypersPanel
 				visible={hypersVisible}
 				onClose={() => setHypersVisible(false)}
@@ -3743,8 +3762,10 @@ function FeedPostCardComponent({
 				st={st}
 				client={client}
 			/>
+			) : null}
 
 			{/* ── More menu (owner actions) ── */}
+			{moreMenuVisible ? (
 			<Modal
 				visible={moreMenuVisible}
 				transparent
@@ -3815,8 +3836,10 @@ function FeedPostCardComponent({
 					</View>
 				</Pressable>
 			</Modal>
+			) : null}
 
 			{/* ── Report post (non-owner) ── */}
+			{reportMenuVisible ? (
 			<Modal
 				visible={reportMenuVisible}
 				transparent
@@ -3917,8 +3940,10 @@ function FeedPostCardComponent({
 					</View>
 				</View>
 			</Modal>
+			) : null}
 
 			{/* ── Extend voting menu ── */}
+			{extendMenuVisible ? (
 			<Modal
 				visible={extendMenuVisible}
 				transparent
@@ -3958,12 +3983,15 @@ function FeedPostCardComponent({
 					</View>
 				</Pressable>
 			</Modal>
+			) : null}
+			{imageViewerVisible ? (
 			<ImageViewerModal
 				visible={imageViewerVisible}
 				imageUrls={post.imageUrls}
 				initialIndex={selectedImageIndex}
 				onClose={() => setImageViewerVisible(false)}
 			/>
+			) : null}
 		</View>
 	);
 }
@@ -4408,7 +4436,15 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client }: FeedH
 	);
 }
 
-export const FeedPostCard = memo(FeedPostCardComponent);
+export const FeedPostCard = memo(FeedPostCardComponent, (prev, next) =>
+	prev.post === next.post &&
+	prev.isViewable === next.isViewable &&
+	prev.variant === next.variant &&
+	prev.showVoteCoachmark === next.showVoteCoachmark &&
+	prev.onCoachmarkDismiss === next.onCoachmarkDismiss &&
+	prev.initialCommentsOpen === next.initialCommentsOpen &&
+	prev.highlightCommentId === next.highlightCommentId,
+);
 
 const styles = StyleSheet.create({
 	fill: { flex: 1 },
