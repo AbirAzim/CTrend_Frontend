@@ -60,12 +60,8 @@ import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaign
 import {
   isExtraTimeLiveStatus,
   isShootoutLiveStatus,
-  matchVoteSpecialOptionHint,
 } from "@ctrend/shared/lib/knockoutFixture";
-import {
-  knockoutRoundBadgeText,
-  matchVoteWinnerPendingHint,
-} from "@ctrend/shared/lib/matchPredictionCopy";
+import { matchVoteWinnerPendingHint } from "@ctrend/shared/lib/matchPredictionCopy";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -1851,8 +1847,6 @@ function FeedPostCardComponent({
   const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
   const showMatchCalculating =
     isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
-  const matchVoteHint = isMatchPost && isPoll && !isVotingClosed ? matchVoteSpecialOptionHint(post) : null;
-  const knockoutRoundLabel = isMatchPost ? knockoutRoundBadgeText(post.fixtureStage) : null;
   const matchWinnerPendingHint = matchVoteWinnerPendingHint(post.fixtureStage);
   const showLiveEtBanner =
     isMatchPost &&
@@ -2070,11 +2064,9 @@ function FeedPostCardComponent({
 
       {post.campaign ? <PostCampaignBadge campaign={post.campaign} /> : null}
 
-      {isMatchPost && (knockoutRoundLabel || matchVoteHint || showLiveEtBanner) ? (
+      {isMatchPost && showLiveEtBanner ? (
         <div className="cx-knockout-strip">
-          {knockoutRoundLabel ? <p className="cx-knockout-round">{knockoutRoundLabel}</p> : null}
-          {matchVoteHint ? <p className="cx-knockout-vote-hint">{matchVoteHint}</p> : null}
-          {showLiveEtBanner && matchWinnerPendingHint ? (
+          {matchWinnerPendingHint ? (
             <p className="cx-knockout-vote-hint">{matchWinnerPendingHint}</p>
           ) : null}
         </div>

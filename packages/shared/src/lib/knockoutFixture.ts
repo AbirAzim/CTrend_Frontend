@@ -35,10 +35,8 @@ export function postHasDrawVoteOption(post: PostVoteMeta): boolean {
   return label.includes("draw");
 }
 
-export function matchVoteSpecialOptionHint(post: PostVoteMeta): string | null {
-  if (postHasDrawVoteOption(post)) {
-    return "Group stage — pick Draw if you think the match will end level after 90 minutes.";
-  }
+/** Group-stage draw vote hint — intentionally omitted (knockout-only UX). */
+export function matchVoteSpecialOptionHint(_post: PostVoteMeta): string | null {
   return null;
 }
 

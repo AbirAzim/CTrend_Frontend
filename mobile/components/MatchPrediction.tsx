@@ -27,6 +27,7 @@ import { useCoins } from "../context/CoinsContext";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import {
   isExtraTimeLiveStatus,
+  isKnockoutStage,
   isPredictionResultPending,
   isShootoutLiveStatus,
 } from "@ctrend/shared/lib/knockoutFixture";
@@ -34,6 +35,7 @@ import {
   knockoutRoundBadgeText,
   predictionKnockoutHint,
   predictionPendingExtraTimeMessage,
+  predictionPendingResultMessage,
   predictionPendingShootoutMessage,
   predictionResolvedAfterShootoutNote,
   predictionScoringRuleHint,
@@ -125,7 +127,7 @@ export function MatchPrediction({
   const formOpen = open && (editing || !mine);
   const fixtureStage = state.fixtureStage ?? fixtureData?.worldCupFixture?.stage ?? null;
   const matchStatus = fixtureData?.worldCupFixture?.status ?? null;
-  const roundBadge = knockoutRoundBadgeText(fixtureStage);
+  const roundBadge = isKnockoutStage(fixtureStage) ? knockoutRoundBadgeText(fixtureStage) : null;
   const knockoutHint = predictionKnockoutHint(fixtureStage);
   const scoringRule = predictionScoringRuleHint(fixtureStage);
   const pendingResult = isPredictionResultPending(
@@ -224,7 +226,7 @@ export function MatchPrediction({
       ) : null}
       {pendingResult && !inExtraTime && !inShootout ? (
         <View style={st.pendingBanner}>
-          <Text style={st.pendingBannerText}>Waiting for the final 90+ET score before grading predictions…</Text>
+          <Text style={st.pendingBannerText}>{predictionPendingResultMessage()}</Text>
         </View>
       ) : null}
 

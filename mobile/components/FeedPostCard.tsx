@@ -81,12 +81,8 @@ import { LinkifyText } from '../lib/linkify';
 import {
   isExtraTimeLiveStatus,
   isShootoutLiveStatus,
-  matchVoteSpecialOptionHint,
 } from '@ctrend/shared/lib/knockoutFixture';
-import {
-  knockoutRoundBadgeText,
-  matchVoteWinnerPendingHint,
-} from '@ctrend/shared/lib/matchPredictionCopy';
+import { matchVoteWinnerPendingHint } from '@ctrend/shared/lib/matchPredictionCopy';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -547,7 +543,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: isDark ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.35)',
 			gap: 4,
 		},
-		knockoutRound: { fontSize: 11, fontWeight: '800' as const, color: '#d97706' },
 		knockoutVoteHint: { fontSize: 11, color: c.subtext, lineHeight: 15 },
 		moreBtn: { padding: 8 },
 		moreBtnText: { fontSize: 20, color: c.subtext, letterSpacing: 2 },
@@ -1097,21 +1092,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		anonRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
-			paddingHorizontal: 12,
-			paddingVertical: 8,
-			marginHorizontal: 10,
-			marginTop: 4,
+			paddingHorizontal: 14,
+			paddingVertical: 6,
 			gap: 8,
-			borderRadius: 12,
-			borderWidth: 1,
-			borderColor: c.border,
-			backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)',
 		},
+		anonIcon: { fontSize: 16 },
 		anonLabel: {
 			flex: 1,
 			fontSize: 12,
 			color: c.subtext,
-			fontWeight: '600' as const,
+			fontWeight: '500' as const,
 		},
 		// ── Two-zone action rail ──
 		// Flush, full-width row separated from the media/vote area by a single
@@ -2636,8 +2626,6 @@ function FeedPostCardComponent({
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
 	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
-	const matchVoteHint = isMatchPost && isPoll && !isVotingClosed ? matchVoteSpecialOptionHint(post) : null;
-	const knockoutRoundLabel = isMatchPost ? knockoutRoundBadgeText(post.fixtureStage) : null;
 	const matchWinnerPendingHint = matchVoteWinnerPendingHint(post.fixtureStage);
 	const showLiveEtBanner =
 		isMatchPost &&
@@ -2812,15 +2800,9 @@ function FeedPostCardComponent({
 			{/* Campaign ribbon */}
 			{campaign ? <PostCampaignBadge campaign={campaign} /> : null}
 
-			{isMatchPost && (knockoutRoundLabel || matchVoteHint || showLiveEtBanner) ? (
+			{isMatchPost && showLiveEtBanner ? (
 				<View style={st.knockoutStrip}>
-					{knockoutRoundLabel ? (
-						<Text style={st.knockoutRound}>{knockoutRoundLabel}</Text>
-					) : null}
-					{matchVoteHint ? (
-						<Text style={st.knockoutVoteHint}>{matchVoteHint}</Text>
-					) : null}
-					{showLiveEtBanner && matchWinnerPendingHint ? (
+					{matchWinnerPendingHint ? (
 						<Text style={st.knockoutVoteHint}>{matchWinnerPendingHint}</Text>
 					) : null}
 				</View>
@@ -3264,7 +3246,8 @@ function FeedPostCardComponent({
 			{/* Anonymous vote toggle — always visible while voting is open */}
 			{(compareUrls || isPoll) && !isVotingClosed && isAuthenticated && (
 				<View style={st.anonRow}>
-					<Text style={st.anonLabel}>Vote anonymously</Text>
+					<View style={{ flex: 1 }} />
+					<Text style={st.anonIcon}>🙈</Text>
 					<Switch
 						value={anon}
 						onValueChange={(val) => void handleAnonymousToggle(val)}

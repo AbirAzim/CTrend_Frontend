@@ -5,33 +5,36 @@ export function knockoutRoundBadgeText(stage: string | null | undefined): string
   return label ? `🏆 ${label}` : null;
 }
 
-/** How score predictions are graded for this fixture. */
-export function predictionScoringRuleHint(stage: string | null | undefined): string | null {
-  if (isKnockoutStage(stage)) {
-    return "Knockout: predictions are scored on the score after 90 minutes + extra time (30 min if needed) — not the penalty shootout.";
-  }
-  return "Predictions are scored on the full-time (90 min) score.";
+/** Short intro for score predictions on knockout fixtures. */
+export function predictionKnockoutHint(stage: string | null | undefined): string | null {
+  if (!isKnockoutStage(stage)) return null;
+  return "Predict the exact score before kickoff.";
 }
 
-export function predictionKnockoutHint(stage: string | null | undefined): string | null {
-  const round = getKnockoutRoundLabel(stage);
-  if (!round) return null;
-  return `${round} · Predict the score before kickoff (extra time counts; shootout does not).`;
+/** How score predictions are graded — knockout fixtures only. */
+export function predictionScoringRuleHint(stage: string | null | undefined): string | null {
+  if (!isKnockoutStage(stage)) return null;
+  return "Graded against the score after 90 minutes plus extra time (if played). Penalty shootouts do not count.";
 }
 
 export function predictionPendingExtraTimeMessage(): string {
-  return "Extra time in progress — your prediction will be checked against the score after 90+ET, before any shootout.";
+  return "Extra time is on. Score predictions use the result after extra time — before any penalty shootout.";
 }
 
 export function predictionPendingShootoutMessage(): string {
-  return "Penalty shootout underway — predictions still use the score before the shootout, not the pen tally.";
+  return "Penalty shootout in progress. Score predictions still use the tied score before penalties started.";
+}
+
+export function predictionPendingResultMessage(): string {
+  return "Waiting for the final score after extra time to grade predictions.";
 }
 
 export function predictionResolvedAfterShootoutNote(): string {
-  return "Match went to penalties. Correct predictions matched the score at the end of extra time.";
+  return "Match decided on penalties. Winning predictions matched the score at the end of extra time.";
 }
 
+/** Shown on the feed card during live extra time / shootouts (knockout vote pick). */
 export function matchVoteWinnerPendingHint(stage: string | null | undefined): string | null {
   if (!isKnockoutStage(stage)) return null;
-  return "Knockout winner is picked after the full match ends (including extra time and penalties if needed).";
+  return "Extra time or penalties in progress — your Home/Away vote above is only confirmed once the full match is over.";
 }
