@@ -3,11 +3,15 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCallback, useState } from "react";
 import { WORLD_CUP_FIXTURE_DETAILS } from "../graphql/worldcup";
 import {
+  buildPlayerEventMap,
+  buildPlayerRatingMap,
   compareEventsByMinute,
   effectiveEventMinute,
-  enrichEventMapFromPlayerStats,
   isScoredGoal as isScoredGoalEvent,
+  lineupPlayerKey,
   normalizePlayerName,
+  playerHasLineupStats,
+  type PlayerLineupEvents,
 } from "../../packages/shared/src/lib/matchEvents";
 import {
   formatKnockoutScoreLines,
@@ -208,47 +212,10 @@ function deriveHalfScore(events: MatchEvent[]) {
 
 // ─── Player event map (goals / cards / subs per player) ──────────────────────
 
-type PEvt = { goals: number; ownGoals: number; assists: number; card: "yellow" | "red" | null; subOff: boolean; subOn: boolean };
-
-function buildPlayerEventMap(events: MatchEvent[], playerMatchStats?: PlayerMatchStat[]): Map<string, PEvt> {
-  const map = new Map<string, PEvt>();
-  const ensure = (p: EventPlayer): PEvt => {
-    const idKey = p.id != null ? `id:${p.id}` : null;
-    const nmKey = p.name ? `nm:${normalizePlayerName(p.name)}` : null;
-    const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
-    const pev: PEvt = existing ?? { goals: 0, ownGoals: 0, assists: 0, card: null, subOff: false, subOn: false };
-    if (idKey) map.set(idKey, pev);
-    if (nmKey) map.set(nmKey, pev);
-    return pev;
-  };
-  for (const e of events) {
-    if (!e.player.name && e.player.id == null) continue;
-    const pev = ensure(e.player);
-    if (isScoredGoal(e)) {
-      if (e.detail?.includes("Own Goal")) {
-        pev.ownGoals++;
-      } else {
-        pev.goals++;
-        if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
-      }
-    } else if (e.type === "Card") {
-      const isRed = e.detail.toLowerCase().includes("red") || e.detail.includes("Second Yellow");
-      pev.card = isRed ? "red" : "yellow";
-    } else if (e.type === "subst") {
-      pev.subOn = true;
-      if (e.assist?.name || e.assist?.id != null) {
-        const apev = ensure(e.assist);
-        apev.subOn = true;
-        apev.subOff = true;
-      }
-    }
-  }
-  enrichEventMapFromPlayerStats(playerMatchStats, ensure);
-  return map;
-}
+type PEvt = PlayerLineupEvents;
 
 function pEvtKey(p: LineupPlayer): string {
-  return p.id != null ? `id:${p.id}` : `nm:${normalizePlayerName(p.name)}`;
+  return lineupPlayerKey(p);
 }
 
 // ─── Goal bar ─────────────────────────────────────────────────────────────────
@@ -583,20 +550,43 @@ function BenchCell({
   photoMap,
   ratingMap,
   evMap,
+  playerMatchStats,
+  onPlayerClick,
 }: {
   player: LineupPlayer;
   photoMap: Map<number, string>;
   ratingMap: Map<number, string>;
   evMap: Map<string, PEvt>;
+  playerMatchStats?: PlayerMatchStat[];
+  onPlayerClick?: (id: number) => void;
 }) {
   const photo = playerPhoto(player, photoMap);
   const [imgFailed, setImgFailed] = useState(false);
   const showPhoto = photo && !imgFailed;
   const rating = player.id != null ? ratingMap.get(player.id) : undefined;
   const pev = evMap.get(pEvtKey(player));
+  const tappable =
+    player.id != null &&
+    Boolean(onPlayerClick) &&
+    playerHasLineupStats(player.id, playerMatchStats);
 
   return (
-    <div className="md-bc">
+    <div
+      className={`md-bc${tappable ? " md-bc--tappable" : ""}`}
+      onClick={tappable ? () => onPlayerClick!(player.id!) : undefined}
+      onKeyDown={
+        tappable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onPlayerClick!(player.id!);
+              }
+            }
+          : undefined
+      }
+      role={tappable ? "button" : undefined}
+      tabIndex={tappable ? 0 : undefined}
+    >
       <div className="md-bc-av-wrap">
         <div className="md-bc-avatar">
           {showPhoto ? (
@@ -727,10 +717,9 @@ function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlay
   const homeL = lineups.find((l) => l.team === "home");
   const awayL = lineups.find((l) => l.team === "away");
   const photoMap = buildPhotoMap(lineups);
-  const ratingMap = new Map(
-    fixture.playerRatings
-      .filter((r) => r.rating != null)
-      .map((r) => [r.playerId, r.rating as string])
+  const ratingMap = buildPlayerRatingMap(
+    fixture.playerRatings,
+    fixture.playerMatchStats,
   );
   const evMap = buildPlayerEventMap(events, fixture.playerMatchStats);
   const sortSubs = (subs: LineupPlayer[]) =>
@@ -819,9 +808,31 @@ function LineupTab({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlay
             const ap = awaySubs[i];
             return (
               <div key={i} className="md-bench-pair">
-                {hp ? <BenchCell player={hp} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} /> : <div className="md-bc md-bc--empty" />}
+                {hp ? (
+                  <BenchCell
+                    player={hp}
+                    photoMap={photoMap}
+                    ratingMap={ratingMap}
+                    evMap={evMap}
+                    playerMatchStats={fixture.playerMatchStats}
+                    onPlayerClick={onPlayerClick}
+                  />
+                ) : (
+                  <div className="md-bc md-bc--empty" />
+                )}
                 <div className="md-bench-pair-div" />
-                {ap ? <BenchCell player={ap} photoMap={photoMap} ratingMap={ratingMap} evMap={evMap} /> : <div className="md-bc md-bc--empty" />}
+                {ap ? (
+                  <BenchCell
+                    player={ap}
+                    photoMap={photoMap}
+                    ratingMap={ratingMap}
+                    evMap={evMap}
+                    playerMatchStats={fixture.playerMatchStats}
+                    onPlayerClick={onPlayerClick}
+                  />
+                ) : (
+                  <div className="md-bc md-bc--empty" />
+                )}
               </div>
             );
           })}

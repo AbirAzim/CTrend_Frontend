@@ -23871,6 +23871,18 @@ html[data-minimal-chrome="true"] .ig-topbar {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 12px;
 }
+.md-bc--tappable {
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+.md-bc--tappable:hover {
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+}
+.md-bc--tappable:focus-visible {
+  outline: 2px solid rgb(var(--cx-accent-rgb) / 0.45);
+  outline-offset: 1px;
+}
 .md-bc--empty { min-height: 60px; }
 
 .md-bc-avatar {

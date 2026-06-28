@@ -19,11 +19,15 @@ import {
 } from 'react-native';
 import { WORLD_CUP_FIXTURE_DETAILS } from '@ctrend/shared/graphql/worldcup';
 import {
+	buildPlayerEventMap,
+	buildPlayerRatingMap,
 	compareEventsByMinute,
 	effectiveEventMinute,
-	enrichEventMapFromPlayerStats,
 	isScoredGoal,
+	lineupPlayerKey,
 	normalizePlayerName,
+	playerHasLineupStats,
+	type PlayerLineupEvents,
 } from '@ctrend/shared/lib/matchEvents';
 import {
 	formatKnockoutScoreLines,
@@ -146,48 +150,10 @@ function parseNum(v?: string | null) { return v ? parseFloat(v.replace('%', ''))
 
 // ─── Player event map ─────────────────────────────────────────────────────────
 
-type PEvt = { goals: number; ownGoals: number; assists: number; card: 'yellow' | 'red' | null; subOff: boolean; subOn: boolean };
-
-function buildPlayerEventMap(events: MatchEvent[], playerMatchStats?: PlayerMatchStat[]): Map<string, PEvt> {
-	const map = new Map<string, PEvt>();
-	const ensure = (p: EventPlayer): PEvt => {
-		const idKey = p.id != null ? `id:${p.id}` : null;
-		const nmKey = p.name ? `nm:${normalizePlayerName(p.name)}` : null;
-		const existing = (idKey && map.get(idKey)) || (nmKey && map.get(nmKey)) || null;
-		const pev: PEvt = existing ?? { goals: 0, ownGoals: 0, assists: 0, card: null, subOff: false, subOn: false };
-		if (idKey) map.set(idKey, pev);
-		if (nmKey) map.set(nmKey, pev);
-		return pev;
-	};
-	for (const e of events) {
-		if (!e.player.name && e.player.id == null) continue;
-		const pev = ensure(e.player);
-		const gd = (e.detail || '').toLowerCase();
-		if (isScoredGoal(e)) {
-			if (gd.includes('own goal')) {
-				pev.ownGoals++;
-			} else {
-				pev.goals++;
-				if (e.assist?.name || e.assist?.id != null) ensure(e.assist).assists++;
-			}
-		} else if (e.type === 'Card') {
-			const isRed = e.detail.toLowerCase().includes('red') || e.detail.includes('Second Yellow');
-			pev.card = isRed ? 'red' : 'yellow';
-		} else if (e.type === 'subst') {
-			pev.subOn = true;
-			if (e.assist?.name || e.assist?.id != null) {
-				const apev = ensure(e.assist);
-				apev.subOn = true;
-				apev.subOff = true;
-			}
-		}
-	}
-	enrichEventMapFromPlayerStats(playerMatchStats, ensure);
-	return map;
-}
+type PEvt = PlayerLineupEvents;
 
 function pEvtKey(p: LineupPlayer): string {
-	return p.id != null ? `id:${p.id}` : `nm:${normalizePlayerName(p.name)}`;
+	return lineupPlayerKey(p);
 }
 
 // ─── Goal bar ─────────────────────────────────────────────────────────────────
@@ -888,9 +854,7 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 
 	const homeL = lineups.find(l => l.team === 'home');
 	const awayL = lineups.find(l => l.team === 'away');
-	const ratingMap = new Map(
-		playerRatings.filter(r => r.rating != null).map(r => [r.playerId, r.rating as string])
-	);
+	const ratingMap = buildPlayerRatingMap(playerRatings, playerMatchStats);
 	const evMap = buildPlayerEventMap(events, playerMatchStats);
 
 	const sortSubs = (subs: LineupPlayer[]) =>
@@ -993,7 +957,14 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 							<View key={i} style={[lu2.benchRow, { borderBottomColor: rowBorder }]}>
 								{/* Home sub */}
 								{hp ? (
-									<View style={lu2.benchPlayer}>
+									<Pressable
+										style={({ pressed }) => [
+											lu2.benchPlayer,
+											playerHasLineupStats(hp.id, playerMatchStats) && onPlayerPress && pressed && { opacity: 0.75 },
+										]}
+										disabled={!playerHasLineupStats(hp.id, playerMatchStats) || !onPlayerPress}
+										onPress={() => hp.id != null && onPlayerPress?.(hp.id)}
+									>
 										<View style={lu2.benchAvWrap}>
 											{hp.photo
 												? <Image source={{ uri: hp.photo }} style={lu2.benchAvatar} contentFit='cover' borderRadius={20} />
@@ -1012,13 +983,21 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 												{hpev && hpev.assists > 0 ? <Text style={lu2.benchAssist}>{'👟'.repeat(Math.min(hpev.assists, 2))}</Text> : null}
 											</View>
 										</View>
-									</View>
+									</Pressable>
 								) : <View style={{ flex: 1 }} />}
 								{/* Divider */}
 								<View style={[lu2.benchDivider, { backgroundColor: rowBorder }]} />
 								{/* Away sub */}
 								{ap ? (
-									<View style={[lu2.benchPlayer, { flexDirection: 'row-reverse' }]}>
+									<Pressable
+										style={({ pressed }) => [
+											lu2.benchPlayer,
+											{ flexDirection: 'row-reverse' },
+											playerHasLineupStats(ap.id, playerMatchStats) && onPlayerPress && pressed && { opacity: 0.75 },
+										]}
+										disabled={!playerHasLineupStats(ap.id, playerMatchStats) || !onPlayerPress}
+										onPress={() => ap.id != null && onPlayerPress?.(ap.id)}
+									>
 										<View style={lu2.benchAvWrap}>
 											{ap.photo
 												? <Image source={{ uri: ap.photo }} style={lu2.benchAvatar} contentFit='cover' borderRadius={20} />
@@ -1037,7 +1016,7 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 												<Text style={[lu2.benchPos, { color: textSub }]}>{ap.pos ?? ''}</Text>
 											</View>
 										</View>
-									</View>
+									</Pressable>
 								) : <View style={{ flex: 1 }} />}
 							</View>
 						);
