@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@apollo/client";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { NavLink, Navigate, Outlet, useNavigate, useSearchParams } from "react-router-dom";
 import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "../graphql/worldcup";
 import {
   type WcFixture,
@@ -21,6 +21,47 @@ import {
   upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
+import { WorldCupKnockoutBracket } from "../components/WorldCupKnockoutBracket";
+
+const WC_TABS = [
+  { id: "fixtures", label: "Fixtures", path: "fixtures" },
+  { id: "results", label: "Results", path: "results" },
+  { id: "standings", label: "Standings", path: "standings" },
+  { id: "stats", label: "Stats", path: "stats" },
+  { id: "road-map", label: "Road Map", path: "road-map" },
+] as const;
+
+type WorldCupTabId = (typeof WC_TABS)[number]["id"];
+
+type WorldCupPageData = {
+  fixtures: WcFixture[];
+  filtered: WcFixture[];
+  teams: ReturnType<typeof fixtureTeams>;
+  loading: boolean;
+  error: Error | undefined;
+  statsData:
+    | {
+        worldCupTopScorers: TopScorer[];
+        worldCupTopAssistants: TopAssistant[];
+      }
+    | undefined;
+  statsLoading: boolean;
+  statsError: Error | undefined;
+  live: WcFixture[];
+  upcomingDays: ReturnType<typeof groupByDay>;
+  recent: WcFixture[];
+  byStage: Record<string, WcFixture[]>;
+  sortedStages: string[];
+  followed: string | null;
+};
+
+const WorldCupDataContext = createContext<WorldCupPageData | null>(null);
+
+function useWorldCupData(): WorldCupPageData {
+  const ctx = useContext(WorldCupDataContext);
+  if (!ctx) throw new Error("useWorldCupData must be used within WorldCupLayout");
+  return ctx;
+}
 
 function StatusBadge({ fixture }: { fixture: WcFixture }) {
   if (isLive(fixture)) {
@@ -327,7 +368,7 @@ function StageSection({ stage, fixtures }: { stage: string; fixtures: WcFixture[
   );
 }
 
-export function WorldCupPage() {
+function WorldCupDataProvider({ children }: { children: ReactNode }) {
   const { data, loading, error } = useQuery<{ worldCupFixtures: WcFixture[] }>(
     WORLD_CUP_FIXTURES,
     { fetchPolicy: "cache-and-network", pollInterval: 60_000 },
@@ -338,19 +379,12 @@ export function WorldCupPage() {
   }>(WORLD_CUP_TOP_STATS, { fetchPolicy: "cache-and-network", pollInterval: 120_000 });
 
   const followed = useFollowedTeam();
-  const [searchParams] = useSearchParams();
-  const focusId = searchParams.get("focus");
   const [, setTick] = useState(0);
-  const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings" | "stats">(
-    tabParam === "results" || tabParam === "standings" || tabParam === "stats" ? tabParam : "fixtures"
-  );
 
   const fixtures = data?.worldCupFixtures ?? [];
   const teams = fixtureTeams(fixtures);
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
 
-  // Adaptive tick for second-level countdown
   useEffect(() => {
     let id: ReturnType<typeof setTimeout>;
     function schedule() {
@@ -359,7 +393,7 @@ export function WorldCupPage() {
     }
     schedule();
     return () => clearTimeout(id);
-  }); // re-runs when filtered changes
+  });
 
   const live = liveFixtures(filtered);
   const upcomingDays = groupByDay(upcomingFixtures(filtered));
@@ -371,17 +405,34 @@ export function WorldCupPage() {
     (a, b) => (WC_STAGE_ORDER[a] ?? 99) - (WC_STAGE_ORDER[b] ?? 99),
   );
 
-  // When arriving from the feed widget with ?focus=<fixtureId>, scroll to that
-  // match and briefly highlight it so the click visibly lands on the match.
-  useEffect(() => {
-    if (!focusId || fixtures.length === 0) return;
-    const el = document.getElementById(`wc-fixture-${focusId}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.add("wc-fixture--focus");
-    const t = setTimeout(() => el.classList.remove("wc-fixture--focus"), 2400);
-    return () => clearTimeout(t);
-  }, [focusId, fixtures.length]);
+  const value: WorldCupPageData = {
+    fixtures,
+    filtered,
+    teams,
+    loading,
+    error: error as Error | undefined,
+    statsData,
+    statsLoading,
+    statsError: statsError as Error | undefined,
+    live,
+    upcomingDays,
+    recent,
+    byStage,
+    sortedStages,
+    followed,
+  };
+
+  return <WorldCupDataContext.Provider value={value}>{children}</WorldCupDataContext.Provider>;
+}
+
+function WorldCupShell() {
+  const {
+    fixtures,
+    teams,
+    loading,
+    error,
+    followed,
+  } = useWorldCupData();
 
   return (
     <div className="wc-page">
@@ -430,19 +481,18 @@ export function WorldCupPage() {
         </div>
       )}
 
-      {/* Tab bar */}
       <div className="wc-tab-bar" role="tablist">
-        {(["fixtures", "results", "standings", "stats"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
+        {WC_TABS.map((tab) => (
+          <NavLink
+            key={tab.id}
+            to={`/world-cup/${tab.path}`}
             role="tab"
-            aria-selected={activeTab === tab}
-            className={`wc-tab-btn${activeTab === tab ? " wc-tab-btn--active" : ""}`}
-            onClick={() => setActiveTab(tab)}
+            className={({ isActive }) =>
+              `wc-tab-btn${isActive ? " wc-tab-btn--active" : ""}`
+            }
           >
-            {tab === "fixtures" ? "Fixtures" : tab === "results" ? "Results" : tab === "standings" ? "Standings" : "Stats"}
-          </button>
+            {tab.label}
+          </NavLink>
         ))}
       </div>
 
@@ -460,97 +510,179 @@ export function WorldCupPage() {
         </p>
       )}
 
-      {activeTab === "fixtures" && (
-        <>
-          {live.length > 0 && (
-            <section className="wc-stage wc-stage--live">
-              <h2 className="wc-stage-title">
-                <span className="wc-live-dot" /> Live now
-              </h2>
+      <Outlet />
+    </div>
+  );
+}
+
+export function WorldCupLayout() {
+  return (
+    <WorldCupDataProvider>
+      <WorldCupShell />
+    </WorldCupDataProvider>
+  );
+}
+
+const LEGACY_TAB_PATH: Record<string, WorldCupTabId> = {
+  fixtures: "fixtures",
+  results: "results",
+  standings: "standings",
+  stats: "stats",
+  bracket: "road-map",
+  "road-map": "road-map",
+};
+
+/** Redirect /world-cup and old ?tab= links to dedicated tab routes. */
+export function WorldCupIndexRedirect() {
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get("tab");
+  const focus = searchParams.get("focus");
+  const path = tab && LEGACY_TAB_PATH[tab] ? LEGACY_TAB_PATH[tab] : "fixtures";
+  const qs = focus ? `?focus=${encodeURIComponent(focus)}` : "";
+  return <Navigate to={`/world-cup/${path}${qs}`} replace />;
+}
+
+export function WorldCupFixturesTab() {
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get("focus");
+  const {
+    fixtures,
+    filtered,
+    followed,
+    live,
+    upcomingDays,
+    sortedStages,
+    byStage,
+  } = useWorldCupData();
+
+  useEffect(() => {
+    if (!focusId || fixtures.length === 0) return;
+    const el = document.getElementById(`wc-fixture-${focusId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("wc-fixture--focus");
+    const t = setTimeout(() => el.classList.remove("wc-fixture--focus"), 2400);
+    return () => clearTimeout(t);
+  }, [focusId, fixtures.length]);
+
+  if (fixtures.length === 0) return null;
+
+  return (
+    <>
+      {live.length > 0 && (
+        <section className="wc-stage wc-stage--live">
+          <h2 className="wc-stage-title">
+            <span className="wc-live-dot" /> Live now
+          </h2>
+          <div className="wc-fixture-list wc-fixture-list--knockout">
+            {live.map((f) => (
+              <FixtureRow key={f.id} fixture={f} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {upcomingDays.length > 0 && (
+        <section className="wc-stage wc-stage--upnext">
+          <h2 className="wc-stage-title">⏱ Up next</h2>
+          {upcomingDays.map((g) => (
+            <div className="wc-day" key={g.key}>
+              <h3 className="wc-day-title">{g.label}</h3>
               <div className="wc-fixture-list wc-fixture-list--knockout">
-                {live.map((f) => (
+                {g.fixtures.map((f) => (
                   <FixtureRow key={f.id} fixture={f} />
                 ))}
               </div>
-            </section>
-          )}
-
-          {upcomingDays.length > 0 && (
-            <section className="wc-stage wc-stage--upnext">
-              <h2 className="wc-stage-title">⏱ Up next</h2>
-              {upcomingDays.map((g) => (
-                <div className="wc-day" key={g.key}>
-                  <h3 className="wc-day-title">{g.label}</h3>
-                  <div className="wc-fixture-list wc-fixture-list--knockout">
-                    {g.fixtures.map((f) => (
-                      <FixtureRow key={f.id} fixture={f} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </section>
-          )}
-
-          {fixtures.length > 0 && (
-            <>
-              <h2 className="wc-section-divider">Full schedule</h2>
-              {sortedStages.map((stage) => (
-                <StageSection key={stage} stage={stage} fixtures={byStage[stage]!} />
-              ))}
-            </>
-          )}
-
-          {followed && filtered.length === 0 && fixtures.length > 0 && (
-            <p className="wc-status-msg">No matches found for {followed}.</p>
-          )}
-        </>
+            </div>
+          ))}
+        </section>
       )}
 
-      {activeTab === "results" && (
-        <>
-          {live.length === 0 && recent.length === 0 ? (
-            <p className="wc-status-msg">No results yet.</p>
-          ) : (
-            <>
-              {live.length > 0 && (
-                <section className="wc-stage wc-stage--live">
-                  <h2 className="wc-stage-title">
-                    <span className="wc-live-dot" /> Live now
-                  </h2>
-                  <div className="wc-fixture-list wc-fixture-list--knockout">
-                    {live.map((f) => (
-                      <FixtureRow key={f.id} fixture={f} />
-                    ))}
-                  </div>
-                </section>
-              )}
-              {recent.length > 0 && (
-                <section className="wc-stage wc-stage--results">
-                  <div className="wc-fixture-list wc-fixture-list--knockout">
-                    {recent.map((f) => (
-                      <FixtureRow key={f.id} fixture={f} />
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-        </>
-      )}
+      <h2 className="wc-section-divider">Full schedule</h2>
+      {sortedStages.map((stage) => (
+        <StageSection key={stage} stage={stage} fixtures={byStage[stage]!} />
+      ))}
 
-      {activeTab === "standings" && (
-        <GroupStandings fixtures={filtered} />
+      {followed && filtered.length === 0 && (
+        <p className="wc-status-msg">No matches found for {followed}.</p>
       )}
-
-      {activeTab === "stats" && (
-        statsError
-          ? <p className="wc-status-msg wc-status-msg--error">Failed to load stats. {statsError.message}</p>
-          : <TopStatsSection
-              scorers={statsData?.worldCupTopScorers ?? []}
-              assistants={statsData?.worldCupTopAssistants ?? []}
-              loading={statsLoading && !statsData}
-            />
-      )}
-    </div>
+    </>
   );
+}
+
+export function WorldCupResultsTab() {
+  const { live, recent } = useWorldCupData();
+
+  if (live.length === 0 && recent.length === 0) {
+    return <p className="wc-status-msg">No results yet.</p>;
+  }
+
+  return (
+    <>
+      {live.length > 0 && (
+        <section className="wc-stage wc-stage--live">
+          <h2 className="wc-stage-title">
+            <span className="wc-live-dot" /> Live now
+          </h2>
+          <div className="wc-fixture-list wc-fixture-list--knockout">
+            {live.map((f) => (
+              <FixtureRow key={f.id} fixture={f} />
+            ))}
+          </div>
+        </section>
+      )}
+      {recent.length > 0 && (
+        <section className="wc-stage wc-stage--results">
+          <div className="wc-fixture-list wc-fixture-list--knockout">
+            {recent.map((f) => (
+              <FixtureRow key={f.id} fixture={f} />
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+export function WorldCupStandingsTab() {
+  const { filtered } = useWorldCupData();
+  return <GroupStandings fixtures={filtered} />;
+}
+
+export function WorldCupStatsTab() {
+  const { statsData, statsLoading, statsError } = useWorldCupData();
+
+  if (statsError) {
+    return (
+      <p className="wc-status-msg wc-status-msg--error">
+        Failed to load stats. {statsError.message}
+      </p>
+    );
+  }
+
+  return (
+    <TopStatsSection
+      scorers={statsData?.worldCupTopScorers ?? []}
+      assistants={statsData?.worldCupTopAssistants ?? []}
+      loading={statsLoading && !statsData}
+    />
+  );
+}
+
+export function WorldCupRoadMapTab() {
+  const { fixtures, loading } = useWorldCupData();
+
+  if (loading && fixtures.length === 0) {
+    return <p className="wc-status-msg">Loading road map…</p>;
+  }
+
+  return <WorldCupKnockoutBracket fixtures={fixtures} />;
+}
+
+/** @deprecated Use WorldCupRoadMapTab */
+export const WorldCupBracketTab = WorldCupRoadMapTab;
+
+/** @deprecated Use nested routes under /world-cup/:tab */
+export function WorldCupPage() {
+  return <Navigate to="/world-cup/fixtures" replace />;
 }

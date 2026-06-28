@@ -1185,7 +1185,7 @@ export function MatchDetailPage() {
     <div className="md-page">
       {/* Top bar */}
       <div className="md-topbar">
-        <button type="button" className="md-back" onClick={() => navigate("/world-cup?tab=results")} aria-label="Back">
+        <button type="button" className="md-back" onClick={() => navigate("/world-cup/results")} aria-label="Back">
           ←
         </button>
         <span className="md-topbar-title">Match Details</span>

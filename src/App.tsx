@@ -15,7 +15,15 @@ import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ScheduledPostsPage } from "./pages/ScheduledPostsPage";
 import { FriendsPage } from "./pages/FriendsPage";
-import { WorldCupPage } from "./pages/WorldCupPage";
+import {
+  WorldCupFixturesTab,
+  WorldCupIndexRedirect,
+  WorldCupLayout,
+  WorldCupResultsTab,
+  WorldCupRoadMapTab,
+  WorldCupStandingsTab,
+  WorldCupStatsTab,
+} from "./pages/WorldCupPage";
 import { CoinsPage } from "./pages/CoinsPage";
 import { PointsPage } from "./pages/PointsPage";
 import { MatchDetailPage } from "./pages/MatchDetailPage";
@@ -69,7 +77,15 @@ export default function App() {
         <Route path="coins/:userId" element={<CoinsPage />} />
         <Route path="points" element={<PointsPage />} />
         <Route path="points/:userId" element={<PointsPage />} />
-        <Route path="world-cup" element={<WorldCupPage />} />
+        <Route path="world-cup" element={<WorldCupLayout />}>
+          <Route index element={<WorldCupIndexRedirect />} />
+          <Route path="fixtures" element={<WorldCupFixturesTab />} />
+          <Route path="results" element={<WorldCupResultsTab />} />
+          <Route path="standings" element={<WorldCupStandingsTab />} />
+          <Route path="stats" element={<WorldCupStatsTab />} />
+          <Route path="road-map" element={<WorldCupRoadMapTab />} />
+          <Route path="bracket" element={<Navigate to="/world-cup/road-map" replace />} />
+        </Route>
         <Route path="world-cup/match/:id" element={<MatchDetailPage />} />
         <Route path="campaign/:slug" element={<CampaignDetailPage />} />
         <Route

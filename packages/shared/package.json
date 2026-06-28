@@ -26,6 +26,7 @@
     "./lib/contentReport": "./src/lib/contentReport.ts",
     "./lib/formatRelativeTime": "./src/lib/formatRelativeTime.ts",
     "./lib/knockoutFixture": "./src/lib/knockoutFixture.ts",
+    "./lib/knockoutBracket": "./src/lib/knockoutBracket.ts",
     "./lib/matchPredictionCopy": "./src/lib/matchPredictionCopy.ts",
     "./lib/matchScoreCopy": "./src/lib/matchScoreCopy.ts",
     "./lib/friendRequestNotification": "./src/lib/friendRequestNotification.ts",

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from "expo-router";
 import { ActivityIndicator, InteractionManager, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES, WORLD_CUP_TOP_STATS } from "@ctrend/shared/graphql/worldcup";
@@ -347,8 +347,14 @@ export default function WorldCupScreen() {
   // ~100-row list renders a beat later instead of blocking the tap).
   const [contentReady, setContentReady] = useState(false);
   const params = useLocalSearchParams<{ tab?: string }>();
-  const initTab = params.tab === "results" || params.tab === "standings" || params.tab === "stats" ? params.tab : "fixtures";
-  const [activeTab, setActiveTab] = useState<"fixtures" | "results" | "standings" | "stats">(initTab);
+  const pathname = usePathname();
+  const initTab =
+    params.tab === "results" || params.tab === "standings" || params.tab === "stats" || params.tab === "road-map"
+      ? params.tab
+      : "fixtures";
+  const [activeTab, setActiveTab] = useState<
+    "fixtures" | "results" | "standings" | "stats" | "road-map"
+  >(initTab === "road-map" ? "fixtures" : initTab);
   // Each sub-tab is rendered once (the first time it's opened) and then kept
   // mounted (just hidden) — so switching back never reloads it.
   const [visited, setVisited] = useState<Record<string, boolean>>({ [initTab]: true });
@@ -415,7 +421,17 @@ export default function WorldCupScreen() {
     results: "Results",
     standings: "Standings",
     stats: "Stats",
+    "road-map": "Road Map",
   };
+  const roadMapActive = pathname?.includes("road-map") ?? false;
+
+  function openTab(tab: typeof activeTab) {
+    if (tab === "road-map") {
+      router.push("/world-cup/road-map" as `/${string}`);
+      return;
+    }
+    setActiveTab(tab);
+  }
 
   return (
     <View style={[st.flex, { backgroundColor: colors.bg }]}>
@@ -425,13 +441,18 @@ export default function WorldCupScreen() {
 
       {/* Sticky tab bar */}
       <View style={st.tabBar}>
-        {(["fixtures", "results", "standings", "stats"] as const).map((tab) => (
+        {(["fixtures", "results", "standings", "stats", "road-map"] as const).map((tab) => (
           <Pressable
             key={tab}
-            style={[st.tabBtn, activeTab === tab && st.tabBtnActive]}
-            onPress={() => setActiveTab(tab)}
+            style={[st.tabBtn, (activeTab === tab || (tab === "road-map" && roadMapActive)) && st.tabBtnActive]}
+            onPress={() => openTab(tab)}
           >
-            <Text style={[st.tabBtnText, activeTab === tab && st.tabBtnTextActive]}>
+            <Text
+              style={[
+                st.tabBtnText,
+                (activeTab === tab || (tab === "road-map" && roadMapActive)) && st.tabBtnTextActive,
+              ]}
+            >
               {TAB_LABELS[tab]}
             </Text>
           </Pressable>
@@ -617,7 +638,7 @@ function makeStyles(c: Palette) {
       borderBottomColor: "transparent",
     },
     tabBtnActive: { borderBottomColor: c.accent },
-    tabBtnText: { fontSize: 13, fontWeight: "700", color: c.muted },
+    tabBtnText: { fontSize: 11.5, fontWeight: "700", color: c.muted },
     tabBtnTextActive: { color: c.accent },
     chipRow: { gap: 8, paddingVertical: 2, paddingRight: 8 },
     chip: {

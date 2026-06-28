@@ -64,7 +64,7 @@ export function WorldCupBanner() {
 
   function handleClick() {
     if (liveMatch) {
-      navigate("/world-cup?tab=results");
+      navigate("/world-cup/results");
     } else {
       navigate("/world-cup");
     }

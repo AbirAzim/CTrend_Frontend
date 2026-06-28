@@ -133,7 +133,7 @@ export function WorldCupFloating() {
 
   function openMatch(f: WcFixture) {
     setOpen(false);
-    navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : `/world-cup?focus=${f.id}`);
+    navigate(f.campaignPostId ? `/post/${f.campaignPostId}` : `/world-cup/fixtures?focus=${f.id}`);
   }
 
   // ── Tab drag handlers ─────────────────────────────────────────────────────
