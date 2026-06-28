@@ -101,7 +101,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.12.0 release: **versionCode 40** across all three files.
+Current version after 1.12.1 release: **versionCode 41** across all three files.
 
 ---
 
@@ -208,12 +208,38 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.12.1 | 41 | 2026-06-28 | Prediction score input polish (visible boxes, focus, Cancel button), includes all 1.12.0 live match UX |
 | 1.12.0 | 40 | 2026-06-27 | Live match scoreboard UI, knockout ET/pen scores, prediction UX, splash/sound launch fixes, Best Player So Far label |
 | 1.11.1 | 39 | 2026-06-27 | Chat composer redesign, animated send button, Gboard GIF/emoji keyboard support, image attach fixes |
 | 1.11.0 | 38 | 2026-06-27 | Admin overview redesign (stats, charts, online users), platform settings UX, notifications page, profile/rewards polish |
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.12.1 (41)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.12.1 (41)
+```
+
+**What's new** (user-facing release notes)
+```
+• Live match scoreboard — clearer scores, animated Match center, and knockout extra-time/penalty results
+• Easier match predictions — visible score boxes, clearer team names, and a proper Cancel button when editing
+• Match details show "Best Player So Far" during live games; Man of the Match after full time
+• Smoother app launch — no white flash on startup and quieter open experience
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Includes 1.12.0 World Cup live UX plus prediction polish: scoreBox card styling, focus states,
+middle score separator, larger Cancel pill, compact inline predict row. LiveMatchPanel, ET/pen
+scores, matchTopPlayerLabel, splash gate, notification sound gate on cold start.
+```
 
 ### Play Console copy — 1.12.0 (40)
 
@@ -385,7 +411,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.12.0 (versionCode 40) |
+| Current version | 1.12.1 (versionCode 41) |
 
 ---
 
