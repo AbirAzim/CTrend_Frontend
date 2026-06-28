@@ -191,13 +191,111 @@ function normTeam(name: string | null | undefined): string {
     "democratic republic of the congo": "congo dr",
     "bosnia and herzegovina": "bosnia & herzegovina",
     "cape verde": "cape verde islands",
+    "cape verde islands": "cape verde islands",
     "côte d'ivoire": "ivory coast",
     "cote d'ivoire": "ivory coast",
+    "ivory coast": "ivory coast",
     "united states": "usa",
     "u.s.a.": "usa",
+    "usa": "usa",
     "turkiye": "türkiye",
+    "türkiye": "türkiye",
+    "korea republic": "south korea",
+    "republic of korea": "south korea",
   };
   return aliases[raw] ?? raw;
+}
+
+function normalizeBracketStage(stage: string | null | undefined): string {
+  const raw = (stage ?? "").trim().toUpperCase();
+  if (!raw || raw === "GROUP_STAGE") return "GROUP_STAGE";
+  if (raw === "ROUND_OF_32" || raw === "ROUND OF 32") return "LAST_32";
+  if (raw === "ROUND_OF_16" || raw === "ROUND OF 16") return "LAST_16";
+  if (raw === "QUARTER_FINAL" || raw === "QUARTER FINAL" || raw === "QUARTER-FINAL") {
+    return "QUARTER_FINALS";
+  }
+  if (raw === "SEMI_FINAL" || raw === "SEMI FINAL" || raw === "SEMI-FINAL") return "SEMI_FINALS";
+  if (raw === "THIRD_PLACE_PLAY_OFF" || raw === "THIRD PLACE PLAY-OFF") return "THIRD_PLACE";
+  return raw;
+}
+
+export function normalizeKnockoutFixtures(fixtures: BracketFixture[]): BracketFixture[] {
+  return fixtures.map((f) => ({
+    ...f,
+    stage: normalizeBracketStage(f.stage),
+  }));
+}
+
+/** Index team crests from all fixtures (group + knockout) for placeholder enrichment. */
+function buildTeamCrestLookup(fixtures: BracketFixture[]): Map<string, BracketTeam> {
+  const map = new Map<string, BracketTeam>();
+  for (const f of fixtures) {
+    for (const team of [f.homeTeam, f.awayTeam]) {
+      const key = normTeam(team.name);
+      if (!key) continue;
+      const existing = map.get(key);
+      if (existing?.crest) continue;
+      if (team.crest) {
+        map.set(key, team);
+      } else if (!existing) {
+        map.set(key, team);
+      }
+    }
+  }
+  return map;
+}
+
+function teamFromLookup(name: string, lookup: Map<string, BracketTeam>): BracketTeam {
+  return enrichTeam({ name, shortName: name, crest: null }, lookup);
+}
+
+function enrichTeam(team: BracketTeam, lookup: Map<string, BracketTeam>): BracketTeam {
+  const key = normTeam(team.name);
+  const found = key ? lookup.get(key) : undefined;
+  if (!found) return team;
+  return {
+    name: team.name ?? found.name,
+    shortName: team.shortName?.trim() || found.shortName?.trim() || team.name,
+    crest: team.crest ?? found.crest ?? null,
+  };
+}
+
+function enrichFixtureTeams(fixture: BracketFixture, lookup: Map<string, BracketTeam>): BracketFixture {
+  return {
+    ...fixture,
+    homeTeam: enrichTeam(fixture.homeTeam, lookup),
+    awayTeam: enrichTeam(fixture.awayTeam, lookup),
+  };
+}
+
+function placeholderR32Fixture(
+  home: string,
+  away: string,
+  side: BracketSide,
+  index: number,
+  lookup: Map<string, BracketTeam>,
+): BracketFixture {
+  return {
+    id: `r32-placeholder-${side}-${index}`,
+    homeTeam: teamFromLookup(home, lookup),
+    awayTeam: teamFromLookup(away, lookup),
+    kickoff: "",
+    status: "SCHEDULED",
+    stage: "LAST_32",
+    score: null,
+  };
+}
+
+export function isBracketPlaceholder(fixture: BracketFixture | null | undefined): boolean {
+  return Boolean(fixture?.id?.startsWith("r32-placeholder-"));
+}
+
+/** Faster refresh while knockout matches are live; otherwise keep roadmap current after FT. */
+export function worldCupRoadMapPollMs(fixtures: BracketFixture[]): number {
+  const knockout = fixtures.filter((f) => f.stage !== "GROUP_STAGE" && !isBracketPlaceholder(f));
+  if (knockout.some((f) => isBracketLive(f))) return 15_000;
+  if (knockout.some((f) => !isBracketFinished(f))) return 30_000;
+  return 60_000;
 }
 
 function fixtureMatchesPair(f: BracketFixture, home: string, away: string): boolean {
@@ -249,23 +347,48 @@ function emptySideColumns(side: BracketSide): BracketSlot[][] {
   });
 }
 
+function pairIndexForFixture(f: BracketFixture, pairs: [string, string][]): number {
+  for (let i = 0; i < pairs.length; i++) {
+    const [home, away] = pairs[i]!;
+    if (fixtureMatchesPair(f, home, away)) return i;
+  }
+  const h = normTeam(f.homeTeam.name);
+  const a = normTeam(f.awayTeam.name);
+  for (let i = 0; i < pairs.length; i++) {
+    const [home, away] = pairs[i]!;
+    const th = normTeam(home);
+    const ta = normTeam(away);
+    if ((h && (h === th || h === ta)) || (a && (a === th || a === ta))) return i;
+  }
+  return -1;
+}
+
 /** Map R32 fixture → official bracket slot using FIFA draw pairings (not kickoff order). */
 function assignR32Slots(
   columns: BracketSlot[][],
   fixtures: BracketFixture[],
   side: BracketSide,
+  lookup: Map<string, BracketTeam>,
 ): void {
   const col = columns[0]!;
   const pairs = side === "left" ? R32_LEFT_PAIRS : R32_RIGHT_PAIRS;
+  const used = new Set<string>();
 
   for (const f of fixtures) {
-    for (let i = 0; i < pairs.length; i++) {
-      const [home, away] = pairs[i]!;
-      if (fixtureMatchesPair(f, home, away)) {
-        col[i] = { ...col[i]!, fixture: f };
-        break;
-      }
+    const idx = pairIndexForFixture(f, pairs);
+    if (idx >= 0 && !used.has(f.id)) {
+      col[idx] = { ...col[idx]!, fixture: enrichFixtureTeams(f, lookup) };
+      used.add(f.id);
     }
+  }
+
+  for (let i = 0; i < pairs.length; i++) {
+    if (col[i]?.fixture && !isBracketPlaceholder(col[i]?.fixture)) continue;
+    const [home, away] = pairs[i]!;
+    col[i] = {
+      ...col[i]!,
+      fixture: placeholderR32Fixture(home, away, side, i, lookup),
+    };
   }
 }
 
@@ -274,6 +397,7 @@ function assignFeederSlots(
   columns: BracketSlot[][],
   fixtures: BracketFixture[],
   stageIdx: number,
+  lookup: Map<string, BracketTeam>,
 ): void {
   const col = columns[stageIdx]!;
   const childCol = columns[stageIdx - 1]!;
@@ -298,7 +422,7 @@ function assignFeederSlots(
     }
 
     if (bestIdx >= 0 && bestScore > 0 && !used.has(f.id)) {
-      col[bestIdx] = { ...col[bestIdx]!, fixture: f };
+      col[bestIdx] = { ...col[bestIdx]!, fixture: enrichFixtureTeams(f, lookup) };
       used.add(f.id);
     }
   }
@@ -308,14 +432,18 @@ function stageFixtures(fixtures: BracketFixture[], stage: string): BracketFixtur
   return fixtures.filter((f) => f.stage === stage);
 }
 
-function buildSideColumns(fixtures: BracketFixture[], side: BracketSide): BracketSlot[][] {
+function buildSideColumns(
+  fixtures: BracketFixture[],
+  side: BracketSide,
+  lookup: Map<string, BracketTeam>,
+): BracketSlot[][] {
   const columns = emptySideColumns(side);
 
-  assignR32Slots(columns, stageFixtures(fixtures, "LAST_32"), side);
+  assignR32Slots(columns, stageFixtures(fixtures, "LAST_32"), side, lookup);
 
   for (let stageIdx = 1; stageIdx < SIDE_STAGES.length; stageIdx++) {
     const stage = SIDE_STAGES[stageIdx]!;
-    assignFeederSlots(columns, stageFixtures(fixtures, stage), stageIdx);
+    assignFeederSlots(columns, stageFixtures(fixtures, stage), stageIdx, lookup);
   }
 
   return columns;
@@ -323,13 +451,15 @@ function buildSideColumns(fixtures: BracketFixture[], side: BracketSide): Bracke
 
 /** Group knockout fixtures into left / center / right bracket columns. */
 export function buildKnockoutBracket(fixtures: BracketFixture[]): KnockoutBracket {
-  const knockout = fixtures.filter((f) => f.stage !== "GROUP_STAGE");
-  const finals = stageFixtures(knockout, "FINAL");
-  const third = stageFixtures(knockout, "THIRD_PLACE");
+  const normalized = normalizeKnockoutFixtures(fixtures);
+  const teamLookup = buildTeamCrestLookup(normalized);
+  const knockout = normalized.filter((f) => f.stage !== "GROUP_STAGE");
+  const finals = stageFixtures(knockout, "FINAL").map((f) => enrichFixtureTeams(f, teamLookup));
+  const third = stageFixtures(knockout, "THIRD_PLACE").map((f) => enrichFixtureTeams(f, teamLookup));
 
   return {
-    left: buildSideColumns(knockout, "left"),
-    right: buildSideColumns(knockout, "right"),
+    left: buildSideColumns(knockout, "left", teamLookup),
+    right: buildSideColumns(knockout, "right", teamLookup),
     center: [
       {
         fixture: finals[0] ?? null,

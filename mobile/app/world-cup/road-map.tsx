@@ -1,9 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@apollo/client/react";
 import { router, useFocusEffect } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
+import { worldCupRoadMapPollMs, type BracketFixture } from "@ctrend/shared/lib/knockoutBracket";
 import { WorldCupKnockoutBracket } from "../../components/WorldCupKnockoutBracket";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
@@ -16,21 +18,47 @@ export default function WorldCupRoadMapScreen() {
   const insets = useSafeAreaInsets();
   const { translateY } = useTabBar();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [landscapeLocked, setLandscapeLocked] = useState(false);
 
-  const { data, loading, error } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
+  const [pollInterval, setPollInterval] = useState(30_000);
+
+  const { data, loading, error, refetch } = useQuery<FixturesData>(WORLD_CUP_FIXTURES, {
     fetchPolicy: "cache-and-network",
-    pollInterval: 60_000,
+    pollInterval,
+    notifyOnNetworkStatusChange: true,
   });
   const fixtures = data?.worldCupFixtures ?? [];
+  const pollMs = useMemo(() => worldCupRoadMapPollMs(fixtures as BracketFixture[]), [fixtures]);
+
+  useEffect(() => {
+    setPollInterval(pollMs);
+  }, [pollMs]);
 
   useFocusEffect(
     useCallback(() => {
       translateY.setValue(0);
-    }, [translateY]),
+      void refetch();
+    }, [translateY, refetch]),
   );
 
   const onOpenMatch = (id: string) => {
     router.push(`/world-cup/match/${id}` as `/${string}`);
+  };
+
+  const toggleRotate = () => {
+    void (async () => {
+      try {
+        if (landscapeLocked) {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          setLandscapeLocked(false);
+        } else {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+          setLandscapeLocked(true);
+        }
+      } catch {
+        /* device may block programmatic rotation */
+      }
+    })();
   };
 
   return (
@@ -57,7 +85,17 @@ export default function WorldCupRoadMapScreen() {
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
           Knockout Road Map
         </Text>
-        <View style={styles.backBtn} />
+        <Pressable
+          onPress={toggleRotate}
+          hitSlop={10}
+          style={styles.rotateBtn}
+          accessibilityRole="button"
+          accessibilityLabel={landscapeLocked ? "Unlock rotation" : "Rotate to landscape"}
+        >
+          <Text style={[styles.rotateText, { color: colors.accent }]}>
+            {landscapeLocked ? "Unlock" : "Rotate"}
+          </Text>
+        </Pressable>
       </View>
 
       <View
@@ -101,6 +139,8 @@ const styles = StyleSheet.create({
   backBtn: { width: 72 },
   backText: { fontSize: 14, fontWeight: "700" },
   title: { flex: 1, textAlign: "center", fontSize: 14, fontWeight: "800" },
+  rotateBtn: { width: 72, alignItems: "flex-end" },
+  rotateText: { fontSize: 13, fontWeight: "800" },
   body: { flex: 1 },
   status: { textAlign: "center", paddingVertical: 24, fontSize: 13 },
 });

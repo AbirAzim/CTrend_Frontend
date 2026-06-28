@@ -23331,6 +23331,105 @@ html[data-topbar-hidden="true"] .wc-tab-bar {
 .wc-brk-body {
   position: relative;
 }
+
+/* Mobile app-style road map (matches native fullscreen UX) */
+@media (max-width: 900px) {
+  body.wc-road-map-active .wc-hero,
+  body.wc-road-map-active .wc-filter-bar,
+  body.wc-road-map-active .wc-tab-bar {
+    display: none;
+  }
+  body.wc-road-map-active .wc-page:has(.wc-brk) {
+    padding: 0;
+    max-width: 100%;
+  }
+  .wc-brk--mobile-app {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    height: calc(
+      100dvh - var(--topbar-h, 56px) - var(--ig-bottom-nav-stack, 72px)
+    );
+    min-height: 280px;
+  }
+  .wc-brk-mobile-bar {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--ig-border);
+    background: var(--ig-bg);
+    flex-shrink: 0;
+  }
+  .wc-brk-mobile-spacer {
+    width: 72px;
+    flex-shrink: 0;
+  }
+  .wc-brk-mobile-title {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--ig-text);
+  }
+  .wc-brk-rotate-btn {
+    width: 72px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ig-link, #0095f6);
+    cursor: pointer;
+  }
+  .wc-brk-body--mobile {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .wc-brk-mobile-viewport {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .wc-brk-touch-viewport {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .wc-brk-touch-stage {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .wc-brk-touch-board {
+    transform-origin: center center;
+    flex-shrink: 0;
+  }
+  .wc-brk-zoom-hint {
+    margin: 0;
+    padding: 6px 12px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--ig-text);
+    opacity: 0.65;
+    flex-shrink: 0;
+  }
+  .wc-brk--mobile-app .wc-brk-board {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+}
 .wc-brk--mobile-portrait .wc-brk-body > :not(.wc-brk-rotate-overlay) {
   filter: blur(2px);
   opacity: 0.35;

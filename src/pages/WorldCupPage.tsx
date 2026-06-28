@@ -21,6 +21,10 @@ import {
   upcomingFixtures,
 } from "../lib/worldCupFixtures";
 import { setFollowedTeam, useFollowedTeam } from "../lib/wcTeam";
+import {
+  worldCupRoadMapPollMs,
+  type BracketFixture,
+} from "@ctrend/shared/lib/knockoutBracket";
 import { WorldCupKnockoutBracket } from "../components/WorldCupKnockoutBracket";
 
 const WC_TABS = [
@@ -53,6 +57,7 @@ type WorldCupPageData = {
   byStage: Record<string, WcFixture[]>;
   sortedStages: string[];
   followed: string | null;
+  refetch: () => Promise<unknown>;
 };
 
 const WorldCupDataContext = createContext<WorldCupPageData | null>(null);
@@ -369,9 +374,10 @@ function StageSection({ stage, fixtures }: { stage: string; fixtures: WcFixture[
 }
 
 function WorldCupDataProvider({ children }: { children: ReactNode }) {
-  const { data, loading, error } = useQuery<{ worldCupFixtures: WcFixture[] }>(
+  const [pollMs, setPollMs] = useState(30_000);
+  const { data, loading, error, refetch } = useQuery<{ worldCupFixtures: WcFixture[] }>(
     WORLD_CUP_FIXTURES,
-    { fetchPolicy: "cache-and-network", pollInterval: 60_000 },
+    { fetchPolicy: "cache-and-network", pollInterval: pollMs },
   );
   const { data: statsData, loading: statsLoading, error: statsError } = useQuery<{
     worldCupTopScorers: TopScorer[];
@@ -382,6 +388,10 @@ function WorldCupDataProvider({ children }: { children: ReactNode }) {
   const [, setTick] = useState(0);
 
   const fixtures = data?.worldCupFixtures ?? [];
+
+  useEffect(() => {
+    setPollMs(worldCupRoadMapPollMs(fixtures as BracketFixture[]));
+  }, [fixtures]);
   const teams = fixtureTeams(fixtures);
   const filtered = fixtures.filter((f) => involvesTeam(f, followed));
 
@@ -420,6 +430,7 @@ function WorldCupDataProvider({ children }: { children: ReactNode }) {
     byStage,
     sortedStages,
     followed,
+    refetch,
   };
 
   return <WorldCupDataContext.Provider value={value}>{children}</WorldCupDataContext.Provider>;
@@ -670,7 +681,15 @@ export function WorldCupStatsTab() {
 }
 
 export function WorldCupRoadMapTab() {
-  const { fixtures, loading } = useWorldCupData();
+  const { fixtures, loading, refetch } = useWorldCupData();
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refetch();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [refetch]);
 
   if (loading && fixtures.length === 0) {
     return <p className="wc-status-msg">Loading road map…</p>;

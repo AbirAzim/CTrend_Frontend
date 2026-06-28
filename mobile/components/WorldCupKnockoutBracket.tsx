@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import Svg, { Path } from "react-native-svg";
@@ -33,6 +33,7 @@ import {
   buildKnockoutBracket,
   isBracketFinished,
   isBracketLive,
+  isBracketPlaceholder,
   isBracketTeamKnown,
 } from "@ctrend/shared/lib/knockoutBracket";
 import { useTheme } from "../context/ThemeContext";
@@ -130,7 +131,7 @@ function BracketFixtureCard({
   const winner = bracketWinnerSide(fixture);
   const hasScore = live || finished;
   const footnote = stageFootnote(stage);
-  const clickable = live || finished;
+  const clickable = (live || finished) && !isBracketPlaceholder(fixture);
 
   const card = (
     <View

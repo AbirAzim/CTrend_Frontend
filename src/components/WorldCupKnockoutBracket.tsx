@@ -25,6 +25,7 @@ import {
   buildKnockoutBracket,
   isBracketFinished,
   isBracketLive,
+  isBracketPlaceholder,
   isBracketTeamKnown,
 } from "@ctrend/shared/lib/knockoutBracket";
 import type { WcFixture } from "../lib/worldCupFixtures";
@@ -67,15 +68,150 @@ function useBracketViewportMode(): BracketViewportMode {
   return mode;
 }
 
-function BracketRotatePrompt() {
+function clampTouchPan(
+  tx: number,
+  ty: number,
+  scale: number,
+  viewportW: number,
+  viewportH: number,
+) {
+  const contentW = BOARD_W * scale;
+  const contentH = BOARD_H * scale;
+  const maxX = Math.max(0, (contentW - viewportW) / 2);
+  const maxY = Math.max(0, (contentH - viewportH) / 2);
+  return {
+    x: Math.min(Math.max(tx, -maxX), maxX),
+    y: Math.min(Math.max(ty, -maxY), maxY),
+  };
+}
+
+type TouchGesture = {
+  mode: "none" | "pan" | "pinch";
+  startDist: number;
+  startScale: number;
+  startTx: number;
+  startTy: number;
+  startCx: number;
+  startCy: number;
+};
+
+function BracketTouchZoomViewport({
+  viewportW,
+  viewportH,
+  children,
+}: {
+  viewportW: number;
+  viewportH: number;
+  children: ReactNode;
+}) {
+  const baseScale =
+    viewportW > 0 && viewportH > 0 ? Math.min(viewportW / BOARD_W, viewportH / BOARD_H) : 1;
+  const minScale = baseScale * 0.92;
+  const maxScale = Math.max(baseScale * 3.5, 2);
+  const [scale, setScale] = useState(baseScale);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const gesture = useRef<TouchGesture>({
+    mode: "none",
+    startDist: 1,
+    startScale: baseScale,
+    startTx: 0,
+    startTy: 0,
+    startCx: 0,
+    startCy: 0,
+  });
+
+  useEffect(() => {
+    setScale(baseScale);
+    setTx(0);
+    setTy(0);
+    gesture.current.startScale = baseScale;
+  }, [baseScale, viewportW, viewportH]);
+
+  function setupGesture(touches: TouchList) {
+    if (touches.length >= 2) {
+      const a = touches[0]!;
+      const b = touches[1]!;
+      gesture.current = {
+        mode: "pinch",
+        startDist: Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)),
+        startScale: scale,
+        startTx: tx,
+        startTy: ty,
+        startCx: (a.clientX + b.clientX) / 2,
+        startCy: (a.clientY + b.clientY) / 2,
+      };
+    } else if (touches.length === 1) {
+      const t = touches[0]!;
+      gesture.current = {
+        mode: "pan",
+        startDist: 1,
+        startScale: scale,
+        startTx: tx,
+        startTy: ty,
+        startCx: t.clientX,
+        startCy: t.clientY,
+      };
+    }
+  }
+
   return (
-    <div className="wc-brk-rotate-overlay" role="status" aria-live="polite">
-      <div className="wc-brk-rotate-card">
-        <div className="wc-brk-rotate-icon" aria-hidden />
-        <p className="wc-brk-rotate-title">Rotate your phone</p>
-        <p className="wc-brk-rotate-sub">
-          The knockout road map is built for landscape view. Turn your device sideways to continue.
-        </p>
+    <div
+      className="wc-brk-touch-viewport"
+      style={{ width: viewportW, height: viewportH }}
+      onTouchStart={(e) => setupGesture(e.touches)}
+      onTouchMove={(e) => {
+        const touches = e.touches;
+        if (touches.length >= 2) {
+          if (gesture.current.mode !== "pinch") setupGesture(touches);
+          const a = touches[0]!;
+          const b = touches[1]!;
+          const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+          const mx = (a.clientX + b.clientX) / 2;
+          const my = (a.clientY + b.clientY) / 2;
+          const nextScale = Math.min(
+            maxScale,
+            Math.max(minScale, gesture.current.startScale * (dist / gesture.current.startDist)),
+          );
+          const clamped = clampTouchPan(
+            gesture.current.startTx + (mx - gesture.current.startCx),
+            gesture.current.startTy + (my - gesture.current.startCy),
+            nextScale,
+            viewportW,
+            viewportH,
+          );
+          setScale(nextScale);
+          setTx(clamped.x);
+          setTy(clamped.y);
+        } else if (touches.length === 1) {
+          if (gesture.current.mode !== "pan") setupGesture(touches);
+          const t = touches[0]!;
+          const clamped = clampTouchPan(
+            gesture.current.startTx + (t.clientX - gesture.current.startCx),
+            gesture.current.startTy + (t.clientY - gesture.current.startCy),
+            scale,
+            viewportW,
+            viewportH,
+          );
+          setTx(clamped.x);
+          setTy(clamped.y);
+        }
+      }}
+      onTouchEnd={() => {
+        gesture.current.mode = "none";
+      }}
+    >
+      <div className="wc-brk-touch-stage">
+        <div
+          className="wc-brk-touch-board"
+          style={{
+            width: BOARD_W,
+            height: BOARD_H,
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -238,7 +374,8 @@ function BracketMatchCard({
 }) {
   const fixture = slot.fixture;
   const stageMeta = BRACKET_STAGE_META[slot.stage as keyof typeof BRACKET_STAGE_META];
-  const clickable = fixture && (isBracketLive(fixture) || isBracketFinished(fixture));
+  const clickable =
+    fixture && !isBracketPlaceholder(fixture) && (isBracketLive(fixture) || isBracketFinished(fixture));
 
   const tbd: BracketTeam = { name: null, shortName: null, crest: null };
 
@@ -579,26 +716,60 @@ function BracketGuide() {
 export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] }) {
   const navigate = useNavigate();
   const viewportMode = useBracketViewportMode();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [landscapeLocked, setLandscapeLocked] = useState(false);
   const bracket = useMemo(() => buildKnockoutBracket(fixtures as BracketFixture[]), [fixtures]);
   const hasKnockout = fixtures.some((f) => f.stage !== "GROUP_STAGE");
-  const isMobilePortrait = viewportMode === "mobile-portrait";
-  const isMobileLandscape = viewportMode === "mobile-landscape";
+  const isMobile = viewportMode !== "desktop";
+  const isLandscape = viewportMode === "mobile-landscape";
 
   const onOpen = (id: string) => navigate(`/world-cup/match/${id}`);
 
   useEffect(() => {
+    if (!isMobile) return;
     document.body.classList.add("wc-road-map-active");
     return () => document.body.classList.remove("wc-road-map-active");
-  }, []);
+  }, [isMobile]);
 
   useEffect(() => {
-    if (isMobileLandscape) {
-      document.body.classList.add("wc-road-map-landscape");
-    } else {
-      document.body.classList.remove("wc-road-map-landscape");
-    }
-    return () => document.body.classList.remove("wc-road-map-landscape");
-  }, [isMobileLandscape]);
+    if (!isMobile) return;
+    const el = bodyRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) setViewportSize({ width: w, height: h });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("orientationchange", update);
+    };
+  }, [isMobile]);
+
+  const toggleRotate = () => {
+    void (async () => {
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock?: (orientation: string) => Promise<void>;
+        unlock?: () => void;
+      };
+      try {
+        if (landscapeLocked) {
+          orientation.unlock?.();
+          setLandscapeLocked(false);
+        } else if (orientation.lock) {
+          await orientation.lock("landscape");
+          setLandscapeLocked(true);
+        }
+      } catch {
+        /* browser may block programmatic rotation */
+      }
+    })();
+  };
 
   if (!hasKnockout) {
     return (
@@ -608,10 +779,65 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
     );
   }
 
-  return (
-    <section
-      className={`wc-brk${isMobileLandscape ? " wc-brk--mobile-landscape" : ""}${isMobilePortrait ? " wc-brk--mobile-portrait" : ""}`}
+  const board = (
+    <div
+      className="wc-brk-board"
+      style={{
+        ["--brk-tree-h" as string]: `${TREE_H}px`,
+        ["--brk-card-h" as string]: `${BRACKET_CARD_H}px`,
+        ["--brk-col-w" as string]: `${BRACKET_COL_W}px`,
+        ["--brk-conn-w" as string]: `${BRACKET_CONN_W}px`,
+        ["--brk-center-w" as string]: `${BRACKET_CENTER_W}px`,
+        ["--brk-champ-w" as string]: `${bracketChampionshipWidth()}px`,
+        ["--brk-board-gap" as string]: `${BRACKET_BOARD_GAP}px`,
+      }}
     >
+      <div className="wc-brk-half">
+        <BracketSide columns={bracket.left} onOpen={onOpen} side="left" />
+      </div>
+      <BracketChampionshipZone slots={bracket.center} onOpen={onOpen} />
+      <div className="wc-brk-half">
+        <BracketSide columns={bracket.right} onOpen={onOpen} side="right" />
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <section className="wc-brk wc-brk--mobile-app">
+        <div className="wc-brk-mobile-bar">
+          <span className="wc-brk-mobile-spacer" aria-hidden />
+          <h2 className="wc-brk-mobile-title">Knockout Road Map</h2>
+          <button type="button" className="wc-brk-rotate-btn" onClick={toggleRotate}>
+            {landscapeLocked ? "Unlock" : "Rotate"}
+          </button>
+        </div>
+        <div className="wc-brk-body wc-brk-body--mobile">
+          <div
+            className="wc-brk-mobile-viewport"
+            ref={bodyRef}
+            onTouchStart={(e) => {
+              if (e.touches.length === 2) e.preventDefault();
+            }}
+          >
+            {viewportSize.width > 0 && viewportSize.height > 0 ? (
+              <BracketTouchZoomViewport viewportW={viewportSize.width} viewportH={viewportSize.height}>
+                {board}
+              </BracketTouchZoomViewport>
+            ) : null}
+          </div>
+          <p className="wc-brk-zoom-hint">
+            {isLandscape
+              ? "Pinch to zoom · drag to pan · double-tap to reset"
+              : "Pinch to zoom · rotate for wider view"}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="wc-brk">
       <div className="wc-brk-head">
         <div>
           <h2 className="wc-brk-head-title">Knockout Road Map</h2>
@@ -621,30 +847,8 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
         </div>
       </div>
       <div className="wc-brk-body">
-        {isMobilePortrait && <BracketRotatePrompt />}
         <BracketGuide />
-        <BracketScaleViewport viewportMode={viewportMode}>
-          <div
-            className="wc-brk-board"
-            style={{
-              ["--brk-tree-h" as string]: `${TREE_H}px`,
-              ["--brk-card-h" as string]: `${BRACKET_CARD_H}px`,
-              ["--brk-col-w" as string]: `${BRACKET_COL_W}px`,
-              ["--brk-conn-w" as string]: `${BRACKET_CONN_W}px`,
-              ["--brk-center-w" as string]: `${BRACKET_CENTER_W}px`,
-              ["--brk-champ-w" as string]: `${bracketChampionshipWidth()}px`,
-              ["--brk-board-gap" as string]: `${BRACKET_BOARD_GAP}px`,
-            }}
-          >
-            <div className="wc-brk-half">
-              <BracketSide columns={bracket.left} onOpen={onOpen} side="left" />
-            </div>
-            <BracketChampionshipZone slots={bracket.center} onOpen={onOpen} />
-            <div className="wc-brk-half">
-              <BracketSide columns={bracket.right} onOpen={onOpen} side="right" />
-            </div>
-          </div>
-        </BracketScaleViewport>
+        <BracketScaleViewport viewportMode={viewportMode}>{board}</BracketScaleViewport>
       </div>
     </section>
   );
