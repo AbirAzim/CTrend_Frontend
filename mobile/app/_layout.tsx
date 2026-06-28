@@ -60,6 +60,7 @@ import {
   setActiveConversationId,
 } from "../lib/activeConversation";
 import {
+  markAppUiReadyForSounds,
   shouldPlayLiveMessageSound,
   shouldPlayLiveNotificationSound,
 } from "../lib/notificationSoundGate";
@@ -483,6 +484,7 @@ function SplashGate() {
   const { hydrated } = useAuth();
   useEffect(() => {
     if (hydrated) {
+      markAppUiReadyForSounds();
       void SplashScreen.hideAsync();
     }
   }, [hydrated]);
@@ -519,7 +521,7 @@ function ForceUpdateGate() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
       <SafeAreaProvider>
         <ApolloProvider client={apolloClient}>
           <AuthProvider>

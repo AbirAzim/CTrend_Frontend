@@ -159,32 +159,11 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Prime players one at a time (muted) so devices that ignore volume=0
-  // don't blast every preset simultaneously on cold start.
+  // Players load when mounted — no audible priming on cold start (volume=0 is ignored on some devices).
   useEffect(() => {
-    let cancelled = false;
-    const prime = async () => {
-      await new Promise((r) => setTimeout(r, 700));
-      if (cancelled) return;
-      for (const p of Object.values(players)) {
-        if (cancelled) return;
-        try {
-          const prevVol = p.volume ?? 1;
-          p.volume = 0;
-          p.play();
-          await new Promise((r) => setTimeout(r, 60));
-          try {
-            p.pause();
-            await p.seekTo(0).catch(() => {});
-          } catch { /* ignore */ }
-          p.volume = prevVol;
-        } catch { /* ignore */ }
-      }
-      if (!cancelled) setSoundsReady(true);
-    };
-    void prime();
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const t = setTimeout(() => setSoundsReady(true), 400);
+    return () => clearTimeout(t);
+  }, []);
 
   function playTick() {
     if (preferences.voteSoundId === "silent") return;
