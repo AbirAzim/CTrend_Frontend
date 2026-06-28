@@ -20,11 +20,14 @@ EXPO_PUBLIC_GRAPHQL_WS=wss://your-api/graphql
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
 ```
 
-**Google Sign-In (Android):** In [Google Cloud Console](https://console.cloud.google.com/), create an **Android** OAuth client for package `com.ctrend.app` and add your debug SHA-1:
+**Google Sign-In (Android):** In [Google Cloud Console](https://console.cloud.google.com/), create an **Android** OAuth client for package `com.ctrend.app` and add SHA-1 fingerprints:
 
 ```
-3A:88:C4:FD:BF:5E:48:F0:10:84:1F:BD:F3:93:01:9B:D4:57:FE:B6
+Debug (mobile/android/app/debug.keystore):  EC:CF:F6:3B:93:80:A3:5F:3B:83:8B:C7:29:E3:E5:59:8C:01:DC:5D
+Release (ke-jitbe-release.keystore):      B0:77:73:F8:4C:06:A1:0D:0B:FE:5A:E8:7B:14:5E:0E:6A:9C:3D:71
 ```
+
+When `android/keystore.properties` exists, **release** builds use the release key; **debug** builds always use `android/app/debug.keystore` (required for Google Sign-In on local installs).
 
 Use the same **Web client ID** as the web app for `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
 

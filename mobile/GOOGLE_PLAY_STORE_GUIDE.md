@@ -345,21 +345,17 @@ cd mobile/android
 ./gradlew signingReport
 ```
 
-Look for `Variant: debug` → SHA-1. Example debug SHA-1 used in this project:
+Look for `Variant: debug` → SHA-1. Debug keystore in this repo (`mobile/android/app/debug.keystore`):
 
 ```
-3A:88:C4:FD:BF:5E:48:F0:10:84:1F:BD:F3:93:01:9B:D4:57:FE:B6
+EC:CF:F6:3B:93:80:A3:5F:3B:83:8B:C7:29:E3:E5:59:8C:01:DC:5D
 ```
 
-**Release** (after [§7](#7-create-a-release-signing-key)):
+**Release** (after [§7](#7-create-a-release-signing-key)) — example from `ke-jitbe-release.keystore`:
 
-```bash
-keytool -list -v \
-  -keystore /path/to/ke-jitbe-release.keystore \
-  -alias ke-jitbe
 ```
-
-Enter keystore password → copy **SHA-1** and **SHA-256**.
+B0:77:73:F8:4C:06:A1:0D:0B:FE:5A:E8:7B:14:5E:0E:6A:9C:3D:71
+```
 
 ### 6.3 Register both SHA-1 values
 

@@ -11,6 +11,14 @@ export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
 
 cd "$ROOT/mobile"
 
+# Load production env so EXPO_PUBLIC_* vars are embedded in the JS bundle.
+if [[ -f .env ]]; then
+  echo "==> Loading mobile/.env..."
+  set -a && source .env && set +a
+else
+  echo "WARN: mobile/.env not found — Google Sign-In and API URLs may be missing from the bundle." >&2
+fi
+
 # ── Stop leftover Gradle daemons to free RAM ──────────────────────────────────
 echo "==> Stopping leftover Gradle daemons..."
 if [[ -x android/gradlew ]]; then
@@ -60,7 +68,11 @@ ls -lah "$APK"
 # ── Install on phone ──────────────────────────────────────────────────────────
 if adb devices 2>/dev/null | grep -q 'device$'; then
   echo "==> Device found — installing APK..."
-  adb install -r "$APK"
+  adb install -r "$APK" || {
+    echo "Install failed (signature mismatch?). Uninstalling old build and retrying..."
+    adb uninstall com.ctrend.app 2>/dev/null || true
+    adb install -r "$APK"
+  }
   echo "==> Enabling app if needed..."
   adb shell pm enable com.ctrend.app 2>/dev/null || true
   echo "==> Launching app..."

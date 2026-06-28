@@ -66,6 +66,11 @@ export function googleSignInErrorMessage(err: unknown): string {
       return "Google Play Services is not available on this device.";
     }
   }
-  if (err instanceof Error && err.message) return err.message;
+  if (err instanceof Error) {
+    if (/DEVELOPER_ERROR/i.test(err.message)) {
+      return "Google Sign-In is not configured for this build's signing key. Add the app SHA-1 to Google Cloud (Android OAuth client) and Firebase, then re-download google-services.json.";
+    }
+    if (err.message) return err.message;
+  }
   return "Google sign-in failed.";
 }

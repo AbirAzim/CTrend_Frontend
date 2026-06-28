@@ -122,6 +122,8 @@ export function MatchPrediction({
   const [error, setError] = useState<string | null>(null);
   const [listMode, setListMode] = useState<null | "all" | "winners">(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [homeFocused, setHomeFocused] = useState(false);
+  const [awayFocused, setAwayFocused] = useState(false);
 
   const homeLabel = teamDisplayLabel(homeTeam, fixtureData?.worldCupFixture?.homeTeam);
   const awayLabel = teamDisplayLabel(awayTeam, fixtureData?.worldCupFixture?.awayTeam);
@@ -245,13 +247,13 @@ export function MatchPrediction({
       {mine && !formOpen ? (
         <View style={st.row}>
           <View style={st.matchCore}>
-            <Text style={st.teamHome} numberOfLines={2}>{homeLabel}</Text>
+            <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
             <View style={st.scoreCluster}>
               <Text style={st.scoreNum}>{mine.homeScore}</Text>
               <Text style={st.dash}>–</Text>
               <Text style={st.scoreNum}>{mine.awayScore}</Text>
             </View>
-            <Text style={st.teamAway} numberOfLines={2}>{awayLabel}</Text>
+            <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
           </View>
           {resolved ? (
             <View style={[st.tag, mine.isWinner ? st.tagWin : st.tagMiss]}>
@@ -273,37 +275,49 @@ export function MatchPrediction({
         isAuthenticated ? (
           <View style={[st.row, st.rowForm]}>
             <View style={st.matchCore}>
-              <Text style={st.teamHome} numberOfLines={2}>{homeLabel}</Text>
-              <View style={st.scoreCluster}>
+              <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+              <View style={st.scoreBox}>
                 <TextInput
-                  style={st.input}
+                  style={[st.input, homeFocused && st.inputFocused]}
                   keyboardType="number-pad"
                   maxLength={2}
                   value={home}
-                  placeholder="–"
+                  placeholder=""
                   placeholderTextColor={colors.muted}
                   onChangeText={(v) => setHome(v.replace(/[^0-9]/g, ""))}
+                  onFocus={() => setHomeFocused(true)}
+                  onBlur={() => setHomeFocused(false)}
+                  selectTextOnFocus
                 />
                 <Text style={st.dash}>–</Text>
                 <TextInput
-                  style={st.input}
+                  style={[st.input, awayFocused && st.inputFocused]}
                   keyboardType="number-pad"
                   maxLength={2}
                   value={away}
-                  placeholder="–"
+                  placeholder=""
                   placeholderTextColor={colors.muted}
                   onChangeText={(v) => setAway(v.replace(/[^0-9]/g, ""))}
+                  onFocus={() => setAwayFocused(true)}
+                  onBlur={() => setAwayFocused(false)}
+                  selectTextOnFocus
                 />
               </View>
-              <Text style={st.teamAway} numberOfLines={2}>{awayLabel}</Text>
+              <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
             </View>
-            <View style={st.formActions}>
+            <View style={st.rowTail}>
               <Pressable style={st.submitBtn} onPress={() => void onSubmit()} disabled={submitting}>
                 <Text style={st.submitText}>{mine ? "Save" : "Predict"}</Text>
               </Pressable>
               {editing ? (
-                <Pressable onPress={() => setEditing(false)} hitSlop={6}>
-                  <Text style={st.link}>Cancel</Text>
+                <Pressable
+                  style={st.cancelBtn}
+                  onPress={() => setEditing(false)}
+                  hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel editing"
+                >
+                  <Text style={st.cancelBtnText}>Cancel</Text>
                 </Pressable>
               ) : null}
               {countBtn}
@@ -438,9 +452,9 @@ function makeStyles(c: ColorPalette) {
     wrap: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: c.border,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 5,
     },
     roundBadge: {
       alignSelf: "flex-start",
@@ -467,81 +481,95 @@ function makeStyles(c: ColorPalette) {
     row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
-      minHeight: 44,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 12,
+      gap: 6,
+      minHeight: 34,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 10,
       backgroundColor: accentSoft,
       borderWidth: 1,
       borderColor: accentBorder,
     },
-    rowForm: {
-      flexDirection: "column",
-      alignItems: "stretch",
-      gap: 8,
-    },
     rowHint: {
       backgroundColor: c.section,
       borderColor: c.border,
+    },
+    rowForm: {
+      minHeight: 48,
+      paddingVertical: 6,
     },
     matchCore: {
       flex: 1,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
+      gap: 6,
       minWidth: 0,
     },
     teamHome: {
       flex: 1,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: "700",
       color: c.text,
       textAlign: "right",
-      lineHeight: 16,
+      lineHeight: 14,
     },
     teamAway: {
       flex: 1,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: "700",
       color: c.text,
       textAlign: "left",
-      lineHeight: 16,
+      lineHeight: 14,
     },
     scoreCluster: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
+      gap: 3,
       flexShrink: 0,
     },
-    formActions: {
+    scoreBox: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "flex-end",
-      gap: 8,
-      flexWrap: "wrap",
+      gap: 4,
+      flexShrink: 0,
+      backgroundColor: c.card,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: `${c.accent}55`,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.12,
+      shadowRadius: 2,
+      elevation: 2,
     },
     scoreNum: {
-      fontSize: 17,
+      fontSize: 15,
       fontWeight: "900",
       color: c.accent,
-      minWidth: 18,
+      minWidth: 16,
       textAlign: "center",
     },
-    dash: { color: c.muted, fontWeight: "800", fontSize: 14 },
+    dash: { color: c.muted, fontWeight: "800", fontSize: 13 },
     input: {
       width: 34,
+      height: 34,
       textAlign: "center",
       fontSize: 16,
-      fontWeight: "800",
-      color: c.text,
-      backgroundColor: c.inputBg,
+      fontWeight: "900",
+      color: c.accent,
+      backgroundColor: c.section,
       borderWidth: 1,
-      borderColor: accentBorder,
+      borderColor: c.border,
       borderRadius: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 2,
+      paddingVertical: 0,
+      paddingHorizontal: 0,
+    },
+    inputFocused: {
+      borderColor: c.accent,
+      backgroundColor: c.card,
     },
     actions: {
       flexDirection: "row",
@@ -552,30 +580,42 @@ function makeStyles(c: ColorPalette) {
     submitBtn: {
       backgroundColor: c.accent,
       borderRadius: 999,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
     },
-    submitText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-    link: { fontSize: 13, fontWeight: "700", color: c.accent },
+    submitText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+    cancelBtn: {
+      minHeight: 32,
+      minWidth: 32,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.card,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cancelBtnText: { fontSize: 11, fontWeight: "800", color: c.subtext },
     rowTail: {
       flexDirection: "row",
       alignItems: "center",
       gap: 6,
       flexShrink: 0,
-      paddingLeft: 10,
-      borderLeftWidth: 1,
-      borderLeftColor: `${c.text}1a`,
+      paddingLeft: 6,
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderLeftColor: `${c.text}14`,
     },
     countBtn: {
       borderRadius: 999,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: accentBorder,
       backgroundColor: accentSoft,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
     },
     countBtnText: {
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: "800",
       color: c.accent,
     },
