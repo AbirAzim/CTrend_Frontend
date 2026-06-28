@@ -215,7 +215,10 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props as Parameters<typeof FloatingTabBar>[0]} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: colors.bg },
+      }}
     >
       <Tabs.Screen
         name="index"

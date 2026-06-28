@@ -1,7 +1,7 @@
 import { ApolloProvider, useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
 import notifee, { EventType } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
-import { router, Stack, usePathname } from "expo-router";
+import { router, Stack, usePathname, useRootNavigationState } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -480,14 +480,40 @@ function NotificationResponseHandler() {
   return null;
 }
 
+function RootStack() {
+  const { colors } = useTheme();
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.bg },
+      }}
+    />
+  );
+}
+
 function SplashGate() {
   const { hydrated } = useAuth();
+  const navState = useRootNavigationState();
+  const pathname = usePathname();
+  const hideStarted = useRef(false);
+
   useEffect(() => {
-    if (hydrated) {
-      markAppUiReadyForSounds();
-      void SplashScreen.hideAsync();
-    }
-  }, [hydrated]);
+    if (!hydrated || !navState?.key || hideStarted.current) return;
+    // Keep native splash up through the index → tabs redirect so a white
+    // navigation shell never flashes between indigo splash and the feed.
+    if (!pathname || pathname === "/" || pathname === "/index") return;
+
+    hideStarted.current = true;
+    markAppUiReadyForSounds();
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void SplashScreen.hideAsync();
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [hydrated, navState?.key, pathname]);
+
   return null;
 }
 
@@ -522,7 +548,7 @@ function ForceUpdateGate() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
-      <SafeAreaProvider>
+      <SafeAreaProvider style={{ flex: 1, backgroundColor: "#000000" }}>
         <ApolloProvider client={apolloClient}>
           <AuthProvider>
             <ThemeProvider>
@@ -540,7 +566,7 @@ export default function RootLayout() {
                           <GlobalNotificationSubscription />
                           <NotificationResilience />
                           <GlobalMessageSubscription />
-                          <Stack screenOptions={{ headerShown: false }} />
+                          <RootStack />
                           <OfflineBanner />
                           <InAppNotificationBanner />
                           <WorldCupFloating />
