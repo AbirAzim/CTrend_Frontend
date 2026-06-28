@@ -62,6 +62,15 @@ function predName(u?: PredUser | null): string {
   return u.displayName?.trim() || (u.username ? `@${u.username.trim()}` : "User");
 }
 
+function teamDisplayLabel(
+  postLabel: string,
+  fixtureTeam?: { name?: string | null; shortName?: string | null } | null,
+): string {
+  const fromPost = postLabel.trim();
+  if (fromPost) return fromPost;
+  return fixtureTeam?.shortName?.trim() || fixtureTeam?.name?.trim() || "Team";
+}
+
 export function MatchPrediction({
   postId,
   fixtureId,
@@ -90,8 +99,8 @@ export function MatchPrediction({
       stage?: string | null;
       status?: string | null;
       rawStatus?: string | null;
-      homeTeam?: { name?: string | null } | null;
-      awayTeam?: { name?: string | null } | null;
+      homeTeam?: { name?: string | null; shortName?: string | null } | null;
+      awayTeam?: { name?: string | null; shortName?: string | null } | null;
     } | null;
   }>(WORLD_CUP_FIXTURE_DETAILS, {
     variables: { id: fixtureId! },
@@ -108,14 +117,14 @@ export function MatchPrediction({
   const [remove, { loading: removing }] = useMutation(DELETE_MATCH_PREDICTION);
 
   const [editing, setEditing] = useState(false);
-  const [home, setHome] = useState("0");
-  const [away, setAway] = useState("0");
+  const [home, setHome] = useState("");
+  const [away, setAway] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [listMode, setListMode] = useState<null | "all" | "winners">(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const homeLabel = fixtureData?.worldCupFixture?.homeTeam?.name?.trim() || homeTeam;
-  const awayLabel = fixtureData?.worldCupFixture?.awayTeam?.name?.trim() || awayTeam;
+  const homeLabel = teamDisplayLabel(homeTeam, fixtureData?.worldCupFixture?.homeTeam);
+  const awayLabel = teamDisplayLabel(awayTeam, fixtureData?.worldCupFixture?.awayTeam);
 
   const state = data?.matchPredictionState;
   if (!enabled || !state) return null;
@@ -144,13 +153,17 @@ export function MatchPrediction({
     isKnockoutStage(fixtureStage) && resolved && Boolean(state.wentToPenalties);
 
   function startEdit() {
-    setHome(mine ? String(mine.homeScore) : "0");
-    setAway(mine ? String(mine.awayScore) : "0");
+    setHome(mine != null ? String(mine.homeScore) : "");
+    setAway(mine != null ? String(mine.awayScore) : "");
     setError(null);
     setEditing(true);
   }
 
   async function onSubmit() {
+    if (home.trim() === "" || away.trim() === "") {
+      setError("Enter a score for both teams.");
+      return;
+    }
     const h = parseInt(home, 10);
     const a = parseInt(away, 10);
     if (Number.isNaN(h) || Number.isNaN(a) || h < 0 || a < 0) {
@@ -173,8 +186,8 @@ export function MatchPrediction({
     try {
       await remove({ variables: { postId } });
       setEditing(false);
-      setHome("0");
-      setAway("0");
+      setHome("");
+      setAway("");
       void refetch();
     } catch {
       setError("Couldn't delete your prediction.");
@@ -232,13 +245,13 @@ export function MatchPrediction({
       {mine && !formOpen ? (
         <View style={st.row}>
           <View style={st.matchCore}>
-            <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+            <Text style={st.teamHome} numberOfLines={2}>{homeLabel}</Text>
             <View style={st.scoreCluster}>
               <Text style={st.scoreNum}>{mine.homeScore}</Text>
               <Text style={st.dash}>–</Text>
               <Text style={st.scoreNum}>{mine.awayScore}</Text>
             </View>
-            <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
+            <Text style={st.teamAway} numberOfLines={2}>{awayLabel}</Text>
           </View>
           {resolved ? (
             <View style={[st.tag, mine.isWinner ? st.tagWin : st.tagMiss]}>
@@ -258,15 +271,17 @@ export function MatchPrediction({
 
       {formOpen ? (
         isAuthenticated ? (
-          <View style={st.row}>
+          <View style={[st.row, st.rowForm]}>
             <View style={st.matchCore}>
-              <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+              <Text style={st.teamHome} numberOfLines={2}>{homeLabel}</Text>
               <View style={st.scoreCluster}>
                 <TextInput
                   style={st.input}
                   keyboardType="number-pad"
                   maxLength={2}
                   value={home}
+                  placeholder="–"
+                  placeholderTextColor={colors.muted}
                   onChangeText={(v) => setHome(v.replace(/[^0-9]/g, ""))}
                 />
                 <Text style={st.dash}>–</Text>
@@ -275,12 +290,14 @@ export function MatchPrediction({
                   keyboardType="number-pad"
                   maxLength={2}
                   value={away}
+                  placeholder="–"
+                  placeholderTextColor={colors.muted}
                   onChangeText={(v) => setAway(v.replace(/[^0-9]/g, ""))}
                 />
               </View>
-              <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
+              <Text style={st.teamAway} numberOfLines={2}>{awayLabel}</Text>
             </View>
-            <View style={st.actions}>
+            <View style={st.formActions}>
               <Pressable style={st.submitBtn} onPress={() => void onSubmit()} disabled={submitting}>
                 <Text style={st.submitText}>{mine ? "Save" : "Predict"}</Text>
               </Pressable>
@@ -289,8 +306,8 @@ export function MatchPrediction({
                   <Text style={st.link}>Cancel</Text>
                 </Pressable>
               ) : null}
+              {countBtn}
             </View>
-            {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
           </View>
         ) : (
           <View style={[st.row, st.rowHint]}>
@@ -459,6 +476,11 @@ function makeStyles(c: ColorPalette) {
       borderWidth: 1,
       borderColor: accentBorder,
     },
+    rowForm: {
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: 8,
+    },
     rowHint: {
       backgroundColor: c.section,
       borderColor: c.border,
@@ -468,28 +490,37 @@ function makeStyles(c: ColorPalette) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 6,
+      gap: 8,
       minWidth: 0,
     },
     teamHome: {
       flex: 1,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: "700",
       color: c.text,
       textAlign: "right",
+      lineHeight: 16,
     },
     teamAway: {
       flex: 1,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: "700",
       color: c.text,
       textAlign: "left",
+      lineHeight: 16,
     },
     scoreCluster: {
       flexDirection: "row",
       alignItems: "center",
       gap: 4,
       flexShrink: 0,
+    },
+    formActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 8,
+      flexWrap: "wrap",
     },
     scoreNum: {
       fontSize: 17,
@@ -500,7 +531,7 @@ function makeStyles(c: ColorPalette) {
     },
     dash: { color: c.muted, fontWeight: "800", fontSize: 14 },
     input: {
-      width: 36,
+      width: 34,
       textAlign: "center",
       fontSize: 16,
       fontWeight: "800",
@@ -509,7 +540,8 @@ function makeStyles(c: ColorPalette) {
       borderWidth: 1,
       borderColor: accentBorder,
       borderRadius: 8,
-      paddingVertical: 5,
+      paddingVertical: 4,
+      paddingHorizontal: 2,
     },
     actions: {
       flexDirection: "row",
