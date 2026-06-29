@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { Link } from "react-router-dom";
 import type { FeedPostCampaignView } from "../types/feed";
+import { CAMPAIGN_BADGE_ICON } from "@ctrend/shared/lib/campaignUi";
 import { ACTIVE_CAMPAIGNS } from "../graphql/campaigns";
 
 type Props = {
@@ -35,7 +36,7 @@ export function PostCampaignBadge({ campaign }: Props) {
         className="cx-post-campaign-ribbon"
         aria-label={`Campaign: ${campaign.name}`}
       >
-        <span aria-hidden style={{ fontSize: "0.78rem" }}>🎯</span>
+        <span aria-hidden style={{ fontSize: "0.78rem" }}>{CAMPAIGN_BADGE_ICON}</span>
         <span className="cx-post-campaign-ribbon-kicker">Campaign</span>
         <span className="cx-post-campaign-ribbon-name">{campaign.name}</span>
         {campaign.prizePerWinner > 0 ? (

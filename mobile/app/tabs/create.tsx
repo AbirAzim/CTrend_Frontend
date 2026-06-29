@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS, GET_POST_BY_ID, UPDATE_POST } from "@ctrend/shared/graphql/feed";
 import { PUBLIC_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
+import { CAMPAIGN_BADGE_ICON } from "@ctrend/shared/lib/campaignUi";
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
@@ -1164,7 +1165,7 @@ export default function CreateScreen() {
                     hitSlop={6}
                     style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}
                   >
-                    <Text style={{ fontSize: 12 }}>🎯</Text>
+                    <Text style={{ fontSize: 12 }}>{CAMPAIGN_BADGE_ICON}</Text>
                     <Text style={[st.campaignPillText, { color: colors.accent }]} numberOfLines={1}>
                       {selectedCampaign.name}
                     </Text>
@@ -1187,7 +1188,7 @@ export default function CreateScreen() {
                   hitSlop={4}
                 >
                   <Text style={[st.campaignAddText, { color: colors.muted }]}>
-                    🎯  Add to a campaign
+                    {CAMPAIGN_BADGE_ICON}  Add to a campaign
                   </Text>
                 </Pressable>
               )}

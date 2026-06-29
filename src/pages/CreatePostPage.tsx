@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES, CREATE_POST, FEED_POSTS } from "../graphql/feed";
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "../graphql/admin";
 import { PUBLIC_CAMPAIGNS, CAMPAIGNS_ADMIN } from "../graphql/campaigns";
+import { CAMPAIGN_BADGE_ICON } from "@ctrend/shared/lib/campaignUi";
 import { DateTimePicker } from "../components/DateTimePicker";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
@@ -942,7 +943,7 @@ export function CreatePostPage() {
           {campaignOptions.length > 0 ? (
             <div className="ig-settings-row ig-settings-row--col">
               <label htmlFor="create-campaign-id" className="ig-settings-label">
-                <span className="ig-settings-icon">🎯</span> Campaign
+                <span className="ig-settings-icon">{CAMPAIGN_BADGE_ICON}</span> Campaign
                 <span className="ig-settings-optional">optional</span>
               </label>
               <div className="ig-cat-select-wrap">

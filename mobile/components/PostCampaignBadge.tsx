@@ -13,6 +13,7 @@ import {
 	View,
 } from 'react-native';
 import { ACTIVE_CAMPAIGNS } from '@ctrend/shared/graphql/campaigns';
+import { CAMPAIGN_BADGE_ICON } from '@ctrend/shared/lib/campaignUi';
 import type { FeedPostCampaignView } from '@ctrend/shared/types/feed';
 import { useTheme } from '../context/ThemeContext';
 
@@ -74,7 +75,7 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 					hitSlop={6}
 					accessibilityRole='button'
 					accessibilityLabel={`Campaign: ${campaign.name}. Tap to expand.`}>
-					<Text style={styles.icon}>🎯</Text>
+					<Text style={styles.icon}>{CAMPAIGN_BADGE_ICON}</Text>
 					<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
 					<Text style={[styles.chevron, { color: colors.subtext }]}>▾</Text>
 				</Pressable>
@@ -92,7 +93,7 @@ function PostCampaignBadgeComponent({ campaign }: Props) {
 						}
 						accessibilityRole='button'
 						accessibilityLabel={`Open campaign: ${campaign.name}`}>
-						<Text style={styles.icon}>🎯</Text>
+						<Text style={styles.icon}>{CAMPAIGN_BADGE_ICON}</Text>
 						<Text style={[styles.kicker, { color: gold }]}>CAMPAIGN</Text>
 						<Text
 							style={[styles.name, { color: colors.text }]}

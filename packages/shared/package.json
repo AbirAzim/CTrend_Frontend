@@ -22,6 +22,7 @@
     "./graphql/worldcup": "./src/graphql/worldcup.ts",
     "./lib/apolloErrorMessage": "./src/lib/apolloErrorMessage.ts",
     "./lib/campaignWinner": "./src/lib/campaignWinner.ts",
+    "./lib/campaignUi": "./src/lib/campaignUi.ts",
     "./lib/coins": "./src/lib/coins.ts",
     "./lib/contentReport": "./src/lib/contentReport.ts",
     "./lib/formatRelativeTime": "./src/lib/formatRelativeTime.ts",
