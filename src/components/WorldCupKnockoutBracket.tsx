@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BRACKET_BOARD_GAP,
@@ -98,14 +98,17 @@ type TouchGesture = {
 function BracketTouchZoomViewport({
   viewportW,
   viewportH,
+  viewRotated = false,
   children,
 }: {
   viewportW: number;
   viewportH: number;
+  viewRotated?: boolean;
   children: ReactNode;
 }) {
-  const baseScale =
-    viewportW > 0 && viewportH > 0 ? Math.min(viewportW / BOARD_W, viewportH / BOARD_H) : 1;
+  const fitW = viewRotated ? viewportH : viewportW;
+  const fitH = viewRotated ? viewportW : viewportH;
+  const baseScale = fitW > 0 && fitH > 0 ? Math.min(fitW / BOARD_W, fitH / BOARD_H) : 1;
   const minScale = baseScale * 0.92;
   const maxScale = Math.max(baseScale * 3.5, 2);
   const [scale, setScale] = useState(baseScale);
@@ -126,7 +129,7 @@ function BracketTouchZoomViewport({
     setTx(0);
     setTy(0);
     gesture.current.startScale = baseScale;
-  }, [baseScale, viewportW, viewportH]);
+  }, [baseScale, fitW, fitH]);
 
   function setupGesture(touches: TouchList) {
     if (touches.length >= 2) {
@@ -155,10 +158,22 @@ function BracketTouchZoomViewport({
     }
   }
 
+  const rotatorStyle: CSSProperties =
+    viewRotated && viewportW > 0 && viewportH > 0
+      ? {
+          position: "absolute",
+          width: viewportH,
+          height: viewportW,
+          left: viewportW / 2 - viewportH / 2,
+          top: viewportH / 2 - viewportW / 2,
+          transform: "rotate(90deg)",
+        }
+      : { width: "100%", height: "100%" };
+
   return (
     <div
       className="wc-brk-touch-viewport"
-      style={{ width: viewportW, height: viewportH }}
+      style={{ width: viewportW, height: viewportH, position: "relative", overflow: "hidden" }}
       onTouchStart={(e) => setupGesture(e.touches)}
       onTouchMove={(e) => {
         const touches = e.touches;
@@ -177,8 +192,8 @@ function BracketTouchZoomViewport({
             gesture.current.startTx + (mx - gesture.current.startCx),
             gesture.current.startTy + (my - gesture.current.startCy),
             nextScale,
-            viewportW,
-            viewportH,
+            fitW,
+            fitH,
           );
           setScale(nextScale);
           setTx(clamped.x);
@@ -190,8 +205,8 @@ function BracketTouchZoomViewport({
             gesture.current.startTx + (t.clientX - gesture.current.startCx),
             gesture.current.startTy + (t.clientY - gesture.current.startCy),
             scale,
-            viewportW,
-            viewportH,
+            fitW,
+            fitH,
           );
           setTx(clamped.x);
           setTy(clamped.y);
@@ -201,16 +216,18 @@ function BracketTouchZoomViewport({
         gesture.current.mode = "none";
       }}
     >
-      <div className="wc-brk-touch-stage">
-        <div
-          className="wc-brk-touch-board"
-          style={{
-            width: BOARD_W,
-            height: BOARD_H,
-            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-          }}
-        >
-          {children}
+      <div style={rotatorStyle}>
+        <div className="wc-brk-touch-stage">
+          <div
+            className="wc-brk-touch-board"
+            style={{
+              width: BOARD_W,
+              height: BOARD_H,
+              transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>
@@ -752,12 +769,6 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
     };
   }, [isMobile]);
 
-  const bracketViewport = useMemo(() => {
-    const { width: w, height: h } = viewportSize;
-    if (w <= 0 || h <= 0) return viewportSize;
-    return viewRotated ? { width: h, height: w } : viewportSize;
-  }, [viewportSize, viewRotated]);
-
   const toggleRotate = () => setViewRotated((v) => !v);
 
   if (!hasKnockout) {
@@ -809,24 +820,16 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
               if (e.touches.length === 2) e.preventDefault();
             }}
           >
-            <div
-              className={`wc-brk-rotate-host${viewRotated ? " wc-brk-rotate-host--on" : ""}`}
-              style={
-                viewRotated && viewportSize.width > 0 && viewportSize.height > 0
-                  ? { width: viewportSize.height, height: viewportSize.width }
-                  : undefined
-              }
-            >
-              <div className="wc-brk-mobile-viewport">
-                {bracketViewport.width > 0 && bracketViewport.height > 0 ? (
-                  <BracketTouchZoomViewport
-                    viewportW={bracketViewport.width}
-                    viewportH={bracketViewport.height}
-                  >
-                    {board}
-                  </BracketTouchZoomViewport>
-                ) : null}
-              </div>
+            <div className="wc-brk-rotate-host">
+              {viewportSize.width > 0 && viewportSize.height > 0 ? (
+                <BracketTouchZoomViewport
+                  viewportW={viewportSize.width}
+                  viewportH={viewportSize.height}
+                  viewRotated={viewRotated}
+                >
+                  {board}
+                </BracketTouchZoomViewport>
+              ) : null}
             </div>
           </div>
           <p className="wc-brk-zoom-hint">

@@ -23450,20 +23450,14 @@ html[data-topbar-hidden="true"] .wc-tab-bar {
     flex: 1;
     min-height: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
     overflow: hidden;
+    position: relative;
   }
   .wc-brk-rotate-host {
     flex: 1;
-    align-self: stretch;
     display: flex;
     min-height: 0;
     min-width: 0;
-  }
-  .wc-brk-rotate-host--on {
-    flex: 0 0 auto;
-    transform: rotate(90deg);
   }
   .wc-brk-mobile-viewport {
     flex: 1;

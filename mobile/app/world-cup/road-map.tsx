@@ -45,12 +45,6 @@ export default function WorldCupRoadMapScreen() {
     router.push(`/world-cup/match/${id}` as `/${string}`);
   };
 
-  const bracketViewport = useMemo(() => {
-    const { width: w, height: h } = viewportSize;
-    if (w <= 0 || h <= 0) return viewportSize;
-    return viewRotated ? { width: h, height: w } : viewportSize;
-  }, [viewportSize, viewRotated]);
-
   return (
     <View style={[styles.root, { backgroundColor: colors.bg, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <View
@@ -105,28 +99,14 @@ export default function WorldCupRoadMapScreen() {
         ) : null}
 
         {fixtures.length > 0 ? (
-          <View style={styles.rotateStage}>
-            <View
-              style={[
-                styles.bracketHost,
-                viewRotated &&
-                  viewportSize.width > 0 &&
-                  viewportSize.height > 0 && {
-                    flex: 0,
-                    width: viewportSize.height,
-                    height: viewportSize.width,
-                    transform: [{ rotate: "90deg" }],
-                  },
-              ]}
-            >
-              <WorldCupKnockoutBracket
-                fixtures={fixtures}
-                onOpenMatch={onOpenMatch}
-                viewportSize={bracketViewport}
-                zoomable
-                viewRotated={viewRotated}
-              />
-            </View>
+          <View style={styles.bracketHost}>
+            <WorldCupKnockoutBracket
+              fixtures={fixtures}
+              onOpenMatch={onOpenMatch}
+              viewportSize={viewportSize}
+              zoomable
+              viewRotated={viewRotated}
+            />
           </View>
         ) : null}
       </View>
@@ -149,12 +129,6 @@ const styles = StyleSheet.create({
   rotateBtn: { width: 72, alignItems: "flex-end" },
   rotateText: { fontSize: 13, fontWeight: "800" },
   body: { flex: 1, overflow: "hidden" },
-  rotateStage: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  bracketHost: { flex: 1, alignSelf: "stretch" },
+  bracketHost: { flex: 1 },
   status: { textAlign: "center", paddingVertical: 24, fontSize: 13 },
 });

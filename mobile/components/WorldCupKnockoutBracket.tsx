@@ -451,13 +451,17 @@ function clampPan(
 function BracketZoomViewport({
   viewportW,
   viewportH,
+  viewRotated = false,
   children,
 }: {
   viewportW: number;
   viewportH: number;
+  viewRotated?: boolean;
   children: ReactNode;
 }) {
-  const baseScale = viewportW > 0 && viewportH > 0 ? Math.min(viewportW / BOARD_W, viewportH / BOARD_H) : 1;
+  const fitW = viewRotated ? viewportH : viewportW;
+  const fitH = viewRotated ? viewportW : viewportH;
+  const baseScale = fitW > 0 && fitH > 0 ? Math.min(fitW / BOARD_W, fitH / BOARD_H) : 1;
   const minScale = baseScale * 0.92;
   const maxScale = Math.max(baseScale * 3.5, 2);
 
@@ -487,7 +491,7 @@ function BracketZoomViewport({
         scale.value = withTiming(baseScale);
         savedScale.value = baseScale;
       }
-      const clamped = clampPan(translateX.value, translateY.value, scale.value, viewportW, viewportH);
+      const clamped = clampPan(translateX.value, translateY.value, scale.value, fitW, fitH);
       translateX.value = withTiming(clamped.x);
       translateY.value = withTiming(clamped.y);
       savedTranslateX.value = clamped.x;
@@ -502,8 +506,8 @@ function BracketZoomViewport({
         savedTranslateX.value + e.translationX,
         savedTranslateY.value + e.translationY,
         scale.value,
-        viewportW,
-        viewportH,
+        fitW,
+        fitH,
       );
       translateX.value = clamped.x;
       translateY.value = clamped.y;
@@ -541,18 +545,43 @@ function BracketZoomViewport({
     ],
   }));
 
+  const rotatorStyle =
+    viewRotated && viewportW > 0 && viewportH > 0
+      ? {
+          position: "absolute" as const,
+          width: viewportH,
+          height: viewportW,
+          left: viewportW / 2 - viewportH / 2,
+          top: viewportH / 2 - viewportW / 2,
+          transform: [{ rotate: "90deg" }],
+        }
+      : { flex: 1, width: viewportW || undefined, height: viewportH || undefined };
+
   return (
-    <View style={{ width: viewportW, height: viewportH, overflow: "hidden" }}>
-      <GestureDetector gesture={composedGesture}>
-        <View style={zoomStyles.stage}>
-          <Animated.View style={[{ width: BOARD_W, height: BOARD_H }, animatedStyle]}>{children}</Animated.View>
-        </View>
-      </GestureDetector>
+    <View
+      style={[
+        zoomStyles.viewport,
+        viewportW > 0 && viewportH > 0
+          ? { width: viewportW, height: viewportH }
+          : { flex: 1 },
+      ]}
+    >
+      <View style={rotatorStyle}>
+        <GestureDetector gesture={composedGesture}>
+          <View style={zoomStyles.stage}>
+            <Animated.View style={[{ width: BOARD_W, height: BOARD_H }, animatedStyle]}>{children}</Animated.View>
+          </View>
+        </GestureDetector>
+      </View>
     </View>
   );
 }
 
 const zoomStyles = StyleSheet.create({
+  viewport: {
+    overflow: "hidden",
+    position: "relative",
+  },
   stage: {
     flex: 1,
     alignItems: "center",
@@ -603,7 +632,7 @@ export function WorldCupKnockoutBracket({
   if (useZoom) {
     return (
       <View style={st.zoomWrap}>
-        <BracketZoomViewport viewportW={viewportW} viewportH={viewportH}>
+        <BracketZoomViewport viewportW={viewportW} viewportH={viewportH} viewRotated={viewRotated}>
           {board}
         </BracketZoomViewport>
         <Text style={st.zoomHint}>
