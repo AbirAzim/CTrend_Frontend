@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BRACKET_BOARD_GAP,
@@ -131,7 +131,7 @@ function BracketTouchZoomViewport({
     gesture.current.startScale = baseScale;
   }, [baseScale, fitW, fitH]);
 
-  function setupGesture(touches: TouchList) {
+  function setupGesture(touches: TouchEvent<HTMLDivElement>["touches"]) {
     if (touches.length >= 2) {
       const a = touches[0]!;
       const b = touches[1]!;
