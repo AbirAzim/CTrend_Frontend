@@ -4424,6 +4424,62 @@ a.cx-friend-avatar:hover {
   font-size: 0.7rem;
 }
 
+/* 2-option compare: slim bottom strip so images stay visible */
+.ig-compare-cell--binary-a .ig-compare-pct,
+.ig-compare-cell--binary-b .ig-compare-pct {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 6px;
+  padding: 5px 6px 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.ig-compare-cell--binary-a .ig-compare-pct--preview,
+.ig-compare-cell--binary-b .ig-compare-pct--preview {
+  padding: 5px 6px 0;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.ig-compare-cell--binary-a .ig-compare-pct-main,
+.ig-compare-cell--binary-b .ig-compare-pct-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-shadow: none;
+}
+
+.ig-compare-cell--binary-a .ig-compare-pct-sub,
+.ig-compare-cell--binary-b .ig-compare-pct-sub {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  text-align: left;
+  -webkit-line-clamp: 1;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-shadow: none;
+}
+
+.ig-compare-cell--binary-a .ig-compare-meter,
+.ig-compare-cell--binary-b .ig-compare-meter {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  height: 3px;
+  margin: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.22);
+}
+
 .cx-compare-vote-hint {
   margin: 0;
   padding: 10px 14px 2px;
