@@ -565,11 +565,14 @@ export function WorldCupKnockoutBracket({
   onOpenMatch,
   viewportSize,
   zoomable = false,
+  viewRotated = false,
 }: {
   fixtures: WcFixture[];
   onOpenMatch: (id: string) => void;
   viewportSize?: { width: number; height: number };
   zoomable?: boolean;
+  /** In-app landscape view — does not rotate the device. */
+  viewRotated?: boolean;
 }) {
   const { colors, isDark } = useTheme();
   const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
@@ -604,9 +607,9 @@ export function WorldCupKnockoutBracket({
           {board}
         </BracketZoomViewport>
         <Text style={st.zoomHint}>
-          {isLandscape
+          {viewRotated || isLandscape
             ? "Pinch to zoom · drag to pan · double-tap to reset"
-            : "Pinch to zoom · rotate for wider view"}
+            : "Pinch to zoom · Rotate widens the bracket in-app"}
         </Text>
       </View>
     );

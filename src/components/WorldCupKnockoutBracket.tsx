@@ -720,11 +720,10 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
   const viewportMode = useBracketViewportMode();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [landscapeLocked, setLandscapeLocked] = useState(false);
+  const [viewRotated, setViewRotated] = useState(false);
   const bracket = useMemo(() => buildKnockoutBracket(fixtures as BracketFixture[]), [fixtures]);
   const hasKnockout = fixtures.some((f) => f.stage !== "GROUP_STAGE");
   const isMobile = viewportMode !== "desktop";
-  const isLandscape = viewportMode === "mobile-landscape";
 
   const onOpen = (id: string) => navigate(`/world-cup/match/${id}`);
 
@@ -753,25 +752,13 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
     };
   }, [isMobile]);
 
-  const toggleRotate = () => {
-    void (async () => {
-      const orientation = screen.orientation as ScreenOrientation & {
-        lock?: (orientation: string) => Promise<void>;
-        unlock?: () => void;
-      };
-      try {
-        if (landscapeLocked) {
-          orientation.unlock?.();
-          setLandscapeLocked(false);
-        } else if (orientation.lock) {
-          await orientation.lock("landscape");
-          setLandscapeLocked(true);
-        }
-      } catch {
-        /* browser may block programmatic rotation */
-      }
-    })();
-  };
+  const bracketViewport = useMemo(() => {
+    const { width: w, height: h } = viewportSize;
+    if (w <= 0 || h <= 0) return viewportSize;
+    return viewRotated ? { width: h, height: w } : viewportSize;
+  }, [viewportSize, viewRotated]);
+
+  const toggleRotate = () => setViewRotated((v) => !v);
 
   if (!hasKnockout) {
     return (
@@ -811,27 +798,41 @@ export function WorldCupKnockoutBracket({ fixtures }: { fixtures: WcFixture[] })
           <span className="wc-brk-mobile-spacer" aria-hidden />
           <h2 className="wc-brk-mobile-title">Knockout Road Map</h2>
           <button type="button" className="wc-brk-rotate-btn" onClick={toggleRotate}>
-            {landscapeLocked ? "Unlock" : "Rotate"}
+            {viewRotated ? "Portrait" : "Rotate"}
           </button>
         </div>
         <div className="wc-brk-body wc-brk-body--mobile">
           <div
-            className="wc-brk-mobile-viewport"
+            className="wc-brk-rotate-stage"
             ref={bodyRef}
             onTouchStart={(e) => {
               if (e.touches.length === 2) e.preventDefault();
             }}
           >
-            {viewportSize.width > 0 && viewportSize.height > 0 ? (
-              <BracketTouchZoomViewport viewportW={viewportSize.width} viewportH={viewportSize.height}>
-                {board}
-              </BracketTouchZoomViewport>
-            ) : null}
+            <div
+              className={`wc-brk-rotate-host${viewRotated ? " wc-brk-rotate-host--on" : ""}`}
+              style={
+                viewRotated && viewportSize.width > 0 && viewportSize.height > 0
+                  ? { width: viewportSize.height, height: viewportSize.width }
+                  : undefined
+              }
+            >
+              <div className="wc-brk-mobile-viewport">
+                {bracketViewport.width > 0 && bracketViewport.height > 0 ? (
+                  <BracketTouchZoomViewport
+                    viewportW={bracketViewport.width}
+                    viewportH={bracketViewport.height}
+                  >
+                    {board}
+                  </BracketTouchZoomViewport>
+                ) : null}
+              </div>
+            </div>
           </div>
           <p className="wc-brk-zoom-hint">
-            {isLandscape
+            {viewRotated
               ? "Pinch to zoom · drag to pan · double-tap to reset"
-              : "Pinch to zoom · rotate for wider view"}
+              : "Pinch to zoom · Rotate widens the bracket in-app"}
           </p>
         </div>
       </section>

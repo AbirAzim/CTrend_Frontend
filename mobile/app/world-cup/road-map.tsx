@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@apollo/client/react";
 import { router, useFocusEffect } from "expo-router";
-import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WORLD_CUP_FIXTURES } from "@ctrend/shared/graphql/worldcup";
 import { worldCupRoadMapPollMs, type BracketFixture } from "@ctrend/shared/lib/knockoutBracket";
@@ -18,7 +17,7 @@ export default function WorldCupRoadMapScreen() {
   const insets = useSafeAreaInsets();
   const { translateY } = useTabBar();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [landscapeLocked, setLandscapeLocked] = useState(false);
+  const [viewRotated, setViewRotated] = useState(false);
 
   const [pollInterval, setPollInterval] = useState(30_000);
 
@@ -38,6 +37,7 @@ export default function WorldCupRoadMapScreen() {
     useCallback(() => {
       translateY.setValue(0);
       void refetch();
+      return () => setViewRotated(false);
     }, [translateY, refetch]),
   );
 
@@ -45,21 +45,11 @@ export default function WorldCupRoadMapScreen() {
     router.push(`/world-cup/match/${id}` as `/${string}`);
   };
 
-  const toggleRotate = () => {
-    void (async () => {
-      try {
-        if (landscapeLocked) {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          setLandscapeLocked(false);
-        } else {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-          setLandscapeLocked(true);
-        }
-      } catch {
-        /* device may block programmatic rotation */
-      }
-    })();
-  };
+  const bracketViewport = useMemo(() => {
+    const { width: w, height: h } = viewportSize;
+    if (w <= 0 || h <= 0) return viewportSize;
+    return viewRotated ? { width: h, height: w } : viewportSize;
+  }, [viewportSize, viewRotated]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg, paddingLeft: insets.left, paddingRight: insets.right }]}>
@@ -86,14 +76,14 @@ export default function WorldCupRoadMapScreen() {
           Knockout Road Map
         </Text>
         <Pressable
-          onPress={toggleRotate}
+          onPress={() => setViewRotated((v) => !v)}
           hitSlop={10}
           style={styles.rotateBtn}
           accessibilityRole="button"
-          accessibilityLabel={landscapeLocked ? "Unlock rotation" : "Rotate to landscape"}
+          accessibilityLabel={viewRotated ? "Show portrait view" : "Rotate bracket view"}
         >
           <Text style={[styles.rotateText, { color: colors.accent }]}>
-            {landscapeLocked ? "Unlock" : "Rotate"}
+            {viewRotated ? "Portrait" : "Rotate"}
           </Text>
         </Pressable>
       </View>
@@ -115,12 +105,29 @@ export default function WorldCupRoadMapScreen() {
         ) : null}
 
         {fixtures.length > 0 ? (
-          <WorldCupKnockoutBracket
-            fixtures={fixtures}
-            onOpenMatch={onOpenMatch}
-            viewportSize={viewportSize}
-            zoomable
-          />
+          <View style={styles.rotateStage}>
+            <View
+              style={[
+                styles.bracketHost,
+                viewRotated &&
+                  viewportSize.width > 0 &&
+                  viewportSize.height > 0 && {
+                    flex: 0,
+                    width: viewportSize.height,
+                    height: viewportSize.width,
+                    transform: [{ rotate: "90deg" }],
+                  },
+              ]}
+            >
+              <WorldCupKnockoutBracket
+                fixtures={fixtures}
+                onOpenMatch={onOpenMatch}
+                viewportSize={bracketViewport}
+                zoomable
+                viewRotated={viewRotated}
+              />
+            </View>
+          </View>
         ) : null}
       </View>
     </View>
@@ -141,6 +148,13 @@ const styles = StyleSheet.create({
   title: { flex: 1, textAlign: "center", fontSize: 14, fontWeight: "800" },
   rotateBtn: { width: 72, alignItems: "flex-end" },
   rotateText: { fontSize: 13, fontWeight: "800" },
-  body: { flex: 1 },
+  body: { flex: 1, overflow: "hidden" },
+  rotateStage: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  bracketHost: { flex: 1, alignSelf: "stretch" },
   status: { textAlign: "center", paddingVertical: 24, fontSize: 13 },
 });

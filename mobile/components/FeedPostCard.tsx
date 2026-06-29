@@ -150,13 +150,13 @@ function getMobileCompareRows(n: number): number[] {
 	return getCompareRows(n);
 }
 
-type CompareOverlayMode = 'full' | 'compact' | 'minimal' | 'trio';
+type CompareOverlayMode = 'full' | 'compact' | 'minimal' | 'slim';
 
 function getCompareOverlayMode(
 	compareCount: number,
 	cellWidth: number,
 ): CompareOverlayMode {
-	if (compareCount === 3) return 'trio';
+	if (compareCount === 3) return 'slim';
 	if (compareCount >= 9 || cellWidth < 115) return 'minimal';
 	if (compareCount >= 5 || cellWidth < 160) return 'compact';
 	return 'full';
@@ -629,9 +629,9 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		},
 		binaryOverlayLabel: {
 			flexShrink: 1,
-			color: 'rgba(255,255,255,0.92)',
-			fontSize: 10,
-			fontWeight: '600' as const,
+			color: '#ffffff',
+			fontSize: 11,
+			fontWeight: '700' as const,
 			textAlign: 'center' as const,
 		},
 		binaryOverlayMeter: {
@@ -809,7 +809,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			overflow: 'hidden' as const,
 			backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)',
 		},
-		// Poll-style subtle edge — no pill/label on the image itself.
+		// Poll-style subtle edge + always-visible label strip on the image.
 		trioEdgeBar: {
 			position: 'absolute' as const,
 			bottom: 0,
@@ -822,21 +822,42 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		trioEdgeBarFill: {
 			height: '100%' as const,
 		},
-		trioCaption: {
-			paddingTop: 5,
-			paddingHorizontal: 2,
+		trioLabelStrip: {
+			position: 'absolute' as const,
+			bottom: 0,
+			left: 0,
+			right: 0,
+			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
+			justifyContent: 'center' as const,
+			gap: 4,
+			paddingTop: 6,
+			paddingBottom: 6,
+			paddingHorizontal: 5,
+			backgroundColor: 'rgba(0,0,0,0.62)',
 		},
-		trioLabel: {
-			fontSize: 10,
-			fontWeight: '600' as const,
-			color: c.muted,
-			textAlign: 'center' as const,
-			lineHeight: 13,
+		trioLabelStripWithBar: {
+			paddingBottom: 8,
 		},
-		trioLabelVoted: {
-			color: '#16a34a',
+		trioLabelDot: {
+			width: 6,
+			height: 6,
+			borderRadius: 3,
+			flexShrink: 0,
+		},
+		trioLabelOnImage: {
+			flexShrink: 1,
+			color: '#ffffff',
+			fontSize: 11,
 			fontWeight: '700' as const,
+			textAlign: 'center' as const,
+			lineHeight: 14,
+			textShadowColor: 'rgba(0,0,0,0.45)',
+			textShadowOffset: { width: 0, height: 1 },
+			textShadowRadius: 2,
+		},
+		trioLabelOnImageVoted: {
+			color: '#bbf7d0',
 		},
 		trioWinnerMark: {
 			position: 'absolute' as const,
@@ -2400,7 +2421,7 @@ function FeedPostCardComponent({
 			} else {
 				badgeScale[i].setValue(0);
 				Animated.timing(cellOpacity[i], {
-					toValue: 0.8,
+					toValue: 0.94,
 					duration: 280,
 					useNativeDriver: true,
 				}).start();
@@ -3243,21 +3264,9 @@ function FeedPostCardComponent({
 								const optionColor = MULTI_SPLIT_COLORS[i % 10];
 								const cellRadius =
 									compareOverlayMode === 'full' ? 6 : 10;
-								const isTrio = compareOverlayMode === 'trio';
-								const trioImageW = multiCellWidth;
-								const trioImageH = multiCellWidth;
 								const cellBody = (
 									<Pressable
-										style={[
-											isTrio ? st.trioImageBox : styles.fill,
-											isTrio
-												? {
-														width: trioImageW,
-														height: trioImageH,
-														borderRadius: cellRadius,
-													}
-												: null,
-										]}
+										style={styles.absoluteFill}
 										onPress={() => handleCellTap(i)}
 										disabled={isVotingClosed}>
 										<Image
@@ -3271,28 +3280,34 @@ function FeedPostCardComponent({
 											recyclingKey={`${post.id}-opt-${i}`}
 											{...feedImageProps()}
 										/>
-										{compareOverlayMode === 'trio' ? (
-											<>
+										{compareOverlayMode === 'slim' ? (
+											<View
+												style={[
+													st.binaryOverlay,
+													!showCompareStats && st.binaryOverlayPreview,
+												]}>
+												<View style={st.binaryOverlayInner}>
+													<Text style={st.binaryOverlayPct}>{pct}%</Text>
+													<Text
+														style={st.binaryOverlayLabel}
+														numberOfLines={1}>
+														{label}
+													</Text>
+												</View>
 												{showCompareStats ? (
-													<View style={st.trioEdgeBar}>
+													<View style={st.binaryOverlayMeter}>
 														<View
 															style={[
-																st.trioEdgeBarFill,
+																st.binaryOverlayMeterFill,
 																{
 																	width: `${Math.max(0, Math.min(100, pct))}%`,
 																	backgroundColor: optionColor,
-																	opacity: 0.85,
 																},
 															]}
 														/>
 													</View>
 												) : null}
-												{isWinner ? (
-													<View style={st.trioWinnerMark}>
-														<Text style={st.trioWinnerMarkText}>👑</Text>
-													</View>
-												) : null}
-											</>
+											</View>
 										) : compareOverlayMode === 'minimal' ? (
 												<View style={st.minimalBar}>
 													<View
@@ -3390,7 +3405,25 @@ function FeedPostCardComponent({
 													</View>
 												</Animated.View>
 											)}
+											{compareOverlayMode === 'slim' && isVoted && !isVotingClosed && (
+												<Animated.View
+													style={[
+														st.votedBadgeRow,
+														{ transform: [{ scale: badgeScale[i] }] },
+													]}>
+													<View style={st.votedBadge}>
+														<Text style={st.votedBadgeText}>✓ VOTED</Text>
+													</View>
+												</Animated.View>
+											)}
 											{compareOverlayMode === 'full' && isWinner && (
+												<View style={st.winnerBadgeRow}>
+													<View style={st.winnerBadge}>
+														<Text style={st.winnerBadgeText}>👑 WINNER</Text>
+													</View>
+												</View>
+											)}
+											{compareOverlayMode === 'slim' && isWinner && (
 												<View style={st.winnerBadgeRow}>
 													<View style={st.winnerBadge}>
 														<Text style={st.winnerBadgeText}>👑 WINNER</Text>
@@ -3403,32 +3436,20 @@ function FeedPostCardComponent({
 									<Animated.View
 										key={`${post.id}-multi-${i}`}
 										style={[
-											isTrio ? st.multiCellTrio : styles.multiCell,
+											styles.multiCell,
 											{
-												width: isTrio ? trioImageW : multiCellWidth,
-												...(isTrio
-													? {}
-													: {
-															height: multiCellWidth,
-															borderRadius: cellRadius,
-														}),
+												width: multiCellWidth,
+												height: multiCellWidth,
+												borderRadius: cellRadius,
 											},
-											isLoser && { opacity: 0.78 },
+											!isVotingClosed
+												? { opacity: cellOpacity[i] }
+												: isLoser
+													? { opacity: 0.78 }
+													: null,
 											{ transform: [{ scale: cellScale[i] }] },
 										]}>
 										{cellBody}
-										{isTrio ? (
-											<View style={st.trioCaption}>
-												<Text
-													style={[
-														st.trioLabel,
-														isVoted && !isVotingClosed && st.trioLabelVoted,
-													]}
-													numberOfLines={2}>
-													{label}
-												</Text>
-											</View>
-										) : null}
 									</Animated.View>
 								);
 							})}
@@ -4838,7 +4859,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'center',
 	},
-	multiCell: { overflow: 'hidden' },
+	multiCell: { overflow: 'hidden', position: 'relative' },
 	multiImg: { width: '100%', height: '100%' },
 	// More menu
 	menuOverlay: {
