@@ -4,7 +4,7 @@
     "slug": "ke-jitbe",
     "version": "1.13.0",
     "scheme": "ctrend",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/icon.png",
