@@ -25,7 +25,7 @@ import {
   buildKnockoutBracket,
   isBracketFinished,
   isBracketLive,
-  isBracketPlaceholder,
+  isBracketSynthetic,
   isBracketTeamKnown,
 } from "@ctrend/shared/lib/knockoutBracket";
 import type { WcFixture } from "../lib/worldCupFixtures";
@@ -375,7 +375,9 @@ function BracketMatchCard({
   const fixture = slot.fixture;
   const stageMeta = BRACKET_STAGE_META[slot.stage as keyof typeof BRACKET_STAGE_META];
   const clickable =
-    fixture && !isBracketPlaceholder(fixture) && (isBracketLive(fixture) || isBracketFinished(fixture));
+    fixture &&
+    !isBracketSynthetic(fixture) &&
+    (isBracketLive(fixture) || isBracketFinished(fixture));
 
   const tbd: BracketTeam = { name: null, shortName: null, crest: null };
 

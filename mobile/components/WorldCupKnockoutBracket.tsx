@@ -33,7 +33,7 @@ import {
   buildKnockoutBracket,
   isBracketFinished,
   isBracketLive,
-  isBracketPlaceholder,
+  isBracketSynthetic,
   isBracketTeamKnown,
 } from "@ctrend/shared/lib/knockoutBracket";
 import { useTheme } from "../context/ThemeContext";
@@ -131,7 +131,7 @@ function BracketFixtureCard({
   const winner = bracketWinnerSide(fixture);
   const hasScore = live || finished;
   const footnote = stageFootnote(stage);
-  const clickable = (live || finished) && !isBracketPlaceholder(fixture);
+  const clickable = (live || finished) && !isBracketSynthetic(fixture);
 
   const card = (
     <View

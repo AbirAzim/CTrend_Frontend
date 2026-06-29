@@ -290,6 +290,14 @@ export function isBracketPlaceholder(fixture: BracketFixture | null | undefined)
   return Boolean(fixture?.id?.startsWith("r32-placeholder-"));
 }
 
+export function isBracketProjected(fixture: BracketFixture | null | undefined): boolean {
+  return Boolean(fixture?.id?.startsWith("bracket-projected-"));
+}
+
+export function isBracketSynthetic(fixture: BracketFixture | null | undefined): boolean {
+  return isBracketPlaceholder(fixture) || isBracketProjected(fixture);
+}
+
 /** Faster refresh while knockout matches are live; otherwise keep roadmap current after FT. */
 export function worldCupRoadMapPollMs(fixtures: BracketFixture[]): number {
   const knockout = fixtures.filter((f) => f.stage !== "GROUP_STAGE" && !isBracketPlaceholder(f));
@@ -428,6 +436,57 @@ function assignFeederSlots(
   }
 }
 
+const TBD_TEAM: BracketTeam = { name: null, shortName: null, crest: null };
+
+function bracketWinnerTeam(fixture: BracketFixture): BracketTeam | null {
+  const side = bracketWinnerSide(fixture);
+  if (side === "home") return fixture.homeTeam;
+  if (side === "away") return fixture.awayTeam;
+  return null;
+}
+
+/** Fill later-round slots from feeder winners when the API fixture is not synced yet. */
+function projectSlotFromFeeders(
+  slot: BracketSlot,
+  feederA: BracketFixture | null | undefined,
+  feederB: BracketFixture | null | undefined,
+  lookup: Map<string, BracketTeam>,
+): BracketFixture | null {
+  const winnerA = feederA ? bracketWinnerTeam(feederA) : null;
+  const winnerB = feederB ? bracketWinnerTeam(feederB) : null;
+  if (!winnerA && !winnerB) return null;
+
+  return {
+    id: `bracket-projected-${slot.stage}-${slot.side}-${slot.index}`,
+    homeTeam: winnerA ? enrichTeam(winnerA, lookup) : TBD_TEAM,
+    awayTeam: winnerB ? enrichTeam(winnerB, lookup) : TBD_TEAM,
+    kickoff: "",
+    status: "SCHEDULED",
+    stage: slot.stage,
+    score: null,
+  };
+}
+
+function projectEmptySlots(columns: BracketSlot[][], lookup: Map<string, BracketTeam>): void {
+  for (let stageIdx = 1; stageIdx < columns.length; stageIdx++) {
+    const col = columns[stageIdx]!;
+    const childCol = columns[stageIdx - 1]!;
+    for (let i = 0; i < col.length; i++) {
+      const slot = col[i]!;
+      if (slot.fixture) continue;
+      const projected = projectSlotFromFeeders(
+        slot,
+        childCol[i * 2]?.fixture,
+        childCol[i * 2 + 1]?.fixture,
+        lookup,
+      );
+      if (projected) {
+        col[i] = { ...slot, fixture: projected };
+      }
+    }
+  }
+}
+
 function stageFixtures(fixtures: BracketFixture[], stage: string): BracketFixture[] {
   return fixtures.filter((f) => f.stage === stage);
 }
@@ -445,6 +504,8 @@ function buildSideColumns(
     const stage = SIDE_STAGES[stageIdx]!;
     assignFeederSlots(columns, stageFixtures(fixtures, stage), stageIdx, lookup);
   }
+
+  projectEmptySlots(columns, lookup);
 
   return columns;
 }
@@ -506,5 +567,11 @@ export function bracketWinnerSide(fixture: BracketFixture): "home" | "away" | nu
   const w = fixture.score?.winner?.toUpperCase() ?? "";
   if (w === "HOME_TEAM" || w === "HOME") return "home";
   if (w === "AWAY_TEAM" || w === "AWAY") return "away";
+  if (!isBracketFinished(fixture)) return null;
+  const h = fixture.score?.home;
+  const a = fixture.score?.away;
+  if (h == null || a == null) return null;
+  if (h > a) return "home";
+  if (a > h) return "away";
   return null;
 }
