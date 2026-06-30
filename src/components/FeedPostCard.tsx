@@ -58,7 +58,6 @@ import { linkifyText } from "../lib/linkify";
 import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coins";
 import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaignWinner";
 import {
-  isExtraTimeLiveStatus,
   isKnockoutStage,
   isShootoutLiveStatus,
 } from "@ctrend/shared/lib/knockoutFixture";
@@ -1873,8 +1872,7 @@ function FeedPostCardComponent({
     isLiveMatch &&
     !showCampaignWinner &&
     Boolean(matchWinnerPendingHint) &&
-    (isExtraTimeLiveStatus(matchStatus, post.matchScore?.phase) ||
-      isShootoutLiveStatus(matchStatus, post.matchScore?.phase));
+    isShootoutLiveStatus(matchStatus, post.matchScore?.phase);
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)

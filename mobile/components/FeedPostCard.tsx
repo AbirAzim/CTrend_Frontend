@@ -80,7 +80,6 @@ import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 import { categoryChipColors } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
 import {
-  isExtraTimeLiveStatus,
   isKnockoutStage,
   isShootoutLiveStatus,
 } from '@ctrend/shared/lib/knockoutFixture';
@@ -2935,8 +2934,7 @@ function FeedPostCardComponent({
 		isLiveMatch &&
 		!showCampaignWinner &&
 		Boolean(matchWinnerPendingHint) &&
-		(isExtraTimeLiveStatus(matchStatus, matchScore?.phase) ||
-			isShootoutLiveStatus(matchStatus, matchScore?.phase));
+		isShootoutLiveStatus(matchStatus, matchScore?.phase);
 
 	const livePhaseLabel =
 		matchScore?.status === 'IN_PLAY' ? formatKnockoutLivePrefix(matchScore) : null;
