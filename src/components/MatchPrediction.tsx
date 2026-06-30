@@ -23,11 +23,9 @@ import {
 } from "@ctrend/shared/lib/knockoutFixture";
 import {
   knockoutRoundBadgeText,
-  predictionKnockoutHint,
   predictionPendingExtraTimeMessage,
   predictionPendingShootoutMessage,
   predictionResolvedAfterShootoutNote,
-  predictionScoringRuleHint,
 } from "@ctrend/shared/lib/matchPredictionCopy";
 import { knockoutEffectiveScore } from "@ctrend/shared/lib/matchScoreCopy";
 
@@ -135,8 +133,6 @@ export function MatchPrediction({
   const matchStatus = fixtureData?.worldCupFixture?.status ?? null;
   const matchPhase = fixtureData?.worldCupFixture?.rawStatus ?? null;
   const roundBadge = isKnockoutStage(fixtureStage) ? knockoutRoundBadgeText(fixtureStage) : null;
-  const knockoutHint = predictionKnockoutHint(fixtureStage);
-  const scoringRule = predictionScoringRuleHint(fixtureStage);
   const pendingResult = isPredictionResultPending(
     resolved,
     matchStatus,
@@ -233,8 +229,6 @@ export function MatchPrediction({
   return (
     <div className="cx-pred">
       {roundBadge ? <p className="cx-pred-round-badge">{roundBadge}</p> : null}
-      {knockoutHint ? <p className="cx-pred-round-hint">{knockoutHint}</p> : null}
-      {scoringRule ? <p className="cx-pred-scoring-rule">{scoringRule}</p> : null}
       {pendingResult && inExtraTime ? (
         <p className="cx-pred-pending-result" role="status">{predictionPendingExtraTimeMessage()}</p>
       ) : null}

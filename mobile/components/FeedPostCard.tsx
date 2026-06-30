@@ -81,9 +81,7 @@ import { categoryChipColors } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
 import {
   isKnockoutStage,
-  isShootoutLiveStatus,
 } from '@ctrend/shared/lib/knockoutFixture';
-import { matchVoteWinnerPendingHint } from '@ctrend/shared/lib/matchPredictionCopy';
 import {
   feedCardLiveScores,
   formatKnockoutLivePrefix,
@@ -2949,13 +2947,6 @@ function FeedPostCardComponent({
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
 	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
-	const matchWinnerPendingHint = matchVoteWinnerPendingHint(post.fixtureStage);
-	const showLiveEtBanner =
-		isMatchPost &&
-		isLiveMatch &&
-		!showCampaignWinner &&
-		Boolean(matchWinnerPendingHint) &&
-		isShootoutLiveStatus(matchStatus, matchScore?.phase);
 
 	const livePhaseLabel =
 		matchScore?.status === 'IN_PLAY' ? formatKnockoutLivePrefix(matchScore) : null;
@@ -3139,14 +3130,6 @@ function FeedPostCardComponent({
 
 			{/* Campaign ribbon */}
 			{campaign ? <PostCampaignBadge campaign={campaign} /> : null}
-
-			{isMatchPost && showLiveEtBanner ? (
-				<View style={st.knockoutStrip}>
-					{matchWinnerPendingHint ? (
-						<Text style={st.knockoutVoteHint}>{matchWinnerPendingHint}</Text>
-					) : null}
-				</View>
-			) : null}
 
 			{/* Announcement header strip */}
 			{isAnnouncement && (
@@ -3895,7 +3878,7 @@ function FeedPostCardComponent({
 					<Text style={matchInProgressStyles.text}>
 						{winnerCountdown
 							? `🏆 Winner reveals in ${winnerCountdown}`
-							: (matchWinnerPendingHint ?? '🏆 Revealing winner…')}
+							: '🏆 Revealing winner…'}
 					</Text>
 				</View>
 			) : null}

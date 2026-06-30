@@ -59,9 +59,7 @@ import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coin
 import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaignWinner";
 import {
   isKnockoutStage,
-  isShootoutLiveStatus,
 } from "@ctrend/shared/lib/knockoutFixture";
-import { matchVoteWinnerPendingHint } from "@ctrend/shared/lib/matchPredictionCopy";
 import {
   feedCardLiveScores,
   formatKnockoutLivePrefix,
@@ -1867,13 +1865,6 @@ function FeedPostCardComponent({
   const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
   const showMatchCalculating =
     isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
-  const matchWinnerPendingHint = matchVoteWinnerPendingHint(post.fixtureStage);
-  const showLiveEtBanner =
-    isMatchPost &&
-    isLiveMatch &&
-    !showCampaignWinner &&
-    Boolean(matchWinnerPendingHint) &&
-    isShootoutLiveStatus(matchStatus, post.matchScore?.phase);
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)
@@ -2089,14 +2080,6 @@ function FeedPostCardComponent({
       </header>
 
       {post.campaign ? <PostCampaignBadge campaign={post.campaign} /> : null}
-
-      {isMatchPost && showLiveEtBanner ? (
-        <div className="cx-knockout-strip">
-          {matchWinnerPendingHint ? (
-            <p className="cx-knockout-vote-hint">{matchWinnerPendingHint}</p>
-          ) : null}
-        </div>
-      ) : null}
 
       {isAnnouncement && (
         <div className="cx-announcement-header">
@@ -2542,7 +2525,7 @@ function FeedPostCardComponent({
           <span>
             {winnerCountdownLabel
               ? `🏆 Winner reveals in ${winnerCountdownLabel}`
-              : (matchWinnerPendingHint ?? "🏆 Revealing winner…")}
+              : "🏆 Revealing winner…"}
           </span>
         </div>
       ) : null}
