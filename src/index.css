@@ -25437,13 +25437,15 @@ html[data-minimal-chrome="true"] .ig-topbar {
 .cx-knockout-round {
   align-self: flex-start;
   margin: 0;
-  font-size: 11px;
-  font-weight: 800;
-  color: #d97706;
-  background: rgb(245 158 11 / 0.16);
-  border: 1px solid rgb(245 158 11 / 0.35);
-  border-radius: 999px;
-  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(var(--cx-ink-rgb) / 0.55);
+  background: rgb(var(--cx-ink-rgb) / 0.06);
+  border: 1px solid rgb(var(--cx-ink-rgb) / 0.1);
+  border-radius: 6px;
+  padding: 3px 8px;
 }
 
 .cx-pred-round-hint,
@@ -25694,19 +25696,20 @@ html[data-minimal-chrome="true"] .ig-topbar {
   align-items: center;
   gap: 6px;
   margin-top: 2px;
-  padding: 7px 14px;
-  border: none;
-  border-radius: 999px;
-  background: rgb(245 158 11 / 0.16);
-  color: #d97706;
+  padding: 8px 14px;
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.45);
+  border-radius: 10px;
+  background: rgb(var(--cx-accent-rgb) / 0.12);
+  color: var(--cx-accent-mid, #6366f1);
   font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .cx-pred-winners-btn:hover {
-  background: rgb(245 158 11 / 0.28);
+  background: rgb(var(--cx-accent-rgb) / 0.2);
+  border-color: rgb(var(--cx-accent-rgb) / 0.6);
 }
 
 .cx-pred-locked {

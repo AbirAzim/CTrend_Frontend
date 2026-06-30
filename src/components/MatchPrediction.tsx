@@ -333,7 +333,7 @@ export function MatchPrediction({
             className="cx-pred-winners-btn"
             onClick={() => setShowWinners(true)}
           >
-            🏆 Prediction winners
+            🏆 View prediction winners
           </button>
         </>
       ) : null}

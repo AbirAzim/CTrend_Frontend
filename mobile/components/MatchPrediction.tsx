@@ -359,7 +359,7 @@ export function MatchPrediction({
             <Text style={st.penNote}>{predictionResolvedAfterShootoutNote()}</Text>
           ) : null}
           <Pressable style={st.winnersBtn} onPress={() => setListMode("winners")}>
-            <Text style={st.winnersText}>🏆 Prediction winners</Text>
+            <Text style={st.winnersText}>🏆 View prediction winners</Text>
           </Pressable>
         </>
       ) : null}
@@ -466,14 +466,20 @@ function makeStyles(c: ColorPalette) {
     },
     roundBadge: {
       alignSelf: "flex-start",
-      backgroundColor: "rgba(245,158,11,0.16)",
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderWidth: 1,
-      borderColor: "rgba(245,158,11,0.35)",
+      backgroundColor: c.section,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
     },
-    roundBadgeText: { fontSize: 11, fontWeight: "800", color: "#d97706" },
+    roundBadgeText: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: c.subtext,
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+    },
     roundHint: { fontSize: 11, color: c.muted, lineHeight: 15 },
     ruleHint: { fontSize: 11, color: c.subtext, lineHeight: 15 },
     pendingBanner: {
@@ -658,12 +664,14 @@ function makeStyles(c: ColorPalette) {
     hint: { fontSize: 12, color: c.muted, flexShrink: 1 },
     winnersBtn: {
       alignSelf: "flex-start",
-      backgroundColor: "rgba(245,158,11,0.16)",
-      borderRadius: 999,
+      backgroundColor: accentSoft,
+      borderRadius: 10,
       paddingHorizontal: 14,
-      paddingVertical: 7,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: `${c.accent}66`,
     },
-    winnersText: { color: "#d97706", fontSize: 13, fontWeight: "800" },
+    winnersText: { color: c.accent, fontSize: 13, fontWeight: "800" },
     error: { color: "#ef4444", fontSize: 12 },
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     sheet: {

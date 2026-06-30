@@ -2,7 +2,7 @@ import { getKnockoutRoundLabel, isKnockoutStage } from "./knockoutFixture";
 
 export function knockoutRoundBadgeText(stage: string | null | undefined): string | null {
   const label = getKnockoutRoundLabel(stage);
-  return label ? `🏆 ${label}` : null;
+  return label ?? null;
 }
 
 /** Short intro for score predictions on knockout fixtures. */
