@@ -28,6 +28,11 @@ import { MY_FRIENDS, FRIEND_SUGGESTIONS, FRIEND_REQUESTS } from "@ctrend/shared/
 import { ME } from "@ctrend/shared/graphql/profile";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
+import {
+  feedHasLiveMatch,
+  shouldSortFeedLiveFirst,
+  sortFeedPostsLiveFirst,
+} from "@ctrend/shared/lib/feedMatchLive";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { FeedPostCard } from "../../components/FeedPostCard";
@@ -305,12 +310,16 @@ export default function FeedScreen() {
     fetchPolicy: "cache-and-network",
   });
 
+  const [feedNowMs, setFeedNowMs] = useState(() => Date.now());
+  const [feedPollMs, setFeedPollMs] = useState(0);
+
   const { data, loading, error, refetch, fetchMore, networkStatus } = useQuery<FeedData>(
     FEED_POSTS,
     {
       variables: feedQueryVars,
       fetchPolicy: "cache-and-network",
       notifyOnNetworkStatusChange: true,
+      pollInterval: feedPollMs,
     },
   );
 
@@ -412,6 +421,20 @@ export default function FeedScreen() {
     });
   }, [data, meData, friendsData, suggestionsData, requestsData]);
 
+  useEffect(() => {
+    if (!shouldSortFeedLiveFirst(feedFilter)) {
+      setFeedPollMs(0);
+      return;
+    }
+    setFeedPollMs(feedHasLiveMatch(apiPosts, feedNowMs) ? 30_000 : 0);
+  }, [apiPosts, feedFilter, feedNowMs]);
+
+  useEffect(() => {
+    if (!apiPosts.some((p) => p.matchType)) return;
+    const t = setInterval(() => setFeedNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [apiPosts]);
+
   // Server-side count drives the next page's `skip` (excludes locally-prepended
   // live-queue posts, which aren't part of the server's offset window).
   serverCountRef.current = data?.feedPosts?.length ?? 0;
@@ -419,12 +442,14 @@ export default function FeedScreen() {
 
   const posts = useMemo(() => {
     const seenIds = new Set<string>();
-    return [...liveQueue, ...apiPosts].filter((p) => {
+    const merged = [...liveQueue, ...apiPosts].filter((p) => {
       if (removedIds.has(p.id) || seenIds.has(p.id)) return false;
       seenIds.add(p.id);
       return true;
     });
-  }, [liveQueue, apiPosts, removedIds]);
+    if (!shouldSortFeedLiveFirst(feedFilter)) return merged;
+    return sortFeedPostsLiveFirst(merged, feedNowMs);
+  }, [liveQueue, apiPosts, removedIds, feedFilter, feedNowMs]);
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     skip: !isAuthenticated,

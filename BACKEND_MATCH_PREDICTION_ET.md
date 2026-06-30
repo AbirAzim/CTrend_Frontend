@@ -40,7 +40,14 @@ Do **not** resolve predictions or grant prediction coins while `predictionsPendi
 Store on fixture or derive from API-Football:
 
 - `scoreAfterExtraTime: { home, away }` — used for prediction winners.
+- **Compute as** `fullTime.home + (extraTime.home ?? 0)` and same for away.
+- `extraTime` is goals scored **only in** the 30-minute ET period, not cumulative.
+- **Do not** use top-level `score.home` / `score.away` after a penalty shootout — the API often returns `0–0` (ET-only delta) while `fullTime` remains `1–1`.
 - Ignore shootout goals in prediction comparison.
+
+### Re-grade after fix
+
+For fixtures already resolved with wrong winners (e.g. Germany vs Paraguay), re-run the prediction resolver using the 90+ET formula above.
 
 ## Campaign winner timing
 

@@ -29,6 +29,7 @@ import {
   predictionResolvedAfterShootoutNote,
   predictionScoringRuleHint,
 } from "@ctrend/shared/lib/matchPredictionCopy";
+import { knockoutEffectiveScore } from "@ctrend/shared/lib/matchScoreCopy";
 
 type PredUser = {
   id: string;
@@ -88,6 +89,11 @@ export function MatchPrediction({
       rawStatus?: string | null;
       homeTeam?: { name?: string | null } | null;
       awayTeam?: { name?: string | null } | null;
+      fullTime?: { home?: number | null; away?: number | null } | null;
+      extraTime?: { home?: number | null; away?: number | null } | null;
+      penalty?: { home?: number | null; away?: number | null } | null;
+      wentToPenalties?: boolean | null;
+      score?: { home?: number | null; away?: number | null } | null;
     } | null;
   }>(WORLD_CUP_FIXTURE_DETAILS, {
     variables: { id: fixtureId! },
@@ -142,6 +148,9 @@ export function MatchPrediction({
   const inShootout = isShootoutLiveStatus(matchStatus, matchPhase);
   const showResolvedPenNote =
     isKnockoutStage(fixtureStage) && resolved && Boolean(state?.wentToPenalties);
+  const gradingScore = fixtureData?.worldCupFixture
+    ? knockoutEffectiveScore(fixtureData.worldCupFixture)
+    : null;
 
   function startEdit() {
     setHome(mine ? String(mine.homeScore) : "0");
@@ -317,6 +326,11 @@ export function MatchPrediction({
 
       {resolved ? (
         <>
+          {gradingScore ? (
+            <p className="cx-pred-result-line">
+              Result after extra time: {homeLabel} {gradingScore.home}–{gradingScore.away} {awayLabel}
+            </p>
+          ) : null}
           {showResolvedPenNote ? (
             <p className="cx-pred-pen-note">{predictionResolvedAfterShootoutNote()}</p>
           ) : null}

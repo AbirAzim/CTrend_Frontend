@@ -14,10 +14,18 @@ import {
   type PlayerLineupEvents,
 } from "../../packages/shared/src/lib/matchEvents";
 import {
-  formatKnockoutScoreLines,
   hasKnockoutScoreBreakdown,
+  knockoutFullTimeDividerLabel,
+  knockoutHeaderSublines,
+  knockoutMainDisplayScore,
   matchTopPlayerLabel,
 } from "@ctrend/shared/lib/matchScoreCopy";
+import {
+  extractPenaltyShootoutKicks,
+  isPenaltyShootoutEvent,
+  penaltyShootoutRounds,
+  penaltyShootoutWinnerSide,
+} from "@ctrend/shared/lib/penaltyShootout";
 import { isKnockoutStage } from "@ctrend/shared/lib/knockoutFixture";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -165,7 +173,7 @@ function isScoredGoal(e: { type: string; detail?: string | null }): boolean {
 // Goal scorers per team
 function goalScorers(events: MatchEvent[], team: "home" | "away") {
   return events
-    .filter((e) => isScoredGoal(e) && e.team === team)
+    .filter((e) => isScoredGoal(e) && !isPenaltyShootoutEvent(e) && e.team === team)
     .sort(compareEventsByMinute)
     .map((e) => {
       const min = minuteLabel(e);
@@ -291,6 +299,72 @@ function EvIcon({ type, detail }: { type: string; detail: string }) {
   return <span className="md-eico">·</span>;
 }
 
+function PenaltyShootoutSection({ fixture }: { fixture: FixtureDetails }) {
+  const kicks = extractPenaltyShootoutKicks(fixture.events);
+  const rounds = penaltyShootoutRounds(kicks);
+  const pen = fixture.penalty;
+  if (!pen || pen.home == null || pen.away == null) return null;
+  const winnerSide = penaltyShootoutWinnerSide(pen) ?? (fixture.score.winner as "home" | "away" | null);
+  const winnerName =
+    winnerSide === "home"
+      ? fixture.homeTeam.name
+      : winnerSide === "away"
+        ? fixture.awayTeam.name
+        : null;
+
+  return (
+    <div className="md-pens">
+      <div className="md-pens-head">
+        <div className="md-pens-title">Penalty shootout</div>
+        {winnerName ? (
+          <div className="md-pens-result">
+            {winnerName} wins · {pen.home}–{pen.away}
+          </div>
+        ) : (
+          <div className="md-pens-result">{pen.home}–{pen.away}</div>
+        )}
+      </div>
+      <div className="md-pens-teams">
+        <span>{fixture.homeTeam.shortName || fixture.homeTeam.name}</span>
+        <span>{fixture.awayTeam.shortName || fixture.awayTeam.name}</span>
+      </div>
+      {rounds.length > 0 ? (
+        <div className="md-pens-grid">
+          {rounds.map((round, i) => (
+            <div key={i} className="md-pens-round">
+              <PenaltyKickCell kick={round.home} align="left" />
+              <span className="md-pens-round-mid" aria-hidden>
+                {round.home?.scored ? "✓" : round.home ? "✕" : "·"}
+                {" "}
+                {round.away?.scored ? "✓" : round.away ? "✕" : "·"}
+              </span>
+              <PenaltyKickCell kick={round.away} align="right" />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PenaltyKickCell({
+  kick,
+  align,
+}: {
+  kick?: { playerName: string; scored: boolean; runHome: number; runAway: number };
+  align: "left" | "right";
+}) {
+  if (!kick) return <div className={`md-pens-cell md-pens-cell--${align} md-pens-cell--empty`} />;
+  return (
+    <div className={`md-pens-cell md-pens-cell--${align}`}>
+      <span className="md-pens-player">{kick.playerName}</span>
+      <span className={`md-pens-outcome${kick.scored ? " md-pens-outcome--goal" : " md-pens-outcome--miss"}`}>
+        {kick.scored ? "Goal" : "Miss"} ({kick.runHome}–{kick.runAway})
+      </span>
+    </div>
+  );
+}
+
 // ─── Overview tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
@@ -325,9 +399,12 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
 
   const rows: Row[] = [];
   if (finished || (score.home != null && score.away != null)) {
-    const label = finished
-      ? `Full-Time  ${score.home ?? 0} – ${score.away ?? 0}`
-      : `${score.home ?? 0} – ${score.away ?? 0}`;
+    const label =
+      isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
+        ? knockoutFullTimeDividerLabel(fixture)
+        : finished
+          ? `Full-Time  ${score.home ?? 0} – ${score.away ?? 0}`
+          : `${score.home ?? 0} – ${score.away ?? 0}`;
     rows.push({ kind: "divider", label });
   }
 
@@ -345,6 +422,9 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
 
   return (
     <div className="md-overview">
+      {fixture.wentToPenalties && fixture.penalty ? (
+        <PenaltyShootoutSection fixture={fixture} />
+      ) : null}
       <div className="md-ov-header">Key Events</div>
       <div className="md-ov-list">
         {rows.map((row, i) => {
@@ -1022,8 +1102,12 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
   const awayWon = score.winner === "away";
   const scoreBreakdown =
     isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
-      ? formatKnockoutScoreLines(fixture)
+      ? knockoutHeaderSublines(fixture)
       : [];
+  const displayScore = knockoutMainDisplayScore(fixture);
+  const penDecided = Boolean(fixture.wentToPenalties && fixture.penalty);
+  const highlightHomeScore = homeWon && !(penDecided && displayScore.home === displayScore.away);
+  const highlightAwayScore = awayWon && !(penDecided && displayScore.home === displayScore.away);
 
   const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
 
@@ -1071,9 +1155,9 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
         {hasScore ? (
           <div className="md-hdr-score">
             <div className="md-hdr-score-main">
-              <span className={homeWon ? "md-sc md-sc--w" : "md-sc"}>{score.home ?? 0}</span>
+              <span className={highlightHomeScore ? "md-sc md-sc--w" : "md-sc"}>{displayScore.home}</span>
               <span className="md-sc-sep">–</span>
-              <span className={awayWon ? "md-sc md-sc--w" : "md-sc"}>{score.away ?? 0}</span>
+              <span className={highlightAwayScore ? "md-sc md-sc--w" : "md-sc"}>{displayScore.away}</span>
             </div>
             {scoreBreakdown.length > 0 ? (
               <div className="md-hdr-score-breakdown">

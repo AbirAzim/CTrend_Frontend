@@ -89,6 +89,7 @@ import {
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
 } from '@ctrend/shared/lib/matchScoreCopy';
+import { isFeedMatchLive, isMatchStatusFinished } from '@ctrend/shared/lib/feedMatchLive';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -2198,7 +2199,21 @@ function FeedPostCardComponent({
 	}, [post.id, post.matchScore?.status, post.matchScore?.home, post.matchScore?.away, post.matchScore?.minute]);
 	const matchScore = liveMatchScore ?? post.matchScore;
 
-	const isLiveMatch = matchScore?.status === 'IN_PLAY' || matchScore?.status === 'PAUSED';
+	const [cardNowMs, setCardNowMs] = useState(() => Date.now());
+	useEffect(() => {
+		if (!post.matchType || isMatchStatusFinished(matchScore?.status)) return;
+		const t = setInterval(() => setCardNowMs(Date.now()), 30_000);
+		return () => clearInterval(t);
+	}, [post.matchType, matchScore?.status]);
+
+	const isLiveMatch = isFeedMatchLive(
+		{
+			matchType: post.matchType,
+			votingEndsAt: activeVotingEndsAt ?? post.votingEndsAt,
+			matchScore,
+		},
+		cardNowMs,
+	);
 
 	const liveCardPulse = useRef(new Animated.Value(0.22)).current;
 	useEffect(() => {
@@ -3064,7 +3079,7 @@ function FeedPostCardComponent({
 								<View style={st.metaRow}>{nodes}</View>
 							) : null;
 						})()}
-						{matchScore && matchScore.status !== 'TIMED' && matchScore.status !== 'IN_PLAY' && matchScore.status !== 'PAUSED' ? (() => {
+						{matchScore && (isLiveMatch || (matchScore.status !== 'TIMED' && matchScore.status !== 'IN_PLAY' && matchScore.status !== 'PAUSED')) ? (() => {
 							const canOpenMatch = Boolean(post.fixtureId) && (isMatchFinished || isLiveMatch || Boolean(post.lineupAvailable));
 							const scoreContent = (
 								<>
@@ -3079,7 +3094,9 @@ function FeedPostCardComponent({
 												isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(sc)
 													? formatKnockoutScoreChip(sc)
 													: null;
-											if (sc.status === 'IN_PLAY') return `${liveMinute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											if (sc.status === 'IN_PLAY' || (isLiveMatch && sc.status !== 'PAUSED' && sc.status !== 'FT' && sc.status !== 'FINISHED')) {
+												return `${liveMinute != null ? `${liveMinute}'` : liveStatusPill}  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
+											}
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											const scoreLine = knockoutLine ?? `FT  ${sc.home ?? 0}–${sc.away ?? 0}`;
 											return `${scoreLine}${teams}`;
@@ -3883,6 +3900,7 @@ function FeedPostCardComponent({
 					]}
 					effectiveMinute={liveMinute}
 					liveStatusPill={liveStatusPill}
+					treatAsLive={isLiveMatch}
 				/>
 			) : null}
 
@@ -5007,12 +5025,14 @@ function MatchDetailRow({
 	teams,
 	effectiveMinute,
 	liveStatusPill,
+	treatAsLive = false,
 }: {
 	fixtureId: string;
 	matchScore: MatchScore;
 	teams: [string | null, string | null];
 	effectiveMinute: number | null;
 	liveStatusPill: string;
+	treatAsLive?: boolean;
 }) {
 	const { colors, isDark } = useTheme();
 	const isLive = matchScore?.status === 'IN_PLAY';
@@ -5028,11 +5048,11 @@ function MatchDetailRow({
 	const home = matchScore?.home ?? 0;
 	const away = matchScore?.away ?? 0;
 
-	if (isLive || isPaused) {
+	if (isLive || isPaused || (treatAsLive && !isFinished)) {
 		return (
 			<LiveMatchPanel
 				fixtureId={fixtureId}
-				isLive={isLive}
+				isLive={isLive || (treatAsLive && !isPaused)}
 				isHt={isPaused}
 				isDark={isDark}
 				colors={colors}

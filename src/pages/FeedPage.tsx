@@ -13,6 +13,11 @@ import {
   RESPOND_FRIEND_REQUEST,
 } from "../graphql/friends";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
+import {
+  feedHasLiveMatch,
+  shouldSortFeedLiveFirst,
+  sortFeedPostsLiveFirst,
+} from "@ctrend/shared/lib/feedMatchLive";
 import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
@@ -130,11 +135,15 @@ export function FeedPage() {
     return { campaignId, postFilter, skip: 0, take: PAGE_SIZE };
   }, [feedFilter]);
 
+  const [feedNowMs, setFeedNowMs] = useState(() => Date.now());
+  const [feedPollMs, setFeedPollMs] = useState(0);
+
   const { data, loading, error, refetch: refetchFeed, fetchMore: fetchMoreFeed } = useQuery(FEED_POSTS, {
     variables: feedQueryVars,
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
     notifyOnNetworkStatusChange: true,
+    pollInterval: feedPollMs,
   });
   const {
     data: friendsData,
@@ -209,6 +218,21 @@ export function FeedPage() {
     ? data.feedPosts.map(mapGqlPostToFeedView)
     : null;
 
+  useEffect(() => {
+    if (!shouldSortFeedLiveFirst(feedFilter)) {
+      setFeedPollMs(0);
+      return;
+    }
+    const raw = apiPosts ?? [];
+    setFeedPollMs(feedHasLiveMatch(raw, feedNowMs) ? 30_000 : 0);
+  }, [apiPosts, feedFilter, feedNowMs]);
+
+  useEffect(() => {
+    if (!apiPosts?.some((p) => p.matchType)) return;
+    const t = setInterval(() => setFeedNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [apiPosts]);
+
   // Number of posts the server has returned so far — drives the next page's
   // `skip` (excludes locally-prepended live-queue posts).
   const serverCount: number = (data?.feedPosts as unknown[] | undefined)?.length ?? 0;
@@ -265,6 +289,10 @@ export function FeedPage() {
     seenIds.add(p.id);
     return true;
   });
+  const orderedPostsRaw = useMemo(() => {
+    if (!shouldSortFeedLiveFirst(feedFilter)) return postsRaw;
+    return sortFeedPostsLiveFirst(postsRaw, feedNowMs);
+  }, [postsRaw, feedFilter, feedNowMs]);
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const suggestions = (suggestionsData?.friendSuggestions ?? []) as FriendRow[];
   const requestedMe = (requestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
@@ -308,7 +336,7 @@ export function FeedPage() {
       if (username) profileByUsername.set(username, image);
       if (email) profileByEmail.set(email, image);
     }
-    return postsRaw.map((p) => {
+    return orderedPostsRaw.map((p) => {
       if (p.authorProfileImageUrl?.trim()) return p;
       const byUsername = profileByUsername.get(p.authorUsername.trim().toLowerCase());
       const byEmail = p.authorEmail
@@ -319,7 +347,7 @@ export function FeedPage() {
         authorProfileImageUrl: byUsername ?? byEmail ?? null,
       };
     });
-  }, [me, friends, suggestions, requestedMe, requestedByMe, postsRaw]);
+  }, [me, friends, suggestions, requestedMe, requestedByMe, orderedPostsRaw]);
 
   // Backend now handles all filtering — posts is already the correct subset.
   const visiblePosts = useMemo(

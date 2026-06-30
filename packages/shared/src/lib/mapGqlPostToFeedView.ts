@@ -1,4 +1,5 @@
 import type { FeedPostCampaignWinnerView, FeedPostView, PostFormat, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
+import { normalizeMatchScoreDisplay } from "./matchScoreCopy";
 
 function mapViewerVote(
   viewerVote: string | null | undefined,
@@ -235,33 +236,40 @@ export function mapGqlPostToFeedView(p: {
       : null,
     matchType: p.matchType ?? false,
     matchScore: p.matchScore
-      ? {
-          home: p.matchScore.home ?? null,
-          away: p.matchScore.away ?? null,
-          status: p.matchScore.status ?? null,
-          minute: p.matchScore.minute ?? null,
-          phase: p.matchScore.phase ?? null,
-          fullTime: p.matchScore.fullTime
-            ? {
-                home: p.matchScore.fullTime.home ?? null,
-                away: p.matchScore.fullTime.away ?? null,
-              }
-            : null,
-          extraTime: p.matchScore.extraTime
-            ? {
-                home: p.matchScore.extraTime.home ?? null,
-                away: p.matchScore.extraTime.away ?? null,
-              }
-            : null,
-          penalty: p.matchScore.penalty
-            ? {
-                home: p.matchScore.penalty.home ?? null,
-                away: p.matchScore.penalty.away ?? null,
-              }
-            : null,
-          wentToExtraTime: p.matchScore.wentToExtraTime ?? null,
-          wentToPenalties: p.matchScore.wentToPenalties ?? null,
-        }
+      ? (() => {
+          const base = {
+            home: p.matchScore.home ?? null,
+            away: p.matchScore.away ?? null,
+            status: p.matchScore.status ?? null,
+            minute: p.matchScore.minute ?? null,
+            phase: p.matchScore.phase ?? null,
+            fullTime: p.matchScore.fullTime
+              ? {
+                  home: p.matchScore.fullTime.home ?? null,
+                  away: p.matchScore.fullTime.away ?? null,
+                }
+              : null,
+            extraTime: p.matchScore.extraTime
+              ? {
+                  home: p.matchScore.extraTime.home ?? null,
+                  away: p.matchScore.extraTime.away ?? null,
+                }
+              : null,
+            penalty: p.matchScore.penalty
+              ? {
+                  home: p.matchScore.penalty.home ?? null,
+                  away: p.matchScore.penalty.away ?? null,
+                }
+              : null,
+            wentToExtraTime: p.matchScore.wentToExtraTime ?? null,
+            wentToPenalties: p.matchScore.wentToPenalties ?? null,
+          };
+          const normalized = normalizeMatchScoreDisplay(base);
+          if (normalized) {
+            return { ...base, home: normalized.home, away: normalized.away };
+          }
+          return base;
+        })()
       : null,
     fixtureWinnerAt: p.fixtureWinnerAt ?? null,
     fixtureId: p.fixtureId ?? null,

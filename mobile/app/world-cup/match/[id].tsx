@@ -30,10 +30,18 @@ import {
 	type PlayerLineupEvents,
 } from '@ctrend/shared/lib/matchEvents';
 import {
-	formatKnockoutScoreLines,
 	hasKnockoutScoreBreakdown,
+	knockoutFullTimeDividerLabel,
+	knockoutHeaderSublines,
+	knockoutMainDisplayScore,
 	matchTopPlayerLabel,
 } from '@ctrend/shared/lib/matchScoreCopy';
+import {
+	extractPenaltyShootoutKicks,
+	isPenaltyShootoutEvent,
+	penaltyShootoutRounds,
+	penaltyShootoutWinnerSide,
+} from '@ctrend/shared/lib/penaltyShootout';
 import { isKnockoutStage } from '@ctrend/shared/lib/knockoutFixture';
 import { useTheme } from '../../../context/ThemeContext';
 
@@ -113,7 +121,7 @@ function shortName(full?: string | null) {
 }
 function goalScorers(events: MatchEvent[], team: 'home' | 'away') {
 	return events
-		.filter(e => isScoredGoal(e) && e.team === team)
+		.filter(e => isScoredGoal(e) && !isPenaltyShootoutEvent(e) && e.team === team)
 		.sort(compareEventsByMinute)
 		.map(e => {
 			const min = minuteLabel(e);
@@ -256,8 +264,12 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 	const shownAway = scorersExpanded ? awayScorers : awayScorers.slice(0, SCORER_LIMIT);
 	const scoreBreakdown =
 		isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
-			? formatKnockoutScoreLines(fixture)
+			? knockoutHeaderSublines(fixture)
 			: [];
+	const displayScore = knockoutMainDisplayScore(fixture);
+	const penDecided = Boolean(fixture.wentToPenalties && fixture.penalty);
+	const highlightHomeScore = homeWon && !(penDecided && displayScore.home === displayScore.away);
+	const highlightAwayScore = awayWon && !(penDecided && displayScore.home === displayScore.away);
 
 	const bg = isDark ? '#111827' : '#fff';
 	const borderC = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
@@ -305,9 +317,9 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 					{hasScore ? (
 						<>
 							<Text style={mh.score}>
-								<Text style={{ color: homeWon ? winColor : textPrimary }}>{score.home ?? 0}</Text>
+								<Text style={{ color: highlightHomeScore ? winColor : textPrimary }}>{displayScore.home}</Text>
 								<Text style={[mh.scoreDash, { color: textMuted }]}> – </Text>
-								<Text style={{ color: awayWon ? winColor : textPrimary }}>{score.away ?? 0}</Text>
+								<Text style={{ color: highlightAwayScore ? winColor : textPrimary }}>{displayScore.away}</Text>
 							</Text>
 							{scoreBreakdown.length > 0 ? (
 								<Text style={[mh.scoreBreakdown, { color: textSub }]}>
@@ -417,6 +429,87 @@ const mh = StyleSheet.create({
 	venue: { fontSize: 11, textAlign: 'center', marginTop: 12, paddingHorizontal: 20 },
 });
 
+// ─── Penalty shootout ─────────────────────────────────────────────────────────
+
+function PenaltyShootoutSection({
+	fixture,
+	isDark,
+}: {
+	fixture: FixtureDetails;
+	isDark: boolean;
+}) {
+	const kicks = extractPenaltyShootoutKicks(fixture.events);
+	const rounds = penaltyShootoutRounds(kicks);
+	const pen = fixture.penalty;
+	if (!pen || pen.home == null || pen.away == null) return null;
+	const winnerSide = penaltyShootoutWinnerSide(pen) ?? (fixture.score.winner as 'home' | 'away' | null);
+	const winnerName =
+		winnerSide === 'home'
+			? fixture.homeTeam.name
+			: winnerSide === 'away'
+				? fixture.awayTeam.name
+				: null;
+	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
+	const textSub = isDark ? '#cbd5e1' : '#475569';
+	const cardBg = isDark ? 'rgba(255,255,255,0.05)' : '#f8fafc';
+	const border = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+
+	return (
+		<View style={[pens.card, { backgroundColor: cardBg, borderColor: border }]}>
+			<Text style={[pens.title, { color: textSub }]}>PENALTY SHOOTOUT</Text>
+			<Text style={[pens.result, { color: textPrimary }]}>
+				{winnerName ? `${winnerName} wins · ` : ''}
+				{pen.home}–{pen.away}
+			</Text>
+			<View style={pens.teamRow}>
+				<Text style={[pens.team, { color: textSub }]}>{fixture.homeTeam.shortName || fixture.homeTeam.name}</Text>
+				<Text style={[pens.team, { color: textSub }]}>{fixture.awayTeam.shortName || fixture.awayTeam.name}</Text>
+			</View>
+			{rounds.map((round, i) => (
+				<View key={i} style={pens.round}>
+					<PenaltyKickCell kick={round.home} align='left' textPrimary={textPrimary} textSub={textSub} />
+					<Text style={[pens.mid, { color: textSub }]}>
+						{round.home?.scored ? '✓' : round.home ? '✕' : '·'} {round.away?.scored ? '✓' : round.away ? '✕' : '·'}
+					</Text>
+					<PenaltyKickCell kick={round.away} align='right' textPrimary={textPrimary} textSub={textSub} />
+				</View>
+			))}
+		</View>
+	);
+}
+
+function PenaltyKickCell({
+	kick,
+	align,
+	textPrimary,
+	textSub,
+}: {
+	kick?: { playerName: string; scored: boolean; runHome: number; runAway: number };
+	align: 'left' | 'right';
+	textPrimary: string;
+	textSub: string;
+}) {
+	if (!kick) return <View style={{ flex: 1 }} />;
+	return (
+		<View style={{ flex: 1, alignItems: align === 'left' ? 'flex-end' : 'flex-start' }}>
+			<Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary }} numberOfLines={1}>{kick.playerName}</Text>
+			<Text style={{ fontSize: 10, fontWeight: '600', color: kick.scored ? '#16a34a' : '#ef4444' }}>
+				{kick.scored ? 'Goal' : 'Miss'} ({kick.runHome}–{kick.runAway})
+			</Text>
+		</View>
+	);
+}
+
+const pens = StyleSheet.create({
+	card: { marginBottom: 16, padding: 14, borderRadius: 12, borderWidth: 1 },
+	title: { textAlign: 'center', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+	result: { textAlign: 'center', fontSize: 15, fontWeight: '800', marginTop: 4, marginBottom: 10 },
+	teamRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+	team: { fontSize: 11, fontWeight: '700' },
+	round: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+	mid: { width: 36, textAlign: 'center', fontSize: 11 },
+});
+
 // ─── Overview tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boolean }) {
@@ -446,7 +539,13 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 	type Row = { kind: 'event'; event: MatchEvent } | { kind: 'divider'; label: string };
 	const rows: Row[] = [];
 	if (finished || (score.home != null && score.away != null)) {
-		rows.push({ kind: 'divider', label: finished ? `Full-Time  ${score.home ?? 0} – ${score.away ?? 0}` : `${score.home ?? 0} – ${score.away ?? 0}` });
+		const label =
+			isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
+				? knockoutFullTimeDividerLabel(fixture)
+				: finished
+					? `Full-Time  ${score.home ?? 0} – ${score.away ?? 0}`
+					: `${score.home ?? 0} – ${score.away ?? 0}`;
+		rows.push({ kind: 'divider', label });
 	}
 	let htInserted = false;
 	for (const e of sorted) {
@@ -460,6 +559,9 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 
 	return (
 		<View style={{ paddingBottom: 24 }}>
+			{fixture.wentToPenalties && fixture.penalty ? (
+				<PenaltyShootoutSection fixture={fixture} isDark={isDark} />
+			) : null}
 			<Text style={[ov.sectionTitle, { color: textSub }]}>Key Events</Text>
 			{rows.map((row, i) => {
 				if (row.kind === 'divider') {
