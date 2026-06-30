@@ -36,6 +36,8 @@ import {
   predictionPendingExtraTimeMessage,
   predictionPendingShootoutMessage,
   predictionResolvedAfterShootoutNote,
+  predictionWinnersButtonLabel,
+  PREDICTION_WINNERS_BUTTON_ICON,
 } from "@ctrend/shared/lib/matchPredictionCopy";
 import { knockoutEffectiveScore } from "@ctrend/shared/lib/matchScoreCopy";
 import { useTheme } from "../context/ThemeContext";
@@ -85,8 +87,8 @@ export function MatchPrediction({
 }) {
   const { isAuthenticated } = useAuth();
   const { awardCoins } = useCoins();
-  const { colors } = useTheme();
-  const st = makeStyles(colors);
+  const { colors, isDark } = useTheme();
+  const st = makeStyles(colors, isDark);
 
   const { data, refetch } = useQuery<StateData>(MATCH_PREDICTION_STATE, {
     variables: { postId },
@@ -233,6 +235,7 @@ export function MatchPrediction({
     <View style={st.wrap}>
       {roundBadge ? (
         <View style={st.roundBadge}>
+          <Text style={st.roundBadgeIcon}>🏆</Text>
           <Text style={st.roundBadgeText}>{roundBadge}</Text>
         </View>
       ) : null}
@@ -358,8 +361,14 @@ export function MatchPrediction({
           {showResolvedPenNote ? (
             <Text style={st.penNote}>{predictionResolvedAfterShootoutNote()}</Text>
           ) : null}
-          <Pressable style={st.winnersBtn} onPress={() => setListMode("winners")}>
-            <Text style={st.winnersText}>🏆 View prediction winners</Text>
+          <Pressable
+            style={st.winnersBtn}
+            onPress={() => setListMode("winners")}
+            accessibilityRole="button"
+            accessibilityLabel={`${PREDICTION_WINNERS_BUTTON_ICON} ${predictionWinnersButtonLabel()}`}
+          >
+            <Text style={st.winnersIcon}>{PREDICTION_WINNERS_BUTTON_ICON}</Text>
+            <Text style={st.winnersText}>{predictionWinnersButtonLabel()}</Text>
           </Pressable>
         </>
       ) : null}
@@ -453,9 +462,12 @@ function PredictionListModal({
   );
 }
 
-function makeStyles(c: ColorPalette) {
+function makeStyles(c: ColorPalette, isDark: boolean) {
   const accentSoft = `${c.accent}1a`;
   const accentBorder = `${c.accent}24`;
+  const winnerGreen = isDark ? "#34d399" : "#059669";
+  const winnerGreenSoft = isDark ? "rgba(52,211,153,0.12)" : "rgba(16,185,129,0.12)";
+  const winnerGreenBorder = isDark ? "rgba(52,211,153,0.45)" : "rgba(16,185,129,0.45)";
   return StyleSheet.create({
     wrap: {
       borderTopWidth: StyleSheet.hairlineWidth,
@@ -466,19 +478,21 @@ function makeStyles(c: ColorPalette) {
     },
     roundBadge: {
       alignSelf: "flex-start",
-      backgroundColor: c.section,
-      borderRadius: 6,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.border,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      backgroundColor: "rgba(245,158,11,0.14)",
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: "rgba(245,158,11,0.35)",
     },
+    roundBadgeIcon: { fontSize: 11 },
     roundBadgeText: {
-      fontSize: 10,
-      fontWeight: "700",
-      color: c.subtext,
-      letterSpacing: 0.4,
-      textTransform: "uppercase",
+      fontSize: 11,
+      fontWeight: "800",
+      color: "#d97706",
     },
     roundHint: { fontSize: 11, color: c.muted, lineHeight: 15 },
     ruleHint: { fontSize: 11, color: c.subtext, lineHeight: 15 },
@@ -664,14 +678,18 @@ function makeStyles(c: ColorPalette) {
     hint: { fontSize: 12, color: c.muted, flexShrink: 1 },
     winnersBtn: {
       alignSelf: "flex-start",
-      backgroundColor: accentSoft,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: winnerGreenSoft,
       borderRadius: 10,
       paddingHorizontal: 14,
       paddingVertical: 8,
       borderWidth: 1,
-      borderColor: `${c.accent}66`,
+      borderColor: winnerGreenBorder,
     },
-    winnersText: { color: c.accent, fontSize: 13, fontWeight: "800" },
+    winnersText: { color: winnerGreen, fontSize: 13, fontWeight: "800" },
+    winnersIcon: { fontSize: 14 },
     error: { color: "#ef4444", fontSize: 12 },
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     sheet: {

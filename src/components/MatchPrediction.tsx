@@ -26,6 +26,8 @@ import {
   predictionPendingExtraTimeMessage,
   predictionPendingShootoutMessage,
   predictionResolvedAfterShootoutNote,
+  predictionWinnersButtonLabel,
+  PREDICTION_WINNERS_BUTTON_ICON,
 } from "@ctrend/shared/lib/matchPredictionCopy";
 import { knockoutEffectiveScore } from "@ctrend/shared/lib/matchScoreCopy";
 
@@ -228,7 +230,12 @@ export function MatchPrediction({
 
   return (
     <div className="cx-pred">
-      {roundBadge ? <p className="cx-pred-round-badge">{roundBadge}</p> : null}
+      {roundBadge ? (
+        <p className="cx-pred-round-badge">
+          <span className="cx-pred-round-badge-icon" aria-hidden>🏆</span>
+          {roundBadge}
+        </p>
+      ) : null}
       {pendingResult && inExtraTime ? (
         <p className="cx-pred-pending-result" role="status">{predictionPendingExtraTimeMessage()}</p>
       ) : null}
@@ -333,7 +340,8 @@ export function MatchPrediction({
             className="cx-pred-winners-btn"
             onClick={() => setShowWinners(true)}
           >
-            🏆 View prediction winners
+            <span className="cx-pred-winners-btn-icon" aria-hidden>{PREDICTION_WINNERS_BUTTON_ICON}</span>
+            {predictionWinnersButtonLabel()}
           </button>
         </>
       ) : null}

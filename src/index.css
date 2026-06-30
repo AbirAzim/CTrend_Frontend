@@ -1950,41 +1950,104 @@ body.capacitor .ig-bottom-nav {
   color: var(--ig-muted);
 }
 
-/* Legacy live dot (vote breakdown etc.) */
-.cx-post-campaign-ribbon {
+/* Campaign ribbon on feed posts (mobile parity — collapsible chip) */
+.cx-post-campaign-wrap {
+  position: relative;
+  margin: 0 14px 8px;
+}
+
+.cx-post-campaign-wrap--collapsed {
   display: flex;
+  justify-content: flex-end;
+}
+
+.cx-post-campaign-chip,
+.cx-post-campaign-ribbon {
+  display: inline-flex;
   flex-direction: row;
   align-items: center;
   gap: 6px;
-  margin: 0 14px 10px;
-  padding: 7px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
-  text-decoration: none;
   border: 1px solid rgb(var(--cx-ink-rgb) / 0.1);
   background: rgb(var(--cx-ink-rgb) / 0.04);
-  transition: opacity 0.15s;
-  overflow: hidden;
-}
-.cx-post-campaign-ribbon:hover { opacity: 0.8; }
-
-.cx-post-campaign-ribbon-bg { display: none; }
-
-.cx-post-campaign-ribbon-inner {
-  display: contents;
+  transition: opacity 0.15s ease, background 0.15s ease;
 }
 
-.cx-post-campaign-ribbon-kicker {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--cx-ink);
-  opacity: 0.5;
+.cx-post-campaign-ribbon {
+  width: 100%;
+  padding: 7px 10px;
+}
+
+.cx-post-campaign-ribbon-main {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cx-post-campaign-ribbon-main:hover {
+  opacity: 0.88;
+}
+
+.cx-post-campaign-chip {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.cx-post-campaign-chip:hover,
+.cx-post-campaign-ribbon:hover {
+  opacity: 0.88;
+  background: rgb(var(--cx-ink-rgb) / 0.07);
+}
+
+.cx-post-campaign-chip-icon {
+  font-size: 0.75rem;
+  line-height: 1;
   flex-shrink: 0;
 }
 
+.cx-post-campaign-chip-kicker,
+.cx-post-campaign-ribbon-kicker {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b45309;
+  flex-shrink: 0;
+}
+
+.cx-post-campaign-chip-chevron,
+.cx-post-campaign-ribbon-chevron {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(var(--cx-ink-rgb) / 0.45);
+  flex-shrink: 0;
+}
+
+.cx-post-campaign-ribbon-chevron {
+  margin-left: auto;
+}
+
+.cx-post-campaign-collapse {
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  margin-left: 2px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(var(--cx-ink-rgb) / 0.45);
+  cursor: pointer;
+  line-height: 1;
+}
+
 .cx-post-campaign-ribbon-name {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--cx-ink);
   white-space: nowrap;
@@ -1995,75 +2058,114 @@ body.capacitor .ig-bottom-nav {
 }
 
 .cx-post-campaign-ribbon-prize {
-  font-size: 0.73rem;
+  font-size: 0.72rem;
   font-weight: 500;
-  color: var(--cx-ink);
-  opacity: 0.5;
+  color: rgb(var(--cx-ink-rgb) / 0.55);
   white-space: nowrap;
   flex-shrink: 0;
 }
-.cx-post-campaign-ribbon-chevron {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--cx-ink);
-  opacity: 0.35;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.cx-post-campaign-wrap {
-  position: relative;
-}
-
-.cx-post-campaign-links {
-  margin: -6px 10px 10px;
-  position: relative;
-}
 
 .cx-post-campaign-other-btn {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0 2px;
   border: none;
   background: transparent;
-  padding: 0;
-  font: inherit;
-  font-size: 0.73rem;
+  color: var(--cx-accent-mid, #6366f1);
+  font-size: 0.75rem;
   font-weight: 700;
-  color: rgb(146 64 14);
   text-decoration: underline;
   cursor: pointer;
 }
 
-.cx-post-campaign-other-list {
-  margin-top: 8px;
-  border: 1px solid rgb(234 179 8 / 0.3);
-  border-radius: 10px;
-  overflow: hidden;
-  background: rgb(255 251 235);
-  box-shadow: 0 8px 20px rgb(180 130 0 / 0.12);
+.cx-post-campaign-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
-.cx-post-campaign-other-item {
+.cx-post-campaign-modal-sheet {
+  width: 100%;
+  max-width: 520px;
+  max-height: 70vh;
+  background: var(--ig-card, #fff);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  padding: 10px 16px 28px;
+  overflow: auto;
+}
+
+.cx-post-campaign-modal-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(var(--cx-ink-rgb) / 0.15);
+  margin: 0 auto 12px;
+}
+
+.cx-post-campaign-modal-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--cx-ink);
+}
+
+.cx-post-campaign-modal-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.cx-post-campaign-modal-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 9px 10px;
-  text-decoration: none;
-  color: rgb(120 53 15);
-  font-size: 0.78rem;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 0;
+  border: none;
+  border-bottom: 1px solid rgb(var(--cx-ink-rgb) / 0.08);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cx-post-campaign-modal-row--current {
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+}
+
+.cx-post-campaign-modal-row-name {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--cx-ink);
+}
+
+.cx-post-campaign-modal-row--current .cx-post-campaign-modal-row-name {
+  color: var(--cx-accent-mid, #6366f1);
   font-weight: 700;
 }
 
-.cx-post-campaign-other-item + .cx-post-campaign-other-item {
-  border-top: 1px solid rgb(234 179 8 / 0.2);
-}
-
 .cx-post-campaign-default-pill {
-  font-size: 0.76rem;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  color: #b45309;
+  border: 1px solid #b45309;
   border-radius: 999px;
   padding: 2px 6px;
-  background: rgb(234 179 8 / 0.2);
+}
+
+.cx-post-campaign-links,
+.cx-post-campaign-other-list,
+.cx-post-campaign-other-item,
+.cx-post-campaign-ribbon-bg,
+.cx-post-campaign-ribbon-inner {
+  display: none;
 }
 
 .cx-campaign-filter-shell {
@@ -2466,51 +2568,51 @@ html[data-topbar-hidden="true"] .ff-bar-outer {
   border-color: rgb(250 204 21 / 0.28);
 }
 
+:root[data-theme="dark"] .cx-post-campaign-chip,
 :root[data-theme="dark"] .cx-post-campaign-ribbon {
   background: var(--cx-matte-inset);
   border-color: var(--cx-matte-border);
 }
 
+:root[data-theme="dark"] .cx-post-campaign-chip-kicker,
 :root[data-theme="dark"] .cx-post-campaign-ribbon-kicker {
-  color: var(--ig-muted);
-  opacity: 1;
+  color: #fbbf24;
 }
 
 :root[data-theme="dark"] .cx-post-campaign-ribbon-name {
   color: var(--ig-text);
-  opacity: 1;
 }
 
 :root[data-theme="dark"] .cx-post-campaign-ribbon-prize {
   color: var(--ig-muted);
-  opacity: 1;
 }
 
-:root[data-theme="dark"] .cx-post-campaign-ribbon-chevron {
+:root[data-theme="dark"] .cx-post-campaign-chip-chevron,
+:root[data-theme="dark"] .cx-post-campaign-ribbon-chevron,
+:root[data-theme="dark"] .cx-post-campaign-collapse {
   color: var(--ig-muted);
-  opacity: 1;
 }
 
 :root[data-theme="dark"] .cx-post-campaign-other-btn {
   color: var(--cx-accent-bright);
 }
 
-:root[data-theme="dark"] .cx-post-campaign-other-list {
-  background: rgb(43 31 7 / 0.95);
-  border-color: rgb(250 204 21 / 0.3);
+:root[data-theme="dark"] .cx-post-campaign-modal-sheet {
+  background: var(--ig-card);
 }
 
-:root[data-theme="dark"] .cx-post-campaign-other-item {
-  color: #fde68a;
+:root[data-theme="dark"] .cx-post-campaign-modal-title,
+:root[data-theme="dark"] .cx-post-campaign-modal-row-name {
+  color: var(--ig-text);
 }
 
-:root[data-theme="dark"] .cx-post-campaign-other-item + .cx-post-campaign-other-item {
-  border-top-color: rgb(250 204 21 / 0.24);
+:root[data-theme="dark"] .cx-post-campaign-modal-row--current .cx-post-campaign-modal-row-name {
+  color: var(--cx-accent-bright);
 }
 
 :root[data-theme="dark"] .cx-post-campaign-default-pill {
-  background: rgb(250 204 21 / 0.28);
-  color: #fde68a;
+  color: #fbbf24;
+  border-color: #fbbf24;
 }
 
 :root[data-theme="dark"] .cx-campaign-filter-chip {
@@ -25436,16 +25538,29 @@ html[data-minimal-chrome="true"] .ig-topbar {
 .cx-pred-round-badge,
 .cx-knockout-round {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin: 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgb(var(--cx-ink-rgb) / 0.55);
-  background: rgb(var(--cx-ink-rgb) / 0.06);
-  border: 1px solid rgb(var(--cx-ink-rgb) / 0.1);
-  border-radius: 6px;
-  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #d97706;
+  background: rgb(245 158 11 / 0.14);
+  border: 1px solid rgb(245 158 11 / 0.35);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+
+.cx-pred-round-badge-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+:root[data-theme="dark"] .cx-pred-round-badge,
+:root[data-theme="dark"] .cx-knockout-round {
+  color: #fbbf24;
+  background: rgb(251 191 36 / 0.12);
+  border-color: rgb(251 191 36 / 0.35);
 }
 
 .cx-pred-round-hint,
@@ -25697,19 +25812,35 @@ html[data-minimal-chrome="true"] .ig-topbar {
   gap: 6px;
   margin-top: 2px;
   padding: 8px 14px;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.45);
+  border: 1px solid rgb(16 185 129 / 0.45);
   border-radius: 10px;
-  background: rgb(var(--cx-accent-rgb) / 0.12);
-  color: var(--cx-accent-mid, #6366f1);
+  background: rgb(16 185 129 / 0.12);
+  color: #059669;
   font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
+.cx-pred-winners-btn-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 .cx-pred-winners-btn:hover {
-  background: rgb(var(--cx-accent-rgb) / 0.2);
-  border-color: rgb(var(--cx-accent-rgb) / 0.6);
+  background: rgb(16 185 129 / 0.2);
+  border-color: rgb(16 185 129 / 0.6);
+}
+
+:root[data-theme="dark"] .cx-pred-winners-btn {
+  color: #34d399;
+  background: rgb(52 211 153 / 0.12);
+  border-color: rgb(52 211 153 / 0.45);
+}
+
+:root[data-theme="dark"] .cx-pred-winners-btn:hover {
+  background: rgb(52 211 153 / 0.2);
+  border-color: rgb(52 211 153 / 0.6);
 }
 
 .cx-pred-locked {

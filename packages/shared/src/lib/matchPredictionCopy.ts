@@ -33,6 +33,13 @@ export function predictionResolvedAfterShootoutNote(): string {
   return "Match decided on penalties. Winning predictions matched the score at the end of extra time.";
 }
 
+/** Icon + label for the resolved-match winners CTA (feed / match card). */
+export const PREDICTION_WINNERS_BUTTON_ICON = "👑";
+
+export function predictionWinnersButtonLabel(): string {
+  return "View prediction winners";
+}
+
 /** Shown on the feed card during live extra time / shootouts (knockout vote pick). */
 export function matchVoteWinnerPendingHint(stage: string | null | undefined): string | null {
   if (!isKnockoutStage(stage)) return null;
