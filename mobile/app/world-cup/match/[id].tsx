@@ -489,11 +489,11 @@ function PenaltyShootoutSection({
 					</View>
 					{rounds.map((round, i) => (
 						<View key={i} style={pens.round}>
-							<PenaltyKickCell kick={round.home} align='left' textPrimary={textPrimary} textSub={textSub} />
+							<PenaltyKickCell kick={round.home} align='left' textPrimary={textPrimary} />
 							<Text style={[pens.mid, { color: textSub }]}>
 								{round.home?.scored ? '✓' : round.home ? '✕' : '·'} {round.away?.scored ? '✓' : round.away ? '✕' : '·'}
 							</Text>
-							<PenaltyKickCell kick={round.away} align='right' textPrimary={textPrimary} textSub={textSub} />
+							<PenaltyKickCell kick={round.away} align='right' textPrimary={textPrimary} />
 						</View>
 					))}
 				</>
@@ -504,14 +504,12 @@ function PenaltyShootoutSection({
 					teamName={homeLabel}
 					summary={homeSummary}
 					align='left'
-					textPrimary={textPrimary}
 					textSub={textSub}
 				/>
 				<PenaltyTeamSummary
 					teamName={awayLabel}
 					summary={awaySummary}
 					align='right'
-					textPrimary={textPrimary}
 					textSub={textSub}
 				/>
 			</View>
@@ -527,13 +525,11 @@ function PenaltyTeamSummary({
 	teamName,
 	summary,
 	align,
-	textPrimary,
 	textSub,
 }: {
 	teamName: string;
 	summary: { scored: string[]; missed: string[] };
 	align: 'left' | 'right';
-	textPrimary: string;
 	textSub: string;
 }) {
 	if (summary.scored.length === 0 && summary.missed.length === 0) return <View style={{ flex: 1 }} />;
@@ -564,12 +560,10 @@ function PenaltyKickCell({
 	kick,
 	align,
 	textPrimary,
-	textSub,
 }: {
 	kick?: { playerName: string; scored: boolean; runHome: number; runAway: number };
 	align: 'left' | 'right';
 	textPrimary: string;
-	textSub: string;
 }) {
 	if (!kick) return <View style={{ flex: 1 }} />;
 	return (
