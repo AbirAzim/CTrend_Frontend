@@ -82,6 +82,7 @@ import { LinkifyText } from '../lib/linkify';
 import {
   isKnockoutStage,
 } from '@ctrend/shared/lib/knockoutFixture';
+import { knockoutRoundBadgeText } from '@ctrend/shared/lib/matchPredictionCopy';
 import {
   feedCardLiveScores,
   formatKnockoutLivePrefix,
@@ -1213,16 +1214,58 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		anonRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
+			justifyContent: 'space-between' as const,
 			paddingHorizontal: 14,
 			paddingVertical: 6,
-			gap: 8,
+			gap: 10,
 		},
-		anonIcon: { fontSize: 16 },
+		anonRowEnd: {
+			justifyContent: 'flex-end' as const,
+		},
+		roundBadge: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 5,
+			backgroundColor: 'rgba(245,158,11,0.14)',
+			borderRadius: 999,
+			paddingHorizontal: 10,
+			paddingVertical: 5,
+			borderWidth: 1,
+			borderColor: 'rgba(245,158,11,0.35)',
+			flexShrink: 1,
+			maxWidth: '58%',
+		},
+		roundBadgeIcon: { fontSize: 11 },
+		roundBadgeText: {
+			fontSize: 11,
+			fontWeight: '800' as const,
+			color: '#d97706',
+			flexShrink: 1,
+		},
+		anonPill: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 8,
+			paddingHorizontal: 14,
+			paddingVertical: 7,
+			borderRadius: 20,
+			borderWidth: 1,
+			borderColor: c.border,
+			backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+			flexShrink: 0,
+		},
+		anonPillActive: {
+			backgroundColor: isDark ? 'rgba(139,92,246,0.18)' : 'rgba(109,40,217,0.1)',
+			borderColor: isDark ? 'rgba(139,92,246,0.4)' : 'rgba(109,40,217,0.35)',
+		},
+		anonIcon: { fontSize: 15 },
 		anonLabel: {
-			flex: 1,
 			fontSize: 12,
-			color: c.subtext,
-			fontWeight: '500' as const,
+			fontWeight: '600' as const,
+			color: c.text,
+		},
+		anonLabelActive: {
+			color: isDark ? '#c4b5fd' : '#6d28d9',
 		},
 		// ── Two-zone action rail ──
 		// Flush, full-width row separated from the media/vote area by a single
@@ -2931,6 +2974,12 @@ function FeedPostCardComponent({
 
 	// Campaign match lifecycle
 	const isMatchPost = Boolean(post.matchType);
+	const knockoutRoundLabel = isKnockoutStage(post.fixtureStage)
+		? knockoutRoundBadgeText(post.fixtureStage)
+		: null;
+	const showRoundBadgeInMetaRow = Boolean(
+		isMatchPost && knockoutRoundLabel && !isVotingClosed && isAuthenticated,
+	);
 	const showCampaignWinner =
 		Boolean(post.campaignWinner) &&
 		isResolvedCampaignWinner(post.campaignWinner) &&
@@ -3625,15 +3674,27 @@ function FeedPostCardComponent({
 
 			{/* Anonymous vote toggle — always visible while voting is open */}
 			{(compareUrls || isPoll) && !isVotingClosed && isAuthenticated && (
-				<View style={st.anonRow}>
-					<View style={{ flex: 1 }} />
-					<Text style={st.anonIcon}>🙈</Text>
-					<Switch
-						value={anon}
-						onValueChange={(val) => void handleAnonymousToggle(val)}
-						trackColor={{ false: colors.border, true: colors.accent }}
-						thumbColor='#ffffff'
-					/>
+				<View style={[st.anonRow, !showRoundBadgeInMetaRow && st.anonRowEnd]}>
+					{showRoundBadgeInMetaRow ? (
+						<View style={st.roundBadge}>
+							<Text style={st.roundBadgeIcon}>🏆</Text>
+							<Text style={st.roundBadgeText} numberOfLines={1}>
+								{knockoutRoundLabel}
+							</Text>
+						</View>
+					) : null}
+					<View style={[st.anonPill, anon && st.anonPillActive]}>
+						<Text style={st.anonIcon}>👻</Text>
+						<Text style={[st.anonLabel, anon && st.anonLabelActive]}>
+							Vote anonymously
+						</Text>
+						<Switch
+							value={anon}
+							onValueChange={(val) => void handleAnonymousToggle(val)}
+							trackColor={{ false: colors.border, true: colors.accent }}
+							thumbColor='#ffffff'
+						/>
+					</View>
 				</View>
 			)}
 
@@ -3903,6 +3964,7 @@ function FeedPostCardComponent({
 					homeTeam={matchTeamLabel(post, 0)}
 					awayTeam={matchTeamLabel(post, 1)}
 					enabled
+					suppressRoundBadge={showRoundBadgeInMetaRow}
 				/>
 			) : null}
 

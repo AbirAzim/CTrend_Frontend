@@ -78,12 +78,14 @@ export function MatchPrediction({
   homeTeam,
   awayTeam,
   enabled,
+  suppressRoundBadge = false,
 }: {
   postId: string;
   fixtureId?: string | null;
   homeTeam: string;
   awayTeam: string;
   enabled: boolean;
+  suppressRoundBadge?: boolean;
 }) {
   const { isAuthenticated } = useAuth();
   const { awardCoins } = useCoins();
@@ -233,7 +235,7 @@ export function MatchPrediction({
 
   return (
     <View style={st.wrap}>
-      {roundBadge ? (
+      {roundBadge && !suppressRoundBadge ? (
         <View style={st.roundBadge}>
           <Text style={st.roundBadgeIcon}>🏆</Text>
           <Text style={st.roundBadgeText}>{roundBadge}</Text>

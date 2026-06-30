@@ -6294,9 +6294,20 @@ a.cx-friend-avatar:hover {
 .cx-anon-toggle-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 8px 16px;
-  background: rgb(var(--cx-ink-rgb) / 0.04);
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 6px 14px;
+}
+
+.cx-anon-toggle-row--split {
+  justify-content: space-between;
+}
+
+.cx-anon-meta-round-badge {
+  margin: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 58%;
 }
 
 .cx-anon-toggle {
@@ -6310,6 +6321,7 @@ a.cx-friend-avatar:hover {
   background: rgb(var(--cx-ink-rgb) / 0.04);
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
   transition: background 0.2s, border-color 0.2s;
 }
 
@@ -10856,7 +10868,7 @@ a.cx-action-chip {
 }
 
 :root[data-theme="dark"] .cx-anon-toggle-row {
-  background: rgb(0 0 0 / 0.2);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .cx-anon-toggle {

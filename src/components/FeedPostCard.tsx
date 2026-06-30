@@ -60,6 +60,7 @@ import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaign
 import {
   isKnockoutStage,
 } from "@ctrend/shared/lib/knockoutFixture";
+import { knockoutRoundBadgeText } from "@ctrend/shared/lib/matchPredictionCopy";
 import {
   feedCardLiveScores,
   formatKnockoutLivePrefix,
@@ -1253,6 +1254,32 @@ function FeedPostCardComponent({
     void persistAnonymousPreference(nextAnonymous);
   }
 
+  function renderAnonVoteRow() {
+    if (voteMode !== "api" || isVotingClosed) return null;
+    return (
+      <div
+        className={`cx-anon-toggle-row${showRoundBadgeInMetaRow ? " cx-anon-toggle-row--split" : ""}`}
+      >
+        {showRoundBadgeInMetaRow ? (
+          <p className="cx-pred-round-badge cx-anon-meta-round-badge">
+            <span className="cx-pred-round-badge-icon" aria-hidden>🏆</span>
+            {knockoutRoundLabel}
+          </p>
+        ) : null}
+        <label className="cx-anon-toggle">
+          <span className="cx-anon-toggle-icon" aria-hidden>👻</span>
+          <span className="cx-anon-toggle-text">Vote anonymously</span>
+          <input
+            type="checkbox"
+            checked={anonymousVote}
+            onChange={(e) => handleAnonymousToggle(e.target.checked)}
+          />
+          <span className="cx-anon-toggle-switch" aria-hidden />
+        </label>
+      </div>
+    );
+  }
+
   function setJustVoted(index: number) {
     if (justVotedTimer.current !== null) clearTimeout(justVotedTimer.current);
     setJustVotedIndex(index);
@@ -1826,6 +1853,12 @@ function FeedPostCardComponent({
   const isUserGlobalPost = Boolean(post.isUserGlobalBroadcast) && !isPlatformPost;
   const hasCampaign = Boolean(post.campaign);
   const isMatchPost = Boolean(post.matchType);
+  const knockoutRoundLabel = isKnockoutStage(post.fixtureStage)
+    ? knockoutRoundBadgeText(post.fixtureStage)
+    : null;
+  const showRoundBadgeInMetaRow = Boolean(
+    isMatchPost && knockoutRoundLabel && !isVotingClosed && voteMode === "api",
+  );
   const showVoteWinner =
     !isMatchPost &&
     post.isVotingOpen === false &&
@@ -2230,22 +2263,7 @@ function FeedPostCardComponent({
               );
             })}
           </div>
-          {voteMode === "api" && !isVotingClosed ? (
-            <div className="cx-anon-toggle-row">
-              <label className="cx-anon-toggle">
-                <span className="cx-anon-toggle-icon" aria-hidden>
-                  👻
-                </span>
-                <span className="cx-anon-toggle-text">Vote anonymously</span>
-                <input
-                  type="checkbox"
-                  checked={anonymousVote}
-                  onChange={(e) => handleAnonymousToggle(e.target.checked)}
-                />
-                <span className="cx-anon-toggle-switch" aria-hidden />
-              </label>
-            </div>
-          ) : null}
+          {renderAnonVoteRow()}
         </>
       ) : compareUrls ? (
         <>
@@ -2428,20 +2446,7 @@ function FeedPostCardComponent({
               Tap an option to cast your vote
             </p>
           ) : null}
-          {voteMode === "api" && !isVotingClosed && (
-            <div className="cx-anon-toggle-row">
-              <label className="cx-anon-toggle">
-                <span className="cx-anon-toggle-icon" aria-hidden>👻</span>
-                <span className="cx-anon-toggle-text">Vote anonymously</span>
-                <input
-                  type="checkbox"
-                  checked={anonymousVote}
-                  onChange={(e) => handleAnonymousToggle(e.target.checked)}
-                />
-                <span className="cx-anon-toggle-switch" aria-hidden />
-              </label>
-            </div>
-          )}
+          {renderAnonVoteRow()}
         </>
       ) : post.imageUrls[0] ? (
         <div className="ig-post-media-wrap">
@@ -2564,6 +2569,7 @@ function FeedPostCardComponent({
           homeTeam={matchTeamLabel(post, 0)}
           awayTeam={matchTeamLabel(post, 1)}
           enabled={voteMode === "api"}
+          suppressRoundBadge={showRoundBadgeInMetaRow}
         />
       ) : null}
 
