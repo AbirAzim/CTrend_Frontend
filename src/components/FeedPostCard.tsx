@@ -63,6 +63,7 @@ import {
 } from "@ctrend/shared/lib/knockoutFixture";
 import { matchVoteWinnerPendingHint } from "@ctrend/shared/lib/matchPredictionCopy";
 import {
+  feedCardLiveScores,
   formatKnockoutLivePrefix,
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
@@ -1890,6 +1891,7 @@ function FeedPostCardComponent({
     ms && ms.status === "IN_PLAY" ? formatKnockoutLivePrefix(ms) : null;
   const liveStatusPill =
     ms?.status === "PAUSED" ? "HT" : livePhaseLabel ?? "LIVE";
+  const feedScores = feedCardLiveScores(ms);
 
   return (
     <article
@@ -2509,10 +2511,15 @@ function FeedPostCardComponent({
             <div className="cx-live-panel-team">
               <span className="cx-live-panel-name">{msTeamA ?? "Home"}</span>
             </div>
-            <div className="cx-live-panel-score" aria-label={`Score ${ms?.home ?? 0} to ${ms?.away ?? 0}`}>
-              {ms?.home ?? 0}
-              <span className="cx-live-panel-score-sep" aria-hidden>–</span>
-              {ms?.away ?? 0}
+            <div className="cx-live-panel-score-col">
+              <div className="cx-live-panel-score" aria-label={`Score ${feedScores.home} to ${feedScores.away}`}>
+                {feedScores.home}
+                <span className="cx-live-panel-score-sep" aria-hidden>–</span>
+                {feedScores.away}
+              </div>
+              {feedScores.penaltyLine ? (
+                <div className="cx-live-panel-pens">{feedScores.penaltyLine}</div>
+              ) : null}
             </div>
             <div className="cx-live-panel-team cx-live-panel-team--away">
               <span className="cx-live-panel-name">{msTeamB ?? "Away"}</span>
@@ -2551,7 +2558,18 @@ function FeedPostCardComponent({
           }}
         >
           <span className="cx-mdb-row-icon" aria-hidden>⚽</span>
-          <span className="cx-mdb-row-label">Full match report & lineups</span>
+          <span className="cx-mdb-row-label">
+            {isMatchFinished ? (
+              <>
+                {msTeamA ?? "Home"} {feedScores.home}–{feedScores.away} {msTeamB ?? "Away"}
+                {feedScores.penaltyLine ? (
+                  <span className="cx-mdb-row-pens"> · {feedScores.penaltyLine}</span>
+                ) : null}
+              </>
+            ) : (
+              "Full match report & lineups"
+            )}
+          </span>
           <span className="cx-mdb-row-arrow" aria-hidden>›</span>
         </button>
       )}

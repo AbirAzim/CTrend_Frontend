@@ -1856,6 +1856,25 @@ body.capacitor .ig-bottom-nav {
   font-weight: 400;
   color: rgb(var(--cx-ink-rgb) / 0.42);
 }
+.cx-live-panel-score-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+}
+.cx-live-panel-pens {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgb(var(--cx-ink-rgb) / 0.62);
+  letter-spacing: 0.01em;
+}
+
+.cx-mdb-row-pens {
+  font-weight: 700;
+  color: rgb(var(--cx-ink-rgb) / 0.62);
+}
 
 .cx-live-panel-foot {
   display: flex;
@@ -24424,6 +24443,24 @@ html[data-topbar-hidden="true"] .wc-tab-bar {
 .md-pens-outcome--goal { color: #16a34a; }
 .md-pens-outcome--miss { color: #ef4444; }
 .md-pens-round-mid { font-size: 0.72rem; color: var(--ig-muted); opacity: 0.7; }
+.md-pens-summaries {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(var(--cx-ink-rgb) / 0.08);
+}
+.md-pens-summary { display: flex; flex-direction: column; gap: 6px; }
+.md-pens-summary--left { text-align: left; }
+.md-pens-summary--right { text-align: right; }
+.md-pens-summary-team { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ig-muted); }
+.md-pens-summary-block { display: flex; flex-direction: column; gap: 3px; }
+.md-pens-summary-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.md-pens-summary-label--goal { color: #16a34a; }
+.md-pens-summary-label--miss { color: #ef4444; }
+.md-pens-summary-player { font-size: 0.78rem; font-weight: 700; }
+.md-pens-sync { margin: 10px 0 0; font-size: 0.75rem; color: var(--ig-muted); text-align: center; }
 .md-sc { font-size: 2.6rem; font-weight: 900; color: var(--cx-ink); line-height: 1; }
 .md-sc--w { color: var(--cx-accent, #6366f1); }
 .md-sc-sep { font-size: 1.8rem; color: var(--ig-muted); font-weight: 300; line-height: 1; }

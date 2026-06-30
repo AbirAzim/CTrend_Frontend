@@ -38,9 +38,11 @@ import {
 } from '@ctrend/shared/lib/matchScoreCopy';
 import {
 	extractPenaltyShootoutKicks,
-	isPenaltyShootoutEvent,
+	isPenaltyShootoutKickEvent,
 	penaltyShootoutRounds,
+	penaltyShootoutTeamSummaries,
 	penaltyShootoutWinnerSide,
+	shouldShowPenaltyShootoutSection,
 } from '@ctrend/shared/lib/penaltyShootout';
 import { isKnockoutStage } from '@ctrend/shared/lib/knockoutFixture';
 import { useTheme } from '../../../context/ThemeContext';
@@ -121,7 +123,7 @@ function shortName(full?: string | null) {
 }
 function goalScorers(events: MatchEvent[], team: 'home' | 'away') {
 	return events
-		.filter(e => isScoredGoal(e) && !isPenaltyShootoutEvent(e) && e.team === team)
+		.filter(e => isScoredGoal(e) && !isPenaltyShootoutKickEvent(e) && e.team === team)
 		.sort(compareEventsByMinute)
 		.map(e => {
 			const min = minuteLabel(e);
@@ -438,17 +440,32 @@ function PenaltyShootoutSection({
 	fixture: FixtureDetails;
 	isDark: boolean;
 }) {
-	const kicks = extractPenaltyShootoutKicks(fixture.events);
+	const kicks = extractPenaltyShootoutKicks(fixture.events, {
+		wentToPenalties: fixture.wentToPenalties,
+	});
 	const rounds = penaltyShootoutRounds(kicks);
 	const pen = fixture.penalty;
-	if (!pen || pen.home == null || pen.away == null) return null;
-	const winnerSide = penaltyShootoutWinnerSide(pen) ?? (fixture.score.winner as 'home' | 'away' | null);
+	if (
+		!shouldShowPenaltyShootoutSection({
+			wentToPenalties: fixture.wentToPenalties,
+			penalty: pen,
+			kickCount: kicks.length,
+		})
+	) {
+		return null;
+	}
+	const winnerSide =
+		penaltyShootoutWinnerSide(pen ?? {}) ??
+		(fixture.score.winner as 'home' | 'away' | null);
 	const winnerName =
 		winnerSide === 'home'
 			? fixture.homeTeam.name
 			: winnerSide === 'away'
 				? fixture.awayTeam.name
 				: null;
+	const { home: homeSummary, away: awaySummary } = penaltyShootoutTeamSummaries(kicks);
+	const homeLabel = fixture.homeTeam.shortName || fixture.homeTeam.name;
+	const awayLabel = fixture.awayTeam.shortName || fixture.awayTeam.name;
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
 	const textSub = isDark ? '#cbd5e1' : '#475569';
 	const cardBg = isDark ? 'rgba(255,255,255,0.05)' : '#f8fafc';
@@ -457,23 +474,88 @@ function PenaltyShootoutSection({
 	return (
 		<View style={[pens.card, { backgroundColor: cardBg, borderColor: border }]}>
 			<Text style={[pens.title, { color: textSub }]}>PENALTY SHOOTOUT</Text>
-			<Text style={[pens.result, { color: textPrimary }]}>
-				{winnerName ? `${winnerName} wins · ` : ''}
-				{pen.home}–{pen.away}
-			</Text>
-			<View style={pens.teamRow}>
-				<Text style={[pens.team, { color: textSub }]}>{fixture.homeTeam.shortName || fixture.homeTeam.name}</Text>
-				<Text style={[pens.team, { color: textSub }]}>{fixture.awayTeam.shortName || fixture.awayTeam.name}</Text>
+			{pen && pen.home != null && pen.away != null ? (
+				<Text style={[pens.result, { color: textPrimary }]}>
+					{winnerName ? `${winnerName} wins · ` : ''}
+					{pen.home}–{pen.away}
+				</Text>
+			) : null}
+
+			{rounds.length > 0 ? (
+				<>
+					<View style={pens.teamRow}>
+						<Text style={[pens.team, { color: textSub }]}>{homeLabel}</Text>
+						<Text style={[pens.team, { color: textSub }]}>{awayLabel}</Text>
+					</View>
+					{rounds.map((round, i) => (
+						<View key={i} style={pens.round}>
+							<PenaltyKickCell kick={round.home} align='left' textPrimary={textPrimary} textSub={textSub} />
+							<Text style={[pens.mid, { color: textSub }]}>
+								{round.home?.scored ? '✓' : round.home ? '✕' : '·'} {round.away?.scored ? '✓' : round.away ? '✕' : '·'}
+							</Text>
+							<PenaltyKickCell kick={round.away} align='right' textPrimary={textPrimary} textSub={textSub} />
+						</View>
+					))}
+				</>
+			) : null}
+
+			<View style={pens.summaryRow}>
+				<PenaltyTeamSummary
+					teamName={homeLabel}
+					summary={homeSummary}
+					align='left'
+					textPrimary={textPrimary}
+					textSub={textSub}
+				/>
+				<PenaltyTeamSummary
+					teamName={awayLabel}
+					summary={awaySummary}
+					align='right'
+					textPrimary={textPrimary}
+					textSub={textSub}
+				/>
 			</View>
-			{rounds.map((round, i) => (
-				<View key={i} style={pens.round}>
-					<PenaltyKickCell kick={round.home} align='left' textPrimary={textPrimary} textSub={textSub} />
-					<Text style={[pens.mid, { color: textSub }]}>
-						{round.home?.scored ? '✓' : round.home ? '✕' : '·'} {round.away?.scored ? '✓' : round.away ? '✕' : '·'}
-					</Text>
-					<PenaltyKickCell kick={round.away} align='right' textPrimary={textPrimary} textSub={textSub} />
+
+			{kicks.length === 0 ? (
+				<Text style={[pens.syncNote, { color: textSub }]}>Kick-by-kick details are syncing…</Text>
+			) : null}
+		</View>
+	);
+}
+
+function PenaltyTeamSummary({
+	teamName,
+	summary,
+	align,
+	textPrimary,
+	textSub,
+}: {
+	teamName: string;
+	summary: { scored: string[]; missed: string[] };
+	align: 'left' | 'right';
+	textPrimary: string;
+	textSub: string;
+}) {
+	if (summary.scored.length === 0 && summary.missed.length === 0) return <View style={{ flex: 1 }} />;
+	return (
+		<View style={[pens.summaryCol, { alignItems: align === 'left' ? 'flex-start' : 'flex-end' }]}>
+			<Text style={[pens.summaryTeam, { color: textSub }]}>{teamName}</Text>
+			{summary.scored.length > 0 ? (
+				<View style={pens.summaryBlock}>
+					<Text style={pens.summaryLabelGoal}>SCORED</Text>
+					{summary.scored.map((name) => (
+						<Text key={`s-${name}`} style={[pens.summaryPlayer, { color: '#16a34a' }]}>✓ {name}</Text>
+					))}
 				</View>
-			))}
+			) : null}
+			{summary.missed.length > 0 ? (
+				<View style={pens.summaryBlock}>
+					<Text style={pens.summaryLabelMiss}>MISSED</Text>
+					{summary.missed.map((name) => (
+						<Text key={`m-${name}`} style={[pens.summaryPlayer, { color: '#ef4444' }]}>✕ {name}</Text>
+					))}
+				</View>
+			) : null}
 		</View>
 	);
 }
@@ -501,13 +583,21 @@ function PenaltyKickCell({
 }
 
 const pens = StyleSheet.create({
-	card: { marginBottom: 16, padding: 14, borderRadius: 12, borderWidth: 1 },
+	card: { marginHorizontal: 16, marginBottom: 16, padding: 14, borderRadius: 12, borderWidth: 1 },
 	title: { textAlign: 'center', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
 	result: { textAlign: 'center', fontSize: 15, fontWeight: '800', marginTop: 4, marginBottom: 10 },
 	teamRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
 	team: { fontSize: 11, fontWeight: '700' },
 	round: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
 	mid: { width: 36, textAlign: 'center', fontSize: 11 },
+	summaryRow: { flexDirection: 'row', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(148,163,184,0.35)' },
+	summaryCol: { flex: 1, gap: 6 },
+	summaryTeam: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+	summaryBlock: { gap: 3 },
+	summaryLabelGoal: { fontSize: 9, fontWeight: '800', color: '#16a34a', letterSpacing: 0.5 },
+	summaryLabelMiss: { fontSize: 9, fontWeight: '800', color: '#ef4444', letterSpacing: 0.5 },
+	summaryPlayer: { fontSize: 12, fontWeight: '700' },
+	syncNote: { marginTop: 10, fontSize: 12, textAlign: 'center', fontWeight: '600' },
 });
 
 // ─── Overview tab ─────────────────────────────────────────────────────────────
@@ -533,7 +623,9 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 		);
 	}
 
-	const sorted = [...events].sort((a, b) => compareEventsByMinute(b, a));
+	const sorted = [...events]
+		.filter((e) => !isPenaltyShootoutKickEvent(e))
+		.sort((a, b) => compareEventsByMinute(b, a));
 	const halfScore = finished ? deriveHalfScore(events) : null;
 
 	type Row = { kind: 'event'; event: MatchEvent } | { kind: 'divider'; label: string };
@@ -559,7 +651,13 @@ function OverviewTab({ fixture, isDark }: { fixture: FixtureDetails; isDark: boo
 
 	return (
 		<View style={{ paddingBottom: 24 }}>
-			{fixture.wentToPenalties && fixture.penalty ? (
+			{shouldShowPenaltyShootoutSection({
+				wentToPenalties: fixture.wentToPenalties,
+				penalty: fixture.penalty,
+				kickCount: extractPenaltyShootoutKicks(fixture.events, {
+					wentToPenalties: fixture.wentToPenalties,
+				}).length,
+			}) ? (
 				<PenaltyShootoutSection fixture={fixture} isDark={isDark} />
 			) : null}
 			<Text style={[ov.sectionTitle, { color: textSub }]}>Key Events</Text>

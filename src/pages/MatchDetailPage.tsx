@@ -22,9 +22,11 @@ import {
 } from "@ctrend/shared/lib/matchScoreCopy";
 import {
   extractPenaltyShootoutKicks,
-  isPenaltyShootoutEvent,
+  isPenaltyShootoutKickEvent,
   penaltyShootoutRounds,
+  penaltyShootoutTeamSummaries,
   penaltyShootoutWinnerSide,
+  shouldShowPenaltyShootoutSection,
 } from "@ctrend/shared/lib/penaltyShootout";
 import { isKnockoutStage } from "@ctrend/shared/lib/knockoutFixture";
 
@@ -173,7 +175,7 @@ function isScoredGoal(e: { type: string; detail?: string | null }): boolean {
 // Goal scorers per team
 function goalScorers(events: MatchEvent[], team: "home" | "away") {
   return events
-    .filter((e) => isScoredGoal(e) && !isPenaltyShootoutEvent(e) && e.team === team)
+    .filter((e) => isScoredGoal(e) && !isPenaltyShootoutKickEvent(e) && e.team === team)
     .sort(compareEventsByMinute)
     .map((e) => {
       const min = minuteLabel(e);
@@ -300,46 +302,120 @@ function EvIcon({ type, detail }: { type: string; detail: string }) {
 }
 
 function PenaltyShootoutSection({ fixture }: { fixture: FixtureDetails }) {
-  const kicks = extractPenaltyShootoutKicks(fixture.events);
+  const kicks = extractPenaltyShootoutKicks(fixture.events, {
+    wentToPenalties: fixture.wentToPenalties,
+  });
   const rounds = penaltyShootoutRounds(kicks);
   const pen = fixture.penalty;
-  if (!pen || pen.home == null || pen.away == null) return null;
-  const winnerSide = penaltyShootoutWinnerSide(pen) ?? (fixture.score.winner as "home" | "away" | null);
+  if (
+    !shouldShowPenaltyShootoutSection({
+      wentToPenalties: fixture.wentToPenalties,
+      penalty: pen,
+      kickCount: kicks.length,
+    })
+  ) {
+    return null;
+  }
+  const winnerSide =
+    penaltyShootoutWinnerSide(pen ?? {}) ??
+    (fixture.score.winner as "home" | "away" | null);
   const winnerName =
     winnerSide === "home"
       ? fixture.homeTeam.name
       : winnerSide === "away"
         ? fixture.awayTeam.name
         : null;
+  const { home: homeSummary, away: awaySummary } = penaltyShootoutTeamSummaries(kicks);
+  const homeLabel = fixture.homeTeam.shortName || fixture.homeTeam.name;
+  const awayLabel = fixture.awayTeam.shortName || fixture.awayTeam.name;
 
   return (
     <div className="md-pens">
       <div className="md-pens-head">
         <div className="md-pens-title">Penalty shootout</div>
-        {winnerName ? (
-          <div className="md-pens-result">
-            {winnerName} wins · {pen.home}–{pen.away}
-          </div>
-        ) : (
-          <div className="md-pens-result">{pen.home}–{pen.away}</div>
-        )}
-      </div>
-      <div className="md-pens-teams">
-        <span>{fixture.homeTeam.shortName || fixture.homeTeam.name}</span>
-        <span>{fixture.awayTeam.shortName || fixture.awayTeam.name}</span>
-      </div>
-      {rounds.length > 0 ? (
-        <div className="md-pens-grid">
-          {rounds.map((round, i) => (
-            <div key={i} className="md-pens-round">
-              <PenaltyKickCell kick={round.home} align="left" />
-              <span className="md-pens-round-mid" aria-hidden>
-                {round.home?.scored ? "✓" : round.home ? "✕" : "·"}
-                {" "}
-                {round.away?.scored ? "✓" : round.away ? "✕" : "·"}
-              </span>
-              <PenaltyKickCell kick={round.away} align="right" />
+        {pen && pen.home != null && pen.away != null ? (
+          winnerName ? (
+            <div className="md-pens-result">
+              {winnerName} wins · {pen.home}–{pen.away}
             </div>
+          ) : (
+            <div className="md-pens-result">{pen.home}–{pen.away}</div>
+          )
+        ) : null}
+      </div>
+
+      {rounds.length > 0 ? (
+        <>
+          <div className="md-pens-teams">
+            <span>{homeLabel}</span>
+            <span>{awayLabel}</span>
+          </div>
+          <div className="md-pens-grid">
+            {rounds.map((round, i) => (
+              <div key={i} className="md-pens-round">
+                <PenaltyKickCell kick={round.home} align="left" />
+                <span className="md-pens-round-mid" aria-hidden>
+                  {round.home?.scored ? "✓" : round.home ? "✕" : "·"}
+                  {" "}
+                  {round.away?.scored ? "✓" : round.away ? "✕" : "·"}
+                </span>
+                <PenaltyKickCell kick={round.away} align="right" />
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      <div className="md-pens-summaries">
+        <PenaltyTeamSummaryCard
+          teamName={homeLabel}
+          summary={homeSummary}
+          align="left"
+        />
+        <PenaltyTeamSummaryCard
+          teamName={awayLabel}
+          summary={awaySummary}
+          align="right"
+        />
+      </div>
+
+      {kicks.length === 0 ? (
+        <p className="md-pens-sync">Kick-by-kick details are syncing…</p>
+      ) : null}
+    </div>
+  );
+}
+
+function PenaltyTeamSummaryCard({
+  teamName,
+  summary,
+  align,
+}: {
+  teamName: string;
+  summary: { scored: string[]; missed: string[] };
+  align: "left" | "right";
+}) {
+  if (summary.scored.length === 0 && summary.missed.length === 0) return null;
+  return (
+    <div className={`md-pens-summary md-pens-summary--${align}`}>
+      <div className="md-pens-summary-team">{teamName}</div>
+      {summary.scored.length > 0 ? (
+        <div className="md-pens-summary-block">
+          <span className="md-pens-summary-label md-pens-summary-label--goal">Scored</span>
+          {summary.scored.map((name) => (
+            <span key={`s-${name}`} className="md-pens-summary-player md-pens-outcome--goal">
+              ✓ {name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {summary.missed.length > 0 ? (
+        <div className="md-pens-summary-block">
+          <span className="md-pens-summary-label md-pens-summary-label--miss">Missed</span>
+          {summary.missed.map((name) => (
+            <span key={`m-${name}`} className="md-pens-summary-player md-pens-outcome--miss">
+              ✕ {name}
+            </span>
           ))}
         </div>
       ) : null}
@@ -389,7 +465,9 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
     );
   }
 
-  const sorted = [...events].sort((a, b) => compareEventsByMinute(b, a));
+  const sorted = [...events]
+    .filter((e) => !isPenaltyShootoutKickEvent(e))
+    .sort((a, b) => compareEventsByMinute(b, a));
 
   const halfScore = finished ? deriveHalfScore(events) : null;
 
@@ -422,7 +500,13 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
 
   return (
     <div className="md-overview">
-      {fixture.wentToPenalties && fixture.penalty ? (
+      {shouldShowPenaltyShootoutSection({
+        wentToPenalties: fixture.wentToPenalties,
+        penalty: fixture.penalty,
+        kickCount: extractPenaltyShootoutKicks(fixture.events, {
+          wentToPenalties: fixture.wentToPenalties,
+        }).length,
+      }) ? (
         <PenaltyShootoutSection fixture={fixture} />
       ) : null}
       <div className="md-ov-header">Key Events</div>

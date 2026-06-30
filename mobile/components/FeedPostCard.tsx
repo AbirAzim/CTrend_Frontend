@@ -85,9 +85,11 @@ import {
 } from '@ctrend/shared/lib/knockoutFixture';
 import { matchVoteWinnerPendingHint } from '@ctrend/shared/lib/matchPredictionCopy';
 import {
+  feedCardLiveScores,
   formatKnockoutLivePrefix,
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
+  type MatchScoreBreakdown,
 } from '@ctrend/shared/lib/matchScoreCopy';
 import { ImageViewerModal } from './ImageViewerModal';
 
@@ -1659,6 +1661,7 @@ function LiveMatchPanel({
 	teamB,
 	home,
 	away,
+	penaltyLine,
 }: {
 	fixtureId: string;
 	isLive: boolean;
@@ -1671,6 +1674,7 @@ function LiveMatchPanel({
 	teamB: string;
 	home: number;
 	away: number;
+	penaltyLine?: string | null;
 }) {
 	const dotColor = isHt ? '#f59e0b' : '#22c55e';
 	const panelBg = isHt
@@ -1759,11 +1763,18 @@ function LiveMatchPanel({
 				<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
 					{teamA}
 				</Text>
-				<Text style={[mdrStyles.livePanelScore, { color: colors.text }]}>
-					{home}
-					<Text style={[mdrStyles.livePanelScoreDash, { color: colors.muted }]}> – </Text>
-					{away}
-				</Text>
+				<View style={mdrStyles.livePanelScoreCol}>
+					<Text style={[mdrStyles.livePanelScore, { color: colors.text }]}>
+						{home}
+						<Text style={[mdrStyles.livePanelScoreDash, { color: colors.muted }]}> – </Text>
+						{away}
+					</Text>
+					{penaltyLine ? (
+						<Text style={[mdrStyles.livePanelPenLine, { color: colors.subtext }]}>
+							{penaltyLine}
+						</Text>
+					) : null}
+				</View>
 				<Text style={[mdrStyles.livePanelTeam, { color: colors.subtext }]} numberOfLines={2}>
 					{teamB}
 				</Text>
@@ -2195,7 +2206,17 @@ function FeedPostCardComponent({
 	useEffect(() => {
 		setLiveMatchScore(post.matchScore ?? null);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [post.id, post.matchScore?.status, post.matchScore?.home, post.matchScore?.away, post.matchScore?.minute]);
+	}, [
+		post.id,
+		post.matchScore?.status,
+		post.matchScore?.home,
+		post.matchScore?.away,
+		post.matchScore?.minute,
+		post.matchScore?.phase,
+		post.matchScore?.penalty?.home,
+		post.matchScore?.penalty?.away,
+		post.matchScore?.wentToPenalties,
+	]);
 	const matchScore = liveMatchScore ?? post.matchScore;
 
 	const isLiveMatch = matchScore?.status === 'IN_PLAY' || matchScore?.status === 'PAUSED';
@@ -4999,13 +5020,7 @@ const matchInProgressStyles = StyleSheet.create({
 	},
 });
 
-type MatchScore = {
-	status: string | null;
-	home: number | null;
-	away: number | null;
-	minute?: number | null;
-	phase?: string | null;
-} | null;
+type MatchScore = MatchScoreBreakdown | null;
 
 function MatchDetailRow({
 	fixtureId,
@@ -5031,8 +5046,7 @@ function MatchDetailRow({
 
 	const teamA = teams[0] ?? 'Home';
 	const teamB = teams[1] ?? 'Away';
-	const home = matchScore?.home ?? 0;
-	const away = matchScore?.away ?? 0;
+	const { home, away, penaltyLine } = feedCardLiveScores(matchScore);
 
 	if (isLive || isPaused) {
 		return (
@@ -5048,6 +5062,7 @@ function MatchDetailRow({
 				teamB={teamB}
 				home={home}
 				away={away}
+				penaltyLine={penaltyLine}
 			/>
 		);
 	}
@@ -5072,9 +5087,16 @@ function MatchDetailRow({
 			}
 		>
 			<View style={[mdrStyles.dot, { backgroundColor: dotColor }]} />
-			<Text style={[mdrStyles.scoreText, { color: colors.text }]} numberOfLines={1}>
-				{teamA} {home}–{away} {teamB}
-			</Text>
+			<View style={mdrStyles.finishedScoreCol}>
+				<Text style={[mdrStyles.scoreText, { color: colors.text }]} numberOfLines={1}>
+					{teamA} {home}–{away} {teamB}
+				</Text>
+				{penaltyLine ? (
+					<Text style={[mdrStyles.penLineText, { color: colors.subtext }]} numberOfLines={1}>
+						{penaltyLine}
+					</Text>
+				) : null}
+			</View>
 			<Text style={[mdrStyles.cta, { color: colors.accent }]}>
 				See details →
 			</Text>
@@ -5113,6 +5135,17 @@ const mdrStyles = StyleSheet.create({
 		paddingHorizontal: 16,
 		paddingTop: 8,
 		paddingBottom: 14,
+	},
+	livePanelScoreCol: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		minWidth: 88,
+	},
+	livePanelPenLine: {
+		marginTop: 4,
+		fontSize: 12,
+		fontWeight: '700',
+		letterSpacing: 0.2,
 	},
 	livePanelTeam: {
 		flex: 1,
@@ -5189,11 +5222,12 @@ const mdrStyles = StyleSheet.create({
 		letterSpacing: 0.3,
 	},
 	scoreText: {
-		flex: 1,
 		fontSize: 13,
 		fontWeight: '700',
 		color: '#cbd5e1',
 	},
+	finishedScoreCol: { flex: 1, gap: 2 },
+	penLineText: { fontSize: 12, fontWeight: '700' },
 	cta: {
 		fontSize: 12,
 		fontWeight: '700',

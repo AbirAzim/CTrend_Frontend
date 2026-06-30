@@ -75,7 +75,16 @@ export function hasKnockoutScoreBreakdown(
 
 export function formatKnockoutPenaltyLine(ms: MatchScoreBreakdown): string | null {
   if (ms.penalty?.home == null || ms.penalty?.away == null) return null;
-  return `Penalties: ${ms.penalty.home}–${ms.penalty.away}`;
+  return `Pens ${ms.penalty.home}–${ms.penalty.away}`;
+}
+
+/** Main board + optional pens subline for feed live/finished panels. */
+export function feedCardLiveScores(
+  ms: MatchScoreBreakdown | null | undefined,
+): { home: number; away: number; penaltyLine: string | null } {
+  if (!ms) return { home: 0, away: 0, penaltyLine: null };
+  const { home, away } = knockoutMainDisplayScore(ms);
+  return { home, away, penaltyLine: formatKnockoutPenaltyLine(ms) };
 }
 
 /** Main header score — 90+ET before any shootout. */
