@@ -25,7 +25,6 @@
     "./lib/campaignUi": "./src/lib/campaignUi.ts",
     "./lib/coins": "./src/lib/coins.ts",
     "./lib/contentReport": "./src/lib/contentReport.ts",
-    "./lib/feedMatchLive": "./src/lib/feedMatchLive.ts",
     "./lib/formatRelativeTime": "./src/lib/formatRelativeTime.ts",
     "./lib/knockoutFixture": "./src/lib/knockoutFixture.ts",
     "./lib/knockoutBracket": "./src/lib/knockoutBracket.ts",

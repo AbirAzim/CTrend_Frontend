@@ -33,6 +33,7 @@ import {
 	ToastAndroid,
 	Vibration,
 	View,
+	type TextStyle,
 } from 'react-native';
 import {
 	VOTE_POST,
@@ -89,7 +90,6 @@ import {
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
 } from '@ctrend/shared/lib/matchScoreCopy';
-import { isFeedMatchLive, isMatchStatusFinished } from '@ctrend/shared/lib/feedMatchLive';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -493,7 +493,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			marginTop: 1,
 		},
 		metaText: { fontSize: 12, fontWeight: '500' as const, color: c.subtext },
-		pinnedMeta: { color: c.tint ?? c.text, fontWeight: '700' as const },
+		pinnedMeta: { color: c.accent, fontWeight: '700' as const },
 		metaSep: { fontSize: 12, color: c.muted },
 		metaCatRow: {
 			flexDirection: 'row' as const,
@@ -625,7 +625,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: '#ffffff',
 			fontSize: 13,
 			fontWeight: '900' as const,
-			fontVariant: ['tabular-nums'] as const,
+			fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
 			letterSpacing: -0.3,
 		},
 		binaryOverlayLabel: {
@@ -1296,7 +1296,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontWeight: '900' as const,
 			color: '#ffffff',
 			lineHeight: 11,
-			fontVariant: ['tabular-nums'] as const,
+			fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
 		},
 		commentComposerStub: {
 			flexDirection: 'row' as const,
@@ -1775,7 +1775,7 @@ function LiveMatchPanel({
 				<Animated.View
 					pointerEvents="none"
 					style={[
-						StyleSheet.absoluteFillObject,
+						StyleSheet.absoluteFill,
 						mdrStyles.livePanelFootHighlight,
 						{ backgroundColor: footAccent, opacity: footBgOpacity },
 					]}
@@ -2199,21 +2199,7 @@ function FeedPostCardComponent({
 	}, [post.id, post.matchScore?.status, post.matchScore?.home, post.matchScore?.away, post.matchScore?.minute]);
 	const matchScore = liveMatchScore ?? post.matchScore;
 
-	const [cardNowMs, setCardNowMs] = useState(() => Date.now());
-	useEffect(() => {
-		if (!post.matchType || isMatchStatusFinished(matchScore?.status)) return;
-		const t = setInterval(() => setCardNowMs(Date.now()), 30_000);
-		return () => clearInterval(t);
-	}, [post.matchType, matchScore?.status]);
-
-	const isLiveMatch = isFeedMatchLive(
-		{
-			matchType: post.matchType,
-			votingEndsAt: activeVotingEndsAt ?? post.votingEndsAt,
-			matchScore,
-		},
-		cardNowMs,
-	);
+	const isLiveMatch = matchScore?.status === 'IN_PLAY' || matchScore?.status === 'PAUSED';
 
 	const liveCardPulse = useRef(new Animated.Value(0.22)).current;
 	useEffect(() => {
@@ -2270,7 +2256,14 @@ function FeedPostCardComponent({
 				const incoming = next.matchScore;
 				setLiveMatchScore((prev) => {
 					const base = prev ?? post.matchScore;
-					return base ? { ...base, ...incoming } : incoming;
+					const merged = base ? { ...base, ...incoming } : { ...incoming };
+					return {
+						...merged,
+						home: merged.home ?? null,
+						away: merged.away ?? null,
+						status: merged.status ?? null,
+						minute: merged.minute ?? null,
+					};
 				});
 			}
 		},
@@ -3079,7 +3072,7 @@ function FeedPostCardComponent({
 								<View style={st.metaRow}>{nodes}</View>
 							) : null;
 						})()}
-						{matchScore && (isLiveMatch || (matchScore.status !== 'TIMED' && matchScore.status !== 'IN_PLAY' && matchScore.status !== 'PAUSED')) ? (() => {
+						{matchScore && matchScore.status !== 'TIMED' && matchScore.status !== 'IN_PLAY' && matchScore.status !== 'PAUSED' ? (() => {
 							const canOpenMatch = Boolean(post.fixtureId) && (isMatchFinished || isLiveMatch || Boolean(post.lineupAvailable));
 							const scoreContent = (
 								<>
@@ -3094,9 +3087,7 @@ function FeedPostCardComponent({
 												isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(sc)
 													? formatKnockoutScoreChip(sc)
 													: null;
-											if (sc.status === 'IN_PLAY' || (isLiveMatch && sc.status !== 'PAUSED' && sc.status !== 'FT' && sc.status !== 'FINISHED')) {
-												return `${liveMinute != null ? `${liveMinute}'` : liveStatusPill}  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
-											}
+											if (sc.status === 'IN_PLAY') return `${liveMinute ?? 0}'  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											if (sc.status === 'PAUSED') return `HT  ${sc.home ?? 0}–${sc.away ?? 0}${teams}`;
 											const scoreLine = knockoutLine ?? `FT  ${sc.home ?? 0}–${sc.away ?? 0}`;
 											return `${scoreLine}${teams}`;
@@ -3149,7 +3140,7 @@ function FeedPostCardComponent({
 			{post.caption ? (
 				<LinkifyText
 					text={post.caption}
-					style={[st.caption, isAnnouncement && st.captionAnnouncement]}
+					style={[st.caption, ...(isAnnouncement ? [st.captionAnnouncement] : [])]}
 				/>
 			) : null}
 
@@ -3900,7 +3891,6 @@ function FeedPostCardComponent({
 					]}
 					effectiveMinute={liveMinute}
 					liveStatusPill={liveStatusPill}
-					treatAsLive={isLiveMatch}
 				/>
 			) : null}
 
@@ -4914,7 +4904,7 @@ const styles = StyleSheet.create({
 	menuRowText: { fontSize: 16 },
 	reportModalRoot: { flex: 1, justifyContent: 'flex-end' },
 	reportModalOverlay: {
-		...StyleSheet.absoluteFillObject,
+		...StyleSheet.absoluteFill,
 		backgroundColor: 'rgba(0,0,0,0.5)',
 	},
 	reportSheet: { maxHeight: '88%', paddingBottom: 24 },
@@ -5025,14 +5015,12 @@ function MatchDetailRow({
 	teams,
 	effectiveMinute,
 	liveStatusPill,
-	treatAsLive = false,
 }: {
 	fixtureId: string;
 	matchScore: MatchScore;
 	teams: [string | null, string | null];
 	effectiveMinute: number | null;
 	liveStatusPill: string;
-	treatAsLive?: boolean;
 }) {
 	const { colors, isDark } = useTheme();
 	const isLive = matchScore?.status === 'IN_PLAY';
@@ -5048,11 +5036,11 @@ function MatchDetailRow({
 	const home = matchScore?.home ?? 0;
 	const away = matchScore?.away ?? 0;
 
-	if (isLive || isPaused || (treatAsLive && !isFinished)) {
+	if (isLive || isPaused) {
 		return (
 			<LiveMatchPanel
 				fixtureId={fixtureId}
-				isLive={isLive || (treatAsLive && !isPaused)}
+				isLive={isLive}
 				isHt={isPaused}
 				isDark={isDark}
 				colors={colors}
@@ -5138,7 +5126,7 @@ const mdrStyles = StyleSheet.create({
 	livePanelScore: {
 		fontSize: 32,
 		fontWeight: '900',
-		fontVariant: ['tabular-nums'],
+		fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
 	},
 	livePanelScoreDash: {
 		fontSize: 24,

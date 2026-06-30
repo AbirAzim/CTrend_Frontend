@@ -68,10 +68,6 @@ import {
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
 } from "@ctrend/shared/lib/matchScoreCopy";
-import {
-  isFeedMatchLive,
-  isMatchStatusFinished,
-} from "@ctrend/shared/lib/feedMatchLive";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -650,18 +646,6 @@ function FeedPostCardComponent({
   const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
   const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
 
-  const [liveMatchScore, setLiveMatchScore] = useState(post.matchScore ?? null);
-  useEffect(() => {
-    setLiveMatchScore(post.matchScore ?? null);
-  }, [
-    post.id,
-    post.matchScore?.status,
-    post.matchScore?.home,
-    post.matchScore?.away,
-    post.matchScore?.minute,
-  ]);
-  const matchScore = liveMatchScore ?? post.matchScore;
-
   useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
     skip: voteMode !== "api",
     variables: { postId: post.id },
@@ -698,13 +682,6 @@ function FeedPostCardComponent({
       if (next.myVoteAnonymous !== undefined && next.myVoteAnonymous !== null) {
         setAnonymousVote(next.myVoteAnonymous);
       }
-      if (next.matchScore) {
-        const incoming = next.matchScore;
-        setLiveMatchScore((prev) => {
-          const base = prev ?? post.matchScore;
-          return base ? { ...base, ...incoming } : incoming;
-        });
-      }
       setVoteFx(true);
       setTimeout(() => setVoteFx(false), 280);
     },
@@ -737,8 +714,7 @@ function FeedPostCardComponent({
 
   const hasActiveCountdown = Boolean(
     (post.votingEndsAt && (post.isVotingOpen ?? true)) ||
-    (post.fixtureWinnerAt && new Date(post.fixtureWinnerAt).getTime() > Date.now()) ||
-    (post.matchType && !isMatchStatusFinished(matchScore?.status)),
+    (post.fixtureWinnerAt && new Date(post.fixtureWinnerAt).getTime() > Date.now()),
   );
   useEffect(() => {
     if (!hasActiveCountdown) {
@@ -748,8 +724,8 @@ function FeedPostCardComponent({
     return () => clearInterval(t);
   }, [hasActiveCountdown]);
 
-  const isMatchInPlay = matchScore?.status === "IN_PLAY";
-  const liveMinute = isMatchInPlay ? (matchScore?.minute ?? null) : null;
+  const isMatchInPlay = post.matchScore?.status === "IN_PLAY";
+  const liveMinute = isMatchInPlay ? (post.matchScore?.minute ?? null) : null;
 
   function closeVotersList() {
     setShowVoters(false);
@@ -1130,72 +1106,28 @@ function FeedPostCardComponent({
     </span>
   ) : null;
 
-  const ms = matchScore;
+  const ms = post.matchScore;
   const msTeamA = post.postOptions?.[0]?.label?.trim() || post.compareOptionLabels?.[0]?.trim() || null;
   const msTeamB = post.postOptions?.[1]?.label?.trim() || post.compareOptionLabels?.[1]?.trim() || null;
   const msTeamLine = msTeamA && msTeamB ? `${msTeamA} vs ${msTeamB}` : null;
-  const liveForFeed = isFeedMatchLive(
-    {
-      matchType: post.matchType,
-      votingEndsAt: activeVotingEndsAt ?? post.votingEndsAt,
-      matchScore: ms,
-    },
-    nowMs,
-  );
-  const livePhaseLabel =
-    ms && ms.status === "IN_PLAY" ? formatKnockoutLivePrefix(ms) : null;
-  const liveStatusPill =
-    ms?.status === "PAUSED" ? "HT" : livePhaseLabel ?? "LIVE";
-  const matchScoreChip = (() => {
-    if (!ms) return null;
-    if (liveForFeed) {
-      const chipClass =
-        ms.status === "PAUSED"
-          ? "cx-match-score-chip cx-match-score-chip--ht"
-          : "cx-match-score-chip cx-match-score-chip--live";
-      const scoreLine = `${liveStatusPill}  ${ms.home ?? 0}–${ms.away ?? 0}`;
-      const minuteSuffix =
-        ms.status === "IN_PLAY" && liveMinute != null ? ` · ${liveMinute}'` : "";
-      const label = `${scoreLine}${minuteSuffix}${msTeamLine ? `  ${msTeamLine}` : ""}`;
-      if (post.fixtureId) {
-        return (
-          <button
-            type="button"
-            className={`${chipClass} cx-match-score-chip--link`}
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/world-cup/match/${post.fixtureId}`);
-            }}
-          >
-            {label}
-          </button>
-        );
-      }
-      return <span className={chipClass}>{label}</span>;
-    }
-    if (ms.status && ms.status !== "TIMED" && ms.status !== "IN_PLAY" && ms.status !== "PAUSED") {
-      if (post.fixtureId) {
-        return (
-          <button
-            type="button"
-            className="cx-match-score-chip cx-match-score-chip--ft cx-match-score-chip--link"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/world-cup/match/${post.fixtureId}`);
-            }}
-          >
-            {(() => {
-              const knockoutLine =
-                isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(ms)
-                  ? formatKnockoutScoreChip(ms)
-                  : null;
-              const scoreLine = knockoutLine ?? `FT  ${ms.home ?? 0}–${ms.away ?? 0}`;
-              return `${scoreLine}${msTeamLine ? `  ${msTeamLine}` : ""}`;
-            })()}
-          </button>
-        );
-      }
-      return (
+  const matchScoreChip =
+    ms && ms.status && ms.status !== "TIMED" && ms.status !== "IN_PLAY" && ms.status !== "PAUSED" ? (
+      post.fixtureId ? (
+        <button
+          type="button"
+          className="cx-match-score-chip cx-match-score-chip--ft cx-match-score-chip--link"
+          onClick={(e) => { e.stopPropagation(); navigate(`/world-cup/match/${post.fixtureId}`); }}
+        >
+          {(() => {
+            const knockoutLine =
+              isKnockoutStage(post.fixtureStage) && hasKnockoutScoreBreakdown(ms)
+                ? formatKnockoutScoreChip(ms)
+                : null;
+            const scoreLine = knockoutLine ?? `FT  ${ms.home ?? 0}–${ms.away ?? 0}`;
+            return `${scoreLine}${msTeamLine ? `  ${msTeamLine}` : ""}`;
+          })()}
+        </button>
+      ) : (
         <span className="cx-match-score-chip cx-match-score-chip--ft">
           {(() => {
             const knockoutLine =
@@ -1206,10 +1138,8 @@ function FeedPostCardComponent({
             return `${scoreLine}${msTeamLine ? `  ${msTeamLine}` : ""}`;
           })()}
         </span>
-      );
-    }
-    return null;
-  })();
+      )
+    ) : null;
   const votingEndsDate = activeVotingEndsAt ? new Date(activeVotingEndsAt) : null;
   const votingHasEndDate =
     votingEndsDate != null && !Number.isNaN(votingEndsDate.getTime());
@@ -1926,8 +1856,9 @@ function FeedPostCardComponent({
       : null;
   // Show "match in progress" only for fixture-linked posts where voting has
   // closed (kickoff passed) but the real match result isn't in yet.
-  const isLiveMatch = liveForFeed;
-  const matchStatus = matchScore?.status ?? null;
+  const isLiveMatch =
+    post.matchScore?.status === "IN_PLAY" || post.matchScore?.status === "PAUSED";
+  const matchStatus = post.matchScore?.status ?? null;
   const isMatchFinished =
     matchStatus === "FT" || matchStatus === "AET" || matchStatus === "PEN" || matchStatus === "AWARDED" || matchStatus === "FINISHED";
   const isMatchNotStarted = !isLiveMatch && !isMatchFinished;
@@ -1942,8 +1873,8 @@ function FeedPostCardComponent({
     isLiveMatch &&
     !showCampaignWinner &&
     Boolean(matchWinnerPendingHint) &&
-    (isExtraTimeLiveStatus(matchStatus, matchScore?.phase) ||
-      isShootoutLiveStatus(matchStatus, matchScore?.phase));
+    (isExtraTimeLiveStatus(matchStatus, post.matchScore?.phase) ||
+      isShootoutLiveStatus(matchStatus, post.matchScore?.phase));
 
   const winnerCountdownMs = post.fixtureWinnerAt
     ? Math.max(0, new Date(post.fixtureWinnerAt).getTime() - nowMs)
@@ -1956,6 +1887,11 @@ function FeedPostCardComponent({
     const s = totalSec % 60;
     return `${m}:${String(s).padStart(2, "0")}`;
   })();
+
+  const livePhaseLabel =
+    ms && ms.status === "IN_PLAY" ? formatKnockoutLivePrefix(ms) : null;
+  const liveStatusPill =
+    ms?.status === "PAUSED" ? "HT" : livePhaseLabel ?? "LIVE";
 
   return (
     <article

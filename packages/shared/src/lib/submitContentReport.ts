@@ -1,10 +1,17 @@
-import type { ApolloClient } from "@apollo/client";
+import type { DocumentNode } from "graphql";
 import { REPORT_CONTENT } from "../graphql/contentReports";
 import { type ContentReportInput, toGraphqlReportInput } from "./contentReport";
 
+type ReportMutateClient = {
+  mutate(options: {
+    mutation: DocumentNode;
+    variables: { input: ReturnType<typeof toGraphqlReportInput> };
+  }): Promise<unknown>;
+};
+
 /** Submits a structured content report stored in the backend moderation queue. */
 export async function submitContentReport(
-  client: ApolloClient<unknown>,
+  client: ReportMutateClient,
   input: ContentReportInput,
 ): Promise<void> {
   await client.mutate({
