@@ -101,7 +101,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.13.0 release: **versionCode 42** across all three files.
+Current version after 1.14.0 release: **versionCode 43** across all three files.
 
 ---
 
@@ -208,6 +208,7 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.14.0 | 43 | 2026-06-30 | Feed/match UX polish — campaign chip, knockout round + anonymous vote row, prediction winners CTA, penalty shootout overview, pens on feed cards |
 | 1.13.0 | 42 | 2026-06-29 | World Cup knockout road map (in-app rotate fix), 3-item compare overlay parity, bracket live updates |
 | 1.12.1 | 41 | 2026-06-28 | Prediction score input polish (visible boxes, focus, Cancel button), includes all 1.12.0 live match UX |
 | 1.12.0 | 40 | 2026-06-27 | Live match scoreboard UI, knockout ET/pen scores, prediction UX, splash/sound launch fixes, Best Player So Far label |
@@ -216,6 +217,31 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.14.0 (43)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.14.0 (43)
+```
+
+**What's new** (user-facing release notes)
+```
+• Cleaner feed cards — collapsible campaign tag, knockout round badge beside anonymous voting
+• Match predictions — clearer “View prediction winners” button and less clutter during extra time
+• Penalty shootouts — see who scored or missed on the match details screen; pens result on feed cards
+• Coin leaderboard fairness — platform admins no longer appear on the public engagement rankings
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+PostCampaignBadge collapsible chip parity. Round-of-32 + anonymous vote meta row. Prediction
+winners crown CTA. PenaltyShootoutSection on match detail. Feed pens subline. Removed ET vote
+banner and prediction hint noise. Backend: exclude admins from coinLeaderboard.
+```
 
 ### Play Console copy — 1.13.0 (42)
 
