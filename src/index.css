@@ -25659,13 +25659,208 @@ html[data-minimal-chrome="true"] .ig-topbar {
   50% { opacity: 0.45; transform: scale(0.88); }
 }
 
-/* ── Match score prediction (compact single-row bar) ── */
+/* ── Match score prediction (card-style scoreboard) ── */
 .cx-pred {
-  border-top: 1px solid rgb(var(--cx-ink-rgb) / 0.08);
-  padding: 10px 14px;
+  margin: 4px 12px 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--ig-border);
+  background: var(--ig-section, rgb(var(--cx-ink-rgb) / 0.04));
+}
+
+.cx-pred-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cx-pred-header-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cx-pred-header-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.cx-pred-header-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cx-ink);
+}
+
+.cx-pred-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cx-pred-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.cx-pred-chip--open {
+  color: var(--cx-accent-deep, var(--cx-accent));
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  border-color: rgb(var(--cx-accent-rgb) / 0.22);
+}
+
+.cx-pred-chip--locked,
+.cx-pred-chip--miss,
+.cx-pred-chip--final {
+  color: var(--ig-muted);
+  background: rgb(var(--cx-ink-rgb) / 0.06);
+  border-color: var(--ig-border);
+}
+
+.cx-pred-chip--win {
+  color: #16a34a;
+  background: rgb(34 197 94 / 0.16);
+  border-color: rgb(34 197 94 / 0.35);
+}
+
+.cx-pred-board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.cx-pred-board-teams {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.cx-pred-board-team {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--cx-ink);
+  line-height: 1.3;
+  text-align: left;
+}
+
+.cx-pred-board-team--away {
+  text-align: right;
+}
+
+.cx-pred-board-vs {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ig-muted);
+  flex-shrink: 0;
+}
+
+.cx-pred-score-pill,
+.cx-pred-input-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 120px;
+  padding: 10px 20px;
+  border-radius: 14px;
+  background: var(--ig-card);
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.22);
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-pred-score-pill strong {
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: var(--cx-accent-deep, var(--cx-accent));
+  line-height: 1;
+  min-width: 1.4rem;
+  text-align: center;
+}
+
+.cx-pred-score-sep {
+  font-size: 1.35rem;
+  font-weight: 300;
+  color: var(--ig-muted);
+  line-height: 1;
+}
+
+.cx-pred-board-caption {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ig-muted);
+}
+
+.cx-pred-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cx-pred-hint-card {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ig-card);
+  border: 1px solid var(--ig-border);
+}
+
+.cx-pred-cancel {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ig-border);
+  background: var(--ig-card);
+  color: var(--ig-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cx-pred-cancel:hover {
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+}
+
+.cx-pred-submit--full {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+}
+
+.cx-pred-winners-btn--full {
+  width: 100%;
+  justify-content: center;
+}
+
+.cx-pred-input--lg {
+  width: 44px;
+  height: 44px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  padding: 0;
+  border-radius: 10px;
 }
 
 .cx-pred-round-badge,

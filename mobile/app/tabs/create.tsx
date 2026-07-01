@@ -37,7 +37,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useCoins } from "../../context/CoinsContext";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
-import { suggestImageLabelFromUri } from "../../lib/suggestImageLabel";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { Ionicons } from "@expo/vector-icons";
@@ -308,9 +307,6 @@ export default function CreateScreen() {
     const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); return d;
   });
 
-  const slotsRef = useRef(slots);
-  slotsRef.current = slots;
-
   const scrollRef = useRef<import("react-native").ScrollView>(null);
   const [pasteUrlActiveId, setPasteUrlActiveId] = useState<string | null>(null);
 
@@ -522,16 +518,6 @@ export default function CreateScreen() {
     setScheduleCustom(sc);
   }
 
-  async function suggestAndApplyLabel(slotId: string, imageUri: string) {
-    const slot = slotsRef.current.find((s) => s.id === slotId);
-    if (!slot || slot.label.trim()) return;
-    const label = await suggestImageLabelFromUri(imageUri);
-    if (!label) return;
-    setSlots((prev) =>
-      prev.map((s) => (s.id === slotId && !s.label.trim() ? { ...s, label } : s)),
-    );
-  }
-
   // ── Image pick + upload ───────────────────────────────────────────────────
   // Upload a local image uri (already picked/cropped) into a slot.
   async function uploadToSlot(slotId: string, uri: string, mimeType = "image/jpeg", fileName?: string) {
@@ -547,7 +533,6 @@ export default function CreateScreen() {
       imageFocalX: DEFAULT_IMAGE_FOCAL,
       imageFocalY: DEFAULT_IMAGE_FOCAL,
     });
-    void suggestAndApplyLabel(slotId, uri);
     try {
       const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
       if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
@@ -602,7 +587,6 @@ export default function CreateScreen() {
     if (!url.trim().startsWith("http")) return;
     const trimmed = url.trim();
     patchSlot(slotId, { publicUrl: trimmed, localUri: null, error: null });
-    void suggestAndApplyLabel(slotId, trimmed);
   }
 
   function dismissPasteUrl(slotId: string) {

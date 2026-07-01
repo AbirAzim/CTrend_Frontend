@@ -14,7 +14,7 @@
       "destination": "/api/post-og?id=:id"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
