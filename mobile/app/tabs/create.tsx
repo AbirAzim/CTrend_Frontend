@@ -31,12 +31,13 @@ import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/ad
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
 import { CompareImageCropper } from "../../components/CompareImageCropper";
-import { AppActionSheet } from "../../components/AppDialog";
+import { AppActionSheet, AppConfirmDialog } from "../../components/AppDialog";
 import { DEFAULT_IMAGE_FOCAL } from "../../lib/imageFocal";
 import { useAuth } from "../../context/AuthContext";
 import { useCoins } from "../../context/CoinsContext";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
+import { suggestImageLabelFromUri } from "../../lib/suggestImageLabel";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
 import { Ionicons } from "@expo/vector-icons";
@@ -46,6 +47,14 @@ const { width: SW } = Dimensions.get("window");
 function defaultCategoryId(cats: Array<{ id: string; name?: string | null }>): string {
   return cats.find((c) => c.name?.trim().toLowerCase() === "entertainment")?.id ?? "";
 }
+
+type PendingConfirm = {
+  title: string;
+  message?: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+};
 
 // Enable smooth layout transitions (e.g. the campaign pill morph) on Android.
 if (
@@ -274,14 +283,15 @@ export default function CreateScreen() {
   const [categoryId, setCategoryId] = useState("");
   // Pre-select platform-wide when admin arrives from "+ New platform post"
   const [platformWide, setPlatformWide] = useState(platformParam === "1");
-  const [broadcastGlobally, setBroadcastGlobally] = useState(false);
+  const [broadcastGlobally, setBroadcastGlobally] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [categoryModal, setCategoryModal] = useState(false);
   const [campaignId, setCampaignId] = useState("");
   const [campaignModal, setCampaignModal] = useState(false);
   const [imageSheetSlotId, setImageSheetSlotId] = useState<string | null>(null);
   // Pending crop: compare images pass through the crop+zoom editor before upload.
-  const [cropper, setCropper] = useState<{ slotId: string; uri: string } | null>(null);
+  const [cropper, setCropper] = useState<{ slotId: string; uri: string; fileName?: string } | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
@@ -500,7 +510,7 @@ export default function CreateScreen() {
     setCategoryId(defaultCategoryId(categories));
     setCampaignId("");
     setPlatformWide(platformParam === "1");
-    setBroadcastGlobally(false);
+    setBroadcastGlobally(true);
     setSubmitError(null);
     setDeadlineEnabled(false);
     setDeadlinePreset(24);
@@ -510,6 +520,16 @@ export default function CreateScreen() {
     setDeadlineCustom(dl);
     const sc = new Date(); sc.setDate(sc.getDate() + 1); sc.setHours(10, 0, 0, 0);
     setScheduleCustom(sc);
+  }
+
+  async function suggestAndApplyLabel(slotId: string, imageUri: string) {
+    const slot = slotsRef.current.find((s) => s.id === slotId);
+    if (!slot || slot.label.trim()) return;
+    const label = await suggestImageLabelFromUri(imageUri);
+    if (!label) return;
+    setSlots((prev) =>
+      prev.map((s) => (s.id === slotId && !s.label.trim() ? { ...s, label } : s)),
+    );
   }
 
   // ── Image pick + upload ───────────────────────────────────────────────────
@@ -527,6 +547,7 @@ export default function CreateScreen() {
       imageFocalX: DEFAULT_IMAGE_FOCAL,
       imageFocalY: DEFAULT_IMAGE_FOCAL,
     });
+    void suggestAndApplyLabel(slotId, uri);
     try {
       const { data } = await getUploadUrl({ variables: { filename, contentType: mimeType } });
       if (!data?.getImageUploadUrl) throw new Error("Could not get upload URL.");
@@ -568,7 +589,7 @@ export default function CreateScreen() {
       const slot = slots.find((s) => s.id === slotId);
       if (isEdit && slot?.locked) votesResetRef.current = true;
       if (!isPoll) {
-        setCropper({ slotId, uri: asset.uri });
+        setCropper({ slotId, uri: asset.uri, fileName: asset.fileName ?? undefined });
         return;
       }
       await uploadToSlot(slotId, asset.uri, asset.mimeType ?? "image/jpeg", asset.fileName ?? undefined);
@@ -579,7 +600,9 @@ export default function CreateScreen() {
 
   async function applyPasteUrl(slotId: string, url: string) {
     if (!url.trim().startsWith("http")) return;
-    patchSlot(slotId, { publicUrl: url.trim(), localUri: null, error: null });
+    const trimmed = url.trim();
+    patchSlot(slotId, { publicUrl: trimmed, localUri: null, error: null });
+    void suggestAndApplyLabel(slotId, trimmed);
   }
 
   function dismissPasteUrl(slotId: string) {
@@ -612,14 +635,13 @@ export default function CreateScreen() {
       if (slot.locked) votesResetRef.current = true;
     };
     if (slot.locked && editPostHasVotes) {
-      Alert.alert(
-        "Remove image?",
-        "Removing this image will reset all current votes on this option.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Remove", style: "destructive", onPress: doClear },
-        ],
-      );
+      setPendingConfirm({
+        title: "Remove image?",
+        message: "Removing this image will reset all current votes on this option.",
+        confirmLabel: "Remove",
+        destructive: true,
+        onConfirm: doClear,
+      });
       return;
     }
     doClear();
@@ -651,19 +673,15 @@ export default function CreateScreen() {
    */
   function requestReplace(slot: Slot) {
     if (slot.locked && editPostHasVotes) {
-      Alert.alert(
-        "Replace image?",
-        "Replacing this with a different photo will remove all current votes. " +
+      setPendingConfirm({
+        title: "Replace image?",
+        message:
+          "Replacing this with a different photo will remove all current votes. " +
           "Cropping or repositioning the same image keeps the votes.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Replace anyway",
-            style: "destructive",
-            onPress: () => openImageOptions(slot.id),
-          },
-        ],
-      );
+        confirmLabel: "Replace anyway",
+        destructive: true,
+        onConfirm: () => openImageOptions(slot.id),
+      });
       return;
     }
     openImageOptions(slot.id);
@@ -837,10 +855,13 @@ export default function CreateScreen() {
       bodyImages.length > 0 ||
       caption.trim();
     if (!dirty) { goBack(); return; }
-    Alert.alert("Discard post?", "Your draft will be lost.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: () => goBack() },
-    ]);
+    setPendingConfirm({
+      title: "Discard post?",
+      message: "Your draft will be lost.",
+      confirmLabel: "Discard",
+      destructive: true,
+      onConfirm: () => goBack(),
+    });
   }
 
   const isSubmitting = submitting || submittingSystem || updating;
@@ -874,10 +895,13 @@ export default function CreateScreen() {
               hitSlop={10}
               style={{ width: 60, alignItems: "flex-end" }}
               onPress={() =>
-                Alert.alert("Clear all?", "This will reset everything you've entered.", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Clear all", style: "destructive", onPress: () => resetForm() },
-                ])
+                setPendingConfirm({
+                  title: "Clear all?",
+                  message: "This will reset everything you've entered.",
+                  confirmLabel: "Clear all",
+                  destructive: true,
+                  onConfirm: () => resetForm(),
+                })
               }
             >
               <Text style={[st.clearAllText, { color: colors.muted }]}>Clear all</Text>
@@ -1020,7 +1044,8 @@ export default function CreateScreen() {
                       style={[st.positionBtn, { backgroundColor: colors.section, borderColor: colors.border }]}
                       onPress={() => requestReplace(slot)}
                     >
-                      <Text style={[st.positionBtnText, { color: colors.subtext }]}>🔁 Replace photo</Text>
+                      <Ionicons name="swap-horizontal-outline" size={14} color={colors.subtext} />
+                      <Text style={[st.positionBtnText, { color: colors.subtext }]}>Replace photo</Text>
                     </Pressable>
                   ) : null}
                   {/* Paste URL — hidden until user opens it from the sheet */}
@@ -1194,8 +1219,8 @@ export default function CreateScreen() {
               </View>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
                 {([
-                  { val: false, ionIcon: "people-outline" as const, title: "Friends only", desc: "Just your friends" },
                   { val: true, ionIcon: "earth-outline" as const, title: "Everyone", desc: "Anyone on Ke Jitbe" },
+                  { val: false, ionIcon: "people-outline" as const, title: "Friends only", desc: "Just your friends" },
                 ] as const).map((o) => {
                   const active = broadcastGlobally === o.val;
                   return (
@@ -1501,8 +1526,18 @@ export default function CreateScreen() {
         onDone={(croppedUri) => {
           const target = cropper;
           setCropper(null);
-          if (target) void uploadToSlot(target.slotId, croppedUri, "image/jpeg");
+          if (target) void uploadToSlot(target.slotId, croppedUri, "image/jpeg", target.fileName);
         }}
+      />
+
+      <AppConfirmDialog
+        visible={pendingConfirm !== null}
+        title={pendingConfirm?.title ?? ""}
+        message={pendingConfirm?.message}
+        confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"}
+        destructive={pendingConfirm?.destructive}
+        onConfirm={() => pendingConfirm?.onConfirm()}
+        onCancel={() => setPendingConfirm(null)}
       />
 
       <AppActionSheet
@@ -1690,7 +1725,16 @@ const st = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  positionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignItems: "center" },
+  positionBtn: {
+    flexDirection: "row",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   positionBtnText: { fontSize: 12, fontWeight: "700" },
 
   addSlotBtn: { borderWidth: 1.5, borderStyle: "dashed", borderRadius: 12, paddingVertical: 13, alignItems: "center" },

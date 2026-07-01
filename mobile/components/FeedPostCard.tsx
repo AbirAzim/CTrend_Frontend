@@ -77,7 +77,6 @@ import {
 } from '@ctrend/shared/lib/contentReport';
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
-import { categoryChipColors, categoryChipColorsOrFallback } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
 import {
   isKnockoutStage,
@@ -495,26 +494,17 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		metaText: { fontSize: 12, fontWeight: '500' as const, color: c.subtext },
 		pinnedMeta: { color: c.accent, fontWeight: '700' as const },
 		metaSep: { fontSize: 12, color: c.muted },
-		metaGlobalBadge: {
+		metaScopeRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
-			gap: 3,
-			paddingHorizontal: 8,
-			paddingVertical: 1,
-			borderRadius: 999,
-		},
-		metaGlobalText: {
-			fontSize: 11,
-			fontWeight: '700' as const,
-			textTransform: 'uppercase' as const,
-			letterSpacing: 0.5,
+			gap: 4,
 		},
 		metaCatRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
 			gap: 4,
 		},
-		// The category's hashed color survives only as this small dot.
+		// Solid dot + name — same muted color as time / platform / global.
 		metaDot: { width: 6, height: 6, borderRadius: 3 },
 		matchScoreBadge: {
 			flexDirection: 'row' as const,
@@ -3009,8 +2999,6 @@ function FeedPostCardComponent({
 	const isMatchNotStarted = !isLiveMatch && !isMatchFinished; // NS, TIMED, null, etc.
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
 	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
-	const catColors = categoryChipColors(post.category, isDark);
-	const globalBadgeColors = categoryChipColorsOrFallback(post.category, isDark);
 
 	const livePhaseLabel =
 		matchScore?.status === 'IN_PLAY' ? formatKnockoutLivePrefix(matchScore) : null;
@@ -3104,31 +3092,21 @@ function FeedPostCardComponent({
 							if (isPlatformPost) {
 								pushSep();
 								nodes.push(
-									<Text key="plat" style={st.metaText}>
-										Platform
-									</Text>,
+									<View key="plat" style={st.metaScopeRow}>
+										<Ionicons name="shield-outline" size={11} color={colors.subtext} />
+										<Text style={st.metaText}>Platform</Text>
+									</View>,
 								);
 							} else if (isUserGlobal) {
 								pushSep();
 								nodes.push(
-									<View
-										key="glob"
-										style={[
-											st.metaGlobalBadge,
-											{ backgroundColor: globalBadgeColors.bg },
-										]}>
-										<Ionicons
-											name="earth-outline"
-											size={11}
-											color={globalBadgeColors.text}
-										/>
-										<Text style={[st.metaGlobalText, { color: globalBadgeColors.text }]}>
-											Global
-										</Text>
+									<View key="glob" style={st.metaScopeRow}>
+										<Ionicons name="earth-outline" size={11} color={colors.subtext} />
+										<Text style={st.metaText}>Global</Text>
 									</View>,
 								);
 							}
-							if (categoryName && catColors) {
+							if (categoryName) {
 								pushSep();
 								nodes.push(
 									<Pressable
@@ -3137,9 +3115,7 @@ function FeedPostCardComponent({
 										hitSlop={6}
 										accessibilityLabel={`Category: ${categoryName}`}
 										style={st.metaCatRow}>
-										<View
-											style={[st.metaDot, { backgroundColor: catColors.text }]}
-										/>
+										<View style={[st.metaDot, { backgroundColor: colors.subtext }]} />
 										<Text style={st.metaText} numberOfLines={1}>
 											{showCatTip ? '🏷 Category' : categoryName}
 										</Text>

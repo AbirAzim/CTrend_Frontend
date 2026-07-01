@@ -20,6 +20,7 @@ import {
   IconMore,
   IconOpenPost,
   IconGlobe,
+  IconShield,
   IconShare,
   IconUsers,
 } from "./IgIcons";
@@ -1092,9 +1093,9 @@ function FeedPostCardComponent({
   // "Category" tooltip via the `data-tip` attribute.
   const categoryName = post.category?.name?.trim();
   const categoryRgb = categoryColorRgb(post.category);
-  const categoryRgbStyle = categoryRgb
-    ? ({ "--cat-rgb": categoryRgb } as CSSProperties)
-    : undefined;
+  const categoryRgbStyle = {
+    "--cat-rgb": categoryRgb ?? "100 116 139",
+  } as CSSProperties;
   const categoryChip = categoryName ? (
     <span
       className="cx-post-category"
@@ -1920,7 +1921,6 @@ function FeedPostCardComponent({
   return (
     <article
       className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}${isLiveMatch ? " ig-post--live" : ""}`}
-      style={isUserGlobalPost ? categoryRgbStyle : undefined}
     >
       {isEndingSoon ? (
         <div className="cx-vote-ending-soon-banner" role="status" aria-live="polite">
@@ -1946,7 +1946,9 @@ function FeedPostCardComponent({
             <div>
               <span className="ig-post-username-row">
                 <span className="ig-post-username">{MODERATOR_PLATFORM_NAME}</span>
-                <span className="cx-platform-post-badge">Platform</span>
+                <span className="cx-post-scope-badge">
+                  <IconShield size={12} /> Platform
+                </span>
                 {categoryChip}{matchScoreChip}
               </span>
               <span className="ig-post-meta">{formatRelativeTime(postTimeIso)}</span>
@@ -1982,7 +1984,7 @@ function FeedPostCardComponent({
                   {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
                 </span>
                 {isUserGlobalPost ? (
-                  <span className="cx-user-global-post-badge" style={categoryRgbStyle}>
+                  <span className="cx-post-scope-badge">
                     <IconGlobe size={12} /> Global
                   </span>
                 ) : null}

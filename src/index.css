@@ -2989,41 +2989,17 @@ html[data-topbar-hidden="true"] .ff-bar-outer {
   max-width: 100%;
 }
 
-.cx-platform-post-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--cx-accent-deep);
-  background: rgb(var(--cx-accent-rgb) / 0.12);
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.22);
-  line-height: 1.3;
-}
-
-.cx-user-global-post-badge {
-  --cat-rgb: 100 116 139;
+/* Global / Platform — plain meta label, same muted color as category/time. */
+.cx-post-scope-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, rgb(var(--cat-rgb)) 13%, transparent);
-  color: color-mix(in srgb, rgb(var(--cat-rgb)) 82%, #0f172a);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1.6;
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.4;
   white-space: nowrap;
-  text-transform: uppercase;
-}
-:root[data-theme="dark"] .cx-user-global-post-badge {
-  background: color-mix(in srgb, rgb(var(--cat-rgb)) 26%, transparent);
-  color: color-mix(in srgb, rgb(var(--cat-rgb)) 72%, #ffffff);
+  color: var(--ig-muted);
 }
 
 .cx-pinned-ribbon {
@@ -3041,11 +3017,6 @@ html[data-topbar-hidden="true"] .ff-bar-outer {
   background: rgb(var(--cx-accent-rgb) / 0.12);
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.22);
   line-height: 1.4;
-}
-
-.ig-post--user-global {
-  --cat-rgb: 100 116 139;
-  border-left: 3px solid color-mix(in srgb, rgb(var(--cat-rgb)) 45%, transparent);
 }
 
 .ig-user-global-post-label {
