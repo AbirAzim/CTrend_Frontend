@@ -14,33 +14,47 @@ const TIERS = [
 
 type Props = {
   stats: MonthlyPodiumStats;
+  layout?: "grid" | "inline";
 };
 
-export function MonthlyPodiumBadge({ stats }: Props) {
-  const total =
-    stats.firstPlaceCount + stats.secondPlaceCount + stats.thirdPlaceCount;
+export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
+  if (layout === "grid") {
+    return (
+      <View style={grid.row} accessibilityLabel="Monthly podium finishes">
+        {TIERS.map(({ key, medal, label, activeBg, border }) => {
+          const count = stats[key];
+          const active = count > 0;
+          return (
+            <View
+              key={key}
+              style={[grid.cell, active ? { backgroundColor: activeBg, borderColor: border } : grid.cellZero]}
+              accessibilityLabel={`${label} place ${count} times`}
+            >
+              <Text style={grid.medal}>{medal}</Text>
+              <Text style={[grid.count, !active && grid.muted]}>{count}</Text>
+              <Text style={[grid.label, !active && grid.muted]}>{label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }
+
+  const total = stats.firstPlaceCount + stats.secondPlaceCount + stats.thirdPlaceCount;
 
   return (
-    <View
-      style={[st.row, total <= 0 && st.rowEmpty]}
-      accessibilityLabel="Monthly podium finishes"
-    >
+    <View style={[inline.row, total <= 0 && inline.rowEmpty]} accessibilityLabel="Monthly podium finishes">
       {TIERS.map(({ key, medal, label, activeBg, border }) => {
         const count = stats[key];
         const active = count > 0;
         return (
           <View
             key={key}
-            style={[
-              st.chip,
-              active
-                ? { backgroundColor: activeBg, borderColor: border }
-                : st.chipZero,
-            ]}
+            style={[inline.chip, active ? { backgroundColor: activeBg, borderColor: border } : inline.chipZero]}
             accessibilityLabel={`${label} place ${count} times`}
           >
-            <Text style={[st.medal, !active && st.muted]}>{medal}</Text>
-            <Text style={[st.count, !active && st.muted]}>×{count}</Text>
+            <Text style={[inline.medal, !active && inline.muted]}>{medal}</Text>
+            <Text style={[inline.count, !active && inline.muted]}>×{count}</Text>
           </View>
         );
       })}
@@ -48,7 +62,34 @@ export function MonthlyPodiumBadge({ stats }: Props) {
   );
 }
 
-const st = StyleSheet.create({
+const grid = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    gap: 3,
+    width: "100%",
+    minWidth: 0,
+  },
+  cell: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  cellZero: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  medal: { fontSize: 11, lineHeight: 13 },
+  count: { fontSize: 10, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 12 },
+  label: { fontSize: 7, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", lineHeight: 9 },
+  muted: { opacity: 0.55 },
+});
+
+const inline = StyleSheet.create({
   row: {
     flexDirection: "row",
     flexWrap: "wrap",

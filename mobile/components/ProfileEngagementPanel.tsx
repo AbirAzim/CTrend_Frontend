@@ -139,77 +139,158 @@ export function ProfileEngagementPanel({
   return (
     <View style={st.wrap}>
       <Text style={st.kicker}>REWARDS & ACHIEVEMENTS</Text>
+
       <View style={st.grid}>
         <Pressable style={[st.card, st.cardCoins]} onPress={() => router.push(coinsRoute)}>
-          <View style={st.iconCoin}>
-            <Text style={st.iconCoinGlyph}>¢</Text>
-          </View>
-          <Text style={st.cardLabel}>Coins</Text>
-          <Text style={st.cardValue}>{coins.toLocaleString()}</Text>
-          <Text style={st.cardSub} numberOfLines={2}>
-            {isSelf ? `Activity · ${coinMonthLabel}` : `${displayName ?? "Member"}`}
-          </Text>
-          <MonthlyPodiumBadge stats={podiumStats} />
-          {coinRank ? (
-            <View style={st.rankChip}>
-              <LeaderboardRankBadge rank={coinRank} size="sm" />
-              <Text style={st.rankChipLabel}>This month</Text>
+          <View style={st.cardTop}>
+            <View style={st.cardTopText}>
+              <Text style={st.cardLabel}>Engagement coins</Text>
+              <Text style={st.cardValue}>{coins.toLocaleString()}</Text>
+              <Text style={st.cardSub} numberOfLines={1}>
+                {isSelf ? coinMonthLabel : `${displayName ?? "Member"}'s balance`}
+              </Text>
             </View>
+            <View style={st.iconCoin}>
+              <Text style={st.iconCoinGlyph}>¢</Text>
+            </View>
+          </View>
+
+          <View style={st.cardMiddle}>
+            <View style={st.coinStats}>
+            <View style={[st.statBox, st.statBoxRank]}>
+              <Text style={st.statKicker}>This month</Text>
+              {coinRank ? (
+                <LeaderboardRankBadge rank={coinRank} size="sm" />
+              ) : (
+                <Text style={st.statEmpty}>No rank yet</Text>
+              )}
+            </View>
+            <View style={[st.statBox, st.statBoxPodium]}>
+              <Text style={st.statKicker}>Podiums</Text>
+              <MonthlyPodiumBadge stats={podiumStats} layout="grid" />
+            </View>
+            </View>
+          </View>
+
+          <View style={st.cardFoot}>
+            {isSelf ? (
+              <Pressable
+                style={st.claimBtn}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  void onClaim();
+                }}
+                disabled={claiming}
+              >
+                <Text style={st.claimBtnText}>{claiming ? "…" : "📅 Daily"}</Text>
+              </Pressable>
+            ) : null}
+            <View style={st.footAction}>
+              <Text style={st.footActionText}>History →</Text>
+            </View>
+          </View>
+          {claimMsg ? (
+            <Text style={st.claimMsg} numberOfLines={2}>
+              {claimMsg}
+            </Text>
           ) : null}
-          {isSelf ? (
-            <Pressable style={st.claimBtn} onPress={(e) => { e.stopPropagation?.(); void onClaim(); }} disabled={claiming}>
-              <Text style={st.claimBtnText}>{claiming ? "…" : "📅 Daily"}</Text>
-            </Pressable>
-          ) : null}
-          {claimMsg ? <Text style={st.claimMsg} numberOfLines={2}>{claimMsg}</Text> : null}
         </Pressable>
 
         <Pressable style={[st.card, st.cardWins]} onPress={() => router.push(campaignRoute)}>
-          <Text style={st.iconTrophy}>🏆</Text>
-          <Text style={st.cardLabel}>Wins</Text>
-          <Text style={st.cardValue}>{totalWins > 0 ? String(totalWins) : "—"}</Text>
-          <Text style={st.cardSub} numberOfLines={2}>
-            {totalWins > 0 ? `${totalWins} victories` : isSelf ? "Match campaigns" : "No wins"}
-          </Text>
-          {loading && wins.length === 0 ? (
-            <ActivityIndicator color="#d97706" size="small" style={{ marginTop: 6 }} />
-          ) : wins.length > 0 ? (
-            <Text style={st.winPreview} numberOfLines={1}>{wins[0]?.campaignName}</Text>
-          ) : null}
-          <Text style={st.cardCta}>View ›</Text>
+          <View style={st.cardTop}>
+            <View style={st.cardTopText}>
+              <Text style={st.cardLabel}>Campaign wins</Text>
+              <Text style={st.cardValue}>{totalWins > 0 ? String(totalWins) : "—"}</Text>
+              <Text style={st.cardSub} numberOfLines={1}>
+                {totalWins > 0 ? `${totalWins} wins` : isSelf ? "Match posts" : "None yet"}
+              </Text>
+            </View>
+            <Text style={st.iconTrophy}>🏆</Text>
+          </View>
+
+          <View style={st.cardBody}>
+            {loading && wins.length === 0 ? (
+              <ActivityIndicator color="#d97706" size="small" />
+            ) : wins.length > 0 ? (
+              <View style={st.winRow}>
+                <Text style={st.winName} numberOfLines={1}>
+                  {wins[0]?.campaignName}
+                </Text>
+                <View style={st.winBadge}>
+                  <Text style={st.winBadgeText}>{wins[0]?.wins}w</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={st.bodyHint}>Vote in campaigns to win</Text>
+            )}
+          </View>
+
+          <View style={st.cardFoot}>
+            <View style={[st.footAction, st.footActionWins]}>
+              <Text style={st.footActionTextWins}>Campaigns →</Text>
+            </View>
+          </View>
         </Pressable>
 
         {referralEnabled ? (
           <Pressable style={[st.card, st.cardPoints]} onPress={() => router.push(pointsRoute)}>
-            <View style={st.iconPoints}>
-              <Text style={st.iconPointsGlyph}>✦</Text>
+            <View style={st.cardTop}>
+              <View style={st.cardTopText}>
+                <Text style={st.cardLabel}>Referral points</Text>
+                <Text style={st.cardValue}>{referralPoints > 0 ? String(referralPoints) : "—"}</Text>
+                <Text style={st.cardSub} numberOfLines={1}>
+                  {referralPoints > 0
+                    ? isSelf
+                      ? "10 pts = 10 BDT"
+                      : "Invite rewards"
+                    : isSelf
+                      ? "Invite friends"
+                      : "None yet"}
+                </Text>
+              </View>
+              <View style={st.iconPoints}>
+                <Text style={st.iconPointsGlyph}>✦</Text>
+              </View>
             </View>
-            <Text style={st.cardLabel}>Points</Text>
-            <Text style={st.cardValue}>{referralPoints > 0 ? String(referralPoints) : "—"}</Text>
-            <Text style={st.cardSub} numberOfLines={2}>
-              {referralPoints > 0
-                ? isSelf
-                  ? "10 pts = 10 BDT"
-                  : "Invite rewards"
-                : isSelf
-                  ? "Invite friends"
-                  : "No points"}
-            </Text>
-            <Text style={st.cardCta}>History ›</Text>
+
+            <View style={st.cardBody}>
+              <Text style={st.bodyHint}>
+                {isSelf ? "Earn from invites & codes" : "Referral balance"}
+              </Text>
+            </View>
+
+            <View style={st.cardFoot}>
+              <View style={[st.footAction, st.footActionPoints]}>
+                <Text style={st.footActionTextPoints}>History →</Text>
+              </View>
+            </View>
           </Pressable>
         ) : (
           <View style={[st.card, st.cardPoints, st.cardPointsPaused]} accessibilityState={{ disabled: true }}>
-            <View style={st.pausedBadge}>
-              <Text style={st.pausedBadgeText}>Paused</Text>
+            <View style={st.cardTop}>
+              <View style={st.cardTopText}>
+                <Text style={st.cardLabel}>Referral points</Text>
+                <Text style={[st.cardValue, st.cardValuePaused]}>—</Text>
+                <Text style={[st.cardSub, st.cardSubPaused]} numberOfLines={1}>
+                  Referral rewards are paused
+                </Text>
+              </View>
+              <View style={[st.iconPoints, st.iconPointsPaused]}>
+                <Text style={st.iconPointsGlyph}>✦</Text>
+              </View>
             </View>
-            <View style={[st.iconPoints, st.iconPointsPaused]}>
-              <Text style={st.iconPointsGlyph}>✦</Text>
+
+            <View style={st.cardBody}>
+              <View style={st.pausedChip}>
+                <Text style={st.pausedChipText}>Paused</Text>
+              </View>
             </View>
-            <Text style={st.cardLabel}>Points</Text>
-            <Text style={[st.cardValue, st.cardValuePaused]}>—</Text>
-            <Text style={[st.cardSub, st.cardSubPaused]} numberOfLines={3}>
-              {isSelf ? "Rewards paused · invite below" : "Unavailable"}
-            </Text>
+
+            <View style={st.cardFoot}>
+              <View style={[st.footAction, st.footActionPoints, st.footActionDisabled]}>
+                <Text style={st.footActionTextDisabled}>Unavailable →</Text>
+              </View>
+            </View>
           </View>
         )}
       </View>
@@ -240,9 +321,7 @@ export function ProfileEngagementPanel({
             </View>
           ) : null}
 
-          {referralEnabled ? (
-            <View style={[st.vDivider, { backgroundColor: colors.border }]} />
-          ) : null}
+          {referralEnabled ? <View style={[st.vDivider, { backgroundColor: colors.border }]} /> : null}
 
           <Pressable
             style={[st.inviteBtn, { backgroundColor: colors.accent }, !referralEnabled && st.inviteBtnFull]}
@@ -254,9 +333,7 @@ export function ProfileEngagementPanel({
             accessibilityLabel="Invite a friend"
           >
             <Text style={st.inviteBtnLabel}>Invite</Text>
-            {referralEnabled ? (
-              <Text style={st.inviteBtnPts}>+{COIN_AMOUNTS.INVITE} pts</Text>
-            ) : null}
+            {referralEnabled ? <Text style={st.inviteBtnPts}>+{COIN_AMOUNTS.INVITE} pts</Text> : null}
           </Pressable>
         </View>
       ) : null}
@@ -283,143 +360,261 @@ function makeStyles(c: ColorPalette) {
       marginHorizontal: 16,
     },
     grid: {
-      flexDirection: "row",
+      flexDirection: "column",
       alignSelf: "stretch",
       width: "100%",
       paddingHorizontal: 16,
-      gap: 8,
-      alignItems: "stretch",
+      gap: 10,
     },
     card: {
-      flex: 1,
+      width: "100%",
       minWidth: 0,
       borderRadius: 16,
       borderWidth: 1,
-      padding: 10,
-      minHeight: 156,
+      padding: 12,
+      minHeight: 168,
+      maxHeight: 196,
+      overflow: "hidden",
+      flexDirection: "column",
     },
     cardCoins: {
-      borderColor: "rgba(245,197,24,0.38)",
+      borderColor: "rgba(245,197,24,0.42)",
       backgroundColor: "rgba(245,197,24,0.14)",
     },
     cardWins: {
-      borderColor: "rgba(245,158,11,0.35)",
+      borderColor: "rgba(245,158,11,0.38)",
       backgroundColor: "rgba(245,158,11,0.1)",
     },
     cardPoints: {
-      borderColor: "rgba(129,140,248,0.4)",
+      borderColor: "rgba(129,140,248,0.44)",
       backgroundColor: "rgba(99,102,241,0.14)",
     },
     cardPointsPaused: {
-      borderColor: "rgba(129,140,248,0.28)",
-      backgroundColor: "rgba(99,102,241,0.08)",
+      borderColor: "rgba(129,140,248,0.44)",
+      backgroundColor: "rgba(99,102,241,0.1)",
+      opacity: 0.95,
     },
-    pausedBadge: {
-      position: "absolute",
-      top: 8,
-      right: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 999,
-      backgroundColor: "rgba(99,102,241,0.18)",
-      borderWidth: 1,
-      borderColor: "rgba(99,102,241,0.3)",
+    cardTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 8,
+      minWidth: 0,
     },
-    pausedBadgeText: {
-      fontSize: 8,
-      fontWeight: "800",
-      letterSpacing: 0.4,
-      textTransform: "uppercase",
-      color: "#818cf8",
+    cardTopText: {
+      flex: 1,
+      minWidth: 0,
+      gap: 1,
     },
-    iconCoin: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: "#f5c518",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 6,
-    },
-    iconCoinGlyph: { color: "#7a4a05", fontWeight: "900", fontSize: 17 },
-    iconTrophy: { fontSize: 28, lineHeight: 32, marginBottom: 2 },
-    iconPoints: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: "#6366f1",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 6,
-    },
-    iconPointsGlyph: { color: "#e0e7ff", fontWeight: "900", fontSize: 16 },
-    iconPointsPaused: { backgroundColor: "rgba(99,102,241,0.45)", opacity: 0.75 },
     cardLabel: {
       fontSize: 9,
       fontWeight: "800",
-      letterSpacing: 0.4,
+      letterSpacing: 0.5,
       textTransform: "uppercase",
       color: c.muted,
-      alignSelf: "stretch",
     },
     cardValue: {
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: "900",
       color: c.text,
-      lineHeight: 24,
-      marginTop: 2,
+      lineHeight: 26,
+      marginTop: 1,
       fontVariant: ["tabular-nums"],
-      alignSelf: "stretch",
     },
     cardValuePaused: { color: c.muted, opacity: 0.85 },
     cardSub: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: "600",
       color: c.subtext,
       lineHeight: 13,
-      marginTop: 2,
+      marginTop: 1,
     },
-    cardSubPaused: { color: c.muted, lineHeight: 12 },
-    rankChip: {
+    cardSubPaused: { color: c.muted },
+    iconCoin: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "#f5c518",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    iconCoinGlyph: { color: "#7a4a05", fontWeight: "900", fontSize: 16 },
+    iconTrophy: { fontSize: 26, lineHeight: 30, flexShrink: 0 },
+    iconPoints: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "#6366f1",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    iconPointsGlyph: { color: "#e0e7ff", fontWeight: "900", fontSize: 15 },
+    iconPointsPaused: { backgroundColor: "rgba(99,102,241,0.45)", opacity: 0.8 },
+    cardMiddle: {
+      flex: 1,
+      justifyContent: "center",
+      minHeight: 36,
+      minWidth: 0,
+    },
+    coinStats: {
+      flexDirection: "row",
+      gap: 8,
+      minWidth: 0,
+    },
+    statBox: {
+      flex: 1,
+      minWidth: 0,
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 6,
+      paddingVertical: 5,
+      gap: 3,
+    },
+    statBoxRank: {
+      flex: 0.72,
+      backgroundColor: "rgba(0,0,0,0.06)",
+      borderColor: "rgba(245,197,24,0.28)",
+    },
+    statBoxPodium: {
+      flex: 1.28,
+      backgroundColor: "rgba(0,0,0,0.04)",
+      borderColor: "rgba(245,197,24,0.18)",
+    },
+    statKicker: {
+      fontSize: 7,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+      color: c.muted,
+    },
+    statEmpty: {
+      fontSize: 9,
+      fontWeight: "700",
+      color: c.muted,
+    },
+    cardBody: {
+      flex: 1,
+      justifyContent: "center",
+      minHeight: 36,
+      minWidth: 0,
+    },
+    bodyHint: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: c.muted,
+      lineHeight: 14,
+    },
+    winRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 5,
-      alignSelf: "flex-start",
-      marginTop: 6,
-      paddingVertical: 3,
-      paddingRight: 7,
-      paddingLeft: 3,
-      borderRadius: 999,
-      backgroundColor: "rgba(245,197,24,0.14)",
+      gap: 8,
+      borderRadius: 8,
       borderWidth: 1,
-      borderColor: "rgba(245,197,24,0.32)",
+      borderColor: "rgba(245,158,11,0.22)",
+      backgroundColor: "rgba(255,255,255,0.08)",
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      minWidth: 0,
     },
-    rankChipLabel: {
+    winName: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 10,
+      fontWeight: "700",
+      color: c.text,
+    },
+    winBadge: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: "rgba(245,197,24,0.5)",
+      backgroundColor: "rgba(255,255,255,0.12)",
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      flexShrink: 0,
+    },
+    winBadgeText: { fontSize: 8, fontWeight: "900", color: "#b45309" },
+    pausedChip: {
+      alignSelf: "flex-start",
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: "rgba(129,140,248,0.38)",
+      backgroundColor: "rgba(99,102,241,0.16)",
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+    },
+    pausedChipText: {
       fontSize: 8,
       fontWeight: "800",
       letterSpacing: 0.4,
       textTransform: "uppercase",
-      color: "#d99411",
+      color: "#a5b4fc",
+    },
+    cardFoot: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 8,
+      minWidth: 0,
+      flexShrink: 0,
     },
     claimBtn: {
-      alignSelf: "flex-start",
-      marginTop: 8,
+      flexShrink: 0,
       backgroundColor: "#f5c518",
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      borderRadius: 999,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      borderRadius: 10,
+      minHeight: 38,
+      justifyContent: "center",
     },
-    claimBtnText: { color: "#7a4a05", fontWeight: "800", fontSize: 9 },
-    claimMsg: { color: c.text, fontWeight: "700", fontSize: 9, marginTop: 4 },
-    winPreview: { fontSize: 10, fontWeight: "700", color: c.text, marginTop: 6 },
-    cardCta: {
-      fontSize: 8,
+    claimBtnText: { color: "#7a4a05", fontWeight: "800", fontSize: 10 },
+    footAction: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 38,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "rgba(245,197,24,0.45)",
+      backgroundColor: "rgba(255,255,255,0.12)",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+    },
+    footActionWins: {
+      borderColor: "rgba(245,158,11,0.38)",
+      backgroundColor: "rgba(255,255,255,0.1)",
+    },
+    footActionPoints: {
+      borderColor: "rgba(129,140,248,0.38)",
+      backgroundColor: "rgba(99,102,241,0.12)",
+    },
+    footActionDisabled: {
+      borderColor: "rgba(129,140,248,0.38)",
+      backgroundColor: "rgba(99,102,241,0.1)",
+      opacity: 0.75,
+    },
+    footActionText: {
+      fontSize: 10,
       fontWeight: "800",
-      color: c.muted,
-      marginTop: "auto" as const,
-      paddingTop: 6,
-      letterSpacing: 0.3,
+      color: "#7a4a05",
     },
+    footActionTextWins: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: "#b45309",
+    },
+    footActionTextPoints: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: "#a5b4fc",
+    },
+    footActionTextDisabled: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: "#a5b4fc",
+    },
+    claimMsg: { color: c.text, fontWeight: "700", fontSize: 9, marginTop: 4 },
     actionsBar: {
       marginHorizontal: 16,
       marginTop: 10,
