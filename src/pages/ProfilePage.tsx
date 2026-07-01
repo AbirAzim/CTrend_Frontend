@@ -760,7 +760,6 @@ export function ProfilePage() {
           userId={userId}
           coins={balance ?? 0}
           isSelf
-          displayName={displayName}
           onInviteFriend={() => openInviteModal("user")}
         />
       ) : null}

@@ -24,13 +24,11 @@ export function ProfileEngagementPanel({
   userId,
   coins,
   isSelf,
-  displayName,
   onInviteFriend,
 }: {
   userId: string;
   coins: number;
   isSelf: boolean;
-  displayName?: string;
   onInviteFriend?: () => void;
 }) {
   const { refresh } = useCoins();

@@ -494,7 +494,6 @@ export default function UserProfileScreen() {
             userId={profile.id}
             coins={profile.coins ?? 0}
             isSelf={false}
-            displayName={name}
           />
 
           {/* Action buttons */}

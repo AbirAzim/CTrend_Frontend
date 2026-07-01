@@ -36,12 +36,10 @@ export function ProfileEngagementPanel({
   userId,
   coins,
   isSelf,
-  displayName,
 }: {
   userId: string;
   coins: number;
   isSelf: boolean;
-  displayName?: string;
 }) {
   const { colors } = useTheme();
   const st = makeStyles(colors);

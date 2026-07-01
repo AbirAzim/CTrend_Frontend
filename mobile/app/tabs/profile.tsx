@@ -560,7 +560,6 @@ export default function ProfileScreen() {
               userId={me.id}
               coins={balance ?? 0}
               isSelf
-              displayName={name}
             />
           ) : null}
 
