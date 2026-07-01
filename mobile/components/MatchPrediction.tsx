@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useQuery, useMutation, useSubscription } from "@apollo/client/react";
 import {
@@ -216,10 +215,10 @@ export function MatchPrediction({
     ) : null;
 
   const optionsMenu =
-    open && !resolved && mine && !formOpen ? (
+    open && !resolved ? (
       <View style={st.menuWrap}>
         <Pressable onPress={() => setMenuOpen((v) => !v)} hitSlop={8} style={st.dotsBtn}>
-          <Ionicons name="ellipsis-horizontal" size={18} color={colors.muted} />
+          <Text style={st.dots}>⋯</Text>
         </Pressable>
         {menuOpen ? (
           <View style={st.menu}>
@@ -234,49 +233,14 @@ export function MatchPrediction({
       </View>
     ) : null;
 
-  const statusChip = resolved && mine?.isWinner ? (
-    <View style={[st.chip, st.chipWin]}>
-      <Text style={st.chipWinText}>Correct</Text>
-    </View>
-  ) : resolved && mine ? (
-    <View style={[st.chip, st.chipMiss]}>
-      <Text style={st.chipMissText}>Missed</Text>
-    </View>
-  ) : resolved ? (
-    <View style={[st.chip, st.chipFinal]}>
-      <Text style={st.chipFinalText}>Final</Text>
-    </View>
-  ) : open ? (
-    <View style={[st.chip, st.chipOpen]}>
-      <Text style={st.chipOpenText}>Open</Text>
-    </View>
-  ) : (
-    <View style={[st.chip, st.chipLocked]}>
-      <Text style={st.chipLockedText}>Locked</Text>
-    </View>
-  );
-
   return (
-    <View style={st.card}>
+    <View style={st.wrap}>
       {roundBadge && !suppressRoundBadge ? (
         <View style={st.roundBadge}>
           <Text style={st.roundBadgeIcon}>🏆</Text>
           <Text style={st.roundBadgeText}>{roundBadge}</Text>
         </View>
       ) : null}
-
-      <View style={st.header}>
-        <View style={st.headerLeft}>
-          <Ionicons name="football-outline" size={15} color={colors.accent} />
-          <Text style={st.headerTitle}>Score prediction</Text>
-          {statusChip}
-        </View>
-        <View style={st.headerRight}>
-          {countBtn}
-          {optionsMenu}
-        </View>
-      </View>
-
       {pendingResult && inExtraTime ? (
         <View style={st.pendingBanner}>
           <Text style={st.pendingBannerText}>{predictionPendingExtraTimeMessage()}</Text>
@@ -289,31 +253,38 @@ export function MatchPrediction({
       ) : null}
 
       {mine && !formOpen ? (
-        <View style={st.board}>
-          <View style={st.boardTeams}>
-            <Text style={st.boardTeam} numberOfLines={2}>{homeLabel}</Text>
-            <Text style={st.boardVs}>VS</Text>
-            <Text style={[st.boardTeam, st.boardTeamAway]} numberOfLines={2}>{awayLabel}</Text>
+        <View style={st.row}>
+          <View style={st.matchCore}>
+            <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+            <View style={st.scoreCluster}>
+              <Text style={st.scoreNum}>{mine.homeScore}</Text>
+              <Text style={st.dash}>–</Text>
+              <Text style={st.scoreNum}>{mine.awayScore}</Text>
+            </View>
+            <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
           </View>
-          <View style={st.scorePill}>
-            <Text style={st.scoreBig}>{mine.homeScore}</Text>
-            <Text style={st.scoreSep}>:</Text>
-            <Text style={st.scoreBig}>{mine.awayScore}</Text>
-          </View>
-          <Text style={st.boardCaption}>Your prediction</Text>
+          {resolved ? (
+            <View style={[st.tag, mine.isWinner ? st.tagWin : st.tagMiss]}>
+              <Text style={[st.tagText, mine.isWinner ? st.tagWinText : st.tagMissText]}>
+                {mine.isWinner ? "✓ Correct" : "Missed"}
+              </Text>
+            </View>
+          ) : null}
+          {(countBtn || (!resolved && (optionsMenu || !open))) ? (
+            <View style={st.rowTail}>
+              {countBtn}
+              {!resolved ? (optionsMenu ?? <Text style={st.locked}>Locked</Text>) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
       {formOpen ? (
         isAuthenticated ? (
-          <>
-            <View style={st.board}>
-              <View style={st.boardTeams}>
-                <Text style={st.boardTeam} numberOfLines={2}>{homeLabel}</Text>
-                <Text style={st.boardVs}>VS</Text>
-                <Text style={[st.boardTeam, st.boardTeamAway]} numberOfLines={2}>{awayLabel}</Text>
-              </View>
-              <View style={st.inputPill}>
+          <View style={[st.row, st.rowForm]}>
+            <View style={st.matchCore}>
+              <Text style={st.teamHome} numberOfLines={1}>{homeLabel}</Text>
+              <View style={st.scoreCluster}>
                 <TextInput
                   style={[st.input, homeFocused && st.inputFocused]}
                   keyboardType="number-pad"
@@ -326,7 +297,7 @@ export function MatchPrediction({
                   onBlur={() => setHomeFocused(false)}
                   selectTextOnFocus
                 />
-                <Text style={st.scoreSep}>:</Text>
+                <Text style={st.dash}>–</Text>
                 <TextInput
                   style={[st.input, awayFocused && st.inputFocused]}
                   keyboardType="number-pad"
@@ -340,46 +311,44 @@ export function MatchPrediction({
                   selectTextOnFocus
                 />
               </View>
+              <Text style={st.teamAway} numberOfLines={1}>{awayLabel}</Text>
             </View>
-            <View style={st.formActions}>
-              <Pressable style={st.primaryBtn} onPress={() => void onSubmit()} disabled={submitting}>
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={st.primaryBtnText}>{mine ? "Save prediction" : "Submit prediction"}</Text>
-                )}
+            <View style={st.actions}>
+              <Pressable style={st.submitBtn} onPress={() => void onSubmit()} disabled={submitting}>
+                <Text style={st.submitText}>{mine ? "Save" : "Predict"}</Text>
               </Pressable>
               {editing ? (
                 <Pressable
-                  style={st.secondaryBtn}
                   onPress={() => setEditing(false)}
+                  hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel editing"
                 >
-                  <Text style={st.secondaryBtnText}>Cancel</Text>
+                  <Text style={st.cancelLink}>Cancel</Text>
                 </Pressable>
               ) : null}
             </View>
-          </>
+            {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
+          </View>
         ) : (
-          <View style={st.hintCard}>
-            <Ionicons name="log-in-outline" size={18} color={colors.muted} />
+          <View style={[st.row, st.rowHint]}>
             <Text style={st.hint}>Log in to predict the score.</Text>
+            {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
           </View>
         )
       ) : null}
 
       {!open && !resolved && !mine ? (
-        <View style={st.hintCard}>
-          <Ionicons name="lock-closed-outline" size={16} color={colors.muted} />
-          <Text style={st.hint}>Predictions are locked — match has started.</Text>
+        <View style={[st.row, st.rowHint]}>
+          <Text style={st.hint}>Predictions are locked (match started).</Text>
+          {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
         </View>
       ) : null}
 
       {resolved && !mine && !formOpen ? (
-        <View style={st.hintCard}>
-          <Ionicons name="checkmark-circle-outline" size={16} color={colors.muted} />
+        <View style={[st.row, st.rowHint]}>
           <Text style={st.hint}>Results are in</Text>
+          {countBtn ? <View style={st.rowTail}>{countBtn}</View> : null}
         </View>
       ) : null}
 
@@ -495,265 +464,163 @@ function PredictionListModal({
 }
 
 function makeStyles(c: ColorPalette, isDark: boolean) {
-  const accentSoft = `${c.accent}14`;
-  const accentBorder = `${c.accent}28`;
-  const winnerGreen = isDark ? "#34d399" : "#059669";
-  const winnerGreenSoft = isDark ? "rgba(52,211,153,0.12)" : "rgba(16,185,129,0.12)";
-  const winnerGreenBorder = isDark ? "rgba(52,211,153,0.45)" : "rgba(16,185,129,0.45)";
+  const winText = isDark ? "#34d399" : "#16a34a";
   return StyleSheet.create({
-    card: {
-      marginHorizontal: 12,
-      marginBottom: 10,
-      marginTop: 4,
-      padding: 12,
-      gap: 10,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: c.border,
-      backgroundColor: c.section,
+    wrap: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 5,
     },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 8,
-    },
-    headerLeft: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      minWidth: 0,
-      flexWrap: "wrap",
-    },
-    headerRight: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      flexShrink: 0,
-    },
-    headerTitle: {
-      fontSize: 12,
-      fontWeight: "800",
-      color: c.text,
-      letterSpacing: 0.2,
-      textTransform: "uppercase",
-    },
-    chip: {
-      borderRadius: 999,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
-    chipOpen: {
-      backgroundColor: accentSoft,
-      borderWidth: 1,
-      borderColor: accentBorder,
-    },
-    chipOpenText: { fontSize: 10, fontWeight: "800", color: c.accent },
-    chipLocked: {
-      backgroundColor: `${c.text}0a`,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    chipLockedText: { fontSize: 10, fontWeight: "800", color: c.muted },
-    chipWin: {
-      backgroundColor: "rgba(34,197,94,0.16)",
-      borderWidth: 1,
-      borderColor: "rgba(34,197,94,0.35)",
-    },
-    chipWinText: { fontSize: 10, fontWeight: "800", color: "#16a34a" },
-    chipMiss: {
-      backgroundColor: `${c.text}0a`,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    chipMissText: { fontSize: 10, fontWeight: "800", color: c.muted },
-    chipFinal: {
-      backgroundColor: `${c.text}0a`,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    chipFinalText: { fontSize: 10, fontWeight: "800", color: c.subtext },
     roundBadge: {
       alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
       gap: 5,
-      backgroundColor: "rgba(245,158,11,0.14)",
       borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderWidth: 1,
-      borderColor: "rgba(245,158,11,0.35)",
-    },
-    roundBadgeIcon: { fontSize: 11 },
-    roundBadgeText: {
-      fontSize: 11,
-      fontWeight: "800",
-      color: "#d97706",
-    },
-    pendingBanner: {
-      backgroundColor: "rgba(99,102,241,0.12)",
-      borderRadius: 10,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderWidth: 1,
-      borderColor: "rgba(99,102,241,0.25)",
-    },
-    pendingBannerText: { fontSize: 11, color: c.subtext, lineHeight: 15 },
-    board: {
-      alignItems: "center",
-      gap: 8,
+      paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    boardTeams: {
+    roundBadgeIcon: { fontSize: 11, color: c.subtext },
+    roundBadgeText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: c.subtext,
+    },
+    pendingBanner: {
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.section,
+    },
+    pendingBannerText: { fontSize: 11, color: c.subtext, lineHeight: 15 },
+    penNote: { fontSize: 11, color: c.muted, lineHeight: 15 },
+    resultLine: { fontSize: 12, fontWeight: "700", color: c.text, lineHeight: 16 },
+    row: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      width: "100%",
+      gap: 6,
+      minHeight: 34,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 10,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.card,
+    },
+    rowHint: {
+      backgroundColor: c.section,
+    },
+    rowForm: {
+      minHeight: 44,
+      paddingVertical: 6,
       gap: 8,
     },
-    boardTeam: {
+    matchCore: {
       flex: 1,
-      fontSize: 13,
-      fontWeight: "800",
-      color: c.text,
-      textAlign: "left",
-      lineHeight: 17,
-    },
-    boardTeamAway: { textAlign: "right" },
-    boardVs: {
-      fontSize: 10,
-      fontWeight: "800",
-      color: c.muted,
-      letterSpacing: 0.6,
-    },
-    scorePill: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 10,
-      minWidth: 120,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      borderRadius: 14,
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: accentBorder,
+      gap: 8,
+      minWidth: 0,
     },
-    scoreBig: {
-      fontSize: 28,
+    teamHome: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: "700",
+      color: c.text,
+      textAlign: "right",
+      lineHeight: 14,
+    },
+    teamAway: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: "700",
+      color: c.text,
+      textAlign: "left",
+      lineHeight: 14,
+    },
+    scoreCluster: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      flexShrink: 0,
+    },
+    scoreNum: {
+      fontSize: 15,
       fontWeight: "900",
-      color: c.accent,
-      minWidth: 28,
+      color: c.text,
+      minWidth: 18,
       textAlign: "center",
-      fontVariant: ["tabular-nums"],
     },
-    scoreSep: {
-      fontSize: 22,
-      fontWeight: "300",
-      color: c.muted,
-      lineHeight: 28,
+    dash: { color: c.muted, fontWeight: "800", fontSize: 13 },
+    input: {
+      width: 36,
+      minHeight: 32,
+      textAlign: "center",
+      fontSize: 15,
+      fontWeight: "800",
+      color: c.text,
+      backgroundColor: c.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: 8,
+      paddingVertical: 5,
+      paddingHorizontal: 2,
     },
-    boardCaption: {
+    inputFocused: {
+      borderColor: c.muted,
+    },
+    actions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+    },
+    submitBtn: {
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.card,
+    },
+    submitText: { color: c.text, fontSize: 12, fontWeight: "700" },
+    cancelLink: { fontSize: 12, fontWeight: "700", color: c.subtext },
+    rowTail: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+      paddingLeft: 6,
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderLeftColor: c.border,
+    },
+    countBtn: {
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+    },
+    countBtnText: {
       fontSize: 11,
       fontWeight: "600",
       color: c.muted,
     },
-    inputPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      minWidth: 140,
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 14,
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: accentBorder,
-    },
-    input: {
-      width: 44,
-      height: 44,
-      textAlign: "center",
-      fontSize: 24,
-      fontWeight: "900",
-      color: c.accent,
-      backgroundColor: c.section,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 10,
-      paddingVertical: 0,
-      paddingHorizontal: 0,
-      fontVariant: ["tabular-nums"],
-    },
-    inputFocused: {
-      borderColor: c.accent,
-      backgroundColor: c.card,
-    },
-    formActions: {
-      gap: 8,
-    },
-    primaryBtn: {
-      backgroundColor: c.accent,
-      borderRadius: 12,
-      paddingVertical: 12,
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: 44,
-    },
-    primaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-    secondaryBtn: {
-      borderRadius: 12,
-      paddingVertical: 10,
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: c.border,
-      backgroundColor: c.card,
-    },
-    secondaryBtnText: { fontSize: 13, fontWeight: "700", color: c.subtext },
-    hintCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 10,
-      borderRadius: 10,
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
-    hint: { fontSize: 12, color: c.muted, flex: 1, lineHeight: 16 },
-    penNote: { fontSize: 11, color: c.muted, lineHeight: 15 },
-    resultLine: { fontSize: 12, fontWeight: "700", color: c.text, lineHeight: 16 },
-    countBtn: {
-      borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: accentBorder,
-      backgroundColor: accentSoft,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    countBtnText: {
-      fontSize: 10,
-      fontWeight: "800",
-      color: c.accent,
-    },
+    tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+    tagWin: { backgroundColor: isDark ? "rgba(52,211,153,0.12)" : "rgba(22,163,74,0.12)" },
+    tagMiss: { backgroundColor: c.section },
+    tagText: { fontSize: 11, fontWeight: "800" },
+    tagWinText: { color: winText },
+    tagMissText: { color: c.muted },
+    locked: { fontSize: 12, fontWeight: "700", color: c.muted },
     menuWrap: { position: "relative" },
-    dotsBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.border,
-    },
+    dotsBtn: { paddingHorizontal: 6, paddingVertical: 2 },
+    dots: { fontSize: 20, fontWeight: "800", color: c.muted, lineHeight: 20 },
     menu: {
       position: "absolute",
-      top: 36,
+      top: 26,
       right: 0,
       minWidth: 130,
       backgroundColor: c.card,
@@ -770,21 +637,21 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
     },
     menuItem: { paddingHorizontal: 14, paddingVertical: 9 },
     menuItemText: { fontSize: 14, fontWeight: "600", color: c.text },
+    hint: { fontSize: 12, color: c.muted, flexShrink: 1 },
     winnersBtn: {
+      alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
       gap: 6,
-      width: "100%",
-      backgroundColor: winnerGreenSoft,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 11,
-      borderWidth: 1,
-      borderColor: winnerGreenBorder,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.section,
     },
-    winnersText: { color: winnerGreen, fontSize: 13, fontWeight: "800" },
-    winnersIcon: { fontSize: 14 },
+    winnersText: { color: c.subtext, fontSize: 12, fontWeight: "700" },
+    winnersIcon: { fontSize: 13, color: c.subtext },
     error: { color: "#ef4444", fontSize: 12 },
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     sheet: {

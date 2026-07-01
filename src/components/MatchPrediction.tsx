@@ -113,8 +113,8 @@ export function MatchPrediction({
   const [remove, { loading: removing }] = useMutation(DELETE_MATCH_PREDICTION);
 
   const [editing, setEditing] = useState(false);
-  const [home, setHome] = useState("0");
-  const [away, setAway] = useState("0");
+  const [home, setHome] = useState("");
+  const [away, setAway] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
   const [showWinners, setShowWinners] = useState(false);
@@ -153,13 +153,17 @@ export function MatchPrediction({
     : null;
 
   function startEdit() {
-    setHome(mine ? String(mine.homeScore) : "0");
-    setAway(mine ? String(mine.awayScore) : "0");
+    setHome(mine ? String(mine.homeScore) : "");
+    setAway(mine ? String(mine.awayScore) : "");
     setError(null);
     setEditing(true);
   }
 
   async function onSubmit() {
+    if (home.trim() === "" || away.trim() === "") {
+      setError("Enter a score for both teams.");
+      return;
+    }
     const h = parseInt(home, 10);
     const a = parseInt(away, 10);
     if (Number.isNaN(h) || Number.isNaN(a) || h < 0 || a < 0) {
@@ -183,8 +187,8 @@ export function MatchPrediction({
     try {
       await remove({ variables: { postId } });
       setEditing(false);
-      setHome("0");
-      setAway("0");
+      setHome("");
+      setAway("");
       void refetch();
     } catch (err) {
       setError(getApolloErrorMessage(err));
@@ -206,7 +210,7 @@ export function MatchPrediction({
     ) : null;
 
   const optionsMenu =
-    open && !resolved && mine && !formOpen ? (
+    open && !resolved ? (
       <span className="cx-pred-menu-wrap">
         <button
           type="button"
@@ -230,18 +234,6 @@ export function MatchPrediction({
       </span>
     ) : null;
 
-  const statusChip = resolved && mine?.isWinner ? (
-    <span className="cx-pred-chip cx-pred-chip--win">Correct</span>
-  ) : resolved && mine ? (
-    <span className="cx-pred-chip cx-pred-chip--miss">Missed</span>
-  ) : resolved ? (
-    <span className="cx-pred-chip cx-pred-chip--final">Final</span>
-  ) : open ? (
-    <span className="cx-pred-chip cx-pred-chip--open">Open</span>
-  ) : (
-    <span className="cx-pred-chip cx-pred-chip--locked">Locked</span>
-  );
-
   return (
     <div className="cx-pred">
       {roundBadge && !suppressRoundBadge ? (
@@ -250,19 +242,6 @@ export function MatchPrediction({
           {roundBadge}
         </p>
       ) : null}
-
-      <div className="cx-pred-header">
-        <div className="cx-pred-header-main">
-          <span className="cx-pred-header-icon" aria-hidden>⚽</span>
-          <span className="cx-pred-header-title">Score prediction</span>
-          {statusChip}
-        </div>
-        <div className="cx-pred-header-actions">
-          {countBtn}
-          {optionsMenu}
-        </div>
-      </div>
-
       {pendingResult && inExtraTime ? (
         <p className="cx-pred-pending-result" role="status">{predictionPendingExtraTimeMessage()}</p>
       ) : null}
@@ -271,76 +250,86 @@ export function MatchPrediction({
       ) : null}
 
       {mine && !formOpen ? (
-        <div className="cx-pred-board">
-          <div className="cx-pred-board-teams">
-            <span className="cx-pred-board-team">{homeLabel}</span>
-            <span className="cx-pred-board-vs">VS</span>
-            <span className="cx-pred-board-team cx-pred-board-team--away">{awayLabel}</span>
+        <div className="cx-pred-row">
+          <div className="cx-pred-core">
+            <span className="cx-pred-team cx-pred-team--home">{homeLabel}</span>
+            <span
+              className="cx-pred-scorebox"
+              aria-label={`Your predicted score: ${homeLabel} ${mine.homeScore}, ${awayLabel} ${mine.awayScore}`}
+            >
+              <strong>{mine.homeScore}</strong>
+              <span className="cx-pred-line-sep" aria-hidden>–</span>
+              <strong>{mine.awayScore}</strong>
+            </span>
+            <span className="cx-pred-team cx-pred-team--away">{awayLabel}</span>
           </div>
-          <div
-            className="cx-pred-score-pill"
-            aria-label={`Your predicted score: ${homeLabel} ${mine.homeScore}, ${awayLabel} ${mine.awayScore}`}
-          >
-            <strong>{mine.homeScore}</strong>
-            <span className="cx-pred-score-sep" aria-hidden>:</span>
-            <strong>{mine.awayScore}</strong>
+          {resolved ? (
+            <span className={`cx-pred-badge${mine.isWinner ? " cx-pred-badge--win" : " cx-pred-badge--miss"}`}>
+              {mine.isWinner ? "✓ Correct" : "Missed"}
+            </span>
+          ) : null}
+          <div className="cx-pred-row-tail">
+            {countBtn}
+            {!resolved ? (optionsMenu ?? <span className="cx-pred-locked">Locked</span>) : null}
           </div>
-          <span className="cx-pred-board-caption">Your prediction</span>
         </div>
       ) : null}
 
       {formOpen ? (
         isAuthenticated ? (
-          <>
-            <div className="cx-pred-board">
-              <div className="cx-pred-board-teams">
-                <span className="cx-pred-board-team">{homeLabel}</span>
-                <span className="cx-pred-board-vs">VS</span>
-                <span className="cx-pred-board-team cx-pred-board-team--away">{awayLabel}</span>
-              </div>
-              <div className="cx-pred-input-pill">
+          <div className="cx-pred-row cx-pred-row--form">
+            <div className="cx-pred-core">
+              <span className="cx-pred-team cx-pred-team--home">{homeLabel}</span>
+              <div className="cx-pred-scorebox">
                 <input
-                  className="cx-pred-input cx-pred-input--lg"
+                  className="cx-pred-input"
                   inputMode="numeric"
                   value={home}
+                  placeholder="0"
                   onChange={(e) => setHome(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
                   aria-label={`${homeLabel} score`}
                 />
-                <span className="cx-pred-score-sep" aria-hidden>:</span>
+                <span className="cx-pred-dash" aria-hidden>–</span>
                 <input
-                  className="cx-pred-input cx-pred-input--lg"
+                  className="cx-pred-input"
                   inputMode="numeric"
                   value={away}
+                  placeholder="0"
                   onChange={(e) => setAway(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
                   aria-label={`${awayLabel} score`}
                 />
               </div>
+              <span className="cx-pred-team cx-pred-team--away">{awayLabel}</span>
             </div>
-            <div className="cx-pred-form-actions">
-              <button type="button" className="cx-pred-submit cx-pred-submit--full" onClick={() => void onSubmit()} disabled={submitting}>
-                {mine ? "Save prediction" : "Submit prediction"}
+            <div className="cx-pred-actions">
+              <button type="button" className="cx-pred-submit" onClick={() => void onSubmit()} disabled={submitting}>
+                {mine ? "Save" : "Predict"}
               </button>
               {editing ? (
-                <button type="button" className="cx-pred-cancel" onClick={() => setEditing(false)}>Cancel</button>
+                <button type="button" className="cx-pred-link" onClick={() => setEditing(false)}>Cancel</button>
               ) : null}
             </div>
-          </>
+            {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
+          </div>
         ) : (
-          <div className="cx-pred-hint-card">
+          <div className="cx-pred-row cx-pred-row--hint">
             <p className="cx-pred-hint">Log in to predict the score.</p>
+            {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
           </div>
         )
       ) : null}
 
       {!open && !resolved && !mine ? (
-        <div className="cx-pred-hint-card">
-          <p className="cx-pred-hint">Predictions are locked — match has started.</p>
+        <div className="cx-pred-row cx-pred-row--hint">
+          <p className="cx-pred-hint">Predictions are locked (match started).</p>
+          {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
         </div>
       ) : null}
 
       {resolved && !mine && !formOpen ? (
-        <div className="cx-pred-hint-card">
+        <div className="cx-pred-row cx-pred-row--hint">
           <p className="cx-pred-hint">Results are in</p>
+          {countBtn ? <div className="cx-pred-row-tail">{countBtn}</div> : null}
         </div>
       ) : null}
 
@@ -356,7 +345,7 @@ export function MatchPrediction({
           ) : null}
           <button
             type="button"
-            className="cx-pred-winners-btn cx-pred-winners-btn--full"
+            className="cx-pred-winners-btn"
             onClick={() => setShowWinners(true)}
           >
             <span className="cx-pred-winners-btn-icon" aria-hidden>{PREDICTION_WINNERS_BUTTON_ICON}</span>
