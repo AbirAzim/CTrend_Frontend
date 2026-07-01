@@ -49,3 +49,19 @@ export function parseTextLinks(text: string | null | undefined): TextSegment[] {
   }
   return segments;
 }
+
+/** First http(s) or www URL in text — used for comment link previews. */
+export function extractFirstUrl(text: string | null | undefined): string | null {
+  for (const seg of parseTextLinks(text)) {
+    if (seg.type === "link") return seg.href;
+  }
+  return null;
+}
+
+export type LinkPreviewData = {
+  url: string;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  siteName?: string | null;
+};

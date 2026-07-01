@@ -12,6 +12,8 @@ import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
+import { linkifyText } from "../lib/linkify";
+import { CommentLinkPreview } from "./CommentLinkPreview";
 
 type CommentAuthor = {
   id: string;
@@ -276,7 +278,8 @@ function CommentItem({
                 )}
               </span>
             ) : null}
-            <p className="cx-comment-body cx-fb-bubble-text">{row.content}</p>
+            <p className="cx-comment-body cx-fb-bubble-text">{linkifyText(row.content)}</p>
+            <CommentLinkPreview text={row.content} />
           </div>
           {reactionTotal > 0 ? (
             <button
@@ -843,7 +846,8 @@ export function PostCommentsPanel({
                       {formatRelativeTime(c.createdAt) || "just now"}
                     </time>
                   </div>
-                  <p className="cx-comment-body">{c.content}</p>
+                  <p className="cx-comment-body">{linkifyText(c.content)}</p>
+                  <CommentLinkPreview text={c.content} />
                 </li>
               ))}
             </ul>

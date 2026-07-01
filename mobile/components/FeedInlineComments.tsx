@@ -33,6 +33,8 @@ import { useCoins } from '../context/CoinsContext';
 import { COIN_AMOUNTS } from '@ctrend/shared/lib/coins';
 import { useTheme } from '../context/ThemeContext';
 import { AppConfirmDialog } from './AppDialog';
+import { LinkifyText } from '../lib/linkify';
+import { CommentLinkPreview } from './CommentLinkPreview';
 
 type GqlComment = {
 	id: string;
@@ -394,10 +396,26 @@ export function FeedInlineComments({
 								</View>
 							</View>
 						) : (
-							<Text style={st.content}>
-								{c.content}
-								{c.editedAt ? <Text style={st.editedTag}> (edited)</Text> : null}
-							</Text>
+							<>
+								<LinkifyText
+									text={c.content}
+									style={st.content}
+									linkStyle={{ color: fb.link, fontWeight: '600' }}
+								/>
+								{c.editedAt ? (
+									<Text style={st.editedTag}> (edited)</Text>
+								) : null}
+								<CommentLinkPreview
+									text={c.content}
+									colors={{
+										card: fb.bubble,
+										border: fb.border,
+										text: fb.text,
+										muted: fb.meta,
+										subtext: fb.subtext,
+									}}
+								/>
+							</>
 						)}
 					</View>
 
