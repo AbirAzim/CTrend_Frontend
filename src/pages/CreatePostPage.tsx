@@ -10,6 +10,7 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
 import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
 import { useAuth } from "../context/AuthContext";
+import { IconGlobe, IconUsers } from "../components/IgIcons";
 import { ImagePositionEditor } from "../components/ImagePositionEditor";
 import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
@@ -580,7 +581,7 @@ export function CreatePostPage() {
                 className={`ig-audience-option${!broadcastGlobally ? " ig-audience-option--active" : ""}`}
                 onClick={() => setBroadcastGlobally(false)}
               >
-                <span className="ig-audience-option-title">👥 Friends</span>
+                <span className="ig-audience-option-title"><IconUsers size={16} /> Friends</span>
                 <span className="ig-audience-option-sub">Only your friends can view and vote</span>
               </button>
               <button
@@ -590,7 +591,7 @@ export function CreatePostPage() {
                 className={`ig-audience-option${broadcastGlobally ? " ig-audience-option--active" : ""}`}
                 onClick={() => setBroadcastGlobally(true)}
               >
-                <span className="ig-audience-option-title">🌐 Global</span>
+                <span className="ig-audience-option-title"><IconGlobe size={16} /> Global</span>
                 <span className="ig-audience-option-sub">Everyone on Ke Jitbe sees it &amp; can vote</span>
               </button>
             </div>

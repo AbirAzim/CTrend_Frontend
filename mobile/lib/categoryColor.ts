@@ -69,6 +69,21 @@ function mix(
   ];
 }
 
+const FALLBACK_RGB: [number, number, number] = [100, 116, 139];
+
+function chipColorsFromRgb(
+  rgb: [number, number, number],
+  isDark: boolean,
+): { bg: string; text: string } {
+  const [r, g, b] = rgb;
+  const bg = `rgba(${r}, ${g}, ${b}, ${isDark ? 0.26 : 0.14})`;
+  const t = isDark
+    ? mix(rgb, [255, 255, 255], 0.28)
+    : mix(rgb, [15, 23, 42], 0.18);
+  const text = `rgb(${t[0]}, ${t[1]}, ${t[2]})`;
+  return { bg, text };
+}
+
 /**
  * Returns `{ bg, text }` colors for the category chip, readable in both themes:
  * light = darkened text on a faint tint, dark = lightened text on a stronger tint.
@@ -80,13 +95,15 @@ export function categoryChipColors(
 ): { bg: string; text: string } | null {
   const rgb = categoryRgb(cat);
   if (!rgb) return null;
-  const [r, g, b] = rgb;
-  const bg = `rgba(${r}, ${g}, ${b}, ${isDark ? 0.26 : 0.14})`;
-  const t = isDark
-    ? mix(rgb, [255, 255, 255], 0.28)
-    : mix(rgb, [15, 23, 42], 0.18);
-  const text = `rgb(${t[0]}, ${t[1]}, ${t[2]})`;
-  return { bg, text };
+  return chipColorsFromRgb(rgb, isDark);
+}
+
+/** Same chip colors as category; falls back to slate when category is missing. */
+export function categoryChipColorsOrFallback(
+  cat: CategoryLike,
+  isDark: boolean,
+): { bg: string; text: string } {
+  return chipColorsFromRgb(categoryRgb(cat) ?? FALLBACK_RGB, isDark);
 }
 
 function rgbToHex([r, g, b]: [number, number, number]): string {

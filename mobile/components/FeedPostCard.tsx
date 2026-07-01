@@ -77,7 +77,7 @@ import {
 } from '@ctrend/shared/lib/contentReport';
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
-import { categoryChipColors } from '../lib/categoryColor';
+import { categoryChipColors, categoryChipColorsOrFallback } from '../lib/categoryColor';
 import { LinkifyText } from '../lib/linkify';
 import {
   isKnockoutStage,
@@ -495,6 +495,20 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		metaText: { fontSize: 12, fontWeight: '500' as const, color: c.subtext },
 		pinnedMeta: { color: c.accent, fontWeight: '700' as const },
 		metaSep: { fontSize: 12, color: c.muted },
+		metaGlobalBadge: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 3,
+			paddingHorizontal: 8,
+			paddingVertical: 1,
+			borderRadius: 999,
+		},
+		metaGlobalText: {
+			fontSize: 11,
+			fontWeight: '700' as const,
+			textTransform: 'uppercase' as const,
+			letterSpacing: 0.5,
+		},
 		metaCatRow: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
@@ -1233,7 +1247,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderWidth: 1,
 			borderColor: 'rgba(245,158,11,0.35)',
 			flexShrink: 1,
-			maxWidth: '58%',
+			maxWidth: '58%' as const,
 		},
 		roundBadgeIcon: { fontSize: 11 },
 		roundBadgeText: {
@@ -2996,6 +3010,7 @@ function FeedPostCardComponent({
 	const showMatchStartsSoon = isMatchPost && isMatchNotStarted && isVotingClosed && !showCampaignWinner;
 	const showMatchCalculating = isMatchPost && isMatchFinished && isVotingClosed && !showCampaignWinner;
 	const catColors = categoryChipColors(post.category, isDark);
+	const globalBadgeColors = categoryChipColorsOrFallback(post.category, isDark);
 
 	const livePhaseLabel =
 		matchScore?.status === 'IN_PLAY' ? formatKnockoutLivePrefix(matchScore) : null;
@@ -3096,9 +3111,21 @@ function FeedPostCardComponent({
 							} else if (isUserGlobal) {
 								pushSep();
 								nodes.push(
-									<Text key="glob" style={st.metaText}>
-										🌍 Global
-									</Text>,
+									<View
+										key="glob"
+										style={[
+											st.metaGlobalBadge,
+											{ backgroundColor: globalBadgeColors.bg },
+										]}>
+										<Ionicons
+											name="earth-outline"
+											size={11}
+											color={globalBadgeColors.text}
+										/>
+										<Text style={[st.metaGlobalText, { color: globalBadgeColors.text }]}>
+											Global
+										</Text>
+									</View>,
 								);
 							}
 							if (categoryName && catColors) {

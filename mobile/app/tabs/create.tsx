@@ -39,6 +39,7 @@ import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
+import { Ionicons } from "@expo/vector-icons";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -1114,8 +1115,8 @@ export default function CreateScreen() {
               </View>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
                 {([
-                  { val: false, icon: "👥", title: "Friends only", desc: "Just your friends" },
-                  { val: true, icon: "🌍", title: "Everyone", desc: "Anyone on Ke Jitbe" },
+                  { val: false, ionIcon: "people-outline" as const, title: "Friends only", desc: "Just your friends" },
+                  { val: true, ionIcon: "earth-outline" as const, title: "Everyone", desc: "Anyone on Ke Jitbe" },
                 ] as const).map((o) => {
                   const active = broadcastGlobally === o.val;
                   return (
@@ -1130,7 +1131,7 @@ export default function CreateScreen() {
                         },
                       ]}
                     >
-                      <Text style={st.audIcon}>{o.icon}</Text>
+                      <Ionicons name={o.ionIcon} size={22} color={active ? colors.accent : colors.muted} style={st.audIcon} />
                       <Text style={[st.audTitle, { color: active ? colors.accent : colors.text }]}>{o.title}</Text>
                       <Text style={[st.audDesc, { color: colors.muted }]}>{o.desc}</Text>
                       {active && (
@@ -1144,8 +1145,8 @@ export default function CreateScreen() {
               </View>
               <Text style={[st.audHint, { color: colors.muted }]}>
                 {broadcastGlobally
-                  ? "🌍 Anyone on Ke Jitbe can see and vote — they'll see it's from you."
-                  : "👥 Only your friends can see and vote on this."}
+                  ? "Anyone on Ke Jitbe can see and vote — they'll see it's from you."
+                  : "Only your friends can see and vote on this."}
               </Text>
             </View>
           )}
@@ -1535,7 +1536,7 @@ const st = StyleSheet.create({
     alignItems: "center",
     gap: 2,
   },
-  audIcon: { fontSize: 22, marginBottom: 2 },
+  audIcon: { marginBottom: 2 },
   audTitle: { fontSize: 13.5, fontWeight: "800" },
   audDesc: { fontSize: 11, textAlign: "center" },
   audCheck: {

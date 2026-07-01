@@ -19,6 +19,7 @@ import {
   IconHeart,
   IconMore,
   IconOpenPost,
+  IconGlobe,
   IconShare,
   IconUsers,
 } from "./IgIcons";
@@ -1091,15 +1092,14 @@ function FeedPostCardComponent({
   // "Category" tooltip via the `data-tip` attribute.
   const categoryName = post.category?.name?.trim();
   const categoryRgb = categoryColorRgb(post.category);
+  const categoryRgbStyle = categoryRgb
+    ? ({ "--cat-rgb": categoryRgb } as CSSProperties)
+    : undefined;
   const categoryChip = categoryName ? (
     <span
       className="cx-post-category"
       data-tip="Category"
-      style={
-        categoryRgb
-          ? ({ "--cat-rgb": categoryRgb } as CSSProperties)
-          : undefined
-      }
+      style={categoryRgbStyle}
     >
       {categoryName}
     </span>
@@ -1920,6 +1920,7 @@ function FeedPostCardComponent({
   return (
     <article
       className={`ig-post${isPlatformPost ? " ig-post--platform" : ""}${isUserGlobalPost ? " ig-post--user-global" : ""}${hasCampaign ? " ig-post--campaign" : ""}${isLiveMatch ? " ig-post--live" : ""}`}
+      style={isUserGlobalPost ? categoryRgbStyle : undefined}
     >
       {isEndingSoon ? (
         <div className="cx-vote-ending-soon-banner" role="status" aria-live="polite">
@@ -1981,7 +1982,9 @@ function FeedPostCardComponent({
                   {post.authorDisplayName?.trim() || `@${post.authorUsername}`}
                 </span>
                 {isUserGlobalPost ? (
-                  <span className="cx-user-global-post-badge">Global</span>
+                  <span className="cx-user-global-post-badge" style={categoryRgbStyle}>
+                    <IconGlobe size={12} /> Global
+                  </span>
                 ) : null}
                 {categoryChip}{matchScoreChip}
               </span>
