@@ -14,8 +14,10 @@ import {
   CLAIM_DAILY_COINS,
   COIN_HISTORY,
   COIN_LEADERBOARD,
+  CURRENT_COIN_MONTH,
 } from "@ctrend/shared/graphql/coins";
 import { COIN_AMOUNTS, COIN_META, type CoinType } from "@ctrend/shared/lib/coins";
+import { currentCompetingMonthKey, formatCoinMonthLabel } from "@ctrend/shared/lib/coinMonth";
 import { formatRelativeTime } from "@ctrend/shared/lib/formatRelativeTime";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import { useAuth } from "../context/AuthContext";
@@ -90,6 +92,13 @@ export function CoinsHub({ userId }: { userId?: string }) {
     fetchPolicy: "cache-and-network",
   });
 
+  const { data: monthData } = useQuery<{ currentCoinMonth: string }>(CURRENT_COIN_MONTH, {
+    fetchPolicy: "cache-first",
+  });
+  const coinMonthLabel = formatCoinMonthLabel(
+    monthData?.currentCoinMonth || currentCompetingMonthKey(),
+  );
+
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
 
   const history = histData?.coinHistory ?? [];
@@ -125,6 +134,7 @@ export function CoinsHub({ userId }: { userId?: string }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={st.heroLabel}>{isSelf ? "YOUR COINS" : "COINS EARNED"}</Text>
+          <Text style={st.heroMonth}>{coinMonthLabel}</Text>
           <Text style={st.heroBalance}>{isSelf ? (balance ?? 0) : earnedTotal}</Text>
           {isSelf && (
             <Pressable style={st.claimBtn} onPress={() => void onClaim()} disabled={claiming}>
@@ -248,7 +258,7 @@ export function CoinsHub({ userId }: { userId?: string }) {
             keyExtractor: (r: LeaderRow) => r.user?.id ?? String(r.rank),
             renderItem: ({ item }: { item: LeaderRow }) => renderLeader(item),
             onEndReached: () => {},
-            empty: lbLoading ? "" : "No one has earned coins yet.",
+            empty: lbLoading ? "" : `No earners yet for ${coinMonthLabel}.`,
           }
         : {
             data: EARN_ORDER as CoinType[],
@@ -326,6 +336,7 @@ function makeStyles(c: ColorPalette) {
     },
     heroCoinGlyph: { color: "#7a4a05", fontWeight: "900", fontSize: 28 },
     heroLabel: { color: c.muted, fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+    heroMonth: { color: c.subtext, fontSize: 10, fontWeight: "600", marginTop: 2 },
     heroBalance: { color: c.text, fontSize: 34, fontWeight: "900", lineHeight: 38 },
     claimBtn: {
       alignSelf: "flex-start",

@@ -1,6 +1,6 @@
 import { gql } from "@apollo/client";
 
-/** Viewer's lifetime coin balance. */
+/** Viewer's current-month coin balance. */
 export const MY_COINS = gql`
   query MyCoins {
     myCoins
@@ -26,7 +26,7 @@ export const COIN_HISTORY = gql`
   }
 `;
 
-/** All-time leaderboard — top coin earners. */
+/** Current-month leaderboard — top coin earners. */
 export const COIN_LEADERBOARD = gql`
   query CoinLeaderboard($take: Int) {
     coinLeaderboard(take: $take) {
@@ -56,6 +56,24 @@ export const CLAIM_DAILY_COINS = gql`
       awarded
       balance
       streakDays
+    }
+  }
+`;
+
+/** Active UTC competition month (`YYYY-MM`). */
+export const CURRENT_COIN_MONTH = gql`
+  query CurrentCoinMonth {
+    currentCoinMonth
+  }
+`;
+
+/** Lifetime monthly-podium finish counts (1st / 2nd / 3rd). */
+export const MONTHLY_PODIUM_STATS = gql`
+  query MonthlyPodiumStats($userId: ID!) {
+    monthlyPodiumStats(userId: $userId) {
+      firstPlaceCount
+      secondPlaceCount
+      thirdPlaceCount
     }
   }
 `;

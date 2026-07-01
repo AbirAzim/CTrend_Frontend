@@ -423,6 +423,7 @@ export const PLATFORM_SETTINGS = gql`
     platformSettings {
       allowUserGlobalPosts
       referralSystemEnabled
+      currentCoinMonthKey
       minAndroidVersionCode
       androidUpdateTitle
       androidUpdateBody

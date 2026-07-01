@@ -11,16 +11,18 @@ import {
   View,
 } from "react-native";
 import { USER_CAMPAIGN_WIN_SUMMARY } from "@ctrend/shared/graphql/campaigns";
-import { CLAIM_DAILY_COINS, REFERRAL_POINTS } from "@ctrend/shared/graphql/coins";
+import { CLAIM_DAILY_COINS, REFERRAL_POINTS, MONTHLY_PODIUM_STATS } from "@ctrend/shared/graphql/coins";
 import { REDEEM_REFERRAL_CODE } from "@ctrend/shared/graphql/referrals";
 import { PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
+import { currentCompetingMonthKey, formatCoinMonthLabel } from "@ctrend/shared/lib/coinMonth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useCoins } from "../context/CoinsContext";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 import { InviteFriendModal } from "./InviteFriendModal";
 import { LeaderboardRankBadge } from "./LeaderboardRankBadge";
+import { MonthlyPodiumBadge } from "./MonthlyPodiumBadge";
 import { useCoinLeaderboardRank } from "../hooks/useCoinLeaderboardRank";
 
 type CampaignWinRow = {
@@ -58,11 +60,29 @@ export function ProfileEngagementPanel({
     REFERRAL_POINTS,
     { variables: { userId }, fetchPolicy: "cache-and-network" },
   );
-  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean; currentCoinMonthKey: string } }>(
     PLATFORM_SETTINGS,
     { fetchPolicy: "cache-first" },
   );
+  const { data: podiumData } = useQuery<{
+    monthlyPodiumStats: {
+      firstPlaceCount: number;
+      secondPlaceCount: number;
+      thirdPlaceCount: number;
+    };
+  }>(MONTHLY_PODIUM_STATS, {
+    variables: { userId },
+    fetchPolicy: "cache-and-network",
+  });
   const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
+  const coinMonthKey =
+    settingsData?.platformSettings?.currentCoinMonthKey?.trim() || currentCompetingMonthKey();
+  const coinMonthLabel = formatCoinMonthLabel(coinMonthKey);
+  const podiumStats = podiumData?.monthlyPodiumStats ?? {
+    firstPlaceCount: 0,
+    secondPlaceCount: 0,
+    thirdPlaceCount: 0,
+  };
   const coinRank = useCoinLeaderboardRank(userId, coins);
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
   const [redeem, { loading: redeeming }] = useMutation(REDEEM_REFERRAL_CODE);
@@ -127,12 +147,13 @@ export function ProfileEngagementPanel({
           <Text style={st.cardLabel}>Coins</Text>
           <Text style={st.cardValue}>{coins.toLocaleString()}</Text>
           <Text style={st.cardSub} numberOfLines={2}>
-            {isSelf ? "Activity & voting" : `${displayName ?? "Member"}`}
+            {isSelf ? `Activity · ${coinMonthLabel}` : `${displayName ?? "Member"}`}
           </Text>
+          <MonthlyPodiumBadge stats={podiumStats} />
           {coinRank ? (
             <View style={st.rankChip}>
               <LeaderboardRankBadge rank={coinRank} size="sm" />
-              <Text style={st.rankChipLabel}>Leaderboard</Text>
+              <Text style={st.rankChipLabel}>This month</Text>
             </View>
           ) : null}
           {isSelf ? (

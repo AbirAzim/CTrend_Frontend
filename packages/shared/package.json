@@ -24,6 +24,7 @@
     "./lib/campaignWinner": "./src/lib/campaignWinner.ts",
     "./lib/campaignUi": "./src/lib/campaignUi.ts",
     "./lib/coins": "./src/lib/coins.ts",
+    "./lib/coinMonth": "./src/lib/coinMonth.ts",
     "./lib/contentReport": "./src/lib/contentReport.ts",
     "./lib/formatRelativeTime": "./src/lib/formatRelativeTime.ts",
     "./lib/knockoutFixture": "./src/lib/knockoutFixture.ts",

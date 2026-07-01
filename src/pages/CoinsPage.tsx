@@ -5,10 +5,12 @@ import {
   CLAIM_DAILY_COINS,
   COIN_HISTORY,
   COIN_LEADERBOARD,
+  CURRENT_COIN_MONTH,
 } from "../graphql/coins";
 import { useAuth } from "../context/AuthContext";
 import { useCoins } from "../context/CoinsContext";
 import { COIN_AMOUNTS, COIN_META, type CoinType } from "../lib/coins";
+import { formatCoinMonthLabel, currentCompetingMonthKey } from "@ctrend/shared/lib/coinMonth";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
@@ -75,6 +77,13 @@ export function CoinsPage() {
     fetchPolicy: "cache-and-network",
   });
 
+  const { data: monthData } = useQuery<{ currentCoinMonth: string }>(CURRENT_COIN_MONTH, {
+    fetchPolicy: "cache-first",
+  });
+  const coinMonthLabel = formatCoinMonthLabel(
+    monthData?.currentCoinMonth || currentCompetingMonthKey(),
+  );
+
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
 
   const history = histData?.coinHistory ?? [];
@@ -112,6 +121,7 @@ export function CoinsPage() {
         <div className="cx-coins-hero-body">
           <div className="cx-coins-hero-label">
             {isSelf ? "Your coins" : "Coins earned"}
+            <span className="cx-coins-hero-month">{coinMonthLabel}</span>
           </div>
           <div className="cx-coins-hero-balance">
             {isSelf ? (balance ?? 0) : earnedTotal}
@@ -211,8 +221,9 @@ export function CoinsPage() {
 
       {tab === "leaderboard" && (
         <div className="cx-coins-list">
+          <p className="cx-coins-list-kicker">Top earners · {coinMonthLabel}</p>
           {leaderboard.length === 0 && !lbLoading && (
-            <div className="cx-coins-empty">No one has earned coins yet.</div>
+            <div className="cx-coins-empty">No one has earned coins this month yet.</div>
           )}
           {leaderboard.map((row) => {
             const u = row.user;

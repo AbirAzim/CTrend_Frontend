@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@apollo/client";
 import { Link } from "react-router-dom";
 import { USER_CAMPAIGN_WIN_SUMMARY } from "../graphql/campaigns";
-import { CLAIM_DAILY_COINS, REFERRAL_POINTS } from "../graphql/coins";
+import { CLAIM_DAILY_COINS, REFERRAL_POINTS, MONTHLY_PODIUM_STATS } from "../graphql/coins";
 import { REDEEM_REFERRAL_CODE } from "../graphql/referrals";
 import { PLATFORM_SETTINGS } from "../graphql/admin";
 import { useCoins } from "../context/CoinsContext";
@@ -9,7 +9,9 @@ import { COIN_AMOUNTS } from "../lib/coins";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useState } from "react";
 import { LeaderboardRankBadge } from "./LeaderboardRankBadge";
+import { MonthlyPodiumBadge } from "./MonthlyPodiumBadge";
 import { useCoinLeaderboardRank } from "../hooks/useCoinLeaderboardRank";
+import { currentCompetingMonthKey, formatCoinMonthLabel } from "@ctrend/shared/lib/coinMonth";
 
 type CampaignWinRow = {
   campaignId?: string | null;
@@ -45,11 +47,29 @@ export function ProfileEngagementPanel({
     REFERRAL_POINTS,
     { variables: { userId }, fetchPolicy: "cache-and-network" },
   );
-  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean; currentCoinMonthKey: string } }>(
     PLATFORM_SETTINGS,
     { fetchPolicy: "cache-first" },
   );
+  const { data: podiumData } = useQuery<{
+    monthlyPodiumStats: {
+      firstPlaceCount: number;
+      secondPlaceCount: number;
+      thirdPlaceCount: number;
+    };
+  }>(MONTHLY_PODIUM_STATS, {
+    variables: { userId },
+    fetchPolicy: "cache-and-network",
+  });
   const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
+  const coinMonthKey =
+    settingsData?.platformSettings?.currentCoinMonthKey?.trim() || currentCompetingMonthKey();
+  const coinMonthLabel = formatCoinMonthLabel(coinMonthKey);
+  const podiumStats = podiumData?.monthlyPodiumStats ?? {
+    firstPlaceCount: 0,
+    secondPlaceCount: 0,
+    thirdPlaceCount: 0,
+  };
   const coinRank = useCoinLeaderboardRank(userId, coins);
   const [claim, { loading: claiming }] = useMutation(CLAIM_DAILY_COINS);
   const [redeem, { loading: redeeming }] = useMutation(REDEEM_REFERRAL_CODE);
@@ -109,115 +129,160 @@ export function ProfileEngagementPanel({
     <section className="cx-profile-engage" aria-label="Rewards and achievements">
       <p className="cx-profile-engage-kicker">Rewards & achievements</p>
       <div className="cx-profile-engage-grid">
-        <Link to={coinsHref} className="cx-profile-reward-card cx-profile-reward-card--coins">
+        <div className="cx-profile-reward-card cx-profile-reward-card--coins cx-profile-reward-card--square">
           <span className="cx-profile-reward-card-glow" aria-hidden />
-          <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--coin" aria-hidden>¢</span>
-          <span className="cx-profile-reward-card-label">Engagement coins</span>
-          <span className="cx-profile-reward-card-value">{coins.toLocaleString()}</span>
-          <div className="cx-profile-reward-card-sub-row">
-            <span className="cx-profile-reward-card-sub">
-              {isSelf ? "Activity & voting" : `${displayName ?? "Member"}'s balance`}
-            </span>
+          <div className="cx-profile-reward-top">
+            <div className="cx-profile-reward-top-text">
+              <span className="cx-profile-reward-card-label">Engagement coins</span>
+              <span className="cx-profile-reward-card-value">{coins.toLocaleString()}</span>
+              <span className="cx-profile-reward-card-sub">
+                {isSelf ? coinMonthLabel : `${displayName ?? "Member"}'s balance`}
+              </span>
+            </div>
+            <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--coin" aria-hidden>¢</span>
+          </div>
+
+          <div className="cx-profile-coin-stats cx-profile-coin-stats--compact">
             {coinRank ? (
-              <span className="cx-profile-rank-chip">
-                <LeaderboardRankBadge rank={coinRank} size="sm" />
-                <span className="cx-profile-rank-chip-label">Leaderboard</span>
+              <div className="cx-profile-coin-stat cx-profile-coin-stat--rank">
+                <span className="cx-profile-coin-stat-kicker">This month</span>
+                <div className="cx-profile-coin-stat-body">
+                  <LeaderboardRankBadge rank={coinRank} size="sm" />
+                </div>
+              </div>
+            ) : (
+              <div className="cx-profile-coin-stat cx-profile-coin-stat--rank cx-profile-coin-stat--empty">
+                <span className="cx-profile-coin-stat-kicker">This month</span>
+                <span className="cx-profile-coin-rank-text">No rank yet</span>
+              </div>
+            )}
+            <div className="cx-profile-coin-stat cx-profile-coin-stat--podium">
+              <span className="cx-profile-coin-stat-kicker">Podiums</span>
+              <MonthlyPodiumBadge stats={podiumStats} layout="grid" />
+            </div>
+          </div>
+
+          <div className="cx-profile-reward-foot">
+            {isSelf ? (
+              <button
+                type="button"
+                className="cx-profile-reward-claim cx-profile-reward-claim--compact"
+                disabled={claiming}
+                onClick={(e) => void onClaim(e)}
+                title="Claim daily bonus"
+              >
+                {claiming ? "…" : "📅 Daily"}
+              </button>
+            ) : null}
+            <Link to={coinsHref} className="cx-profile-card-action cx-profile-card-action--coins">
+              History
+            </Link>
+            {claimMsg ? (
+              <span className="cx-profile-reward-claim-msg" role="status">
+                {claimMsg}
               </span>
             ) : null}
           </div>
-          {isSelf ? (
-            <button
-              type="button"
-              className="cx-profile-reward-claim"
-              disabled={claiming}
-              onClick={(e) => void onClaim(e)}
-            >
-              {claiming ? "Claiming…" : "📅 Daily bonus"}
-            </button>
-          ) : null}
-          {claimMsg ? <span className="cx-profile-reward-claim-msg" role="status">{claimMsg}</span> : null}
-          <span className="cx-profile-reward-card-cta">View history ›</span>
-        </Link>
+        </div>
 
-        <div className="cx-profile-reward-card cx-profile-reward-card--wins">
-          <Link to={campaignHref} className="cx-profile-reward-card-link">
-            <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--wins" aria-hidden />
-            <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--trophy" aria-hidden>🏆</span>
-            <span className="cx-profile-reward-card-label">Campaign wins</span>
-            <span className="cx-profile-reward-card-value">{totalWins > 0 ? totalWins : "—"}</span>
-            <span className="cx-profile-reward-card-sub">
-              {totalWins > 0
-                ? `${totalWins} ${totalWins === 1 ? "victory" : "victories"}`
-                : isSelf
-                  ? "Vote in match posts"
-                  : "No victories yet"}
-            </span>
-            <div className="cx-profile-reward-wins-body">
-              {loading && wins.length === 0 ? (
-                <p className="cx-profile-reward-wins-loading muted small">Loading…</p>
-              ) : wins.length === 0 ? null : (
-                <ul className="cx-profile-reward-wins-list">
-                  {wins.slice(0, 2).map((row) => {
-                    const href = row.campaignSlug ? `/campaign/${row.campaignSlug}` : null;
-                    const rowInner = (
-                      <>
-                        <span className="cx-profile-reward-win-name">{row.campaignName}</span>
-                        <span className="cx-profile-reward-win-badge">
-                          {row.wins}w
-                        </span>
-                      </>
-                    );
-                    return (
-                      <li key={row.campaignId ?? row.campaignName}>
-                        {href ? (
-                          <Link to={href} className="cx-profile-reward-win-row" onClick={(e) => e.stopPropagation()}>{rowInner}</Link>
-                        ) : (
-                          <div className="cx-profile-reward-win-row">{rowInner}</div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+        <div className="cx-profile-reward-card cx-profile-reward-card--wins cx-profile-reward-card--square">
+          <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--wins" aria-hidden />
+          <div className="cx-profile-reward-top">
+            <div className="cx-profile-reward-top-text">
+              <span className="cx-profile-reward-card-label">Campaign wins</span>
+              <span className="cx-profile-reward-card-value">{totalWins > 0 ? totalWins : "—"}</span>
+              <span className="cx-profile-reward-card-sub">
+                {totalWins > 0 ? `${totalWins} wins` : isSelf ? "Match posts" : "None yet"}
+              </span>
             </div>
-            <span className="cx-profile-reward-card-cta">View campaigns ›</span>
-          </Link>
+            <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--trophy" aria-hidden>🏆</span>
+          </div>
+          <div className="cx-profile-reward-wins-body">
+            {loading && wins.length === 0 ? (
+              <p className="cx-profile-reward-wins-loading muted small">Loading…</p>
+            ) : wins.length === 0 ? (
+              <p className="cx-profile-reward-wins-empty">Vote in campaigns to win</p>
+            ) : (
+              <ul className="cx-profile-reward-wins-list">
+                {wins.slice(0, 1).map((row) => {
+                  const href = row.campaignSlug ? `/campaign/${row.campaignSlug}` : null;
+                  return (
+                    <li key={row.campaignId ?? row.campaignName}>
+                      {href ? (
+                        <Link to={href} className="cx-profile-reward-win-row">
+                          <span className="cx-profile-reward-win-name">{row.campaignName}</span>
+                          <span className="cx-profile-reward-win-badge">{row.wins}w</span>
+                        </Link>
+                      ) : (
+                        <div className="cx-profile-reward-win-row">
+                          <span className="cx-profile-reward-win-name">{row.campaignName}</span>
+                          <span className="cx-profile-reward-win-badge">{row.wins}w</span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <div className="cx-profile-reward-foot">
+            <Link to={campaignHref} className="cx-profile-card-action cx-profile-card-action--wins">
+              Campaigns
+            </Link>
+          </div>
         </div>
 
         <div
-          className={`cx-profile-reward-card cx-profile-reward-card--points${referralEnabled ? "" : " cx-profile-reward-card--paused"}`}
+          className={`cx-profile-reward-card cx-profile-reward-card--points cx-profile-reward-card--square${referralEnabled ? "" : " cx-profile-reward-card--paused"}`}
           aria-disabled={!referralEnabled}
         >
           {referralEnabled ? (
-            <Link to={pointsHref} className="cx-profile-reward-card-link">
+            <>
               <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
-              <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
-              <span className="cx-profile-reward-card-label">Referral points</span>
-              <span className="cx-profile-reward-card-value">{referralPoints > 0 ? referralPoints : "—"}</span>
-              <span className="cx-profile-reward-card-sub">
-                {referralPoints > 0
-                  ? isSelf
-                    ? "From invites & codes · 10 pts = 10 BDT"
-                    : "Invite rewards earned"
-                  : isSelf
-                    ? "Invite friends to earn"
-                    : "No invite points yet"}
-              </span>
-              <span className="cx-profile-reward-card-cta">View history ›</span>
-            </Link>
+              <div className="cx-profile-reward-top">
+                <div className="cx-profile-reward-top-text">
+                  <span className="cx-profile-reward-card-label">Referral points</span>
+                  <span className="cx-profile-reward-card-value">{referralPoints > 0 ? referralPoints : "—"}</span>
+                  <span className="cx-profile-reward-card-sub">
+                    {referralPoints > 0
+                      ? isSelf ? "10 pts = 10 BDT" : "Invite rewards"
+                      : isSelf ? "Invite friends" : "None yet"}
+                  </span>
+                </div>
+                <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points" aria-hidden>✦</span>
+              </div>
+              <div className="cx-profile-reward-points-body">
+                <p className="cx-profile-reward-points-hint">
+                  {isSelf ? "Earn from invites & codes" : "Referral balance"}
+                </p>
+              </div>
+              <div className="cx-profile-reward-foot">
+                <Link to={pointsHref} className="cx-profile-card-action cx-profile-card-action--points">
+                  History
+                </Link>
+              </div>
+            </>
           ) : (
-            <div className="cx-profile-reward-card-link cx-profile-reward-card-link--static">
-              <span className="cx-profile-reward-card-glow cx-profile-reward-card-glow--points" aria-hidden />
-              <span className="cx-profile-reward-card-paused-badge">Paused</span>
-              <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points cx-profile-reward-card-icon--paused" aria-hidden>✦</span>
-              <span className="cx-profile-reward-card-label">Referral points</span>
-              <span className="cx-profile-reward-card-value cx-profile-reward-card-value--paused">—</span>
-              <span className="cx-profile-reward-card-sub cx-profile-reward-card-paused-note">
-                {isSelf
-                  ? "Rewards paused · invites still work below"
-                  : "Not available"}
-              </span>
-            </div>
+            <>
+              <div className="cx-profile-reward-top">
+                <div className="cx-profile-reward-top-text">
+                  <span className="cx-profile-reward-card-label">Referral points</span>
+                  <span className="cx-profile-reward-card-value cx-profile-reward-card-value--paused">—</span>
+                  <span className="cx-profile-reward-card-sub cx-profile-reward-card-paused-note">
+                    Referral rewards are paused
+                  </span>
+                </div>
+                <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--points cx-profile-reward-card-icon--paused" aria-hidden>✦</span>
+              </div>
+              <div className="cx-profile-reward-points-body cx-profile-reward-points-body--paused">
+                <span className="cx-profile-reward-paused-chip">Paused</span>
+              </div>
+              <div className="cx-profile-reward-foot">
+                <span className="cx-profile-card-action cx-profile-card-action--points cx-profile-card-action--disabled">
+                  Unavailable
+                </span>
+              </div>
+            </>
           )}
         </div>
       </div>

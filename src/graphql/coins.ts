@@ -1,6 +1,6 @@
 import { gql } from "@apollo/client";
 
-/** Viewer's lifetime coin balance. */
+/** Viewer's current-month coin balance. */
 export const MY_COINS = gql`
   query MyCoins {
     myCoins
@@ -13,7 +13,7 @@ export const REFERRAL_POINTS = gql`
   }
 `;
 
-/** Public coin history for any user (defaults to the viewer when omitted). */
+/** Public coin history for the current UTC month. */
 export const COIN_HISTORY = gql`
   query CoinHistory($userId: ID, $skip: Int, $take: Int) {
     coinHistory(userId: $userId, skip: $skip, take: $take) {
@@ -25,7 +25,7 @@ export const COIN_HISTORY = gql`
   }
 `;
 
-/** All-time leaderboard — top coin earners. */
+/** Current-month leaderboard — top coin earners. */
 export const COIN_LEADERBOARD = gql`
   query CoinLeaderboard($take: Int) {
     coinLeaderboard(take: $take) {
@@ -41,20 +41,35 @@ export const COIN_LEADERBOARD = gql`
   }
 `;
 
-/** Leaderboard position for a user (null if no coins earned). */
+/** Leaderboard position for the current month. */
 export const COIN_LEADERBOARD_RANK = gql`
   query CoinLeaderboardRank($userId: ID) {
     coinLeaderboardRank(userId: $userId)
   }
 `;
 
-/** Claim the once-a-day login streak bonus. */
 export const CLAIM_DAILY_COINS = gql`
   mutation ClaimDailyCoins {
     claimDailyCoins {
       awarded
       balance
       streakDays
+    }
+  }
+`;
+
+export const CURRENT_COIN_MONTH = gql`
+  query CurrentCoinMonth {
+    currentCoinMonth
+  }
+`;
+
+export const MONTHLY_PODIUM_STATS = gql`
+  query MonthlyPodiumStats($userId: ID!) {
+    monthlyPodiumStats(userId: $userId) {
+      firstPlaceCount
+      secondPlaceCount
+      thirdPlaceCount
     }
   }
 `;
