@@ -8907,6 +8907,116 @@ a.cx-friend-avatar:hover {
   border-color: rgb(var(--cx-accent-rgb) / 0.5);
 }
 
+/* ── Source picker bottom sheet ── */
+.ig-source-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 900;
+  display: flex;
+  align-items: flex-end;
+  animation: ig-source-fade 0.18s ease;
+}
+
+@keyframes ig-source-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.ig-source-sheet {
+  width: 100%;
+  background: var(--ig-white);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 16px max(24px, env(safe-area-inset-bottom));
+  animation: ig-source-slide 0.28s var(--cx-ease-spring);
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ig-source-sheet {
+    background: #1c1c1e;
+  }
+}
+
+@keyframes ig-source-slide {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.ig-source-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(var(--cx-ink-rgb) / 0.18);
+  margin: 0 auto 18px;
+}
+
+.ig-source-sheet-title {
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cx-ink);
+  margin: 0 0 18px;
+  letter-spacing: -0.01em;
+}
+
+.ig-source-sheet-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ig-source-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 8px;
+  border: 1.5px solid rgb(var(--cx-accent-rgb) / 0.15);
+  border-radius: 16px;
+  background: rgb(var(--cx-accent-rgb) / 0.04);
+  color: var(--cx-ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.ig-source-option:active {
+  transform: scale(0.94);
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+}
+
+.ig-source-option-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.ig-source-sheet-cancel {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 14px;
+  background: rgb(var(--cx-ink-rgb) / 0.07);
+  color: var(--cx-ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.ig-source-sheet-cancel:active {
+  background: rgb(var(--cx-ink-rgb) / 0.14);
+}
+
 /* ── Settings card ── */
 .ig-create-settings-card {
   background: rgb(255 255 255 / 0.6);

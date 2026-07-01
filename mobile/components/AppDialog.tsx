@@ -15,6 +15,8 @@ type ActionSheetProps = {
 	message?: string;
 	actions: DialogAction[];
 	onClose: () => void;
+	/** When true, renders as a centered card instead of a bottom sheet. */
+	centered?: boolean;
 };
 
 /** Bottom sheet action picker — replaces native Alert.alert option lists. */
@@ -24,9 +26,53 @@ export function AppActionSheet({
 	message,
 	actions,
 	onClose,
+	centered = false,
 }: ActionSheetProps) {
 	const { colors } = useTheme();
 	const insets = useSafeAreaInsets();
+
+	if (centered) {
+		return (
+			<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+				<View style={styles.centeredRoot}>
+					<Pressable style={styles.overlay} onPress={onClose} />
+					<View style={[styles.centeredCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+						{title ? (
+							<Text style={[styles.centeredTitle, { color: colors.text }]}>{title}</Text>
+						) : null}
+						{message ? (
+							<Text style={[styles.message, { color: colors.subtext }]}>{message}</Text>
+						) : null}
+						{actions.map((action, i) => (
+							<Pressable
+								key={`${action.label}-${i}`}
+								style={[
+									styles.centeredRow,
+									i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+									action.cancel && [styles.centeredCancelRow, { borderTopWidth: 1, borderTopColor: colors.border }],
+								]}
+								onPress={() => {
+									onClose();
+									action.onPress();
+								}}
+							>
+								<Text
+									style={[
+										styles.centeredRowText,
+										action.destructive && styles.destructiveText,
+										action.cancel && { color: colors.muted, fontSize: 15, fontWeight: "600" },
+										!action.destructive && !action.cancel && { color: colors.accent },
+									]}
+								>
+									{action.label}
+								</Text>
+							</Pressable>
+						))}
+					</View>
+				</View>
+			</Modal>
+		);
+	}
 
 	return (
 		<Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -160,6 +206,42 @@ export function AppConfirmDialog({
 
 const styles = StyleSheet.create({
 	root: { flex: 1, justifyContent: "flex-end" },
+	centeredRoot: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 32,
+	},
+	centeredCard: {
+		width: "100%",
+		maxWidth: 320,
+		borderRadius: 20,
+		borderWidth: 1,
+		overflow: "hidden",
+	},
+	centeredTitle: {
+		fontSize: 15,
+		fontWeight: "800",
+		textAlign: "center",
+		paddingHorizontal: 20,
+		paddingTop: 20,
+		paddingBottom: 14,
+		letterSpacing: -0.2,
+	},
+	centeredRow: {
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+	},
+	centeredCancelRow: {
+		paddingVertical: 14,
+		paddingHorizontal: 20,
+		marginTop: 4,
+	},
+	centeredRowText: {
+		fontSize: 16,
+		fontWeight: "700",
+		textAlign: "center",
+	},
 	confirmRoot: {
 		flex: 1,
 		justifyContent: "center",

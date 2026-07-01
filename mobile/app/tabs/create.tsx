@@ -296,6 +296,9 @@ export default function CreateScreen() {
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
 
+  const scrollRef = useRef<import("react-native").ScrollView>(null);
+  const [pasteUrlActiveId, setPasteUrlActiveId] = useState<string | null>(null);
+
   // Hide the floating tab bar while this screen is focused so its own action
   // buttons are unobstructed; restore it on blur. Focus-based (not mount-based)
   // because this tab screen stays mounted between visits.
@@ -459,7 +462,13 @@ export default function CreateScreen() {
   function addSlot() {
     const max = isPoll ? 8 : 4;
     if (slots.length >= max) return;
-    setSlots((prev) => [...prev, makeSlot(String(Date.now()))]);
+    const newId = String(Date.now());
+    setSlots((prev) => [...prev, makeSlot(newId)]);
+    // Scroll to the new slot and immediately offer the image picker
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+      setImageSheetSlotId(newId);
+    }, 150);
   }
   function removeSlot(id: string) {
     if (slots.length <= 2) return;
@@ -783,6 +792,7 @@ export default function CreateScreen() {
   return (
     <KeyboardAvoidingView style={[{ flex: 1, backgroundColor: colors.bg }]} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: insets.bottom + 100, gap: 14 }}
         keyboardShouldPersistTaps="handled"
@@ -941,8 +951,8 @@ export default function CreateScreen() {
                       <Text style={[st.positionBtnText, { color: colors.subtext }]}>🔁 Replace photo</Text>
                     </Pressable>
                   ) : null}
-                  {/* Paste URL — new options only */}
-                  {!locked && (
+                  {/* Paste URL — hidden until user opens it from the sheet, or already has a URL typed */}
+                  {!locked && (pasteUrlActiveId === slot.id || slot.pasteUrl !== "") && (
                     <TextInput
                       style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
                       value={slot.pasteUrl}
@@ -950,10 +960,13 @@ export default function CreateScreen() {
                         patchSlot(slot.id, { pasteUrl: v });
                         if (v.trim().startsWith("http")) void applyPasteUrl(slot.id, v);
                       }}
-                      placeholder="or paste URL"
+                      onFocus={() => setPasteUrlActiveId(slot.id)}
+                      onBlur={() => { if (!slot.pasteUrl) setPasteUrlActiveId(null); }}
+                      placeholder="Paste image URL…"
                       placeholderTextColor={colors.muted}
                       autoCapitalize="none"
                       keyboardType="url"
+                      autoFocus={pasteUrlActiveId === slot.id && !slot.pasteUrl}
                     />
                   )}
                   {/* Label — always editable, even for existing options. */}
@@ -1415,6 +1428,7 @@ export default function CreateScreen() {
       />
 
       <AppActionSheet
+        centered
         visible={imageSheetSlotId !== null}
         title={imageSheetSlot?.localUri || imageSheetSlot?.publicUrl ? "Image options" : "Add image"}
         onClose={() => setImageSheetSlotId(null)}
@@ -1460,6 +1474,10 @@ export default function CreateScreen() {
                 {
                   label: "Take a photo",
                   onPress: () => void pickAndUpload(imageSheetSlotId!, true),
+                },
+                {
+                  label: "Paste URL",
+                  onPress: () => setPasteUrlActiveId(imageSheetSlotId!),
                 },
                 { label: "Cancel", cancel: true, onPress: () => {} },
               ]

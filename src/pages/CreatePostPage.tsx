@@ -23,6 +23,7 @@ type DraftCompareItem = {
   imageFocalX: number;
   imageFocalY: number;
   localPreview?: string;
+  imageSource?: "upload" | "url";
 };
 
 type CategoriesQueryData = {
@@ -62,6 +63,8 @@ export function CreatePostPage() {
   const { user } = useAuth();
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const cameraInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const lastItemRef = useRef<HTMLDivElement | null>(null);
 
   const [caption, setCaption] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -76,6 +79,8 @@ export function CreatePostPage() {
   const [positionEditId, setPositionEditId] = useState<string | null>(null);
   // Pending crop: compare images pass through the crop+zoom editor before upload.
   const [cropper, setCropper] = useState<{ id: string; url: string } | null>(null);
+  const [sourcePicker, setSourcePicker] = useState<string | null>(null);
+  const [urlEditId, setUrlEditId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -101,6 +106,8 @@ export function CreatePostPage() {
 
   function handleFileChange(id: string, file: File | undefined) {
     if (!file) return;
+    setSourcePicker(null);
+    setUrlEditId(null);
     if (!isPoll && !isAnnouncement) {
       // Compare images go through the crop+zoom editor for a uniform shape.
       setCropper({ id, url: URL.createObjectURL(file) });
@@ -116,7 +123,7 @@ export function CreatePostPage() {
     setItems((prev) =>
       prev.map((it) =>
         it.id === id
-          ? { ...it, localPreview, imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL }
+          ? { ...it, localPreview, imageSource: "upload", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL }
           : it,
       ),
     );
@@ -455,16 +462,22 @@ export function CreatePostPage() {
   }
 
   function addItem() {
+    const newId = String(Date.now());
     setItems((prev) => [
       ...prev,
       {
-        id: String(Date.now()),
+        id: newId,
         imageUrl: "",
         title: "",
         imageFocalX: DEFAULT_IMAGE_FOCAL,
         imageFocalY: DEFAULT_IMAGE_FOCAL,
       },
     ]);
+    // Scroll new slot into view and immediately offer the source picker
+    setTimeout(() => {
+      lastItemRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      setSourcePicker(newId);
+    }, 120);
   }
 
   function removeItem(id: string) {
@@ -484,6 +497,7 @@ export function CreatePostPage() {
           return {
             ...it,
             imageUrl: value,
+            imageSource: "url",
             imageFocalX: DEFAULT_IMAGE_FOCAL,
             imageFocalY: DEFAULT_IMAGE_FOCAL,
           };
@@ -667,11 +681,25 @@ export function CreatePostPage() {
         <div className="ig-create-vs-wrap">
           <div className="ig-compare-grid">
             {items.map((item, idx) => (
-              <div className="ig-compare-slot" key={item.id}>
+              <div
+                className="ig-compare-slot"
+                key={item.id}
+                ref={idx === items.length - 1 ? lastItemRef : null}
+              >
                 <input
                   ref={(el) => { fileInputRefs.current[item.id] = el; }}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                  style={{ display: "none" }}
+                  onChange={(ev) =>
+                    void handleFileChange(item.id, ev.target.files?.[0])
+                  }
+                />
+                <input
+                  ref={(el) => { cameraInputRefs.current[item.id] = el; }}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
                   style={{ display: "none" }}
                   onChange={(ev) =>
                     void handleFileChange(item.id, ev.target.files?.[0])
@@ -694,7 +722,7 @@ export function CreatePostPage() {
                           }
                         : undefined
                     }
-                    onClick={() => fileInputRefs.current[item.id]?.click()}
+                    onClick={() => setSourcePicker(item.id)}
                     disabled={uploadingId === item.id}
                     aria-label={`Upload image for option ${LABELS[idx] ?? idx + 1}`}
                   >
@@ -724,7 +752,7 @@ export function CreatePostPage() {
                       <button
                         type="button"
                         className="ig-compare-zone-action"
-                        onClick={() => fileInputRefs.current[item.id]?.click()}
+                        onClick={() => setSourcePicker(item.id)}
                       >
                         Change
                       </button>
@@ -732,15 +760,18 @@ export function CreatePostPage() {
                   ) : null}
                 </div>
 
-                <input
-                  type="url"
-                  className="ig-compare-url-input"
-                  value={item.imageUrl}
-                  onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
-                  placeholder="or paste URL"
-                  autoComplete="off"
-                  disabled={uploadingId === item.id}
-                />
+                {(urlEditId === item.id || item.imageSource === "url") && (
+                  <input
+                    type="url"
+                    className="ig-compare-url-input"
+                    value={item.imageUrl}
+                    onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
+                    placeholder="Paste image URL…"
+                    autoComplete="off"
+                    autoFocus={urlEditId === item.id}
+                    disabled={uploadingId === item.id}
+                  />
+                )}
 
                 <input
                   id={`create-item-title-${item.id}`}
@@ -1133,6 +1164,69 @@ export function CreatePostPage() {
           }}
         />
       ) : null}
+
+      {sourcePicker && (() => {
+        const pickerItem = items.find((it) => it.id === sourcePicker);
+        const hasImage = !!(pickerItem?.imageUrl || pickerItem?.localPreview);
+        return (
+          <div
+            className="ig-source-sheet-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose image source"
+            onClick={() => setSourcePicker(null)}
+          >
+            <div className="ig-source-sheet" onClick={(e) => e.stopPropagation()}>
+              <div className="ig-source-sheet-handle" />
+              <p className="ig-source-sheet-title">
+                {hasImage ? "Change image" : "Add image"}
+              </p>
+              <div className="ig-source-sheet-options">
+                <button
+                  type="button"
+                  className="ig-source-option"
+                  onClick={() => {
+                    cameraInputRefs.current[sourcePicker]?.click();
+                    setSourcePicker(null);
+                  }}
+                >
+                  <span className="ig-source-option-icon">📷</span>
+                  <span>Camera</span>
+                </button>
+                <button
+                  type="button"
+                  className="ig-source-option"
+                  onClick={() => {
+                    fileInputRefs.current[sourcePicker]?.click();
+                    setSourcePicker(null);
+                  }}
+                >
+                  <span className="ig-source-option-icon">🖼️</span>
+                  <span>Gallery</span>
+                </button>
+                <button
+                  type="button"
+                  className="ig-source-option"
+                  onClick={() => {
+                    setUrlEditId(sourcePicker);
+                    setSourcePicker(null);
+                  }}
+                >
+                  <span className="ig-source-option-icon">🔗</span>
+                  <span>Paste URL</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                className="ig-source-sheet-cancel"
+                onClick={() => setSourcePicker(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {showPreview && (
         <div
