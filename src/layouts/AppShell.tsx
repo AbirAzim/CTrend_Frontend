@@ -68,11 +68,12 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const minimalChrome = /^\/world-cup\/match\//.test(location.pathname);
-  const [navHidden, setNavHidden] = useState(false);
-  const [topbarHidden, setTopbarHidden] = useState(false);
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const chromeHiddenRef = useRef(false);
   useEffect(() => {
-    document.documentElement.dataset.topbarHidden = topbarHidden ? "true" : "false";
-  }, [topbarHidden]);
+    document.documentElement.dataset.topbarHidden = chromeHidden ? "true" : "false";
+    document.documentElement.dataset.chromeHidden = chromeHidden ? "true" : "false";
+  }, [chromeHidden]);
   useEffect(() => {
     document.documentElement.dataset.minimalChrome = minimalChrome ? "true" : "false";
     return () => {
@@ -93,6 +94,9 @@ export function AppShell() {
   });
   const lastYRef = useRef(0);
   const scrollRafRef = useRef<number | null>(null);
+  const scrollAccumRef = useRef(0);
+  const lastScrollDirRef = useRef<-1 | 0 | 1>(0);
+  const chromeCooldownUntilRef = useRef(0);
   const topbarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -122,6 +126,33 @@ export function AppShell() {
   } = useMessenger();
 
   const messengerOpen = panelOpen || openWindowIds.length > 0;
+  const topbarHidden = chromeHidden;
+  const navHidden = chromeHidden && !(mobileShell && messengerOpen);
+
+  function revealChrome() {
+    scrollAccumRef.current = 0;
+    lastScrollDirRef.current = 0;
+    if (!chromeHiddenRef.current) return;
+    chromeHiddenRef.current = false;
+    setChromeHidden(false);
+    chromeCooldownUntilRef.current = Date.now() + 280;
+  }
+
+  function hideChrome() {
+    scrollAccumRef.current = 0;
+    lastScrollDirRef.current = 0;
+    if (chromeHiddenRef.current) return;
+    chromeHiddenRef.current = true;
+    setChromeHidden(true);
+    chromeCooldownUntilRef.current = Date.now() + 280;
+  }
+
+  function resetChromeScrollTracking() {
+    lastYRef.current = window.scrollY;
+    scrollAccumRef.current = 0;
+    lastScrollDirRef.current = 0;
+    chromeCooldownUntilRef.current = 0;
+  }
 
   const bottomNavActive = useMemo(() => {
     if (isAuthenticated && messengerOpen) {
@@ -187,45 +218,55 @@ export function AppShell() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    lastYRef.current = 0;
-    setNavHidden(false);
-    setTopbarHidden(false);
+    chromeHiddenRef.current = false;
+    setChromeHidden(false);
+    resetChromeScrollTracking();
   }, [location.pathname]);
 
   useEffect(() => {
-    if (mobileShell && messengerOpen) {
-      setNavHidden(false);
-    }
-  }, [mobileShell, messengerOpen]);
+    const CHROME_REVEAL_TOP = 56;
+    const HIDE_DISTANCE = 44;
+    const SHOW_DISTANCE = 32;
 
-  useEffect(() => {
-    lastYRef.current = window.scrollY;
+    resetChromeScrollTracking();
+
     function onScroll() {
       if (scrollRafRef.current != null) {
         return;
       }
       scrollRafRef.current = window.requestAnimationFrame(() => {
         scrollRafRef.current = null;
+        const now = Date.now();
         const y = window.scrollY;
         const delta = y - lastYRef.current;
-        if (Math.abs(delta) < 8) {
-          return;
-        }
         lastYRef.current = y;
-        if (y < 60) {
-          setNavHidden(false);
-          setTopbarHidden(false);
+
+        if (y < CHROME_REVEAL_TOP) {
+          revealChrome();
           return;
         }
-        if (delta > 0) {
-          setNavHidden(!(mobileShell && messengerOpen));
-          setTopbarHidden(true);
-        } else {
-          setNavHidden(false);
-          setTopbarHidden(false);
+
+        if (now < chromeCooldownUntilRef.current) {
+          return;
+        }
+
+        const dir: -1 | 0 | 1 = delta > 1 ? 1 : delta < -1 ? -1 : 0;
+        if (dir !== 0) {
+          if (lastScrollDirRef.current !== 0 && dir !== lastScrollDirRef.current) {
+            scrollAccumRef.current = 0;
+          }
+          lastScrollDirRef.current = dir;
+          scrollAccumRef.current += delta;
+        }
+
+        if (!chromeHiddenRef.current && scrollAccumRef.current >= HIDE_DISTANCE) {
+          hideChrome();
+        } else if (chromeHiddenRef.current && scrollAccumRef.current <= -SHOW_DISTANCE) {
+          revealChrome();
         }
       });
     }
+
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
@@ -234,7 +275,7 @@ export function AppShell() {
         scrollRafRef.current = null;
       }
     };
-  }, [mobileShell, messengerOpen]);
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

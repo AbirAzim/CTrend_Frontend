@@ -1574,8 +1574,8 @@ body.capacitor .ig-logo {
   z-index: 100;
   box-sizing: border-box;
   transition:
-    transform 0.4s var(--cx-ease-spring),
-    opacity 0.4s var(--cx-ease-out);
+    transform 0.32s var(--cx-ease-spring),
+    opacity 0.28s var(--cx-ease-out);
 }
 
 body.capacitor-android .ig-bottom-nav,
@@ -1628,7 +1628,7 @@ body.capacitor .ig-post-media {
 
 .ig-bottom-nav--hidden {
   opacity: 0;
-  transform: translate(-50%, calc(100% + 24px)) scale(0.92);
+  transform: translate(-50%, calc(100% + 20px));
   pointer-events: none;
 }
 
@@ -2319,27 +2319,21 @@ body.capacitor .ig-bottom-nav {
   padding: 6px 0 5px;
   border-bottom: 1.5px solid rgb(var(--cx-ink-rgb) / 0.09);
   transition:
-    top 0.22s ease-out,
-    max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s ease-out,
-    padding 0.25s ease-out,
-    transform 0.22s ease-out,
-    margin 0.22s ease-out,
-    border-color 0.22s ease-out;
+    top 0.28s var(--cx-ease-out),
+    opacity 0.28s var(--cx-ease-out),
+    transform 0.32s var(--cx-ease-spring),
+    visibility 0.28s var(--cx-ease-out);
   max-height: 120px;
   overflow: hidden;
   /* match post card horizontal margins so widths align */
   margin: 0 12px;
   border-radius: 16px 16px 0 0;
 }
-html[data-topbar-hidden="true"] .ff-bar-outer {
-  max-height: 0;
+html[data-topbar-hidden="true"] .ff-bar-outer,
+html[data-chrome-hidden="true"] .ff-bar-outer {
+  top: max(8px, env(safe-area-inset-top));
   opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-top: 0;
-  margin-bottom: 0;
-  border-bottom-width: 0;
+  visibility: hidden;
   pointer-events: none;
   transform: translateY(calc(-100% - 8px));
 }
@@ -23702,7 +23696,8 @@ a.cd-lb-row:hover {
   z-index: 10;
   transition: top 0.22s ease-out;
 }
-html[data-topbar-hidden="true"] .wc-tab-bar {
+html[data-topbar-hidden="true"] .wc-tab-bar,
+html[data-chrome-hidden="true"] .wc-tab-bar {
   top: max(8px, env(safe-area-inset-top));
 }
 .wc-tab-btn {
