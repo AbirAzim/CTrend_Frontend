@@ -146,7 +146,7 @@ export function ProfileEngagementPanel({
             ) : (
               <div className="cx-profile-coin-stat cx-profile-coin-stat--rank cx-profile-coin-stat--empty">
                 <span className="cx-profile-coin-stat-kicker">This month</span>
-                <span className="cx-profile-coin-rank-text">No rank yet</span>
+                <span className="cx-profile-coin-rank-text">—</span>
               </div>
             )}
             <div className="cx-profile-coin-stat cx-profile-coin-stat--podium">

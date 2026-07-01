@@ -27672,17 +27672,17 @@ html[data-minimal-chrome="true"] .ig-topbar {
   }
 
   .cx-profile-engage-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .cx-profile-reward-card {
-    aspect-ratio: 5 / 4;
-    max-height: 196px;
+    aspect-ratio: 1 / 1;
+    max-height: none;
     min-height: 0;
     width: 100%;
     max-width: 100%;
-    padding: 12px;
+    padding: 8px;
   }
 
   .cx-profile-reward-card:nth-child(3) {
@@ -27692,53 +27692,97 @@ html[data-minimal-chrome="true"] .ig-topbar {
   }
 
   .cx-profile-reward-top .cx-profile-reward-card-icon--coin {
-    width: 36px;
-    height: 36px;
-    font-size: 1.1rem;
+    width: 30px;
+    height: 30px;
+    font-size: 0.95rem;
   }
 
   .cx-profile-reward-top .cx-profile-reward-card-icon--trophy {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
   }
 
   .cx-profile-reward-top .cx-profile-reward-card-icon--points {
-    width: 36px;
-    height: 36px;
-    font-size: 0.92rem;
+    width: 30px;
+    height: 30px;
+    font-size: 0.82rem;
   }
 
   .cx-profile-reward-card-value {
-    font-size: 1.55rem;
+    font-size: 1.35rem;
+  }
+
+  .cx-profile-reward-card-label {
+    font-size: 0.52rem;
   }
 
   .cx-profile-reward-card-sub {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
   }
 
   .cx-profile-coin-stats--compact {
-    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
-    gap: 8px;
+    grid-template-columns: minmax(34px, 0.42fr) minmax(0, 1.58fr);
+    gap: 4px;
+    overflow: visible;
+  }
+
+  .cx-profile-coin-stat {
+    padding: 4px 4px;
+    overflow: visible;
+  }
+
+  .cx-profile-coin-stat--podium {
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .cx-profile-coin-stat--podium .cx-podium-grid {
+    gap: 2px;
+  }
+
+  .cx-profile-coin-stat--podium .cx-podium-cell {
+    padding: 3px 1px 2px;
+    min-height: 34px;
+  }
+
+  .cx-profile-coin-stat--podium .cx-podium-cell-medal {
+    font-size: 0.58rem;
+  }
+
+  .cx-profile-coin-stat--podium .cx-podium-cell-count {
+    font-size: 0.58rem;
+    font-weight: 900;
+  }
+
+  .cx-profile-coin-stat--podium .cx-podium-cell-label {
+    font-size: 0.42rem;
+    display: block;
+  }
+
+  .cx-profile-coin-stat-kicker {
+    font-size: 0.48rem;
+    margin-bottom: 2px;
   }
 
   .cx-profile-reward-foot {
     flex-wrap: nowrap;
-    gap: 6px;
+    gap: 4px;
   }
 
   .cx-profile-card-action {
-    min-height: 38px;
-    padding: 8px 10px;
-    font-size: 0.68rem;
+    min-height: 30px;
+    padding: 6px 6px;
+    font-size: 0.62rem;
   }
 
   .cx-profile-reward-claim--compact {
-    min-height: 38px;
-    padding: 8px 10px;
+    min-height: 30px;
+    padding: 6px 8px;
+    font-size: 0.62rem;
   }
 
   .cx-profile-reward-paused-chip {
-    font-size: 0.56rem;
-    padding: 4px 9px;
+    font-size: 0.52rem;
+    padding: 3px 7px;
   }
 
   .cx-profile-engage-actions {

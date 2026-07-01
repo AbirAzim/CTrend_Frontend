@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { useTheme } from "../context/ThemeContext";
 
 export type MonthlyPodiumStats = {
   firstPlaceCount: number;
@@ -18,6 +19,8 @@ type Props = {
 };
 
 export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
+  const { colors } = useTheme();
+
   if (layout === "grid") {
     return (
       <View style={grid.row} accessibilityLabel="Monthly podium finishes">
@@ -27,12 +30,17 @@ export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
           return (
             <View
               key={key}
-              style={[grid.cell, active ? { backgroundColor: activeBg, borderColor: border } : grid.cellZero]}
+              style={[
+                grid.cell,
+                active
+                  ? { backgroundColor: activeBg, borderColor: border }
+                  : { backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.12)" },
+              ]}
               accessibilityLabel={`${label} place ${count} times`}
             >
               <Text style={grid.medal}>{medal}</Text>
-              <Text style={[grid.count, !active && grid.muted]}>{count}</Text>
-              <Text style={[grid.label, !active && grid.muted]}>{label}</Text>
+              <Text style={[grid.count, { color: colors.text }, !active && grid.muted]}>{count}</Text>
+              <Text style={[grid.label, { color: colors.muted }]}>{label}</Text>
             </View>
           );
         })}
@@ -54,7 +62,7 @@ export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
             accessibilityLabel={`${label} place ${count} times`}
           >
             <Text style={[inline.medal, !active && inline.muted]}>{medal}</Text>
-            <Text style={[inline.count, !active && inline.muted]}>×{count}</Text>
+            <Text style={[inline.count, { color: colors.text }, !active && inline.muted]}>×{count}</Text>
           </View>
         );
       })}
@@ -65,28 +73,39 @@ export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
 const grid = StyleSheet.create({
   row: {
     flexDirection: "row",
-    gap: 3,
+    gap: 2,
     width: "100%",
     minWidth: 0,
+    alignSelf: "stretch",
   },
   cell: {
     flex: 1,
     minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 1,
+    borderRadius: 6,
     borderWidth: 1,
+    minHeight: 34,
   },
-  cellZero: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: "rgba(255,255,255,0.1)",
+  medal: { fontSize: 10, lineHeight: 12 },
+  count: {
+    fontSize: 10,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    lineHeight: 12,
+    marginTop: 1,
   },
-  medal: { fontSize: 11, lineHeight: 13 },
-  count: { fontSize: 10, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 12 },
-  label: { fontSize: 7, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", lineHeight: 9 },
-  muted: { opacity: 0.55 },
+  label: {
+    fontSize: 7,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    lineHeight: 9,
+    marginTop: 1,
+  },
+  muted: { opacity: 0.7 },
 });
 
 const inline = StyleSheet.create({
