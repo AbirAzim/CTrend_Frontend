@@ -43,7 +43,17 @@ CommandError: No Android connected device found
 ```
 → Check USB cable, re-enable USB debugging, confirm `adb devices` shows the device, then retry.
 
-### Method 2 — safe build script (low-RAM / clean rebuild)
+### Method 2 — `npm run device` (Gradle debug APK + adb install)
+
+From `mobile/`:
+
+```bash
+npm run device
+```
+
+Runs `assembleDebug` then `adb install -r` on the connected device. Good when you don't need Metro attached and want the same standalone debug APK the release pipeline uses. Cold build ~8–9 min; incremental faster.
+
+### Method 3 — safe build script (low-RAM / clean rebuild)
 
 From repo root:
 
@@ -101,7 +111,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.14.0 release: **versionCode 43** across all three files.
+Current version after 1.15.0 release: **versionCode 44** across all three files.
 
 ---
 
@@ -208,6 +218,7 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.15.0 | 44 | 2026-07-01 | Profile rewards 3-column layout + podium badges on mobile; Android 15 edge-to-edge (`react-native-edge-to-edge`, `SystemBars`); World Cup campaign rules refresh (tiered prizes, draw/score-prediction rules — backend) |
 | 1.14.0 | 43 | 2026-06-30 | Feed/match UX polish — campaign chip, knockout round + anonymous vote row, prediction winners CTA, penalty shootout overview, pens on feed cards |
 | 1.13.0 | 42 | 2026-06-29 | World Cup knockout road map (in-app rotate fix), 3-item compare overlay parity, bracket live updates |
 | 1.12.1 | 41 | 2026-06-28 | Prediction score input polish (visible boxes, focus, Cancel button), includes all 1.12.0 live match UX |
@@ -217,6 +228,34 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.15.0 (44)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.15.0 — Profile rewards & Android 15 polish
+```
+
+**What's new** (user-facing release notes)
+```
+• Profile rewards — Coins, Wins, and Referral cards now sit side-by-side on all screen sizes, matching the web layout. Monthly podium badges (🥇🥈🥉) are easier to read on mobile.
+
+• World Cup Fever 2026 — Updated campaign rules: tiered bKash prizes (100–1,000 BDT), correct draw/outcome eligibility, and score-prediction priority in the prize draw.
+
+• Android 15 ready — Improved edge-to-edge display using modern system bar APIs (addresses Play Console recommendations).
+
+• General stability and UI polish across the profile and feed.
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+ProfileEngagementPanel 3-column grid parity with web; MonthlyPodiumBadge grid layout.
+react-native-edge-to-edge + SystemBars (replaces expo-status-bar); Theme.EdgeToEdge.Material3
+in styles.xml. Backend: World Cup campaign rules/prizes seed (tiered BDT, draw + prediction
+priority text). Requires backend restart for campaign rule text in API.
+```
 
 ### Play Console copy — 1.14.0 (43)
 
@@ -422,13 +461,40 @@ Google Sign-In requires the **release SHA-1** registered in Google Cloud Console
 | Rebuild after any `.env` change | Env vars are baked in at bundle time, not at runtime |
 | Enable `minifyEnabled` (R8) before next release | Reduces the ~55MB AAB size and silences Play's deobfuscation-file warning |
 | `build-mobile-aab-release.sh` uses `grep -E` not `grep -P` | macOS BSD grep has no `-P` flag — PCRE patterns will break on Mac, use `-E` |
+| Use `react-native-edge-to-edge` + `SystemBars` for status/nav bar styling on Android | `expo-status-bar` uses deprecated edge-to-edge APIs on Android 15+; Play Console may flag it |
+| `AppTheme` parent must be `Theme.EdgeToEdge.Material3` (no `statusBarColor` / `navigationBarColor` in `styles.xml`) | Deprecated theme attrs trigger Play Console edge-to-edge warnings |
+
+---
+
+## Android edge-to-edge (Android 15+)
+
+Google Play may recommend: *"Your app uses deprecated APIs or parameters for edge-to-edge"* when targeting API 35+.
+
+**What we use (since 1.15.0):**
+
+| Piece | Location |
+|-------|----------|
+| `react-native-edge-to-edge` dependency | `mobile/package.json` |
+| Expo config plugin | `mobile/app.json` → `plugins` → `react-native-edge-to-edge` with `parentTheme: Material3`, `enforceNavigationBarContrast: false` |
+| Native theme | `mobile/android/app/src/main/res/values/styles.xml` → `AppTheme` parent `Theme.EdgeToEdge.Material3` (no manual `android:statusBarColor` / `android:navigationBarColor`) |
+| JS system bars | `mobile/app/_layout.tsx` → `<SystemBars style={{ statusBar, navigationBar }} />` (replaces `expo-status-bar`) |
+| RN Gradle flag | `mobile/android/gradle.properties` → `edgeToEdgeEnabled=true` |
+| Themed root background | `ThemedRoot` in `_layout.tsx` — paints `colors.bg` so the nav bar area isn't white on dark theme |
+
+**Removed:** direct `expo-status-bar` dependency (was wrapping RN `StatusBar` with deprecated Android APIs).
+
+After changing theme/plugin config, rebuild native (`npm run device` or `bundleRelease`) — JS-only reload is not enough.
 
 ---
 
 ## Quick reference
 
 ```bash
-# Debug install on Pixel 6 (from mobile/)
+# Debug install on Pixel 6 (from mobile/) — Gradle + adb
+npm run device
+# equivalent: npm run apk && npm run adb-install
+
+# Debug install — expo run (from mobile/)
 ANDROID_SERIAL=1C071FDF600CCE npx expo run:android
 
 # Debug install — clean / low-RAM (from repo root)
@@ -463,7 +529,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.12.1 (versionCode 41) |
+| Current version | 1.15.0 (versionCode 44) |
 
 ---
 
