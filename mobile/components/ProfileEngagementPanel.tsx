@@ -15,7 +15,6 @@ import { CLAIM_DAILY_COINS, REFERRAL_POINTS, MONTHLY_PODIUM_STATS } from "@ctren
 import { REDEEM_REFERRAL_CODE } from "@ctrend/shared/graphql/referrals";
 import { PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
-import { currentCompetingMonthKey, formatCoinMonthLabel } from "@ctrend/shared/lib/coinMonth";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useCoins } from "../context/CoinsContext";
 import { useTheme } from "../context/ThemeContext";
@@ -60,7 +59,7 @@ export function ProfileEngagementPanel({
     REFERRAL_POINTS,
     { variables: { userId }, fetchPolicy: "cache-and-network" },
   );
-  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean; currentCoinMonthKey: string } }>(
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
     PLATFORM_SETTINGS,
     { fetchPolicy: "cache-first" },
   );
@@ -75,9 +74,6 @@ export function ProfileEngagementPanel({
     fetchPolicy: "cache-and-network",
   });
   const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
-  const coinMonthKey =
-    settingsData?.platformSettings?.currentCoinMonthKey?.trim() || currentCompetingMonthKey();
-  const coinMonthLabel = formatCoinMonthLabel(coinMonthKey);
   const podiumStats = podiumData?.monthlyPodiumStats ?? {
     firstPlaceCount: 0,
     secondPlaceCount: 0,
@@ -146,9 +142,6 @@ export function ProfileEngagementPanel({
             <View style={st.cardTopText}>
               <Text style={st.cardLabel}>Engagement coins</Text>
               <Text style={st.cardValue}>{coins.toLocaleString()}</Text>
-              <Text style={st.cardSub} numberOfLines={1}>
-                {isSelf ? coinMonthLabel : `${displayName ?? "Member"}'s balance`}
-              </Text>
             </View>
             <View style={st.iconCoin}>
               <Text style={st.iconCoinGlyph}>¢</Text>

@@ -11,7 +11,6 @@ import { useState } from "react";
 import { LeaderboardRankBadge } from "./LeaderboardRankBadge";
 import { MonthlyPodiumBadge } from "./MonthlyPodiumBadge";
 import { useCoinLeaderboardRank } from "../hooks/useCoinLeaderboardRank";
-import { currentCompetingMonthKey, formatCoinMonthLabel } from "@ctrend/shared/lib/coinMonth";
 
 type CampaignWinRow = {
   campaignId?: string | null;
@@ -47,7 +46,7 @@ export function ProfileEngagementPanel({
     REFERRAL_POINTS,
     { variables: { userId }, fetchPolicy: "cache-and-network" },
   );
-  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean; currentCoinMonthKey: string } }>(
+  const { data: settingsData } = useQuery<{ platformSettings: { referralSystemEnabled: boolean } }>(
     PLATFORM_SETTINGS,
     { fetchPolicy: "cache-first" },
   );
@@ -62,9 +61,6 @@ export function ProfileEngagementPanel({
     fetchPolicy: "cache-and-network",
   });
   const referralEnabled = Boolean(settingsData?.platformSettings?.referralSystemEnabled);
-  const coinMonthKey =
-    settingsData?.platformSettings?.currentCoinMonthKey?.trim() || currentCompetingMonthKey();
-  const coinMonthLabel = formatCoinMonthLabel(coinMonthKey);
   const podiumStats = podiumData?.monthlyPodiumStats ?? {
     firstPlaceCount: 0,
     secondPlaceCount: 0,
@@ -135,9 +131,6 @@ export function ProfileEngagementPanel({
             <div className="cx-profile-reward-top-text">
               <span className="cx-profile-reward-card-label">Engagement coins</span>
               <span className="cx-profile-reward-card-value">{coins.toLocaleString()}</span>
-              <span className="cx-profile-reward-card-sub">
-                {isSelf ? coinMonthLabel : `${displayName ?? "Member"}'s balance`}
-              </span>
             </div>
             <span className="cx-profile-reward-card-icon cx-profile-reward-card-icon--coin" aria-hidden>¢</span>
           </div>
