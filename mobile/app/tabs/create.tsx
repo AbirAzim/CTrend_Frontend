@@ -43,6 +43,10 @@ import { Ionicons } from "@expo/vector-icons";
 
 const { width: SW } = Dimensions.get("window");
 
+function defaultCategoryId(cats: Array<{ id: string; name?: string | null }>): string {
+  return cats.find((c) => c.name?.trim().toLowerCase() === "entertainment")?.id ?? "";
+}
+
 // Enable smooth layout transitions (e.g. the campaign pill morph) on Android.
 if (
   Platform.OS === "android" &&
@@ -318,6 +322,12 @@ export default function CreateScreen() {
   const categories = catData?.categories ?? [];
   const selectedCat = categories.find((c) => c.id === categoryId);
 
+  useEffect(() => {
+    if (isEdit || categoryId || categories.length === 0) return;
+    const entId = defaultCategoryId(categories);
+    if (entId) setCategoryId(entId);
+  }, [categories, categoryId, isEdit]);
+
   // Campaigns — admin sees all (with inactive flagged); users see only
   // campaigns admins enabled for users (isPublic).
   const { data: publicCampData } = useQuery<PublicCampaignsData>(PUBLIC_CAMPAIGNS, {
@@ -487,7 +497,7 @@ export default function CreateScreen() {
     setSlots([makeSlot("1"), makeSlot("2")]);
     setBodyImages([]);
     setCaption("");
-    setCategoryId("");
+    setCategoryId(defaultCategoryId(categories));
     setCampaignId("");
     setPlatformWide(platformParam === "1");
     setBroadcastGlobally(false);
@@ -513,6 +523,7 @@ export default function CreateScreen() {
       uploading: true,
       error: null,
       publicUrl: null,
+      pasteUrl: "",
       imageFocalX: DEFAULT_IMAGE_FOCAL,
       imageFocalY: DEFAULT_IMAGE_FOCAL,
     });
@@ -537,6 +548,7 @@ export default function CreateScreen() {
   }
 
   async function pickAndUpload(slotId: string, useCamera: boolean) {
+    setPasteUrlActiveId((id) => (id === slotId ? null : id));
     try {
       if (useCamera) {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -568,6 +580,49 @@ export default function CreateScreen() {
   async function applyPasteUrl(slotId: string, url: string) {
     if (!url.trim().startsWith("http")) return;
     patchSlot(slotId, { publicUrl: url.trim(), localUri: null, error: null });
+  }
+
+  function dismissPasteUrl(slotId: string) {
+    setPasteUrlActiveId((id) => (id === slotId ? null : id));
+    setSlots((prev) =>
+      prev.map((s) => {
+        if (s.id !== slotId) return s;
+        return {
+          ...s,
+          pasteUrl: "",
+          ...(s.localUri ? {} : { publicUrl: null, error: null }),
+        };
+      }),
+    );
+  }
+
+  function clearSlotImage(slot: Slot) {
+    if (!slot.localUri && !slot.publicUrl && !slot.pasteUrl) return;
+    const doClear = () => {
+      setPasteUrlActiveId((id) => (id === slot.id ? null : id));
+      patchSlot(slot.id, {
+        localUri: null,
+        publicUrl: null,
+        pasteUrl: "",
+        uploading: false,
+        error: null,
+        imageFocalX: DEFAULT_IMAGE_FOCAL,
+        imageFocalY: DEFAULT_IMAGE_FOCAL,
+      });
+      if (slot.locked) votesResetRef.current = true;
+    };
+    if (slot.locked && editPostHasVotes) {
+      Alert.alert(
+        "Remove image?",
+        "Removing this image will reset all current votes on this option.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Remove", style: "destructive", onPress: doClear },
+        ],
+      );
+      return;
+    }
+    doClear();
   }
 
   function openImageOptions(slotId: string) {
@@ -668,7 +723,8 @@ export default function CreateScreen() {
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(isSchedule: boolean) {
     setSubmitError(null);
-    if (!categoryId) { setSubmitError("Please select a category."); return; }
+    const resolvedCategoryId = categoryId || defaultCategoryId(categories);
+    if (!resolvedCategoryId) { setSubmitError("Please select a category."); return; }
 
     let imageUrls: string[];
     let options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
@@ -710,7 +766,7 @@ export default function CreateScreen() {
     // ── Edit mode: update the existing post instead of creating a new one ──
     if (isEdit && editId) {
       const updateInput: Record<string, unknown> = {
-        categoryId,
+        categoryId: resolvedCategoryId,
         imageUrls,
         options,
         // Always send caption so clearing it persists; "" clears the campaign too.
@@ -736,7 +792,7 @@ export default function CreateScreen() {
       return;
     }
 
-    const input: Record<string, unknown> = { categoryId, format: format.toUpperCase(), imageUrls, options };
+    const input: Record<string, unknown> = { categoryId: resolvedCategoryId, format: format.toUpperCase(), imageUrls, options };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
     if (campaignId) input.campaignId = campaignId;
     // Non-admin global broadcast (admins use createSystemPost instead) — Phase 36
@@ -935,9 +991,24 @@ export default function CreateScreen() {
                         <Text style={st.slotReplaceHintText}>Tap to crop</Text>
                       </View>
                     )}
+                    {hasImage && !slot.uploading && !locked && (
+                      <Pressable
+                        style={st.slotClearImage}
+                        onPress={() => clearSlotImage(slot)}
+                        hitSlop={8}
+                        accessibilityLabel="Remove image"
+                      >
+                        <Ionicons name="close" size={13} color="#fff" />
+                      </Pressable>
+                    )}
                     {slots.length > 2 && !locked && (
-                      <Pressable style={st.slotRemove} onPress={() => removeSlot(slot.id)} hitSlop={6}>
-                        <Text style={st.slotRemoveText}>✕</Text>
+                      <Pressable
+                        style={st.slotRemoveOption}
+                        onPress={() => removeSlot(slot.id)}
+                        hitSlop={6}
+                        accessibilityLabel="Remove option"
+                      >
+                        <Ionicons name="trash-outline" size={12} color="#fff" />
                       </Pressable>
                     )}
                   </Pressable>
@@ -952,23 +1023,31 @@ export default function CreateScreen() {
                       <Text style={[st.positionBtnText, { color: colors.subtext }]}>🔁 Replace photo</Text>
                     </Pressable>
                   ) : null}
-                  {/* Paste URL — hidden until user opens it from the sheet, or already has a URL typed */}
-                  {!locked && (pasteUrlActiveId === slot.id || slot.pasteUrl !== "") && (
-                    <TextInput
-                      style={[st.slotInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
-                      value={slot.pasteUrl}
-                      onChangeText={(v) => {
-                        patchSlot(slot.id, { pasteUrl: v });
-                        if (v.trim().startsWith("http")) void applyPasteUrl(slot.id, v);
-                      }}
-                      onFocus={() => setPasteUrlActiveId(slot.id)}
-                      onBlur={() => { if (!slot.pasteUrl) setPasteUrlActiveId(null); }}
-                      placeholder="Paste image URL…"
-                      placeholderTextColor={colors.muted}
-                      autoCapitalize="none"
-                      keyboardType="url"
-                      autoFocus={pasteUrlActiveId === slot.id && !slot.pasteUrl}
-                    />
+                  {/* Paste URL — hidden until user opens it from the sheet */}
+                  {!locked && pasteUrlActiveId === slot.id && (
+                    <View style={st.pasteUrlRow}>
+                      <TextInput
+                        style={[st.slotInput, st.pasteUrlInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                        value={slot.pasteUrl}
+                        onChangeText={(v) => {
+                          patchSlot(slot.id, { pasteUrl: v });
+                          if (v.trim().startsWith("http")) void applyPasteUrl(slot.id, v);
+                        }}
+                        placeholder="Paste image URL…"
+                        placeholderTextColor={colors.muted}
+                        autoCapitalize="none"
+                        keyboardType="url"
+                        autoFocus
+                      />
+                      <Pressable
+                        style={st.pasteUrlDismiss}
+                        onPress={() => dismissPasteUrl(slot.id)}
+                        hitSlop={10}
+                        accessibilityLabel="Close paste URL"
+                      >
+                        <Ionicons name="close" size={14} color="#fff" />
+                      </Pressable>
+                    </View>
                   )}
                   {/* Label — always editable, even for existing options. */}
                   <TextInput
@@ -1156,9 +1235,6 @@ export default function CreateScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={{ color: colors.accent, fontSize: 14 }}>◆</Text>
               <Text style={[st.settingKey, { color: colors.text }]}>Category</Text>
-              <View style={st.requiredBadge}>
-                <Text style={st.requiredText}>REQUIRED</Text>
-              </View>
             </View>
             <View style={[st.catPicker, { backgroundColor: colors.section, borderColor: colors.border }]}>
               <Text style={[st.catPickerText, { color: selectedCat ? colors.text : colors.muted }]}>
@@ -1319,7 +1395,8 @@ export default function CreateScreen() {
             onPress={() => setPreviewVisible(true)}
             style={[st.previewBtn, { borderColor: colors.border }]}
           >
-            <Text style={[st.previewBtnText, { color: colors.muted }]}>👁  Preview</Text>
+            <Ionicons name="eye-outline" size={18} color={colors.muted} />
+            <Text style={[st.previewBtnText, { color: colors.muted }]}>Preview</Text>
           </Pressable>
           <Pressable onPress={confirmCancel} hitSlop={10} style={{ alignItems: "center", paddingVertical: 4 }}>
             <Text style={[st.cancelText, { color: colors.muted }]}>Cancel</Text>
@@ -1478,7 +1555,10 @@ export default function CreateScreen() {
                 },
                 {
                   label: "Paste URL",
-                  onPress: () => setPasteUrlActiveId(imageSheetSlotId!),
+                  onPress: () => {
+                    setImageSheetSlotId(null);
+                    setPasteUrlActiveId(imageSheetSlotId!);
+                  },
                 },
                 { label: "Cancel", cancel: true, onPress: () => {} },
               ]
@@ -1569,6 +1649,30 @@ const st = StyleSheet.create({
   slotOverlayText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   slotDone: { position: "absolute", bottom: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: "#22c55e", justifyContent: "center", alignItems: "center" },
   slotDoneText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  slotClearImage: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  slotRemoveOption: {
+    position: "absolute",
+    top: 4,
+    left: 28,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(185,28,28,0.82)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
   slotRemove: { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
   slotRemoveText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   slotReplaceHint: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.45)", paddingVertical: 3, alignItems: "center" },
@@ -1576,6 +1680,16 @@ const st = StyleSheet.create({
   lockedNote: { fontSize: 12, lineHeight: 17, borderWidth: 1, borderRadius: 10, padding: 10 },
   slotError: { color: "#f87171", fontSize: 10, textAlign: "center" },
   slotInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12 },
+  pasteUrlRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pasteUrlInput: { flex: 1 },
+  pasteUrlDismiss: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   positionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, alignItems: "center" },
   positionBtnText: { fontSize: 12, fontWeight: "700" },
 
@@ -1666,7 +1780,16 @@ const st = StyleSheet.create({
   confirmScheduleBtn: { borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   cancelText: { fontSize: 14, fontWeight: "600" },
 
-  previewBtn: { borderWidth: 1.5, borderStyle: "dashed", borderRadius: 14, paddingVertical: 13, alignItems: "center" },
+  previewBtn: {
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
   previewBtnText: { fontSize: 14, fontWeight: "700" },
   previewOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: 0 },
   previewModal: { flex: 1, marginTop: 48 },

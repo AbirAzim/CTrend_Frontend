@@ -490,6 +490,26 @@ export function CreatePostPage() {
     });
   }
 
+  function dismissUrlEdit(id: string) {
+    setUrlEditId(null);
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== id) return it;
+        if (it.imageSource !== "url") return it;
+        const trimmed = it.imageUrl.trim();
+        if (trimmed.startsWith("http")) return it;
+        return {
+          ...it,
+          imageUrl: "",
+          localPreview: undefined,
+          imageSource: undefined,
+          imageFocalX: DEFAULT_IMAGE_FOCAL,
+          imageFocalY: DEFAULT_IMAGE_FOCAL,
+        };
+      }),
+    );
+  }
+
   function updateItem(id: string, key: "imageUrl" | "title", value: string) {
     setItems((prev) =>
       prev.map((it) => {
@@ -761,17 +781,27 @@ export function CreatePostPage() {
                   ) : null}
                 </div>
 
-                {(urlEditId === item.id || item.imageSource === "url") && (
-                  <input
-                    type="url"
-                    className="ig-compare-url-input"
-                    value={item.imageUrl}
-                    onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
-                    placeholder="Paste image URL…"
-                    autoComplete="off"
-                    autoFocus={urlEditId === item.id}
-                    disabled={uploadingId === item.id}
-                  />
+                {urlEditId === item.id && (
+                  <div className="ig-compare-url-row">
+                    <input
+                      type="url"
+                      className="ig-compare-url-input"
+                      value={item.imageUrl}
+                      onChange={(ev) => updateItem(item.id, "imageUrl", ev.target.value)}
+                      placeholder="Paste image URL…"
+                      autoComplete="off"
+                      autoFocus
+                      disabled={uploadingId === item.id}
+                    />
+                    <button
+                      type="button"
+                      className="ig-compare-url-dismiss"
+                      onClick={() => dismissUrlEdit(item.id)}
+                      aria-label="Remove paste URL"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 )}
 
                 <input
