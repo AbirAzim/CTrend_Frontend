@@ -3,7 +3,7 @@ import notifee, { EventType } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { router, Stack, usePathname, useRootNavigationState } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { StatusBar } from "expo-status-bar";
+import { SystemBars } from "react-native-edge-to-edge";
 import { useEffect, useRef, type ReactNode } from "react";
 import { AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -108,7 +108,8 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 
 function AppStatusBar() {
   const { isDark } = useTheme();
-  return <StatusBar style={isDark ? "light" : "dark"} />;
+  const barStyle = isDark ? "light" : "dark";
+  return <SystemBars style={{ statusBar: barStyle, navigationBar: barStyle }} />;
 }
 
 // Root container painted with the active theme background. Without this the
