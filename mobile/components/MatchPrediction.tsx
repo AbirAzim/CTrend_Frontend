@@ -39,7 +39,6 @@ import {
   predictionWinnersButtonLabel,
   PREDICTION_WINNERS_BUTTON_ICON,
 } from "@ctrend/shared/lib/matchPredictionCopy";
-import { knockoutEffectiveScore } from "@ctrend/shared/lib/matchScoreCopy";
 import { useTheme } from "../context/ThemeContext";
 import type { ColorPalette } from "../context/ThemeContext";
 
@@ -159,9 +158,6 @@ export function MatchPrediction({
   const inShootout = isShootoutLiveStatus(matchStatus, matchPhase);
   const showResolvedPenNote =
     isKnockoutStage(fixtureStage) && resolved && Boolean(state.wentToPenalties);
-  const gradingScore = fixtureData?.worldCupFixture
-    ? knockoutEffectiveScore(fixtureData.worldCupFixture)
-    : null;
 
   function startEdit() {
     setHome(mine != null ? String(mine.homeScore) : "");
@@ -354,11 +350,6 @@ export function MatchPrediction({
 
       {resolved ? (
         <>
-          {gradingScore ? (
-            <Text style={st.resultLine}>
-              Result after extra time: {homeLabel} {gradingScore.home}–{gradingScore.away} {awayLabel}
-            </Text>
-          ) : null}
           {showResolvedPenNote ? (
             <Text style={st.penNote}>{predictionResolvedAfterShootoutNote()}</Text>
           ) : null}
@@ -498,7 +489,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
     },
     pendingBannerText: { fontSize: 11, color: c.subtext, lineHeight: 15 },
     penNote: { fontSize: 11, color: c.muted, lineHeight: 15 },
-    resultLine: { fontSize: 12, fontWeight: "700", color: c.text, lineHeight: 16 },
     row: {
       flexDirection: "row",
       alignItems: "center",
