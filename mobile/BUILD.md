@@ -111,7 +111,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.15.0 release: **versionCode 44** across all three files.
+Current version after 1.16.1 release: **versionCode 46** across all three files.
 
 ---
 
@@ -218,6 +218,8 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.16.1 | 46 | 2026-07-02 | Feed infinite scroll prefetch — next page loads before you reach the bottom (matches web); includes all 1.16.0 features |
+| 1.16.0 | 45 | 2026-07-01 | Stacked compare layout when creating posts; refreshed Ke Jitbe header with scroll-aware tagline; feed top bar + filter chrome polish; profile rewards & search UI improvements |
 | 1.15.0 | 44 | 2026-07-01 | Profile rewards 3-column layout + podium badges on mobile; Android 15 edge-to-edge (`react-native-edge-to-edge`, `SystemBars`); World Cup campaign rules refresh (tiered prizes, draw/score-prediction rules — backend) |
 | 1.14.0 | 43 | 2026-06-30 | Feed/match UX polish — campaign chip, knockout round + anonymous vote row, prediction winners CTA, penalty shootout overview, pens on feed cards |
 | 1.13.0 | 42 | 2026-06-29 | World Cup knockout road map (in-app rotate fix), 3-item compare overlay parity, bracket live updates |
@@ -228,6 +230,64 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.16.1 (46)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.1 — Smoother feed scrolling
+```
+
+**What's new** (user-facing release notes)
+```
+• Faster feed scrolling — the next posts load before you reach the bottom, so you rarely wait at the end of the list
+
+• Create stacked compares — choose Stacked layout when posting so images show full-width, one above the other
+
+• Refreshed feed header — new Ke Jitbe branding with scroll-aware tagline on the home feed
+
+• Feed polish — cleaner top bar, search pill, and filter bar when scrolling
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Feed prefetch parity with web: auto-fetch page 2 after page 1, onViewableItemsChanged
+(PREFETCH_ITEMS_AHEAD=8), onEndReachedThreshold=3, drawDistance=1600. Includes 1.16.0
+stacked compare layout, FeedTopBar, profile/search polish.
+```
+
+### Play Console copy — 1.16.0 (45)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.0 — Stacked compares & feed polish
+```
+
+**What's new** (user-facing release notes)
+```
+• Create stacked compares — choose Stacked layout when posting so images show full-width, one above the other (great for landscape photos)
+
+• Refreshed feed header — new Ke Jitbe branding with a smoother scroll experience on the home feed
+
+• Feed polish — cleaner top bar, search pill, and filter bar when scrolling
+
+• Profile rewards and search UI improvements
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+CompareLayout STACKED/SIDE_BY_SIDE on create/edit (16:9 crop for stacked binary).
+FeedTopBar scroll-linked tagline + FeedNavSearch. Feed filter chrome Reanimated fixes.
+ProfileEngagementPanel + MonthlyPodiumBadge polish. Header logo/branding refresh.
+```
 
 ### Play Console copy — 1.15.0 (44)
 
@@ -529,7 +589,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.15.0 (versionCode 44) |
+| Current version | 1.16.1 (versionCode 46) |
 
 ---
 

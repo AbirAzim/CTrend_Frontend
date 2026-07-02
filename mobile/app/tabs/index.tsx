@@ -57,6 +57,10 @@ const CHROME_AT_TOP_EXIT_Y = 100;
 const TAB_BAR_H = 64 + 14; // pill height + bottom margin
 const FILTER_BAR_H = 48;
 const PAGE_SIZE = 20;
+/** Start fetching the next server page when this many items remain below the viewport. */
+const PREFETCH_ITEMS_AHEAD = 8;
+/** FlashList: trigger onEndReached this many screen-heights before the list end. */
+const END_REACHED_THRESHOLD = 3;
 const CHROME_SCROLL_THRESHOLD = 56;
 const CHROME_THROTTLE_MS = 120;
 const FEED_ITEM_EST_HEIGHT = 580;
@@ -98,6 +102,7 @@ export default function FeedScreen() {
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(true);
   const serverCountRef = useRef(0);
+  const postsLengthRef = useRef(0);
 
   // Tap-to-vote coach mark gating. Eligible until the user has voted (DONE) or
   // it has already appeared in VOTE_COACH_MAX_SHOWS sessions. `suppressed`
@@ -267,8 +272,6 @@ export default function FeedScreen() {
     translateY.setValue(0);
   }, [feedFilter, filterProgress, scrollY, translateY]);
 
-  // Prefetch the next page well before the user hits the bottom so the feed
-  // always feels like it has more — no visible "loading" at the end.
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMoreRef.current) return;
     const skip = serverCountRef.current;
@@ -299,6 +302,29 @@ export default function FeedScreen() {
       loadingMoreRef.current = false;
     }
   }, [fetchMore, feedQueryVars, client]);
+
+  const loadMoreFnRef = useRef(loadMore);
+  loadMoreFnRef.current = loadMore;
+
+  const maybePrefetchMore = useCallback(() => {
+    void loadMoreFnRef.current();
+  }, []);
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+      if (!viewableItems.length) return;
+      let maxIndex = 0;
+      for (const token of viewableItems) {
+        if (token.index != null && token.index > maxIndex) maxIndex = token.index;
+      }
+      const remaining = postsLengthRef.current - 1 - maxIndex;
+      if (remaining <= PREFETCH_ITEMS_AHEAD) {
+        void loadMoreFnRef.current();
+      }
+    },
+  ).current;
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 15 }).current;
 
   type UserRow = { id?: string | null; username?: string | null; email?: string | null; profileImageUrl?: string | null };
   const { data: meData } = useQuery<{ me: UserRow }>(ME, {
@@ -362,6 +388,15 @@ export default function FeedScreen() {
       return true;
     });
   }, [liveQueue, apiPosts, removedIds]);
+
+  postsLengthRef.current = posts.length;
+
+  // Prefetch page 2 as soon as page 1 lands so the user rarely waits at the bottom.
+  useEffect(() => {
+    const serverCount = data?.feedPosts?.length ?? 0;
+    if (serverCount < PAGE_SIZE || !hasMoreRef.current || loadingMoreRef.current) return;
+    void loadMoreFnRef.current();
+  }, [data?.feedPosts?.length]);
 
   useSubscription<{ newPosts: { postId: string } }>(NEW_POSTS, {
     skip: !isAuthenticated,
@@ -473,11 +508,13 @@ export default function FeedScreen() {
           onScrollEndDrag={handleScrollEnd}
           onMomentumScrollEnd={handleScrollEnd}
           scrollEventThrottle={16}
-          drawDistance={1000}
+          drawDistance={1600}
           decelerationRate="normal"
           overScrollMode="never"
-          onEndReached={() => void loadMore()}
-          onEndReachedThreshold={0.6}
+          onEndReached={maybePrefetchMore}
+          onEndReachedThreshold={END_REACHED_THRESHOLD}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
