@@ -106,12 +106,14 @@ function FeedTopBar() {
 
           {isAuthenticated && (
             <PressableScale style={styles.plainIconBtn} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)} accessibilityLabel="Notifications">
-              <Ionicons name="notifications-outline" size={22} color={colors.text} />
-              {unreadCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
-                </View>
-              )}
+              <View style={styles.notifIconWrap}>
+                <Ionicons name="notifications-outline" size={22} color={colors.text} />
+                {unreadCount > 0 && (
+                  <View style={[styles.notifBadge, { borderColor: colors.topbar }]}>
+                    <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
+                  </View>
+                )}
+              </View>
             </PressableScale>
           )}
 
@@ -690,11 +692,25 @@ const styles = StyleSheet.create({
   rectBtnAdmin: { backgroundColor: "#7c3aed" },
   rectBtnCreate: { backgroundColor: "#4f46e5" },
   rectBtnSymbol: { fontSize: 15, color: "#ffffff", fontWeight: "700" },
+  notifIconWrap: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
   notifBadge: {
-    position: "absolute", top: -5, right: -1,
-    backgroundColor: "#ef4444", borderRadius: 7,
-    minWidth: 14, height: 14,
-    justifyContent: "center", alignItems: "center", paddingHorizontal: 2,
+    position: "absolute",
+    top: -6,
+    right: -7,
+    backgroundColor: "#e11d48",
+    borderRadius: 7,
+    borderWidth: 1.5,
+    minWidth: 14,
+    height: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 2,
   },
   notifBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800", lineHeight: 10 },
   list: { flex: 1 },
