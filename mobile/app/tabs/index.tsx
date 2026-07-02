@@ -106,8 +106,8 @@ function FeedTopBar() {
 
         {/* Notification bell — signed-in only */}
         {isAuthenticated && (
-          <PressableScale style={[styles.circleBtn, styles.circleBtnBell]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
-            <Ionicons name="notifications" size={19} color="#f87171" />
+          <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
+            <Ionicons name="notifications-outline" size={19} color={colors.text} />
             {unreadCount > 0 && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
@@ -123,7 +123,7 @@ function FeedTopBar() {
             onPress={() => void handleLogout()}
             hitSlop={6}
           >
-            <Ionicons name="log-out-outline" size={19} color="#fca5a5" />
+            <Ionicons name="log-out-outline" size={19} color="#f87171" />
           </PressableScale>
         ) : (
           <PressableScale
@@ -651,9 +651,10 @@ const styles = StyleSheet.create({
   circleBtn: {
     width: 36, height: 36, borderRadius: 18,
     justifyContent: "center", alignItems: "center",
+    position: "relative",
+    overflow: "visible",
   },
-  circleBtnBell: { backgroundColor: "rgba(239,68,68,0.14)" },
-  circleBtnLogout: { backgroundColor: "rgba(127,29,29,0.5)" },
+  circleBtnLogout: { backgroundColor: "rgba(239,68,68,0.14)" },
   circleBtnLogin: {
     width: "auto",
     flexDirection: "row",
@@ -673,12 +674,12 @@ const styles = StyleSheet.create({
   rectBtnCreate: { backgroundColor: "#4f46e5" },
   rectBtnSymbol: { fontSize: 15, color: "#ffffff", fontWeight: "700" },
   notifBadge: {
-    position: "absolute", top: -1, right: -1,
-    backgroundColor: "#ef4444", borderRadius: 8,
-    minWidth: 16, height: 16,
-    justifyContent: "center", alignItems: "center", paddingHorizontal: 3,
+    position: "absolute", top: -5, right: -1,
+    backgroundColor: "#ef4444", borderRadius: 7,
+    minWidth: 14, height: 14,
+    justifyContent: "center", alignItems: "center", paddingHorizontal: 2,
   },
-  notifBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+  notifBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800", lineHeight: 10 },
   list: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { fontSize: 16, fontWeight: "700", color: "#ef4444", marginBottom: 8 },

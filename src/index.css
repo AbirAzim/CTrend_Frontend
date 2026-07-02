@@ -1538,6 +1538,31 @@ body.capacitor .ig-topbar {
   transform: scale(0.94);
 }
 
+.ig-icon-btn.ig-topbar-plain {
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: var(--ig-muted);
+  overflow: visible;
+}
+
+.ig-icon-btn.ig-topbar-plain:hover {
+  color: var(--cx-accent);
+  background: transparent;
+  transform: scale(1.08);
+}
+
+.ig-icon-btn.ig-topbar-plain--active {
+  color: var(--cx-accent);
+  transform: scale(1.05);
+}
+
+.ig-icon-btn.ig-topbar-plain svg {
+  width: 22px;
+  height: 22px;
+}
+
 .ig-heart-dot::after {
   content: "";
   position: absolute;
@@ -10850,26 +10875,20 @@ a.cx-action-chip {
   }
 }
 
-.ig-topbar-logout {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.ig-icon-btn.ig-topbar-logout {
   width: 38px;
   height: 38px;
-  border: 1px solid rgb(225 29 72 / 0.28);
-  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
-  color: #be123c;
-  border-radius: 999px;
-  padding: 0;
-  cursor: pointer;
-  transition:
-    transform 0.25s var(--cx-ease-spring),
-    box-shadow 0.25s var(--cx-ease-out);
+  border: 1px solid rgb(var(--cx-rose-rgb) / 0.28);
+  background: rgb(var(--cx-rose-rgb) / 0.08);
+  color: var(--cx-rose-soft);
 }
 
-.ig-topbar-logout:hover {
-  transform: scale(1.03);
-  box-shadow: 0 10px 20px rgb(190 24 93 / 0.15);
+.ig-icon-btn.ig-topbar-logout:hover {
+  background: rgb(var(--cx-rose-rgb) / 0.14);
+}
+
+.ig-icon-btn.ig-topbar-logout:active {
+  transform: scale(0.94);
 }
 
 /* ── Dark mode premium overrides ── */
@@ -11608,12 +11627,6 @@ a.cx-action-chip {
   background: var(--cx-accent-mid);
   border-color: var(--cx-accent-mid);
   color: #fff;
-}
-
-:root[data-theme="dark"] .ig-topbar-logout {
-  background: linear-gradient(135deg, rgb(127 29 29 / 0.45), rgb(136 19 55 / 0.45));
-  border-color: rgb(251 113 133 / 0.36);
-  color: #fecdd3;
 }
 
 /* Bottom nav:3-up (home · create · you) — not a5-tab clone */
@@ -14662,7 +14675,7 @@ a.cx-profile-btn-accent {
   }
 
   .ig-icon-btn,
-  .ig-topbar-logout {
+  .ig-icon-btn.ig-topbar-logout {
     width: 36px;
     height: 36px;
   }
@@ -20029,37 +20042,37 @@ a.cd-lb-row:hover {
 /* ═══════════════════════════════════════════════════
    NOTIFICATION BELL
 ═══════════════════════════════════════════════════ */
-.nb-wrap { position: relative; display: flex; align-items: center; }
+.nb-wrap { position: relative; display: flex; align-items: center; overflow: visible; }
 
-.nb-btn {
+.nb-icon-wrap {
   position: relative;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 50%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s;
-  font-size: 1.2rem;
-  color: var(--ig-text);
+  width: 22px;
+  height: 22px;
 }
-.nb-btn:hover { background: var(--ig-surface-2, rgba(0,0,0,.08)); }
-[data-theme="dark"] .nb-btn:hover { background: rgba(255,255,255,.08); }
 
-.nb-badge {
+.nb-count-badge {
   position: absolute;
-  top: 0; right: 0;
-  background: #e0245e;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 2px 4px;
+  top: -8px;
+  right: -7px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
   border-radius: 999px;
-  min-width: 16px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  border: 1.5px solid var(--ig-card, #fff);
+  box-shadow: 0 1px 4px rgb(244 63 94 / 0.3);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .nb-dropdown {
@@ -22056,7 +22069,7 @@ a.cd-lb-row:hover {
   .ig-topbar-icon-btn,
   .ig-nav-item,
   .ig-icon-btn,
-  .nb-btn,
+  .ig-icon-btn.ig-topbar-plain,
   .cx-gsearch-mobile-btn,
   .cw-emoji-toggle,
   .cw-send-btn,
@@ -22065,7 +22078,7 @@ a.cd-lb-row:hover {
   .cx-friend-msg-btn,
   .md-back,
   .ig-post-detail-back,
-  .nb-btn,
+  .ig-icon-btn.ig-topbar-plain,
   .nb-action-btn,
   .cx-friend-actions .btn-ghost,
   .cx-side-head .btn-ghost {
@@ -22077,7 +22090,7 @@ a.cd-lb-row:hover {
   .cx-friend-msg-btn,
   .md-back,
   .ig-post-detail-back,
-  .nb-btn,
+  .ig-icon-btn.ig-topbar-plain,
   .nb-action-btn {
     min-height: 44px;
     min-width: 44px;

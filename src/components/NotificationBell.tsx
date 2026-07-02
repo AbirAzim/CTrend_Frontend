@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotificationActions } from "../hooks/useNotificationActions";
 import { useMobileShell } from "../lib/useMobileShell";
+import { IconBell } from "./IgIcons";
 import { NotificationList } from "./NotificationList";
 
 export function NotificationBell() {
@@ -48,16 +49,16 @@ export function NotificationBell() {
     <div className="nb-wrap" ref={ref}>
       <button
         type="button"
-        className="nb-btn"
+        className={`ig-icon-btn ig-topbar-plain${open ? " ig-topbar-plain--active" : ""}`}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         onClick={onBellClick}
       >
-        <span className="nb-icon" aria-hidden>
-          🔔
+        <span className="nb-icon-wrap">
+          <IconBell size={22} active={open} />
+          {unreadCount > 0 && (
+            <span className="nb-count-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+          )}
         </span>
-        {unreadCount > 0 && (
-          <span className="nb-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
-        )}
       </button>
 
       {open && !mobileShell ? (
