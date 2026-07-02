@@ -9,6 +9,8 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useDerivedValue,
+  useFrameCallback,
+  useSharedValue,
   type SharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,63 +23,72 @@ import { FeedNavSearch } from "./FeedNavSearch";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
-/** Scroll distance over which the header eases from expanded → compact. */
-export const TOP_NAV_COLLAPSE_DISTANCE = 100;
-const LOGO_W_EXPANDED = 96;
-const LOGO_H_EXPANDED = 26;
-const LOGO_W_COMPACT = 68;
-const LOGO_H_COMPACT = 20;
-const TAG_H = 14;
+/** Pixels of scroll mapped to full tagline hide/show. */
+export const TOP_NAV_COLLAPSE_DISTANCE = 140;
+const LOGO_W = 112;
+const LOGO_H = 30;
+const TAG_H = 16;
+const SHELL_PAD_TOP = 12;
+const SHELL_PAD_BOTTOM_EXPANDED = 14;
+const SHELL_PAD_BOTTOM_COMPACT = 12;
+const SEARCH_H = 38;
+const EXPAND_LERP = 0.16;
 
 type Props = {
   scrollY: SharedValue<number>;
 };
 
-function smoothstep(t: number) {
-  "worklet";
-  return t * t * (3 - 2 * t);
-}
-
 function FeedTopBarInner({ scrollY }: Props) {
   const { logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const paddingTopExpanded = insets.top + 10;
-  const paddingTopCompact = insets.top + 6;
+  const shellPaddingTop = insets.top + SHELL_PAD_TOP;
 
-  const expand = useDerivedValue(() => {
-    const linear = interpolate(
-      scrollY.value,
-      [0, TOP_NAV_COLLAPSE_DISTANCE],
-      [1, 0],
-      Extrapolation.CLAMP,
-    );
-    return smoothstep(linear);
+  const expandTarget = useDerivedValue(() =>
+    interpolate(scrollY.value, [0, TOP_NAV_COLLAPSE_DISTANCE], [1, 0], Extrapolation.CLAMP),
+  );
+
+  const expand = useSharedValue(1);
+
+  useFrameCallback(() => {
+    "worklet";
+    const target = expandTarget.value;
+    const diff = target - expand.value;
+    if (Math.abs(diff) < 0.001) {
+      expand.value = target;
+      return;
+    }
+    expand.value += diff * EXPAND_LERP;
   });
 
   const shellStyle = useAnimatedStyle(() => ({
-    paddingTop: interpolate(expand.value, [0, 1], [paddingTopCompact, paddingTopExpanded], Extrapolation.CLAMP),
-    paddingBottom: interpolate(expand.value, [0, 1], [6, 12], Extrapolation.CLAMP),
+    paddingTop: shellPaddingTop,
+    paddingBottom: interpolate(
+      expand.value,
+      [0, 1],
+      [SHELL_PAD_BOTTOM_COMPACT, SHELL_PAD_BOTTOM_EXPANDED],
+      Extrapolation.CLAMP,
+    ),
   }));
 
-  const brandStyle = useAnimatedStyle(() => {
-    const logoH = interpolate(expand.value, [0, 1], [LOGO_H_COMPACT, LOGO_H_EXPANDED], Extrapolation.CLAMP);
-    const tagH = interpolate(expand.value, [0, 1], [0, TAG_H], Extrapolation.CLAMP);
-    return { height: logoH + tagH };
-  });
+  const brandStyle = useAnimatedStyle(() => ({
+    height: LOGO_H + TAG_H * expand.value,
+  }));
 
-  const logoStyle = useAnimatedStyle(() => ({
-    width: interpolate(expand.value, [0, 1], [LOGO_W_COMPACT, LOGO_W_EXPANDED], Extrapolation.CLAMP),
-    height: interpolate(expand.value, [0, 1], [LOGO_H_COMPACT, LOGO_H_EXPANDED], Extrapolation.CLAMP),
+  const tagSlotStyle = useAnimatedStyle(() => ({
+    height: TAG_H * expand.value,
   }));
 
   const tagStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(expand.value, [0, 0.45, 1], [0, 0, 1], Extrapolation.CLAMP),
-    height: interpolate(expand.value, [0, 1], [0, TAG_H], Extrapolation.CLAMP),
-  }));
-
-  const searchStyle = useAnimatedStyle(() => ({
-    height: interpolate(expand.value, [0, 1], [30, 36], Extrapolation.CLAMP),
+    opacity: expand.value,
+    transform: [
+      {
+        translateY: interpolate(expand.value, [0, 1], [TAG_H * 0.65, 0], Extrapolation.CLAMP),
+      },
+      {
+        scaleY: interpolate(expand.value, [0, 1], [0.82, 1], Extrapolation.CLAMP),
+      },
+    ],
   }));
 
   const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
@@ -109,22 +120,24 @@ function FeedTopBarInner({ scrollY }: Props) {
           <Animated.View style={[styles.brand, brandStyle]}>
             <View style={[styles.brandBar, styles.brandBarGradient]} />
             <View style={styles.brandBody}>
-              <Animated.View style={logoStyle}>
+              <View style={styles.logoBox}>
                 <Image
                   source={isDark ? headerLogoAsset : headerLogoLightAsset}
                   style={styles.brandLogoFill}
                   contentFit="contain"
                   accessibilityLabel="Ke Jitbe"
                 />
-              </Animated.View>
+              </View>
               {isAuthenticated ? (
-                <Animated.View style={[tagStyle, styles.tagClip]}>
-                  <Text
-                    style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
-                    numberOfLines={1}
-                  >
-                    Compare · vote · vibe
-                  </Text>
+                <Animated.View style={[styles.tagClip, tagSlotStyle]}>
+                  <Animated.View style={tagStyle}>
+                    <Text
+                      style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
+                      numberOfLines={1}
+                    >
+                      Compare · vote · vibe
+                    </Text>
+                  </Animated.View>
                 </Animated.View>
               ) : (
                 <Text
@@ -139,9 +152,9 @@ function FeedTopBarInner({ scrollY }: Props) {
         </Pressable>
 
         {isAuthenticated && (
-          <Animated.View style={[styles.searchInline, searchStyle]}>
+          <View style={styles.searchInline}>
             <FeedNavSearch />
-          </Animated.View>
+          </View>
         )}
 
         <View style={styles.actions}>
@@ -209,13 +222,14 @@ const styles = StyleSheet.create({
   },
   topBarRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 8,
   },
   searchInline: {
     flex: 1,
     minWidth: 0,
-    justifyContent: "flex-end",
+    height: SEARCH_H,
+    justifyContent: "center",
   },
   brandPress: {
     flexShrink: 0,
@@ -239,18 +253,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 1,
   },
+  logoBox: {
+    width: LOGO_W,
+    height: LOGO_H,
+  },
   tagClip: {
     overflow: "hidden",
+    justifyContent: "flex-end",
+    transformOrigin: "top",
   },
-  brandLogoFill: { width: "100%", height: "100%" },
   brandTag: {
     fontSize: 8,
     fontWeight: "700",
     letterSpacing: 1.4,
     textTransform: "uppercase",
+    lineHeight: TAG_H,
   },
   brandTagLight: { color: "#6d28d9" },
   brandTagDark: { color: "#c4b5fd" },
+  brandLogoFill: { width: "100%", height: "100%" },
   actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
   plainIconBtn: {
     width: 36,
