@@ -1431,21 +1431,25 @@ body.capacitor .ig-topbar {
 }
 
 .ig-brand-tag {
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
+  font-family: var(--cx-font-display);
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ig-muted);
-  opacity: 0.92;
   white-space: nowrap;
+  background: linear-gradient(92deg, #a16207 0%, #be185d 46%, #6d28d9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
-.ig-logo {
-  text-decoration: none;
-  transition: transform 0.35s var(--cx-ease-spring);
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
+:root[data-theme="dark"] .ig-brand-tag {
+  background: linear-gradient(92deg, #f5c842 0%, #e8a0c8 48%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .ig-logo-mark {
@@ -1456,10 +1460,21 @@ body.capacitor .ig-topbar {
   display: block;
   border-radius: 0;
   transition: transform 0.35s var(--cx-ease-spring), filter 0.25s ease;
-  filter: none;
 }
 
-:root[data-theme="dark"] .ig-logo-mark {
+.ig-logo-mark--light {
+  display: none;
+}
+
+:root:not([data-theme="dark"]) .ig-logo-mark--light {
+  display: block;
+}
+
+:root:not([data-theme="dark"]) .ig-logo-mark--dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .ig-logo-mark--dark {
   filter: brightness(1.06);
 }
 

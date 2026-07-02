@@ -5,6 +5,7 @@ import { Image } from "expo-image";
 import { PressableScale } from "../../components/PressableScale";
 import { CoinCounter } from "../../components/CoinCounter";
 import headerLogoAsset from "../../assets/header-logo.png";
+import headerLogoLightAsset from "../../assets/header-logo-light.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
@@ -73,12 +74,15 @@ function FeedTopBar() {
         <View style={[styles.brandBar, styles.brandBarGradient]} />
         <View style={styles.brandBody}>
           <Image
-            source={headerLogoAsset}
+            source={isDark ? headerLogoAsset : headerLogoLightAsset}
             style={styles.brandLogo}
             contentFit="contain"
             accessibilityLabel="Ke Jitbe"
           />
-          <Text style={[styles.brandTag, { color: colors.muted }]} numberOfLines={1}>
+          <Text
+            style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
+            numberOfLines={1}
+          >
             Compare · vote · vibe
           </Text>
         </View>
@@ -643,10 +647,12 @@ const styles = StyleSheet.create({
   brandLogo: { width: 108, height: 24 },
   brandTag: {
     fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 1.2,
+    fontWeight: "700",
+    letterSpacing: 1.4,
     textTransform: "uppercase",
   },
+  brandTagLight: { color: "#6d28d9" },
+  brandTagDark: { color: "#c4b5fd" },
   actions: { flexDirection: "row", alignItems: "center", gap: 7 },
   circleBtn: {
     width: 36, height: 36, borderRadius: 18,
