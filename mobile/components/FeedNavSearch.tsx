@@ -4,13 +4,14 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
 /** Top-nav search pill — matches web `GlobalSearch` bar; opens full search on tap. */
-export function FeedNavSearch() {
+export function FeedNavSearch({ compact = false }: { compact?: boolean }) {
   const { colors } = useTheme();
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.pill,
+        compact && styles.pillCompact,
         {
           backgroundColor: colors.card,
           borderColor: colors.border,
@@ -35,9 +36,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 34,
+    height: 38,
     borderRadius: 999,
     borderWidth: 1,
+    paddingHorizontal: 12,
+  },
+  pillCompact: {
+    height: 32,
     paddingHorizontal: 10,
   },
   placeholder: {

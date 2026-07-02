@@ -52,10 +52,11 @@ const VOTE_COACH_DONE_KEY = "ctrend_vote_coach_done";
 const VOTE_COACH_SHOWN_KEY = "ctrend_vote_coach_shown";
 const VOTE_COACH_MAX_SHOWS = 3;
 
-function FeedTopBar() {
+function FeedTopBar({ expanded }: { expanded: boolean }) {
   const { logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const showBrandTag = !isAuthenticated || expanded;
 
   const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
     skip: !isAuthenticated,
@@ -69,18 +70,33 @@ function FeedTopBar() {
   }
 
   return (
-    <View style={[styles.topBar, { paddingTop: insets.top + 8, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
-      <View style={styles.topBarRow}>
+    <View
+      style={[
+        styles.topBar,
+        expanded && styles.topBarExpanded,
+        {
+          paddingTop: insets.top + (expanded ? 10 : 6),
+          paddingBottom: expanded ? 14 : 8,
+          backgroundColor: colors.topbar,
+          borderBottomColor: colors.border,
+        },
+      ]}
+    >
+      <View style={[styles.topBarRow, expanded && styles.topBarRowExpanded]}>
         <Pressable style={styles.brand} hitSlop={4} accessibilityLabel="Ke Jitbe">
           <View style={[styles.brandBar, styles.brandBarGradient]} />
           <View style={styles.brandBody}>
             <Image
               source={isDark ? headerLogoAsset : headerLogoLightAsset}
-              style={[styles.brandLogo, isAuthenticated && styles.brandLogoCompact]}
+              style={[
+                styles.brandLogo,
+                isAuthenticated && !expanded && styles.brandLogoCompact,
+                expanded && styles.brandLogoExpanded,
+              ]}
               contentFit="contain"
               accessibilityLabel="Ke Jitbe"
             />
-            {!isAuthenticated && (
+            {showBrandTag && (
               <Text
                 style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
                 numberOfLines={1}
@@ -93,7 +109,7 @@ function FeedTopBar() {
 
         {isAuthenticated && (
           <View style={styles.searchInline}>
-            <FeedNavSearch />
+            <FeedNavSearch compact={!expanded} />
           </View>
         )}
 
@@ -144,6 +160,8 @@ function FeedTopBar() {
 
 const MemoFeedTopBar = memo(FeedTopBar);
 
+const TOP_NAV_EXPAND_SCROLL_Y = 48;
+
 const TAB_BAR_H = 64 + 14; // pill height + bottom margin
 const FILTER_BAR_H = 54; // fixed — avoids list padding relayout on measure
 const PAGE_SIZE = 20; // posts per page (matches backend `take` default)
@@ -171,6 +189,7 @@ export default function FeedScreen() {
   const scrollAccumRef = useRef(0);
   const insetsBottomRef = useRef(insets.bottom);
   const chromeThrottleRef = useRef(0);
+  const [topNavExpanded, setTopNavExpanded] = useState(true);
   insetsBottomRef.current = insets.bottom;
 
   // Direction-based filter animation — same as bottom nav:
@@ -210,6 +229,12 @@ export default function FeedScreen() {
   }, []);
 
   const applyChrome = useCallback((scrollingDown: boolean, y: number) => {
+    if (y < TOP_NAV_EXPAND_SCROLL_Y) {
+      setTopNavExpanded(true);
+    } else if (scrollingDown) {
+      setTopNavExpanded(false);
+    }
+
     if (y < 60) {
       scrollAccumRef.current = 0;
       if (!tabBarVisible.current) {
@@ -500,7 +525,7 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.bg }]}>
-      <MemoFeedTopBar />
+      <MemoFeedTopBar expanded={topNavExpanded} />
       <View style={styles.feedArea}>
         {/* Filter bar is absolutely positioned so native-driver animation
             doesn't cause layout shifts in the FlatList below */}
@@ -608,7 +633,6 @@ const styles = StyleSheet.create({
   },
   topBar: {
     paddingHorizontal: 12,
-    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     ...(Platform.OS === "android"
       ? { elevation: 0 }
@@ -620,10 +644,17 @@ const styles = StyleSheet.create({
           shadowRadius: 8,
         }),
   },
+  topBarExpanded: {
+    paddingHorizontal: 14,
+  },
   topBarRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  topBarRowExpanded: {
+    alignItems: "flex-end",
+    gap: 10,
   },
   searchInline: {
     flex: 1,
@@ -650,6 +681,7 @@ const styles = StyleSheet.create({
   },
   brandLogo: { width: 108, height: 24 },
   brandLogoCompact: { width: 72, height: 22 },
+  brandLogoExpanded: { width: 96, height: 26 },
   brandTag: {
     fontSize: 8,
     fontWeight: "700",
