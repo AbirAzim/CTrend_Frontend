@@ -18,7 +18,6 @@ export function CoinCounter() {
     >
       <Animated.View
         ref={(node) => {
-          // PressableScale wraps an Animated.View; capture the inner View for measuring.
           viewRef.current = node as unknown as View;
           registerCounter(node as unknown as View);
         }}
@@ -44,7 +43,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: "rgba(245,197,24,0.4)",
-    backgroundColor: "rgba(245,197,24,0.14)",
+    backgroundColor: "transparent",
   },
   coin: {
     width: 20,
@@ -61,5 +60,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     minWidth: 11,
     textAlign: "center",
+    fontVariant: ["tabular-nums"],
   },
 });

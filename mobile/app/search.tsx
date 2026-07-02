@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useLazyQuery } from "@apollo/client/react";
 import { Image } from "expo-image";
 import { router, Stack } from "expo-router";
@@ -166,8 +167,8 @@ export default function SearchScreen() {
 
       {/* ── Search bar ── */}
       <View style={[st.topBar, { paddingTop: insets.top, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
-        <View style={[st.inputWrap, { backgroundColor: colors.section, borderColor: colors.border }]}>
-          <Text style={[st.searchIcon, { color: colors.muted }]}>🔍</Text>
+        <View style={[st.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Ionicons name="search-outline" size={17} color={colors.muted} />
           <TextInput
             ref={inputRef}
             autoFocus
@@ -228,13 +229,13 @@ const st = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
+    minHeight: 36,
   },
-  searchIcon: { fontSize: 14 },
   input: { flex: 1, fontSize: 15, padding: 0 },
   cancelBtn: { paddingHorizontal: 4 },
   cancelText: { fontSize: 15, fontWeight: "600" },

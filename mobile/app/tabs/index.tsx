@@ -31,6 +31,7 @@ import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications"
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
+import { FeedNavSearch } from "../../components/FeedNavSearch";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { CampaignBanner } from "../../components/CampaignBanner";
 import { FeedCampaignFilter } from "../../components/FeedCampaignFilter";
@@ -69,76 +70,71 @@ function FeedTopBar() {
 
   return (
     <View style={[styles.topBar, { paddingTop: insets.top + 8, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
-      {/* Brand */}
-      <Pressable style={styles.brand} hitSlop={4} accessibilityLabel="Ke Jitbe">
-        <View style={[styles.brandBar, styles.brandBarGradient]} />
-        <View style={styles.brandBody}>
-          <Image
-            source={isDark ? headerLogoAsset : headerLogoLightAsset}
-            style={styles.brandLogo}
-            contentFit="contain"
-            accessibilityLabel="Ke Jitbe"
-          />
-          <Text
-            style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
-            numberOfLines={1}
-          >
-            Compare · vote · vibe
-          </Text>
-        </View>
-      </Pressable>
-
-      {/* Action icons */}
-      <View style={styles.actions}>
-        {/* Search — signed-in only */}
-        {isAuthenticated && (
-          <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={() => router.push("/search" as `/${string}`)} hitSlop={6}>
-            <Ionicons name="search" size={19} color={colors.text} />
-          </PressableScale>
-        )}
-
-        {/* Theme toggle */}
-        <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} onPress={toggleTheme} hitSlop={6}>
-          <Ionicons name={isDark ? "sunny" : "moon"} size={19} color={isDark ? "#fbbf24" : colors.text} />
-        </PressableScale>
-
-        {/* Create + Admin live in the bottom nav (Create FAB + Admin shield), so they're
-            intentionally not duplicated here. */}
-
-        {/* Coins counter — signed-in only */}
-        {isAuthenticated && <CoinCounter />}
-
-        {/* Notification bell — signed-in only */}
-        {isAuthenticated && (
-          <PressableScale style={[styles.circleBtn, { backgroundColor: colors.circleBtnBg }]} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)}>
-            <Ionicons name="notifications-outline" size={19} color={colors.text} />
-            {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
-              </View>
+      <View style={styles.topBarRow}>
+        <Pressable style={styles.brand} hitSlop={4} accessibilityLabel="Ke Jitbe">
+          <View style={[styles.brandBar, styles.brandBarGradient]} />
+          <View style={styles.brandBody}>
+            <Image
+              source={isDark ? headerLogoAsset : headerLogoLightAsset}
+              style={[styles.brandLogo, isAuthenticated && styles.brandLogoCompact]}
+              contentFit="contain"
+              accessibilityLabel="Ke Jitbe"
+            />
+            {!isAuthenticated && (
+              <Text
+                style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
+                numberOfLines={1}
+              >
+                Compare · vote · vibe
+              </Text>
             )}
-          </PressableScale>
+          </View>
+        </Pressable>
+
+        {isAuthenticated && (
+          <View style={styles.searchInline}>
+            <FeedNavSearch />
+          </View>
         )}
 
-        {/* Logout (signed-in) / Log in (guest) */}
-        {isAuthenticated ? (
-          <PressableScale
-            style={[styles.circleBtn, styles.circleBtnLogout]}
-            onPress={() => void handleLogout()}
-            hitSlop={6}
-          >
-            <Ionicons name="log-out-outline" size={19} color="#f87171" />
+        <View style={styles.actions}>
+          <PressableScale style={styles.plainIconBtn} onPress={toggleTheme} hitSlop={6} accessibilityLabel="Toggle theme">
+            <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={22} color={colors.text} />
           </PressableScale>
-        ) : (
-          <PressableScale
-            style={[styles.circleBtn, styles.circleBtnLogin]}
-            onPress={() => router.push("/auth/login")}
-            hitSlop={6}
-          >
-            <Ionicons name="log-in-outline" size={19} color="#fff" />
-            <Text style={styles.loginLabel}>Log in</Text>
-          </PressableScale>
-        )}
+
+          {isAuthenticated && <CoinCounter />}
+
+          {isAuthenticated && (
+            <PressableScale style={styles.plainIconBtn} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)} accessibilityLabel="Notifications">
+              <Ionicons name="notifications-outline" size={22} color={colors.text} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
+                </View>
+              )}
+            </PressableScale>
+          )}
+
+          {isAuthenticated ? (
+            <PressableScale
+              style={styles.plainIconBtn}
+              onPress={() => void handleLogout()}
+              hitSlop={6}
+              accessibilityLabel="Logout"
+            >
+              <Ionicons name="log-out-outline" size={22} color={colors.text} />
+            </PressableScale>
+          ) : (
+            <PressableScale
+              style={[styles.circleBtn, styles.circleBtnLogin]}
+              onPress={() => router.push("/auth/login")}
+              hitSlop={6}
+            >
+              <Ionicons name="log-in-outline" size={19} color="#fff" />
+              <Text style={styles.loginLabel}>Log in</Text>
+            </PressableScale>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -609,11 +605,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 18,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     ...(Platform.OS === "android"
       ? { elevation: 0 }
@@ -624,6 +617,15 @@ const styles = StyleSheet.create({
           shadowOpacity: 0.08,
           shadowRadius: 8,
         }),
+  },
+  topBarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchInline: {
+    flex: 1,
+    minWidth: 0,
   },
   brand: {
     flexDirection: "row",
@@ -645,6 +647,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   brandLogo: { width: 108, height: 24 },
+  brandLogoCompact: { width: 72, height: 22 },
   brandTag: {
     fontSize: 8,
     fontWeight: "700",
@@ -653,14 +656,22 @@ const styles = StyleSheet.create({
   },
   brandTagLight: { color: "#6d28d9" },
   brandTagDark: { color: "#c4b5fd" },
-  actions: { flexDirection: "row", alignItems: "center", gap: 7 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
+  plainIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    overflow: "visible",
+  },
   circleBtn: {
     width: 36, height: 36, borderRadius: 18,
     justifyContent: "center", alignItems: "center",
     position: "relative",
     overflow: "visible",
   },
-  circleBtnLogout: { backgroundColor: "rgba(239,68,68,0.14)" },
   circleBtnLogin: {
     width: "auto",
     flexDirection: "row",

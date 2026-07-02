@@ -1,4 +1,4 @@
-import { compareEventsByMinute, effectiveEventMinute } from "./matchEvents";
+import { compareEventsByMinute } from "./matchEvents";
 
 export type PenaltyShootoutKick = {
   team: "home" | "away";

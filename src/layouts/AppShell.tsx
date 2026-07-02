@@ -343,7 +343,7 @@ export function AppShell() {
           {isAuthenticated ? (
             <button
               type="button"
-              className="ig-icon-btn ig-topbar-logout"
+              className="ig-icon-btn ig-topbar-plain"
               onClick={onLogoutClick}
               aria-label="Logout"
               title="Logout"

@@ -10890,22 +10890,6 @@ a.cx-action-chip {
   }
 }
 
-.ig-icon-btn.ig-topbar-logout {
-  width: 38px;
-  height: 38px;
-  border: 1px solid rgb(var(--cx-rose-rgb) / 0.28);
-  background: rgb(var(--cx-rose-rgb) / 0.08);
-  color: var(--cx-rose-soft);
-}
-
-.ig-icon-btn.ig-topbar-logout:hover {
-  background: rgb(var(--cx-rose-rgb) / 0.14);
-}
-
-.ig-icon-btn.ig-topbar-logout:active {
-  transform: scale(0.94);
-}
-
 /* ── Dark mode premium overrides ── */
 
 :root[data-theme="dark"] .ig-topbar {
@@ -14690,7 +14674,7 @@ a.cx-profile-btn-accent {
   }
 
   .ig-icon-btn,
-  .ig-icon-btn.ig-topbar-logout {
+  .ig-icon-btn.ig-topbar-plain {
     width: 36px;
     height: 36px;
   }
@@ -26282,22 +26266,38 @@ html[data-minimal-chrome="true"] .ig-topbar {
   padding: 0 12px 0 8px;
   border-radius: 999px;
   border: 1px solid rgba(245, 197, 24, 0.35);
-  background: linear-gradient(135deg, rgba(255, 215, 64, 0.16), rgba(245, 158, 11, 0.10));
+  background: transparent;
   color: var(--ig-text, #1c1e21);
   font: inherit;
   font-weight: 800;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition: transform 0.18s ease, border-color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .cx-coin-counter:hover {
-  background: linear-gradient(135deg, rgba(255, 215, 64, 0.26), rgba(245, 158, 11, 0.16));
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 197, 24, 0.55);
+  transform: scale(1.04);
+  box-shadow: none;
 }
 .cx-coin-counter:active { transform: scale(0.95); }
 
-.cx-coin-counter-icon,
+.cx-coin-counter-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe88a 0%, #f5c518 45%, #d99411 100%);
+  color: #7a4a05;
+  font-weight: 900;
+  font-size: 0.82rem;
+  line-height: 1;
+  box-shadow: inset 0 -1px 2px rgba(120, 72, 5, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+  flex: 0 0 auto;
+}
+
 .cx-coin-fly-face {
   display: inline-flex;
   align-items: center;
@@ -26317,6 +26317,11 @@ html[data-minimal-chrome="true"] .ig-topbar {
   min-width: 12px;
   text-align: left;
   font-variant-numeric: tabular-nums;
+  color: #d99411;
+}
+
+:root[data-theme="dark"] .cx-coin-counter-value {
+  color: #f5c518;
 }
 
 /* Pulse when the balance increases */
