@@ -1,38 +1,36 @@
-import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react";
-import { Image } from "expo-image";
-import { PressableScale } from "../../components/PressableScale";
-import { CoinCounter } from "../../components/CoinCounter";
-import headerLogoAsset from "../../assets/header-logo.png";
-import headerLogoLightAsset from "../../assets/header-logo-light.png";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
+  Animated as RNAnimated,
   ListRenderItem,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Animated, {
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { FlashList } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { FEED_POSTS, GET_POST_BY_ID, NEW_POSTS, POST_DELETED_SUB } from "@ctrend/shared/graphql/feed";
 import { MY_FRIENDS, FRIEND_SUGGESTIONS, FRIEND_REQUESTS } from "@ctrend/shared/graphql/friends";
 import { ME } from "@ctrend/shared/graphql/profile";
-import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
 import type { FeedPostView } from "@ctrend/shared/types/feed";
-import { FeedNavSearch } from "../../components/FeedNavSearch";
+import { FeedTopBar } from "../../components/FeedTopBar";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { CampaignBanner } from "../../components/CampaignBanner";
 import { FeedCampaignFilter } from "../../components/FeedCampaignFilter";
@@ -52,179 +50,18 @@ type FeedData = { feedPosts: unknown[] };
 const VOTE_COACH_DONE_KEY = "ctrend_vote_coach_done";
 const VOTE_COACH_SHOWN_KEY = "ctrend_vote_coach_shown";
 const VOTE_COACH_MAX_SHOWS = 3;
-const TOP_NAV_ANIM_MS = 240;
 
-function FeedTopBar({ expanded }: { expanded: boolean }) {
-  const { logout, isAuthenticated } = useAuth();
-  const { isDark, toggleTheme, colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const expandAnim = useRef(new Animated.Value(expanded ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(expandAnim, {
-      toValue: expanded ? 1 : 0,
-      duration: TOP_NAV_ANIM_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [expanded, expandAnim]);
-
-  const paddingTopExtra = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [6, 10],
-  });
-  const paddingBottom = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [8, 14],
-  });
-  const paddingHorizontal = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [12, 14],
-  });
-  const logoWidth = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: isAuthenticated ? [72, 96] : [108, 108],
-  });
-  const logoHeight = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: isAuthenticated ? [22, 26] : [24, 24],
-  });
-  const tagOpacity = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-  const tagMaxHeight = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 14],
-  });
-  const controlsTranslateY = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 2],
-  });
-
-  const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
-    skip: !isAuthenticated,
-    fetchPolicy: "cache-first",
-  });
-  const unreadCount: number = notifData?.unreadNotificationCount ?? 0;
-
-  async function handleLogout() {
-    await logout();
-    router.replace("/auth/login");
-  }
-
-  return (
-    <Animated.View
-      style={[
-        styles.topBar,
-        {
-          paddingTop: Animated.add(insets.top, paddingTopExtra),
-          paddingBottom,
-          paddingHorizontal,
-          backgroundColor: colors.topbar,
-          borderBottomColor: colors.border,
-        },
-      ]}
-    >
-      <View style={styles.topBarRow}>
-        <Pressable style={styles.brand} hitSlop={4} accessibilityLabel="Ke Jitbe">
-          <View style={[styles.brandBar, styles.brandBarGradient]} />
-          <View style={styles.brandBody}>
-            <Animated.View style={{ width: logoWidth, height: logoHeight }}>
-              <Image
-                source={isDark ? headerLogoAsset : headerLogoLightAsset}
-                style={styles.brandLogoFill}
-                contentFit="contain"
-                accessibilityLabel="Ke Jitbe"
-              />
-            </Animated.View>
-            {isAuthenticated ? (
-              <Animated.View
-                style={{
-                  opacity: tagOpacity,
-                  maxHeight: tagMaxHeight,
-                  overflow: "hidden",
-                }}
-              >
-                <Text
-                  style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
-                  numberOfLines={1}
-                >
-                  Compare · vote · vibe
-                </Text>
-              </Animated.View>
-            ) : (
-              <Text
-                style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
-                numberOfLines={1}
-              >
-                Compare · vote · vibe
-              </Text>
-            )}
-          </View>
-        </Pressable>
-
-        {isAuthenticated && (
-          <Animated.View style={[styles.searchInline, { transform: [{ translateY: controlsTranslateY }] }]}>
-            <FeedNavSearch expandProgress={expandAnim} />
-          </Animated.View>
-        )}
-
-        <Animated.View style={[styles.actions, { transform: [{ translateY: controlsTranslateY }] }]}>
-          <PressableScale style={styles.plainIconBtn} onPress={toggleTheme} hitSlop={6} accessibilityLabel="Toggle theme">
-            <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={22} color={colors.text} />
-          </PressableScale>
-
-          {isAuthenticated && <CoinCounter />}
-
-          {isAuthenticated && (
-            <PressableScale style={styles.plainIconBtn} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)} accessibilityLabel="Notifications">
-              <View style={styles.notifIconWrap}>
-                <Ionicons name="notifications-outline" size={22} color={colors.text} />
-                {unreadCount > 0 && (
-                  <View style={[styles.notifBadge, { borderColor: colors.topbar }]}>
-                    <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
-                  </View>
-                )}
-              </View>
-            </PressableScale>
-          )}
-
-          {isAuthenticated ? (
-            <PressableScale
-              style={styles.plainIconBtn}
-              onPress={() => void handleLogout()}
-              hitSlop={6}
-              accessibilityLabel="Logout"
-            >
-              <Ionicons name="log-out-outline" size={22} color={colors.text} />
-            </PressableScale>
-          ) : (
-            <PressableScale
-              style={[styles.circleBtn, styles.circleBtnLogin]}
-              onPress={() => router.push("/auth/login")}
-              hitSlop={6}
-            >
-              <Ionicons name="log-in-outline" size={19} color="#fff" />
-              <Text style={styles.loginLabel}>Log in</Text>
-            </PressableScale>
-          )}
-        </Animated.View>
-      </View>
-    </Animated.View>
-  );
-}
-
-const MemoFeedTopBar = memo(FeedTopBar);
-
-const TOP_NAV_EXPAND_SCROLL_Y = 48;
+const CHROME_AT_TOP_ENTER_Y = 32;
+const CHROME_AT_TOP_EXIT_Y = 100;
 
 const TAB_BAR_H = 64 + 14; // pill height + bottom margin
-const FILTER_BAR_H = 54; // fixed — avoids list padding relayout on measure
-const PAGE_SIZE = 20; // posts per page (matches backend `take` default)
-const CHROME_SCROLL_THRESHOLD = 56; // accumulate dy before toggling chrome
+const FILTER_BAR_H = 48;
+const PAGE_SIZE = 20;
+const CHROME_SCROLL_THRESHOLD = 56;
 const CHROME_THROTTLE_MS = 120;
-const FEED_ITEM_EST_HEIGHT = 580; // average card height for FlashList recycling
+const FEED_ITEM_EST_HEIGHT = 580;
+
+const ReanimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -242,16 +79,21 @@ export default function FeedScreen() {
   const tabBarAnimating = useRef(false);
   const filterVisible = useRef(true);
   const filterAnimating = useRef(false);
-  const filterBarHeightRef = useRef(FILTER_BAR_H);
   const scrollAccumRef = useRef(0);
   const insetsBottomRef = useRef(insets.bottom);
   const chromeThrottleRef = useRef(0);
-  const [topNavExpanded, setTopNavExpanded] = useState(true);
+  const atTopRef = useRef(true);
+  const scrollY = useSharedValue(0);
+  const filterProgress = useSharedValue(1);
   insetsBottomRef.current = insets.bottom;
 
-  // Direction-based filter animation — same as bottom nav:
-  // scroll DOWN → filter hides, scroll UP → filter shows.
-  const filterTranslateY = useRef(new Animated.Value(0)).current;
+  const filterBarStyle = useAnimatedStyle(() => ({
+    height: FILTER_BAR_H * filterProgress.value,
+    opacity: filterProgress.value,
+    overflow: "hidden" as const,
+  }));
+
+  // Direction-based chrome: scroll DOWN → filter + bottom tab hide; scroll UP → show.
   // Infinite scroll: guard against overlapping/needless page fetches.
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -285,82 +127,78 @@ export default function FeedScreen() {
     }
   }, []);
 
-  const applyChrome = useCallback((scrollingDown: boolean, y: number) => {
-    if (y < TOP_NAV_EXPAND_SCROLL_Y) {
-      setTopNavExpanded(true);
-    } else if (scrollingDown) {
-      setTopNavExpanded(false);
-    }
+  const finishFilterAnim = useCallback(() => {
+    filterAnimating.current = false;
+  }, []);
 
-    if (y < 60) {
-      scrollAccumRef.current = 0;
-      if (!tabBarVisible.current) {
-        tabBarVisible.current = true;
-        tabBarAnimating.current = true;
-        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-          tabBarAnimating.current = false;
-        });
-      }
-      if (!filterVisible.current) {
-        filterVisible.current = true;
-        filterAnimating.current = false;
-        Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-      }
+  const showChrome = useCallback(() => {
+    if (!tabBarVisible.current) {
+      tabBarVisible.current = true;
+      tabBarAnimating.current = true;
+      RNAnimated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        tabBarAnimating.current = false;
+      });
+    }
+    if (!filterVisible.current) {
+      filterVisible.current = true;
+      filterAnimating.current = false;
+      filterProgress.value = withTiming(1, { duration: 180 });
+    }
+  }, [filterProgress, translateY]);
+
+  const applyChrome = useCallback((scrollingDown: boolean) => {
+    if (atTopRef.current) {
+      showChrome();
       return;
     }
 
     const bottomOffset = TAB_BAR_H + insetsBottomRef.current;
-    const filterOffset = filterBarHeightRef.current;
 
     if (scrollingDown) {
       if (tabBarVisible.current && !tabBarAnimating.current) {
         tabBarVisible.current = false;
         tabBarAnimating.current = true;
-        Animated.timing(translateY, { toValue: bottomOffset, duration: 200, useNativeDriver: true }).start(() => {
+        RNAnimated.timing(translateY, { toValue: bottomOffset, duration: 200, useNativeDriver: true }).start(() => {
           tabBarAnimating.current = false;
         });
       }
       if (filterVisible.current && !filterAnimating.current) {
         filterVisible.current = false;
         filterAnimating.current = true;
-        Animated.timing(filterTranslateY, { toValue: -filterOffset, duration: 200, useNativeDriver: true }).start(() => {
-          filterAnimating.current = false;
+        filterProgress.value = withTiming(0, { duration: 180 }, (done) => {
+          if (done) runOnJS(finishFilterAnim)();
         });
       }
       return;
     }
 
-    if (!tabBarVisible.current && !tabBarAnimating.current) {
-      tabBarVisible.current = true;
-      tabBarAnimating.current = true;
-      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        tabBarAnimating.current = false;
-      });
-    }
-    if (!filterVisible.current && !filterAnimating.current) {
-      filterVisible.current = true;
-      filterAnimating.current = true;
-      Animated.timing(filterTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        filterAnimating.current = false;
-      });
-    }
-  }, [filterTranslateY, translateY]);
+    showChrome();
+  }, [filterProgress, finishFilterAnim, showChrome, translateY]);
 
   const handleScrollEnd = useCallback(() => {
     if (Math.abs(scrollAccumRef.current) >= CHROME_SCROLL_THRESHOLD) {
-      applyChrome(scrollAccumRef.current > 0, lastScrollY.current);
+      applyChrome(scrollAccumRef.current > 0);
       scrollAccumRef.current = 0;
     }
   }, [applyChrome]);
 
-  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const y = e.nativeEvent.contentOffset.y;
+  const handleScrollJS = useCallback((y: number) => {
     const diff = y - lastScrollY.current;
     lastScrollY.current = y;
     scrollAccumRef.current += diff;
 
-    if (y < 60) {
-      applyChrome(false, y);
+    if (y < CHROME_AT_TOP_ENTER_Y) {
+      atTopRef.current = true;
+    } else if (y > CHROME_AT_TOP_EXIT_Y) {
+      atTopRef.current = false;
+    }
+
+    if (diff < -8 && !filterVisible.current) {
+      showChrome();
+    }
+
+    if (atTopRef.current) {
+      showChrome();
       scrollAccumRef.current = 0;
       return;
     }
@@ -373,9 +211,16 @@ export default function FeedScreen() {
       chromeThrottleRef.current = now;
       const scrollingDown = scrollAccumRef.current > 0;
       scrollAccumRef.current = 0;
-      applyChrome(scrollingDown, y);
+      applyChrome(scrollingDown);
     }
-  }
+  }, [applyChrome, showChrome]);
+
+  const onFeedScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
+      runOnJS(handleScrollJS)(e.contentOffset.y);
+    },
+  });
 
   const feedQueryVars = useMemo(() => {
     const campaignId = feedFilter.startsWith("campaign:")
@@ -411,14 +256,16 @@ export default function FeedScreen() {
     setRemovedIds(new Set());
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
-    filterTranslateY.setValue(0);
+    atTopRef.current = true;
+    lastScrollY.current = 0;
+    scrollY.value = 0;
+    filterProgress.value = 1;
     filterVisible.current = true;
     filterAnimating.current = false;
-    lastScrollY.current = 0;
     tabBarVisible.current = true;
     tabBarAnimating.current = false;
     translateY.setValue(0);
-  }, [feedFilter, filterTranslateY, translateY]);
+  }, [feedFilter, filterProgress, scrollY, translateY]);
 
   // Prefetch the next page well before the user hits the bottom so the feed
   // always feels like it has more — no visible "loading" at the end.
@@ -582,21 +429,14 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.bg }]}>
-      <MemoFeedTopBar expanded={topNavExpanded} />
+      <FeedTopBar scrollY={scrollY} />
       <View style={styles.feedArea}>
-        {/* Filter bar is absolutely positioned so native-driver animation
-            doesn't cause layout shifts in the FlatList below */}
         <Animated.View
           style={[
-            styles.filterBarAbsolute,
-            { transform: [{ translateY: filterTranslateY }], backgroundColor: colors.topbar },
+            filterBarStyle,
+            styles.filterBar,
+            { backgroundColor: colors.topbar, borderBottomColor: colors.border },
           ]}
-          onLayout={(e) => {
-            const h = e.nativeEvent.layout.height;
-            if (Math.abs(h - filterBarHeightRef.current) > 2) {
-              filterBarHeightRef.current = h;
-            }
-          }}
         >
           <FeedCampaignFilter
             activeFilter={feedFilter}
@@ -616,7 +456,7 @@ export default function FeedScreen() {
           </Text>
         </View>
       ) : (
-        <FlashList
+        <ReanimatedFlashList
           data={posts}
           extraData={coachPostId}
           keyExtractor={keyExtractor}
@@ -628,8 +468,8 @@ export default function FeedScreen() {
           // score prediction) instead of the first tap only dismissing it.
           keyboardShouldPersistTaps="handled"
           style={[styles.list, { backgroundColor: colors.bg }]}
-          contentContainerStyle={{ paddingTop: FILTER_BAR_H + 8, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
-          onScroll={handleScroll}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + TAB_BAR_H + 16 }}
+          onScroll={onFeedScroll}
           onScrollEndDrag={handleScrollEnd}
           onMomentumScrollEnd={handleScrollEnd}
           scrollEventThrottle={16}
@@ -680,118 +520,10 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  feedArea: { flex: 1, position: 'relative', overflow: 'hidden' },
-  filterBarAbsolute: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  topBar: {
+  feedArea: { flex: 1 },
+  filterBar: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    ...(Platform.OS === "android"
-      ? { elevation: 0 }
-      : {
-          elevation: 4,
-          shadowColor: "#6366f1",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-        }),
   },
-  topBarRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-  },
-  searchInline: {
-    flex: 1,
-    minWidth: 0,
-  },
-  brand: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    flexShrink: 0,
-    gap: 8,
-  },
-  brandBar: {
-    width: 3,
-    borderRadius: 999,
-    marginVertical: 2,
-  },
-  brandBarGradient: {
-    backgroundColor: "#9b5de5",
-  },
-  brandBody: {
-    flexDirection: "column",
-    justifyContent: "center",
-    gap: 1,
-  },
-  brandLogoFill: { width: "100%", height: "100%" },
-  brandTag: {
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-  },
-  brandTagLight: { color: "#6d28d9" },
-  brandTagDark: { color: "#c4b5fd" },
-  actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
-  plainIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    overflow: "visible",
-  },
-  circleBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    justifyContent: "center", alignItems: "center",
-    position: "relative",
-    overflow: "visible",
-  },
-  circleBtnLogin: {
-    width: "auto",
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#ec4899",
-  },
-  loginLabel: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
-  iconSymbol: { fontSize: 15, color: "#e2e8f0" },
-  bellSymbol: { fontSize: 15 },
-  logoutSymbol: { fontSize: 17, color: "#fca5a5", fontWeight: "700" },
-  rectBtn: {
-    height: 34, paddingHorizontal: 11, borderRadius: 10,
-    justifyContent: "center", alignItems: "center",
-  },
-  rectBtnAdmin: { backgroundColor: "#7c3aed" },
-  rectBtnCreate: { backgroundColor: "#4f46e5" },
-  rectBtnSymbol: { fontSize: 15, color: "#ffffff", fontWeight: "700" },
-  notifIconWrap: {
-    width: 22,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  notifBadge: {
-    position: "absolute",
-    top: -6,
-    right: -7,
-    backgroundColor: "#e11d48",
-    borderRadius: 7,
-    borderWidth: 1.5,
-    minWidth: 14,
-    height: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 2,
-  },
-  notifBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800", lineHeight: 10 },
   list: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { fontSize: 16, fontWeight: "700", color: "#ef4444", marginBottom: 8 },

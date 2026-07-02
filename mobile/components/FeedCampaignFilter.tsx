@@ -73,9 +73,7 @@ export function FeedCampaignFilter({ activeFilter, onFilterChange }: Props) {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		borderBottomWidth: StyleSheet.hairlineWidth,
-	},
+	container: {},
 	tabRow: {
 		flexDirection: 'row',
 		paddingVertical: 4,

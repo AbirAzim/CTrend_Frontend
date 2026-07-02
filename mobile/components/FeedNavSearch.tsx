@@ -1,26 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Animated, Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
 /** Top-nav search pill — matches web `GlobalSearch` bar; opens full search on tap. */
-export function FeedNavSearch({
-  expandProgress,
-}: {
-  expandProgress?: Animated.Value;
-}) {
+export function FeedNavSearch() {
   const { colors } = useTheme();
-
-  const pillHeight =
-    expandProgress?.interpolate({
-      inputRange: [0, 1],
-      outputRange: [32, 38],
-    }) ?? 38;
-  const pillPaddingH =
-    expandProgress?.interpolate({
-      inputRange: [0, 1],
-      outputRange: [10, 12],
-    }) ?? 12;
 
   return (
     <Pressable
@@ -32,12 +17,10 @@ export function FeedNavSearch({
       accessibilityRole="search"
       accessibilityLabel="Search people and posts"
     >
-      <Animated.View
+      <Pressable
         style={[
           styles.pill,
           {
-            height: pillHeight,
-            paddingHorizontal: pillPaddingH,
             backgroundColor: colors.card,
             borderColor: colors.border,
           },
@@ -47,7 +30,7 @@ export function FeedNavSearch({
         <Text style={[styles.placeholder, { color: colors.muted }]} numberOfLines={1}>
           Search…
         </Text>
-      </Animated.View>
+      </Pressable>
     </Pressable>
   );
 }
@@ -57,6 +40,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    height: "100%",
+    paddingHorizontal: 12,
     borderRadius: 999,
     borderWidth: 1,
   },
