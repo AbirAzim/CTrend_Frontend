@@ -965,8 +965,13 @@ export default function ProfileScreen() {
                 actionLoading={actionLoadingIds.has(f.id)}
                 rightSlot={
                   <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    <Pressable style={[st.iconBtn, { backgroundColor: colors.accent }]} onPress={() => void handleDm(f.id)}>
-                      <MessageIcon size={17} color="#fff" />
+                    <Pressable
+                      style={st.plainIconBtn}
+                      onPress={() => void handleDm(f.id)}
+                      hitSlop={6}
+                      accessibilityLabel="Message"
+                    >
+                      <MessageIcon size={22} color={colors.text} />
                     </Pressable>
                     <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleUnfriend(f.id)}>
                       <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Unfriend</Text>
@@ -1195,7 +1200,13 @@ const st = StyleSheet.create({
   personName: { fontSize: 14, fontWeight: "700" },
 
   // Action buttons
-  iconBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  plainIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   ghostBtn: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   ghostBtnText: { fontSize: 12, fontWeight: "600" },
   acceptBtn: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: "#22c55e" },
