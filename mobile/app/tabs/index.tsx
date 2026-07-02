@@ -6,8 +6,6 @@ import {
   ActivityIndicator,
   Animated as RNAnimated,
   ListRenderItem,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Platform,
   RefreshControl,
   StyleSheet,
