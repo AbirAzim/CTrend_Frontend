@@ -25,6 +25,7 @@ import { GET_POST_BY_ID, UPDATE_POST, CATEGORIES } from "@ctrend/shared/graphql/
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { PollIcon, ImagesIcon, VoteIcon } from "../components/ContentIcons";
 import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL } from "../lib/imageFocal";
 import { useTheme } from "../context/ThemeContext";
@@ -646,7 +647,7 @@ export default function EditPostScreen() {
                     </Pressable>
                   ) : (
                     <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
-                      <Text style={{ fontSize: 18, color: "#fff" }}>🖼</Text>
+                      <ImagesIcon size={18} color="#fff" />
                     </View>
                   )}
                   {bodyUploadingId === b.id ? (
@@ -692,7 +693,7 @@ export default function EditPostScreen() {
                     </Pressable>
                   ) : (
                     <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
-                      <Text style={{ fontSize: 18, color: "#fff" }}>🖼</Text>
+                      <ImagesIcon size={18} color="#fff" />
                     </View>
                   )}
                   {bodyUploadingId === b.id ? (
@@ -750,8 +751,10 @@ export default function EditPostScreen() {
                       }}
                       cachePolicy="memory-disk"
                     />
+                  ) : isPoll ? (
+                    <PollIcon size={20} color={colors.muted} />
                   ) : (
-                    <Text style={{ fontSize: 20, color: colors.muted }}>{isPoll ? "📊" : "🖼"}</Text>
+                    <ImagesIcon size={20} color={colors.muted} />
                   )}
                   {uploadingIdx === i ? (
                     <View style={[StyleSheet.absoluteFill, st.thumbOverlay]}>
@@ -910,7 +913,7 @@ export default function EditPostScreen() {
                 </View>
                 <DateTimeStepper date={votingEnd} onChange={setVotingEnd} colors={colors} />
                 <View style={[st.scheduleSummary, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "44" }]}>
-                  <Text style={{ fontSize: 18 }}>🗳️</Text>
+                  <VoteIcon size={18} color={colors.accent} />
                   <View style={{ flex: 1 }}>
                     <Text style={[st.scheduleSummaryTitle, { color: colors.accent }]}>Voting ends</Text>
                     <Text style={[st.scheduleSummaryDate, { color: colors.text }]}>{fmtScheduleSummary(votingEnd)}</Text>

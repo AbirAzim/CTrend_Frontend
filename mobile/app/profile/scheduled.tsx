@@ -17,6 +17,7 @@ import { MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST, NEW_POSTS } from "@ctrend/sh
 import { useSubscription } from "@apollo/client/react";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
+import { ImagesIcon } from "../../components/ContentIcons";
 
 type ScheduledPost = {
   id: string;
@@ -146,7 +147,7 @@ export default function ScheduledPostsScreen() {
                     <Image source={{ uri: img0 }} style={[st.thumb, img1 ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : {}]} contentFit="cover" cachePolicy="memory-disk" />
                   ) : (
                     <View style={[st.thumb, { alignItems: "center", justifyContent: "center" }]}>
-                      <Text style={{ fontSize: 24 }}>🖼</Text>
+                      <ImagesIcon size={24} color={colors.muted} />
                     </View>
                   )}
                   {img1 ? (

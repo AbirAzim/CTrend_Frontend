@@ -27,6 +27,7 @@ import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { useCoins } from "../context/CoinsContext";
 import type { FeedPostView } from "../types/feed";
+import { IconCompare, IconVote, IconImages } from "../components/IgIcons";
 
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
@@ -869,7 +870,7 @@ export function ProfilePage() {
           onClick={() => setOpenContent((v) => !v)}
           aria-expanded={openContent}
         >
-          <span className="cx-section-toggle-icon" aria-hidden>📊</span>
+          <span className="cx-section-toggle-icon" aria-hidden><IconCompare size={18} /></span>
           <span className="cx-section-toggle-text">
             <strong>Your content</strong>
             <span className="muted small">
@@ -924,7 +925,8 @@ export function ProfilePage() {
             className={`cx-conn-tab${profileContentTab === "voted" ? " cx-conn-tab--active" : ""}`}
             onClick={() => selectProfileContentTab("voted")}
           >
-            🗳️ Voted
+            <IconVote size={14} />
+            Voted
             {votedPosts.length > 0 && <span className="cx-conn-tab-badge">{votedPosts.length}</span>}
           </button>
         </div>
@@ -1022,7 +1024,7 @@ export function ProfilePage() {
                               />
                             ))
                           ) : (
-                            <div className="cx-scheduled-card-placeholder" aria-hidden>🖼</div>
+                            <div className="cx-scheduled-card-placeholder" aria-hidden><IconImages size={22} /></div>
                           )}
                         </div>
                         <div className="cx-scheduled-card-body">
@@ -1129,7 +1131,7 @@ export function ProfilePage() {
               <p className="cx-conn-empty">Loading voted posts…</p>
             ) : votedPosts.length === 0 ? (
               <div className="cx-conn-empty">
-                <span className="cx-conn-empty-icon">🗳️</span>
+                <span className="cx-conn-empty-icon" aria-hidden><IconVote size={28} /></span>
                 <p>
                   {votedFilter === "anonymous"
                     ? "You haven't voted anonymously on any posts yet."

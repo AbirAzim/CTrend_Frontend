@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { IconEdit, IconLock } from "./IgIcons";
+import { IconEdit, IconLock, IconPoll, IconImages, IconVote } from "./IgIcons";
 
 export type ProfileCompareCardPost = {
   id: string;
@@ -100,7 +100,10 @@ export function ProfileCompareCard({
         <div className={`cx-kept-card-media${isPoll ? " cx-kept-card-media--poll" : ""}`}>
           {isPoll ? (
             <div className="cx-poll-card-preview" aria-hidden>
-              <span className="cx-poll-card-preview-badge">📊 Poll</span>
+              <span className="cx-poll-card-preview-badge">
+                <IconPoll size={11} />
+                Poll
+              </span>
               <span className="cx-poll-card-preview-bars">
                 <span className="cx-poll-card-preview-bar" />
                 <span className="cx-poll-card-preview-bar" />
@@ -114,7 +117,7 @@ export function ProfileCompareCard({
             </div>
           ) : images.length === 0 ? (
             <span className="cx-profile-card-media-empty" aria-hidden>
-              📷
+              <IconImages size={22} />
             </span>
           ) : (
             images.slice(0, 4).map((url, idx) => (
@@ -153,7 +156,8 @@ export function ProfileCompareCard({
             {showRichMeta ? (
               <div className="cx-profile-card-stats" aria-label="Engagement stats">
                 <span className="cx-profile-card-stat" title="Votes">
-                  🗳️ {totalVotes.toLocaleString()}
+                  <IconVote size={12} />
+                  {totalVotes.toLocaleString()}
                 </span>
                 <span className="cx-profile-card-stat" title="Comments">
                   💬 {(post.commentCount ?? 0).toLocaleString()}

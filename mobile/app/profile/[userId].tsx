@@ -36,6 +36,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useBackToFeed } from "../../hooks/useBackToFeed";
 import { useTheme } from "../../context/ThemeContext";
 import { useToast } from "../../components/useToast";
+import { CompareIcon, ImagesIcon, MessageIcon } from "../../components/ContentIcons";
 import { ProfileEngagementPanel } from "../../components/ProfileEngagementPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -215,7 +216,7 @@ function FriendButton({
 function Section({
   icon, title, subtitle, open, onToggle, colors, children, onLayout,
 }: {
-  icon: string;
+  icon: ReactNode;
   title: string;
   subtitle?: string;
   open: boolean;
@@ -235,7 +236,7 @@ function Section({
         android_ripple={{ color: colors.accent + "11" }}
       >
         <View style={[styles.accIcon, { backgroundColor: colors.accent + "1a" }]}>
-          <Text style={{ fontSize: 16 }}>{icon}</Text>
+          {icon}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.accTitle, { color: colors.text }]}>{title}</Text>
@@ -514,7 +515,12 @@ export default function UserProfileScreen() {
                 >
                   {dmLoading
                     ? <ActivityIndicator size="small" color={colors.accent} />
-                    : <Text style={[styles.friendBtnText, { color: colors.accent }]}>💬 Message</Text>
+                    : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <MessageIcon size={16} color={colors.accent} />
+                        <Text style={[styles.friendBtnText, { color: colors.accent }]}>Message</Text>
+                      </View>
+                    )
                   }
                 </Pressable>
               )}
@@ -544,7 +550,7 @@ export default function UserProfileScreen() {
           {/* Compares (collapsible) */}
           {isAuthenticated && (
             <Section
-              icon="📊"
+              icon={<CompareIcon size={16} color={colors.text} />}
               title="Compares"
               subtitle={posts.length > 0 ? `${posts.length} compare${posts.length === 1 ? "" : "s"} to explore` : "No compares yet"}
               open={openPosts}
@@ -581,7 +587,7 @@ export default function UserProfileScreen() {
                           />
                         ) : (
                           <View style={[styles.gridThumb, { backgroundColor: colors.section, alignItems: "center", justifyContent: "center" }]}>
-                            <Text style={{ color: colors.muted, fontSize: 20 }}>🖼</Text>
+                            <ImagesIcon size={20} color={colors.muted} />
                           </View>
                         )}
                         {votes > 0 && (

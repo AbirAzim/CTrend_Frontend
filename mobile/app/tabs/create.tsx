@@ -27,6 +27,7 @@ import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS, GET_POST_BY_ID, UPDATE_POST } from "@ctrend/shared/graphql/feed";
 import { PUBLIC_CAMPAIGNS, CAMPAIGNS_ADMIN } from "@ctrend/shared/graphql/campaigns";
 import { CAMPAIGN_BADGE_ICON } from "@ctrend/shared/lib/campaignUi";
+import { CompareIcon, PollIcon, ImagesIcon } from "../../components/ContentIcons";
 import { CREATE_SYSTEM_POST, PLATFORM_SETTINGS } from "@ctrend/shared/graphql/admin";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { getApolloErrorMessage } from "../../lib/apolloErrorMessage";
@@ -897,20 +898,26 @@ export default function CreateScreen() {
         {!isEdit && (
           <View style={[st.formatSwitch, { backgroundColor: colors.section, borderColor: colors.border }]}>
             {([
-              { f: "compare", label: "🖼  Compare" },
-              { f: "poll", label: "📊  Poll" },
-              ...(isAdmin ? [{ f: "announcement", label: "📢  Announce" }] : []),
-            ] as Array<{ f: "compare" | "poll" | "announcement"; label: string }>).map(({ f, label }) => {
+              { f: "compare" as const, label: "Compare", Icon: CompareIcon },
+              { f: "poll" as const, label: "Poll", Icon: PollIcon },
+              ...(isAdmin ? [{ f: "announcement" as const, label: "Announce", Icon: null }] : []),
+            ] as Array<{ f: "compare" | "poll" | "announcement"; label: string; Icon: typeof CompareIcon | null }>).map(({ f, label, Icon }) => {
               const active = format === f;
+              const iconColor = active ? "#fff" : colors.subtext;
               return (
                 <Pressable
                   key={f}
                   style={[st.formatBtn, active && { backgroundColor: colors.accent }]}
                   onPress={() => setFormat(f)}
                 >
-                  <Text style={[st.formatBtnText, { color: active ? "#fff" : colors.subtext }]}>
-                    {label}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {Icon ? <Icon size={15} color={iconColor} /> : (
+                      <Text style={{ fontSize: 14, color: iconColor }}>📢</Text>
+                    )}
+                    <Text style={[st.formatBtnText, { color: iconColor }]}>
+                      {label}
+                    </Text>
+                  </View>
                 </Pressable>
               );
             })}
@@ -922,7 +929,7 @@ export default function CreateScreen() {
           /* ── Announcement images ── */
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, gap: 8 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 14 }}>🖼</Text>
+              <ImagesIcon size={15} color={colors.muted} />
               <Text style={[st.settingKey, { color: colors.text }]}>Images</Text>
               <Text style={[st.optional, { color: colors.muted }]}>optional · up to 6</Text>
             </View>
@@ -1085,7 +1092,7 @@ export default function CreateScreen() {
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, gap: 10 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ fontSize: 14 }}>📊</Text>
+                <PollIcon size={15} color={colors.muted} />
                 <Text style={[st.settingKey, { color: colors.text }]}>Poll options</Text>
                 <View style={st.requiredBadge}><Text style={st.requiredText}>REQUIRED</Text></View>
               </View>
@@ -1140,7 +1147,7 @@ export default function CreateScreen() {
           {/* Context images (optional) */}
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, gap: 8 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 14 }}>🖼</Text>
+              <ImagesIcon size={15} color={colors.muted} />
               <Text style={[st.settingKey, { color: colors.text }]}>Context images</Text>
               <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
             </View>

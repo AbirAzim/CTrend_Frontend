@@ -8,6 +8,7 @@ import { DEFAULT_IMAGE_FOCAL } from "../lib/imageFocal";
 import { useImageUpload } from "../lib/useImageUpload";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useAuth } from "../context/AuthContext";
+import { IconPoll, IconImages } from "./IgIcons";
 
 type CompareItem = {
   imageUrl: string;
@@ -737,7 +738,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                     {b.url ? (
                       <img src={b.url} alt="" />
                     ) : (
-                      <span className="cx-edit-item-placeholder">🖼</span>
+                      <span className="cx-edit-item-placeholder" aria-hidden><IconImages size={20} /></span>
                     )}
                     {bodyUploadingId === b.id && (
                       <span className="cx-edit-poll-photo-uploading">…</span>
@@ -804,7 +805,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                     {b.url ? (
                       <img src={b.url} alt="" />
                     ) : (
-                      <span className="cx-edit-item-placeholder">🖼</span>
+                      <span className="cx-edit-item-placeholder" aria-hidden><IconImages size={20} /></span>
                     )}
                     {bodyUploadingId === b.id && (
                       <span className="cx-edit-poll-photo-uploading">…</span>
@@ -880,7 +881,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                             }}
                           />
                         ) : (
-                          <span className="cx-edit-item-placeholder">📊</span>
+                          <span className="cx-edit-item-placeholder" aria-hidden><IconPoll size={20} /></span>
                         )}
                       </div>
                       <div className="cx-edit-item-fields">

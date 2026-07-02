@@ -9190,8 +9190,10 @@ a.cx-friend-avatar:hover {
 }
 
 .ig-settings-icon {
-  font-size: 0.9rem;
-  color: var(--cx-accent);
+  display: inline-flex;
+  align-items: center;
+  color: var(--ig-text-secondary);
+  flex-shrink: 0;
 }
 
 .ig-settings-optional {
@@ -13813,6 +13815,9 @@ a.cx-profile-btn-accent {
 }
 
 .cx-profile-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   line-height: 1;
 }
 
@@ -22923,6 +22928,10 @@ a.cd-lb-row:hover {
 }
 .ig-format-switch-btn {
   flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 9px 10px;
   border: none;
   border-radius: 9px;

@@ -10,7 +10,7 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useImageUpload } from "../lib/useImageUpload";
 import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
 import { useAuth } from "../context/AuthContext";
-import { IconGlobe, IconUsers } from "../components/IgIcons";
+import { IconGlobe, IconUsers, IconCompare, IconPoll, IconImages } from "../components/IgIcons";
 import { ImagePositionEditor } from "../components/ImagePositionEditor";
 import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
@@ -563,7 +563,8 @@ export function CreatePostPage() {
             className={`ig-format-switch-btn${format === "compare" ? " ig-format-switch-btn--active" : ""}`}
             onClick={() => setFormat("compare")}
           >
-            🖼 Compare
+            <IconCompare size={15} />
+            Compare
           </button>
           <button
             type="button"
@@ -572,7 +573,8 @@ export function CreatePostPage() {
             className={`ig-format-switch-btn${format === "poll" ? " ig-format-switch-btn--active" : ""}`}
             onClick={() => setFormat("poll")}
           >
-            📊 Poll
+            <IconPoll size={15} />
+            Poll
           </button>
           {isAdmin && (
             <button
@@ -653,7 +655,7 @@ export function CreatePostPage() {
         {isAnnouncement ? (
           <div className="ig-poll-body-edit">
             <span className="ig-settings-label">
-              <span className="ig-settings-icon">🖼</span> Images
+              <span className="ig-settings-icon" aria-hidden><IconImages size={15} /></span> Images
               <span className="ig-settings-optional">optional · up to 6</span>
             </span>
             <div className="ig-poll-body-grid">
@@ -843,7 +845,7 @@ export function CreatePostPage() {
           <div className="ig-poll-edit">
             <div className="ig-poll-edit-head">
               <span className="ig-settings-label">
-                <span className="ig-settings-icon">📊</span> Poll options
+                <span className="ig-settings-icon" aria-hidden><IconPoll size={15} /></span> Poll options
                 <span className="ig-settings-required">required</span>
               </span>
               <button
@@ -913,7 +915,7 @@ export function CreatePostPage() {
           {/* ── Poll body / context images (optional) ── */}
           <div className="ig-poll-body-edit">
             <span className="ig-settings-label">
-              <span className="ig-settings-icon">🖼</span> Context images
+              <span className="ig-settings-icon" aria-hidden><IconImages size={15} /></span> Context images
               <span className="ig-settings-optional">optional</span>
             </span>
             <p className="muted small">Shown above your poll options.</p>
@@ -1232,7 +1234,7 @@ export function CreatePostPage() {
                     setSourcePicker(null);
                   }}
                 >
-                  <span className="ig-source-option-icon">🖼️</span>
+                  <span className="ig-source-option-icon" aria-hidden><IconImages size={18} /></span>
                   <span>Gallery</span>
                 </button>
                 <button

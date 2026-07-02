@@ -539,3 +539,86 @@ export function IconArchive({ size = 16 }: IconProps) {
     </svg>
   );
 }
+
+/** Side-by-side compare format. */
+export function IconCompare({ size = 16 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="5" width="7" height="14" rx="1.5" />
+      <rect x="14" y="5" width="7" height="14" rx="1.5" />
+    </svg>
+  );
+}
+
+/** Poll / chart format. */
+export function IconPoll({ size = 16 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 20V10" />
+      <path d="M10 20V4" />
+      <path d="M16 20v-7" />
+      <path d="M3 20h18" />
+    </svg>
+  );
+}
+
+/** Image / gallery slot. */
+export function IconImages({ size = 16 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10.5" r="1.5" />
+      <path d="m3 16 5-5 4 4 3-3 6 6" />
+    </svg>
+  );
+}
+
+/** Vote / ballot. */
+export function IconVote({ size = 16 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}

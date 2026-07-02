@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CANCEL_SCHEDULED_POST, MY_SCHEDULED_POSTS, NEW_POSTS } from "../graphql/feed";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
+import { IconImages } from "../components/IgIcons";
 
 type ScheduledPost = {
   id: string;
@@ -136,7 +137,7 @@ export function ScheduledPostsPage() {
                   </div>
                 ) : (
                   <div className="ig-scheduled-card-placeholder" aria-hidden>
-                    <span>🖼</span>
+                    <IconImages size={22} />
                     <span>No preview</span>
                   </div>
                 )}

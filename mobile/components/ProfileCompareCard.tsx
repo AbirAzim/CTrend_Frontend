@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { PollIcon, ImagesIcon, VoteIcon } from "../components/ContentIcons";
 import { useTheme } from "../context/ThemeContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -101,7 +102,10 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
         {isPoll ? (
           <View style={[st.pollMedia, { backgroundColor: colors.accent + "1f" }]}>
             <View style={[st.pollBadge, { backgroundColor: colors.accent + "28" }]}>
-              <Text style={[st.pollBadgeText, { color: colors.accent }]}>📊 POLL</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <PollIcon size={11} color={colors.accent} />
+                <Text style={[st.pollBadgeText, { color: colors.accent }]}>POLL</Text>
+              </View>
             </View>
             <View style={st.pollBars}>
               <View style={[st.pollBar, { width: "90%", backgroundColor: colors.accent + "a6" }]} />
@@ -116,7 +120,7 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
           </View>
         ) : images.length === 0 ? (
           <View style={[st.emptyMedia, { backgroundColor: colors.section }]}>
-            <Text style={st.emptyIcon}>📷</Text>
+            <ImagesIcon size={22} color={colors.muted} />
           </View>
         ) : (
           images.map((url, i) => (
@@ -167,7 +171,10 @@ export default function ProfileCompareCard({ post, variant, onEdit }: Props) {
         <View style={[st.statsBar, { borderTopColor: colors.border }]}>
           {showRichMeta ? (
             <View style={st.statsRow}>
-              <Text style={[st.stat, { color: colors.text }]}>🗳️ {totalVotes}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <VoteIcon size={12} color={colors.text} />
+                <Text style={[st.stat, { color: colors.text }]}>{totalVotes}</Text>
+              </View>
               <Text style={[st.stat, { color: colors.text }]}>💬 {post.commentCount ?? 0}</Text>
               <Text style={[st.stat, { color: colors.text }]}>❤️ {post.hypeCount ?? 0}</Text>
               <Text style={[st.stat, { color: colors.text }]}>🔖 {post.saveCount ?? 0}</Text>

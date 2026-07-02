@@ -44,6 +44,7 @@ import { ProfileEngagementPanel } from "../../components/ProfileEngagementPanel"
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
 import ProfileCompareCard from "../../components/ProfileCompareCard";
+import { CompareIcon, VoteIcon, ImagesIcon, MessageIcon } from "../../components/ContentIcons";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = Math.floor((SCREEN_W - 38) / 2); // 2×14 padding + 10 gap
@@ -161,7 +162,7 @@ function PersonRow({ person, actionLoading, colors, rightSlot }: {
 function Section({
   icon, title, subtitle, open, onToggle, colors, children, onLayout, badge,
 }: {
-  icon: string;
+  icon: ReactNode;
   title: string;
   subtitle?: string;
   open: boolean;
@@ -175,7 +176,7 @@ function Section({
     <View style={[st.section, { borderTopColor: colors.border }]} onLayout={onLayout}>
       <Pressable style={st.sectionHead} onPress={onToggle} android_ripple={{ color: colors.accent + "11" }}>
         <View style={[st.sectionIcon, { backgroundColor: colors.accent + "1a" }]}>
-          <Text style={{ fontSize: 16 }}>{icon}</Text>
+          {icon}
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -600,7 +601,7 @@ export default function ProfileScreen() {
             android_ripple={{ color: colors.accent + "11" }}
           >
             <View style={[st.sectionIcon, { backgroundColor: colors.accent + "1a" }]}>
-              <Text style={{ fontSize: 16 }}>📊</Text>
+              <CompareIcon size={16} color={colors.text} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[st.sectionTitle, { color: colors.text }]}>Your content</Text>
@@ -646,7 +647,7 @@ export default function ProfileScreen() {
             disabled={contactingAdmin}
           >
             <View style={st.contactAdminLeft}>
-              <Text style={st.contactAdminIcon}>💬</Text>
+              <MessageIcon size={20} color={colors.text} />
               <View>
                 <Text style={[st.contactAdminTitle, { color: colors.text }]}>Contact admin</Text>
                 <Text style={[st.contactAdminSub, { color: colors.muted }]}>Questions, bugs or feedback — we'll reply</Text>
@@ -740,9 +741,12 @@ export default function ProfileScreen() {
             style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
             onPress={() => setContentTab("voted")}
           >
-            <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
-              🗳️ Voted
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <VoteIcon size={14} color={contentTab === "voted" ? colors.accent : colors.muted} />
+              <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
+                Voted{votedPosts.length > 0 ? ` (${votedPosts.length})` : ""}
+              </Text>
+            </View>
           </Pressable>
         </View>
         <View style={{ flex: 1 }}>
@@ -790,7 +794,7 @@ export default function ProfileScreen() {
                           <Image source={{ uri: img0 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
                         ) : (
                           <View style={[st.schedThumb, { alignItems: "center", justifyContent: "center" }]}>
-                            <Text style={{ fontSize: 22 }}>🖼</Text>
+                            <ImagesIcon size={22} color={colors.muted} />
                           </View>
                         )}
                         {img1 ? (
@@ -962,7 +966,7 @@ export default function ProfileScreen() {
                 rightSlot={
                   <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                     <Pressable style={[st.iconBtn, { backgroundColor: colors.accent }]} onPress={() => void handleDm(f.id)}>
-                      <Text style={{ fontSize: 14 }}>💬</Text>
+                      <MessageIcon size={17} color="#fff" />
                     </Pressable>
                     <Pressable style={[st.ghostBtn, { borderColor: colors.border }]} onPress={() => void handleUnfriend(f.id)}>
                       <Text style={[st.ghostBtnText, { color: colors.subtext }]}>Unfriend</Text>
@@ -1098,7 +1102,6 @@ const st = StyleSheet.create({
     borderWidth: 1,
   },
   contactAdminLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  contactAdminIcon: { fontSize: 20 },
   contactAdminTitle: { fontSize: 14, fontWeight: "800" },
   contactAdminSub: { fontSize: 11.5, marginTop: 1 },
   logoutBtn: { borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16, borderWidth: 1 },
