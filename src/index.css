@@ -8699,6 +8699,18 @@ a.cx-friend-avatar:hover {
   gap: 10px;
 }
 
+.ig-compare-grid--vertical {
+  grid-template-columns: 1fr;
+}
+
+.ig-compare-grid--vertical .ig-compare-zone {
+  aspect-ratio: 16 / 9;
+}
+
+.ig-create-vs-wrap:has(.ig-compare-grid--vertical) .ig-compare-vs-badge {
+  top: 50%;
+}
+
 .ig-compare-vs-badge {
   position: absolute;
   top: 38%;
@@ -22963,7 +22975,12 @@ a.cd-lb-row:hover {
 .ig-compare-layout-switch {
   display: flex;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
+}
+
+.ig-compare-layout-hint {
+  margin: 0 0 12px;
+  line-height: 1.35;
 }
 
 .ig-compare-layout-btn {

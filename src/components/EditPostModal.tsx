@@ -10,7 +10,7 @@ import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useAuth } from "../context/AuthContext";
 import { IconPoll, IconImages } from "./IgIcons";
 import type { CompareLayout } from "../types/feed";
-import { normalizeCompareLayout, toGqlCompareLayout } from "@ctrend/shared/lib/compareLayout";
+import { normalizeCompareLayout, compareCropAspect, toGqlCompareLayout } from "@ctrend/shared/lib/compareLayout";
 
 type CompareItem = {
   imageUrl: string;
@@ -1099,7 +1099,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
       {cropper ? (
         <CompareImageCropper
           src={cropper.url}
-          aspect={1}
+          aspect={isPoll ? 1 : compareCropAspect(compareLayout, items.length)}
           onCancel={() => {
             if (cropper.url.startsWith("blob:")) URL.revokeObjectURL(cropper.url);
             setCropper(null);

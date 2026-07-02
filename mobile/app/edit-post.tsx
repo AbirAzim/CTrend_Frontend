@@ -24,6 +24,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GET_POST_BY_ID, UPDATE_POST, CATEGORIES } from "@ctrend/shared/graphql/feed";
 import { GET_IMAGE_UPLOAD_URL } from "@ctrend/shared/graphql/upload";
 import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
+import {
+  compareCropAspect,
+  normalizeCompareLayout,
+  toGqlCompareLayout,
+  type CompareLayout,
+} from "@ctrend/shared/lib/compareLayout";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { PollIcon, ImagesIcon, VoteIcon } from "../components/ContentIcons";
 import { CompareImageCropper } from "../components/CompareImageCropper";
@@ -161,6 +167,7 @@ export default function EditPostScreen() {
   >([]);
   const [isPoll, setIsPoll] = useState(false);
   const [isAnnouncement, setIsAnnouncement] = useState(false);
+  const [compareLayout, setCompareLayout] = useState<CompareLayout>("horizontal");
   // Whether the post already has votes — gates the replace-photo warning.
   const [hasVotes, setHasVotes] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
@@ -216,6 +223,7 @@ export default function EditPostScreen() {
     const announcement = post.format === "announcement";
     setIsPoll(poll);
     setIsAnnouncement(announcement);
+    setCompareLayout(normalizeCompareLayout(post.compareLayout));
     const optionVotes = (post.optionStats ?? []).reduce(
       (sum, s) => sum + (s.count ?? 0),
       0,
@@ -586,6 +594,7 @@ export default function EditPostScreen() {
               imageFocalY: o.imageFocalY ?? undefined,
             })),
             imageUrls: options.map((o) => o.imageUrl),
+            compareLayout: toGqlCompareLayout(compareLayout),
             ...adminInput,
             ...audienceInput,
             ...scheduleInput,
@@ -1084,7 +1093,7 @@ export default function EditPostScreen() {
       <CompareImageCropper
         visible={cropper !== null}
         uri={cropper?.uri ?? null}
-        aspect={isPoll ? 1 : 1.25}
+        aspect={isPoll ? 1 : compareCropAspect(compareLayout, Math.max(options.length, 2))}
         onCancel={() => setCropper(null)}
         onDone={(croppedUri) => {
           const target = cropper;

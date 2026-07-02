@@ -16,7 +16,11 @@ import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
 import { FeedPostCard } from "../components/FeedPostCard";
 import type { FeedPostView, CompareLayout } from "../types/feed";
-import { toGqlCompareLayout } from "@ctrend/shared/lib/compareLayout";
+import {
+  compareCellAspectRatio,
+  compareCropAspect,
+  toGqlCompareLayout,
+} from "@ctrend/shared/lib/compareLayout";
 
 type DraftCompareItem = {
   id: string;
@@ -598,26 +602,33 @@ export function CreatePostPage() {
         </div>
 
         {!isPoll && !isAnnouncement && (
-          <div className="ig-compare-layout-switch" role="radiogroup" aria-label="Compare layout">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={compareLayout === "horizontal"}
-              className={`ig-compare-layout-btn${compareLayout === "horizontal" ? " ig-compare-layout-btn--active" : ""}`}
-              onClick={() => setCompareLayout("horizontal")}
-            >
-              Side by side
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={compareLayout === "vertical"}
-              className={`ig-compare-layout-btn${compareLayout === "vertical" ? " ig-compare-layout-btn--active" : ""}`}
-              onClick={() => setCompareLayout("vertical")}
-            >
-              Stacked
-            </button>
-          </div>
+          <>
+            <div className="ig-compare-layout-switch" role="radiogroup" aria-label="Compare layout">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={compareLayout === "horizontal"}
+                className={`ig-compare-layout-btn${compareLayout === "horizontal" ? " ig-compare-layout-btn--active" : ""}`}
+                onClick={() => setCompareLayout("horizontal")}
+              >
+                Side by side
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={compareLayout === "vertical"}
+                className={`ig-compare-layout-btn${compareLayout === "vertical" ? " ig-compare-layout-btn--active" : ""}`}
+                onClick={() => setCompareLayout("vertical")}
+              >
+                Stacked
+              </button>
+            </div>
+            <p className="ig-compare-layout-hint muted small">
+              {compareLayout === "vertical"
+                ? "Stacked shows wide landscape strips (16:9) — crop each photo to fit."
+                : "Side by side uses portrait frames (4:5) — crop each photo to fit."}
+            </p>
+          </>
         )}
 
         {/* ── Audience: Friends vs Global (only when admin allows global) ── */}
@@ -733,7 +744,9 @@ export function CreatePostPage() {
         <>
         {/* ── Compare slots ── */}
         <div className="ig-create-vs-wrap">
-          <div className="ig-compare-grid">
+          <div
+            className={`ig-compare-grid${compareLayout === "vertical" && items.length < 3 ? " ig-compare-grid--vertical" : ""}`}
+          >
             {items.map((item, idx) => (
               <div
                 className="ig-compare-slot"
@@ -1199,6 +1212,7 @@ export function CreatePostPage() {
         <ImagePositionEditor
           src={positionEditItem.imageUrl || positionEditItem.localPreview!}
           label={`Option ${LABELS[items.findIndex((it) => it.id === positionEditItem.id)] ?? ""}`}
+          aspectRatio={compareCellAspectRatio(compareLayout, items.length)}
           focalX={positionEditItem.imageFocalX}
           focalY={positionEditItem.imageFocalY}
           onChange={(imageFocalX, imageFocalY) => {
@@ -1215,7 +1229,7 @@ export function CreatePostPage() {
       {cropper ? (
         <CompareImageCropper
           src={cropper.url}
-          aspect={1}
+          aspect={compareCropAspect(compareLayout, items.length)}
           onCancel={() => {
             URL.revokeObjectURL(cropper.url);
             setCropper(null);

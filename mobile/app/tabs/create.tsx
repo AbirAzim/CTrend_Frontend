@@ -40,7 +40,7 @@ import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import type { FeedPostView, CompareLayout } from "@ctrend/shared/types/feed";
-import { toGqlCompareLayout, normalizeCompareLayout } from "@ctrend/shared/lib/compareLayout";
+import { toGqlCompareLayout, normalizeCompareLayout, compareCropAspect, compareCellAspectRatio } from "@ctrend/shared/lib/compareLayout";
 import { Ionicons } from "@expo/vector-icons";
 
 const { width: SW } = Dimensions.get("window");
@@ -864,6 +864,9 @@ export default function CreateScreen() {
 
   const isSubmitting = submitting || submittingSystem || updating;
   const slotW = (SW - 16 * 2 - 12) / 2;
+  const isVerticalBinary = !isPoll && !isAnnouncement && compareLayout === "vertical" && slots.length < 3;
+  const slotPreviewW = isVerticalBinary ? SW - 16 * 2 : slotW;
+  const slotPreviewAspect = compareCellAspectRatio(compareLayout, slots.length);
 
   return (
     <KeyboardAvoidingView style={[{ flex: 1, backgroundColor: colors.bg }]} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -938,22 +941,29 @@ export default function CreateScreen() {
         )}
 
         {!isPoll && !isAnnouncement && (
-          <View style={[st.layoutSwitch, { backgroundColor: colors.section, borderColor: colors.border }]}>
-            {([
-              { key: "horizontal" as const, label: "Side by side" },
-              { key: "vertical" as const, label: "Stacked" },
-            ]).map(({ key, label }) => {
-              const active = compareLayout === key;
-              return (
-                <Pressable
-                  key={key}
-                  style={[st.layoutBtn, active && { backgroundColor: colors.card, borderColor: colors.accent + "55" }]}
-                  onPress={() => setCompareLayout(key)}
-                >
-                  <Text style={[st.layoutBtnText, { color: active ? colors.text : colors.subtext }]}>{label}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={{ gap: 6, marginBottom: 10 }}>
+            <View style={[st.layoutSwitch, { backgroundColor: colors.section, borderColor: colors.border, marginBottom: 0 }]}>
+              {([
+                { key: "horizontal" as const, label: "Side by side" },
+                { key: "vertical" as const, label: "Stacked" },
+              ]).map(({ key, label }) => {
+                const active = compareLayout === key;
+                return (
+                  <Pressable
+                    key={key}
+                    style={[st.layoutBtn, active && { backgroundColor: colors.card, borderColor: colors.accent + "55" }]}
+                    onPress={() => setCompareLayout(key)}
+                  >
+                    <Text style={[st.layoutBtnText, { color: active ? colors.text : colors.subtext }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[st.layoutHint, { color: colors.muted }]}>
+              {compareLayout === "vertical"
+                ? "Stacked uses wide landscape strips (16:9) — tap each photo to crop."
+                : "Side by side uses portrait frames (4:5) — tap each photo to crop."}
+            </Text>
           </View>
         )}
 
@@ -1000,16 +1010,19 @@ export default function CreateScreen() {
                 : " You can also replace photos freely until the first vote is cast."}
             </Text>
           )}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          <View style={{ flexDirection: isVerticalBinary ? "column" : "row", flexWrap: "wrap", gap: 12 }}>
             {slots.map((slot, idx) => {
               const imgSrc = slot.localUri ?? (slot.publicUrl && !slot.pasteUrl ? slot.publicUrl : null);
               const hasImage = imgSrc || (slot.pasteUrl && slot.publicUrl);
               const locked = Boolean(slot.locked);
               return (
-                <View key={slot.id} style={{ width: slotW, gap: 6 }}>
+                <View key={slot.id} style={{ width: slotPreviewW, gap: 6 }}>
                   {/* Image tile — tap crops/repositions the current image */}
                   <Pressable
-                    style={[st.slotTile, { borderColor: slot.error ? "#ef4444" : hasImage ? colors.accent + "66" : colors.border }]}
+                    style={[
+                      st.slotTile,
+                      { aspectRatio: slotPreviewAspect, borderColor: slot.error ? "#ef4444" : hasImage ? colors.accent + "66" : colors.border },
+                    ]}
                     onPress={() => (hasImage ? cropExisting(slot) : openImageOptions(slot.id))}
                   >
                     {hasImage ? (
@@ -1544,8 +1557,7 @@ export default function CreateScreen() {
       <CompareImageCropper
         visible={cropper !== null}
         uri={cropper?.uri ?? null}
-        /* Match the post cell shape: 3+ options render as squares, 2 as portrait. */
-        aspect={slots.length >= 3 ? 1 : 1.25}
+        aspect={compareCropAspect(compareLayout, slots.length)}
         onCancel={() => setCropper(null)}
         onDone={(croppedUri) => {
           const target = cropper;
@@ -1776,6 +1788,7 @@ const st = StyleSheet.create({
     alignItems: "center",
   },
   layoutBtnText: { fontSize: 13, fontWeight: "700" },
+  layoutHint: { fontSize: 12, lineHeight: 16, paddingHorizontal: 2 },
   formatBtn: { flex: 1, borderRadius: 9, paddingVertical: 9, alignItems: "center" },
   formatBtnText: { fontSize: 14, fontWeight: "800" },
 

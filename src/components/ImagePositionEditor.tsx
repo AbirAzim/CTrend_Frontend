@@ -8,6 +8,8 @@ import {
 type Props = {
   src: string;
   label: string;
+  /** Feed cell width÷height (default square). */
+  aspectRatio?: number;
   focalX: number;
   focalY: number;
   onChange: (focalX: number, focalY: number) => void;
@@ -17,6 +19,7 @@ type Props = {
 export function ImagePositionEditor({
   src,
   label,
+  aspectRatio = 1,
   focalX,
   focalY,
   onChange,
@@ -97,6 +100,7 @@ export function ImagePositionEditor({
           <div
             ref={frameRef}
             className="cx-image-position-frame"
+            style={{ aspectRatio }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
