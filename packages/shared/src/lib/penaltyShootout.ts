@@ -38,19 +38,14 @@ export function isPenaltyShootoutEvent(e: { type: string; detail?: string | null
   return false;
 }
 
-/** Shootout kick (scored or missed) — excludes regulation / ET open-play goals. */
+/** Shootout kick (scored or missed) — excludes regulation / ET open-play and spot-kick goals. */
 export function isPenaltyShootoutKickEvent(e: {
   type: string;
   detail?: string | null;
   time: number;
   timeExtra?: number | null;
 }): boolean {
-  if (isPenaltyShootoutEvent(e)) return true;
-  const d = (e.detail || "").toLowerCase();
-  const min = effectiveEventMinute(e);
-  // After ET (120'+): penalty attempts are shootout kicks.
-  if (min >= 120 && d.includes("penalty")) return true;
-  return false;
+  return isPenaltyShootoutEvent(e);
 }
 
 export function isPenaltyShootoutKickScored(e: { type: string; detail?: string | null }): boolean {
@@ -141,9 +136,10 @@ export function shouldShowPenaltyShootoutSection(input: {
   penalty?: { home?: number | null; away?: number | null } | null;
   kickCount?: number;
 }): boolean {
-  if (input.wentToPenalties) return true;
-  if (input.penalty?.home != null && input.penalty?.away != null) return true;
-  return (input.kickCount ?? 0) > 0;
+  if (!input.wentToPenalties) return false;
+  const hasPenScore =
+    input.penalty?.home != null && input.penalty?.away != null;
+  return hasPenScore || (input.kickCount ?? 0) > 0;
 }
 
 export function penaltyShootoutWinnerSide(

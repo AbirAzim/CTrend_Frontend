@@ -30,11 +30,25 @@ describe("penaltyShootout", () => {
     expect(kicks[1]?.playerName).toBe("Hakimi");
   });
 
-  it("includes missed penalties at 120+", () => {
+  it("excludes extra-time spot-kick winners at 120+", () => {
+    const e = {
+      team: "home",
+      type: "Goal",
+      detail: "Penalty",
+      time: 120,
+      timeExtra: 5,
+      player: { name: "Tielemans" },
+    };
+    expect(isPenaltyShootoutKickEvent(e)).toBe(false);
+    const kicks = extractPenaltyShootoutKicks([e], { wentToPenalties: false });
+    expect(kicks).toHaveLength(0);
+  });
+
+  it("includes missed penalties only when API confirms a shootout", () => {
     const e = {
       team: "away",
       type: "Goal",
-      detail: "Missed Penalty",
+      detail: "Missed Penalty Shootout",
       time: 121,
       timeExtra: null,
       player: { name: "Ziyech" },
