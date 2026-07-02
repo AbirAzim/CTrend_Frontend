@@ -41,8 +41,8 @@ export function ProfileEngagementPanel({
   coins: number;
   isSelf: boolean;
 }) {
-  const { colors } = useTheme();
-  const st = makeStyles(colors);
+  const { colors, isDark } = useTheme();
+  const st = makeStyles(colors, isDark);
   const { refresh } = useCoins();
   const [claimMsg, setClaimMsg] = useState<string | null>(null);
   const [redeemCode, setRedeemCode] = useState("");
@@ -339,7 +339,11 @@ export function ProfileEngagementPanel({
   );
 }
 
-function makeStyles(c: ColorPalette) {
+function makeStyles(c: ColorPalette, isDark: boolean) {
+  const footBg = isDark ? "rgba(0,0,0,0.48)" : "rgba(255,255,255,0.72)";
+  const statBg = isDark ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.55)";
+  const innerBg = isDark ? "rgba(0,0,0,0.38)" : "rgba(255,255,255,0.55)";
+
   return StyleSheet.create({
     wrap: { marginBottom: 14, alignSelf: "stretch", width: "100%" },
     kicker: {
@@ -402,7 +406,7 @@ function makeStyles(c: ColorPalette) {
       fontWeight: "800",
       letterSpacing: 0.4,
       textTransform: "uppercase",
-      color: c.muted,
+      color: c.subtext,
     },
     cardValue: {
       fontSize: 17,
@@ -470,15 +474,15 @@ function makeStyles(c: ColorPalette) {
       width: 34,
       flexGrow: 0,
       flexShrink: 0,
-      backgroundColor: "rgba(0,0,0,0.06)",
-      borderColor: "rgba(245,197,24,0.28)",
+      backgroundColor: statBg,
+      borderColor: isDark ? "rgba(251,191,36,0.42)" : "rgba(245,197,24,0.28)",
       alignItems: "center",
     },
     statBoxPodium: {
       flex: 1,
       minWidth: 52,
-      backgroundColor: "rgba(255,255,255,0.08)",
-      borderColor: "rgba(245,197,24,0.22)",
+      backgroundColor: statBg,
+      borderColor: isDark ? "rgba(251,191,36,0.36)" : "rgba(245,197,24,0.22)",
       overflow: "visible",
     },
     statKicker: {
@@ -486,12 +490,12 @@ function makeStyles(c: ColorPalette) {
       fontWeight: "800",
       letterSpacing: 0.35,
       textTransform: "uppercase",
-      color: c.muted,
+      color: c.subtext,
     },
     statEmpty: {
       fontSize: 12,
       fontWeight: "800",
-      color: c.muted,
+      color: c.text,
       lineHeight: 14,
     },
     cardBody: {
@@ -504,7 +508,7 @@ function makeStyles(c: ColorPalette) {
     bodyHint: {
       fontSize: 8,
       fontWeight: "600",
-      color: c.muted,
+      color: c.subtext,
       lineHeight: 11,
     },
     winRow: {
@@ -513,8 +517,8 @@ function makeStyles(c: ColorPalette) {
       gap: 4,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: "rgba(245,158,11,0.22)",
-      backgroundColor: "rgba(255,255,255,0.08)",
+      borderColor: isDark ? "rgba(251,146,60,0.38)" : "rgba(245,158,11,0.22)",
+      backgroundColor: innerBg,
       paddingHorizontal: 5,
       paddingVertical: 4,
       minWidth: 0,
@@ -529,13 +533,13 @@ function makeStyles(c: ColorPalette) {
     winBadge: {
       borderRadius: 999,
       borderWidth: 1,
-      borderColor: "rgba(245,197,24,0.5)",
-      backgroundColor: "rgba(255,255,255,0.12)",
+      borderColor: isDark ? "rgba(251,191,36,0.55)" : "rgba(245,197,24,0.5)",
+      backgroundColor: isDark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.12)",
       paddingHorizontal: 4,
       paddingVertical: 1,
       flexShrink: 0,
     },
-    winBadgeText: { fontSize: 7, fontWeight: "900", color: "#b45309" },
+    winBadgeText: { fontSize: 7, fontWeight: "900", color: isDark ? "#fcd34d" : "#b45309" },
     pausedChip: {
       alignSelf: "flex-start",
       borderRadius: 999,
@@ -550,7 +554,7 @@ function makeStyles(c: ColorPalette) {
       fontWeight: "800",
       letterSpacing: 0.3,
       textTransform: "uppercase",
-      color: "#a5b4fc",
+      color: isDark ? "#e0e7ff" : "#4338ca",
     },
     cardFoot: {
       flexDirection: "row",
@@ -577,44 +581,44 @@ function makeStyles(c: ColorPalette) {
       minHeight: 30,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: "rgba(245,197,24,0.45)",
-      backgroundColor: "rgba(255,255,255,0.12)",
+      borderColor: isDark ? "rgba(251,191,36,0.5)" : "rgba(245,197,24,0.45)",
+      backgroundColor: footBg,
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 4,
     },
     footActionWins: {
-      borderColor: "rgba(245,158,11,0.38)",
-      backgroundColor: "rgba(255,255,255,0.1)",
+      borderColor: isDark ? "rgba(251,146,60,0.48)" : "rgba(245,158,11,0.38)",
+      backgroundColor: footBg,
     },
     footActionPoints: {
-      borderColor: "rgba(129,140,248,0.38)",
-      backgroundColor: "rgba(99,102,241,0.12)",
+      borderColor: isDark ? "rgba(165,180,252,0.5)" : "rgba(129,140,248,0.38)",
+      backgroundColor: footBg,
     },
     footActionDisabled: {
-      borderColor: "rgba(129,140,248,0.38)",
-      backgroundColor: "rgba(99,102,241,0.1)",
-      opacity: 0.75,
+      borderColor: isDark ? "rgba(165,180,252,0.38)" : "rgba(129,140,248,0.38)",
+      backgroundColor: footBg,
+      opacity: 0.85,
     },
     footActionText: {
-      fontSize: 8,
+      fontSize: 9,
       fontWeight: "800",
-      color: "#7a4a05",
+      color: isDark ? "#fcd34d" : "#92400e",
     },
     footActionTextWins: {
-      fontSize: 8,
+      fontSize: 9,
       fontWeight: "800",
-      color: "#b45309",
+      color: isDark ? "#fdba74" : "#b45309",
     },
     footActionTextPoints: {
-      fontSize: 8,
+      fontSize: 9,
       fontWeight: "800",
-      color: "#a5b4fc",
+      color: isDark ? "#e0e7ff" : "#4338ca",
     },
     footActionTextDisabled: {
-      fontSize: 8,
+      fontSize: 9,
       fontWeight: "800",
-      color: "#a5b4fc",
+      color: isDark ? "#c7d2fe" : "#6366f1",
     },
     feedbackMsg: {
       marginHorizontal: 16,

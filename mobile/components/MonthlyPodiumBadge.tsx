@@ -19,7 +19,10 @@ type Props = {
 };
 
 export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const inactiveCell = isDark
+    ? { backgroundColor: "rgba(0,0,0,0.38)", borderColor: "rgba(255,255,255,0.16)" }
+    : { backgroundColor: "rgba(0,0,0,0.06)", borderColor: "rgba(0,0,0,0.1)" };
 
   if (layout === "grid") {
     return (
@@ -32,15 +35,13 @@ export function MonthlyPodiumBadge({ stats, layout = "inline" }: Props) {
               key={key}
               style={[
                 grid.cell,
-                active
-                  ? { backgroundColor: activeBg, borderColor: border }
-                  : { backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.12)" },
+                active ? { backgroundColor: activeBg, borderColor: border } : inactiveCell,
               ]}
               accessibilityLabel={`${label} place ${count} times`}
             >
               <Text style={grid.medal}>{medal}</Text>
               <Text style={[grid.count, { color: colors.text }, !active && grid.muted]}>{count}</Text>
-              <Text style={[grid.label, { color: colors.muted }]}>{label}</Text>
+              <Text style={[grid.label, { color: colors.subtext }]}>{label}</Text>
             </View>
           );
         })}
