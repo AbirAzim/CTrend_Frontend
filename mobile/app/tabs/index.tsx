@@ -4,7 +4,7 @@ import { useApolloClient, useQuery, useSubscription } from "@apollo/client/react
 import { Image } from "expo-image";
 import { PressableScale } from "../../components/PressableScale";
 import { CoinCounter } from "../../components/CoinCounter";
-import logoAsset from "../../assets/logo.png";
+import headerLogoAsset from "../../assets/header-logo.png";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
@@ -69,13 +69,19 @@ function FeedTopBar() {
   return (
     <View style={[styles.topBar, { paddingTop: insets.top + 8, backgroundColor: colors.topbar, borderBottomColor: colors.border }]}>
       {/* Brand */}
-      <Pressable style={styles.brand} hitSlop={4}>
-        <Text style={[styles.brandText, { color: colors.accentLight }]} numberOfLines={1}>Ke Jitbe</Text>
-        <Image
-          source={logoAsset}
-          style={styles.brandLogo}
-          contentFit="contain"
-        />
+      <Pressable style={styles.brand} hitSlop={4} accessibilityLabel="Ke Jitbe">
+        <View style={[styles.brandBar, styles.brandBarGradient]} />
+        <View style={styles.brandBody}>
+          <Image
+            source={headerLogoAsset}
+            style={styles.brandLogo}
+            contentFit="contain"
+            accessibilityLabel="Ke Jitbe"
+          />
+          <Text style={[styles.brandTag, { color: colors.muted }]} numberOfLines={1}>
+            Compare · vote · vibe
+          </Text>
+        </View>
       </Pressable>
 
       {/* Action icons */}
@@ -615,9 +621,32 @@ const styles = StyleSheet.create({
           shadowRadius: 8,
         }),
   },
-  brand: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
-  brandText: { fontSize: 20, fontWeight: "800", letterSpacing: 0.3 },
-  brandLogo: { width: 24, height: 22 },
+  brand: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    flexShrink: 0,
+    gap: 8,
+  },
+  brandBar: {
+    width: 3,
+    borderRadius: 999,
+    marginVertical: 2,
+  },
+  brandBarGradient: {
+    backgroundColor: "#9b5de5",
+  },
+  brandBody: {
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: 1,
+  },
+  brandLogo: { width: 108, height: 24 },
+  brandTag: {
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
   actions: { flexDirection: "row", alignItems: "center", gap: 7 },
   circleBtn: {
     width: 36, height: 36, borderRadius: 18,

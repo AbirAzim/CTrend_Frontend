@@ -304,11 +304,13 @@ export function AppShell() {
       )}
       <header ref={topbarRef} className={`ig-topbar${topbarHidden ? " ig-topbar--hidden" : ""}`}>
         <div className="ig-brand-block">
-          <NavLink to="/" className="ig-logo" end>
-            Ke Jitbe
-            <img src="/logo.png" className="ig-logo-img" alt="" aria-hidden="true" />
+          <NavLink to="/" className="ig-brand-unit" end aria-label="Ke Jitbe home">
+            <span className="ig-brand-bar" aria-hidden="true" />
+            <span className="ig-brand-body">
+              <img src="/header-logo.png?v=3" className="ig-logo-mark" alt="" />
+              <span className="ig-brand-tag">Compare · vote · vibe</span>
+            </span>
           </NavLink>
-          <span className="ig-brand-tag">Compare · vote · vibe</span>
         </div>
         {isAuthenticated && <GlobalSearch />}
         <div className="ig-topbar-actions">
