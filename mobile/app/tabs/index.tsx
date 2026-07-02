@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   ListRenderItem,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -51,12 +52,55 @@ type FeedData = { feedPosts: unknown[] };
 const VOTE_COACH_DONE_KEY = "ctrend_vote_coach_done";
 const VOTE_COACH_SHOWN_KEY = "ctrend_vote_coach_shown";
 const VOTE_COACH_MAX_SHOWS = 3;
+const TOP_NAV_ANIM_MS = 240;
 
 function FeedTopBar({ expanded }: { expanded: boolean }) {
   const { logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const showBrandTag = !isAuthenticated || expanded;
+  const expandAnim = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(expandAnim, {
+      toValue: expanded ? 1 : 0,
+      duration: TOP_NAV_ANIM_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [expanded, expandAnim]);
+
+  const paddingTopExtra = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [6, 10],
+  });
+  const paddingBottom = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 14],
+  });
+  const paddingHorizontal = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 14],
+  });
+  const logoWidth = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: isAuthenticated ? [72, 96] : [108, 108],
+  });
+  const logoHeight = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: isAuthenticated ? [22, 26] : [24, 24],
+  });
+  const tagOpacity = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  const tagMaxHeight = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 14],
+  });
+  const controlsTranslateY = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 2],
+  });
 
   const { data: notifData } = useQuery(UNREAD_NOTIFICATION_COUNT, {
     skip: !isAuthenticated,
@@ -70,33 +114,46 @@ function FeedTopBar({ expanded }: { expanded: boolean }) {
   }
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.topBar,
-        expanded && styles.topBarExpanded,
         {
-          paddingTop: insets.top + (expanded ? 10 : 6),
-          paddingBottom: expanded ? 14 : 8,
+          paddingTop: Animated.add(insets.top, paddingTopExtra),
+          paddingBottom,
+          paddingHorizontal,
           backgroundColor: colors.topbar,
           borderBottomColor: colors.border,
         },
       ]}
     >
-      <View style={[styles.topBarRow, expanded && styles.topBarRowExpanded]}>
+      <View style={styles.topBarRow}>
         <Pressable style={styles.brand} hitSlop={4} accessibilityLabel="Ke Jitbe">
           <View style={[styles.brandBar, styles.brandBarGradient]} />
           <View style={styles.brandBody}>
-            <Image
-              source={isDark ? headerLogoAsset : headerLogoLightAsset}
-              style={[
-                styles.brandLogo,
-                isAuthenticated && !expanded && styles.brandLogoCompact,
-                expanded && styles.brandLogoExpanded,
-              ]}
-              contentFit="contain"
-              accessibilityLabel="Ke Jitbe"
-            />
-            {showBrandTag && (
+            <Animated.View style={{ width: logoWidth, height: logoHeight }}>
+              <Image
+                source={isDark ? headerLogoAsset : headerLogoLightAsset}
+                style={styles.brandLogoFill}
+                contentFit="contain"
+                accessibilityLabel="Ke Jitbe"
+              />
+            </Animated.View>
+            {isAuthenticated ? (
+              <Animated.View
+                style={{
+                  opacity: tagOpacity,
+                  maxHeight: tagMaxHeight,
+                  overflow: "hidden",
+                }}
+              >
+                <Text
+                  style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
+                  numberOfLines={1}
+                >
+                  Compare · vote · vibe
+                </Text>
+              </Animated.View>
+            ) : (
               <Text
                 style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
                 numberOfLines={1}
@@ -108,12 +165,12 @@ function FeedTopBar({ expanded }: { expanded: boolean }) {
         </Pressable>
 
         {isAuthenticated && (
-          <View style={styles.searchInline}>
-            <FeedNavSearch compact={!expanded} />
-          </View>
+          <Animated.View style={[styles.searchInline, { transform: [{ translateY: controlsTranslateY }] }]}>
+            <FeedNavSearch expandProgress={expandAnim} />
+          </Animated.View>
         )}
 
-        <View style={styles.actions}>
+        <Animated.View style={[styles.actions, { transform: [{ translateY: controlsTranslateY }] }]}>
           <PressableScale style={styles.plainIconBtn} onPress={toggleTheme} hitSlop={6} accessibilityLabel="Toggle theme">
             <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={22} color={colors.text} />
           </PressableScale>
@@ -152,9 +209,9 @@ function FeedTopBar({ expanded }: { expanded: boolean }) {
               <Text style={styles.loginLabel}>Log in</Text>
             </PressableScale>
           )}
-        </View>
+        </Animated.View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -632,7 +689,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   topBar: {
-    paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     ...(Platform.OS === "android"
       ? { elevation: 0 }
@@ -644,17 +700,10 @@ const styles = StyleSheet.create({
           shadowRadius: 8,
         }),
   },
-  topBarExpanded: {
-    paddingHorizontal: 14,
-  },
   topBarRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  topBarRowExpanded: {
     alignItems: "flex-end",
-    gap: 10,
+    gap: 8,
   },
   searchInline: {
     flex: 1,
@@ -679,9 +728,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 1,
   },
-  brandLogo: { width: 108, height: 24 },
-  brandLogoCompact: { width: 72, height: 22 },
-  brandLogoExpanded: { width: 96, height: 26 },
+  brandLogoFill: { width: "100%", height: "100%" },
   brandTag: {
     fontSize: 8,
     fontWeight: "700",
