@@ -15,7 +15,8 @@ import { ImagePositionEditor } from "../components/ImagePositionEditor";
 import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
 import { FeedPostCard } from "../components/FeedPostCard";
-import type { FeedPostView } from "../types/feed";
+import type { FeedPostView, CompareLayout } from "../types/feed";
+import { toGqlCompareLayout } from "@ctrend/shared/lib/compareLayout";
 
 type DraftCompareItem = {
   id: string;
@@ -90,6 +91,7 @@ export function CreatePostPage() {
   const [broadcastGlobally, setBroadcastGlobally] = useState(false);
   /** Post layout: `compare` (image grid), `poll` (stacked option rows), or `announcement` (admin info post). */
   const [format, setFormat] = useState<"compare" | "poll" | "announcement">("compare");
+  const [compareLayout, setCompareLayout] = useState<CompareLayout>("horizontal");
   const isPoll = format === "poll";
   const isAnnouncement = format === "announcement";
   /** Poll-only body/context images (post-level `imageUrls`). Optional, 0+. */
@@ -252,6 +254,7 @@ export function CreatePostPage() {
     return {
       id: "preview",
       format,
+      compareLayout: !isPoll && !isAnnouncement ? compareLayout : "horizontal",
       postType: isAdmin && postType === "system" ? "system" : "user",
       isUserGlobalBroadcast: broadcastGlobally || null,
       authorId: user?.id ?? "preview",
@@ -280,7 +283,7 @@ export function CreatePostPage() {
       hypeCount: 0,
       saveCount: 0,
     };
-  }, [format, isAnnouncement, items, caption, user, isAdmin, postType, broadcastGlobally, bodyImages, previewCategory, previewCampaign, votingEndEnabled, votingEndsAt]);
+  }, [format, compareLayout, isAnnouncement, items, caption, user, isAdmin, postType, broadcastGlobally, bodyImages, previewCategory, previewCampaign, votingEndEnabled, votingEndsAt, isPoll]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -385,6 +388,7 @@ export function CreatePostPage() {
       caption?: string;
       campaignId?: string;
       broadcastGlobally?: boolean;
+      compareLayout?: "HORIZONTAL" | "VERTICAL";
     } = {
       categoryId: category,
       format: format.toUpperCase() as "COMPARE" | "POLL" | "ANNOUNCEMENT",
@@ -409,6 +413,9 @@ export function CreatePostPage() {
     if (showGlobalPostOption && broadcastGlobally) {
       input.broadcastGlobally = true;
     }
+    if (!isPoll && !isAnnouncement) {
+      input.compareLayout = toGqlCompareLayout(compareLayout);
+    }
 
     const useSystemMutate = isAdmin && (postType === "system" || isAnnouncement);
     try {
@@ -432,6 +439,7 @@ export function CreatePostPage() {
         setCampaignId("");
         setScheduledAt("");
         setScheduleEnabled(false);
+        setCompareLayout("horizontal");
         setItems([
           { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
           { id: "2", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
@@ -588,6 +596,29 @@ export function CreatePostPage() {
             </button>
           )}
         </div>
+
+        {!isPoll && !isAnnouncement && (
+          <div className="ig-compare-layout-switch" role="radiogroup" aria-label="Compare layout">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={compareLayout === "horizontal"}
+              className={`ig-compare-layout-btn${compareLayout === "horizontal" ? " ig-compare-layout-btn--active" : ""}`}
+              onClick={() => setCompareLayout("horizontal")}
+            >
+              Side by side
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={compareLayout === "vertical"}
+              className={`ig-compare-layout-btn${compareLayout === "vertical" ? " ig-compare-layout-btn--active" : ""}`}
+              onClick={() => setCompareLayout("vertical")}
+            >
+              Stacked
+            </button>
+          </div>
+        )}
 
         {/* ── Audience: Friends vs Global (only when admin allows global) ── */}
         {showGlobalPostOption && (

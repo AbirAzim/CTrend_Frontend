@@ -1,4 +1,5 @@
 import type { FeedPostCampaignWinnerView, FeedPostView, PostFormat, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
+import { normalizeCompareLayout } from "./compareLayout";
 import { normalizeMatchScoreDisplay } from "./matchScoreCopy";
 
 function mapViewerVote(
@@ -32,6 +33,7 @@ export function mapGqlPostToFeedView(p: {
   authorProfileImageUrl?: string | null;
   isUserGlobalBroadcast?: boolean | null;
   format?: string | null;
+  compareLayout?: string | null;
   imageUrls?: string[] | null;
   caption?: string | null;
   createdAt?: string | null;
@@ -163,6 +165,7 @@ export function mapGqlPostToFeedView(p: {
     id: p.id,
     postType,
     format,
+    compareLayout: normalizeCompareLayout(p.compareLayout),
     authorId: p.authorId ?? null,
     authorUsername: p.authorUsername,
     authorDisplayName: p.authorDisplayName ?? null,

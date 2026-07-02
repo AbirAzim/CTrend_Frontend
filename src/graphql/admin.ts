@@ -245,6 +245,7 @@ export const ADMIN_PLATFORM_POSTS = gql`
       id
       type
       format
+      compareLayout
       caption
       imageUrls
       createdAt

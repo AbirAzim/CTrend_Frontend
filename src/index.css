@@ -4248,6 +4248,18 @@ a.cx-friend-avatar:hover {
   aspect-ratio: 8 / 5;
 }
 
+/* Stacked binary compare — better for wide / landscape images */
+.ig-post-media-wrap--compare-vertical:not(.ig-post-media-wrap--compare-grid):not(.ig-post-media-wrap--compare-rows) {
+  flex-direction: column;
+  aspect-ratio: 4 / 5;
+}
+
+.ig-post-media-wrap--compare-vertical:not(.ig-post-media-wrap--compare-grid):not(.ig-post-media-wrap--compare-rows) .ig-compare-cell {
+  flex: 1 1 0;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+
 /* Grid layout for 3+ compare options — no horizontal scroll */
 .ig-post-media-wrap--compare-grid {
   display: grid;
@@ -22946,6 +22958,31 @@ a.cd-lb-row:hover {
   background: var(--ig-surface);
   color: var(--ig-text);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+.ig-compare-layout-switch {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ig-compare-layout-btn {
+  flex: 1 1 0;
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--cx-ink-rgb) / 0.12);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ig-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ig-compare-layout-btn--active {
+  background: rgb(var(--cx-accent-rgb) / 0.1);
+  border-color: rgb(var(--cx-accent-rgb) / 0.35);
+  color: var(--ig-text);
 }
 .ig-poll-edit,
 .ig-poll-body-edit {

@@ -79,6 +79,7 @@ export const FEED_POSTS = gql`
       authorProfileImageUrl
       isUserGlobalBroadcast
       format
+      compareLayout
       imageUrls
       caption
       createdAt
@@ -136,6 +137,7 @@ export const GET_POST_BY_ID = gql`
       authorProfileImageUrl
       isUserGlobalBroadcast
       format
+      compareLayout
       imageUrls
       caption
       createdAt
@@ -228,6 +230,7 @@ export const MY_SAVED_POSTS = gql`
       authorProfileImageUrl
       isUserGlobalBroadcast
       format
+      compareLayout
       imageUrls
       caption
       createdAt
@@ -419,6 +422,7 @@ export const POST_UPDATED = gql`
       type
       isUserGlobalBroadcast
       format
+      compareLayout
       imageUrls
       caption
       scheduledAt

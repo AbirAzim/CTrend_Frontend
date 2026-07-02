@@ -69,6 +69,7 @@ import {
   formatKnockoutScoreChip,
   hasKnockoutScoreBreakdown,
 } from "@ctrend/shared/lib/matchScoreCopy";
+import { isVerticalCompareLayout } from "@ctrend/shared/lib/compareLayout";
 
 function storyInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -982,6 +983,8 @@ function FeedPostCardComponent({
   }, [post.imageUrls]);
 
   const isBinaryCompare = compareUrls?.length === 2;
+  const isVerticalBinary =
+    isBinaryCompare && isVerticalCompareLayout(post.compareLayout);
   const isMultiCompare = Boolean(compareUrls && compareUrls.length > 2);
 
   // Multi-compare layout — fixed per-count rows (see getCompareRows), all cells
@@ -2274,6 +2277,8 @@ function FeedPostCardComponent({
         <>
           <div
             className={`ig-post-media-wrap ig-post-media-wrap--compare${
+              isVerticalBinary ? " ig-post-media-wrap--compare-vertical" : ""
+            }${
               isMultiCompare ? " ig-post-media-wrap--compare-rows" : ""
             }${isVotingClosed ? " ig-post-media-wrap--voting-closed" : ""}`}
           >

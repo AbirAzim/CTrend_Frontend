@@ -9,6 +9,8 @@ import { useImageUpload } from "../lib/useImageUpload";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useAuth } from "../context/AuthContext";
 import { IconPoll, IconImages } from "./IgIcons";
+import type { CompareLayout } from "../types/feed";
+import { normalizeCompareLayout, toGqlCompareLayout } from "@ctrend/shared/lib/compareLayout";
 
 type CompareItem = {
   imageUrl: string;
@@ -36,6 +38,7 @@ type BodyImage = {
 type EditablePost = {
   id: string;
   format?: string | null;
+  compareLayout?: string | null;
   caption?: string | null;
   imageUrls: string[];
   options?: Array<{
@@ -159,6 +162,9 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   );
   const [endingSoonLeadMinutes, setEndingSoonLeadMinutes] = useState(
     post.endingSoonLeadMinutes ?? 5,
+  );
+  const [compareLayout, setCompareLayout] = useState<CompareLayout>(
+    normalizeCompareLayout(post.compareLayout),
   );
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   // Pending crop. `reset` = replace with a different photo (wipes votes); false
@@ -519,6 +525,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             ...sharedInput,
             // Crop/reposition keeps votes; a replace/remove sets resetVotes.
             resetVotes: resetVotesRef.current,
+            compareLayout: toGqlCompareLayout(compareLayout),
             imageUrls: items.map((it) => it.imageUrl.trim()),
             options: items.map((it) => ({
               label: it.label.trim() || "Option",
@@ -952,6 +959,26 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
             </>
           ) : (
             <>
+          <div className="ig-compare-layout-switch" role="radiogroup" aria-label="Compare layout">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={compareLayout === "horizontal"}
+              className={`ig-compare-layout-btn${compareLayout === "horizontal" ? " ig-compare-layout-btn--active" : ""}`}
+              onClick={() => setCompareLayout("horizontal")}
+            >
+              Side by side
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={compareLayout === "vertical"}
+              className={`ig-compare-layout-btn${compareLayout === "vertical" ? " ig-compare-layout-btn--active" : ""}`}
+              onClick={() => setCompareLayout("vertical")}
+            >
+              Stacked
+            </button>
+          </div>
           <p className="cx-edit-section-label">
             Compare Items
             <span className="cx-edit-item-count">{items.length} / 10</span>

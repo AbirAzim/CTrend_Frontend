@@ -7,12 +7,17 @@ export type FeedPostType = "user" | "system" | "org";
 /** Post layout: `compare` = side-by-side images, `poll` = stacked option rows, `announcement` = admin info post no voting. */
 export type PostFormat = "compare" | "poll" | "announcement";
 
+/** Two-image compare layout: side-by-side (default) or stacked vertically. */
+export type CompareLayout = "horizontal" | "vertical";
+
 export type FeedPostView = {
   id: string;
   /** API post type — `system` = platform-wide Ke Jitbe polls. */
   postType?: FeedPostType | null;
   /** Post layout format (defaults to `compare` when absent). */
   format?: PostFormat | null;
+  /** Two-image compare orientation (defaults to `horizontal`). */
+  compareLayout?: CompareLayout | null;
   authorId?: string | null;
   authorUsername: string;
   authorDisplayName: string | null;

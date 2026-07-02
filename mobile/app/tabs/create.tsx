@@ -39,7 +39,8 @@ import { useCoins } from "../../context/CoinsContext";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
 import { FeedPostCard } from "../../components/FeedPostCard";
-import type { FeedPostView } from "@ctrend/shared/types/feed";
+import type { FeedPostView, CompareLayout } from "@ctrend/shared/types/feed";
+import { toGqlCompareLayout, normalizeCompareLayout } from "@ctrend/shared/lib/compareLayout";
 import { Ionicons } from "@expo/vector-icons";
 
 const { width: SW } = Dimensions.get("window");
@@ -76,6 +77,7 @@ type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string
 type EditPostData = {
   id: string;
   format?: string | null;
+  compareLayout?: string | null;
   caption?: string | null;
   imageUrls?: (string | null)[] | null;
   options?: { label?: string | null; imageFocalX?: number | null; imageFocalY?: number | null }[] | null;
@@ -273,6 +275,7 @@ export default function CreateScreen() {
 
   // Post layout: `compare` (image grid) or `poll` (stacked option rows).
   const [format, setFormat] = useState<"compare" | "poll" | "announcement">("compare");
+  const [compareLayout, setCompareLayout] = useState<CompareLayout>("horizontal");
   const isPoll = format === "poll";
   const isAnnouncement = format === "announcement";
 
@@ -358,6 +361,7 @@ export default function CreateScreen() {
     return {
       id: "preview",
       format: format as "compare" | "poll" | "announcement",
+      compareLayout: !isPoll && !isAnnouncement ? compareLayout : "horizontal",
       postType: isAdmin && (platformWide || isAnnouncement) ? "system" : "user",
       isUserGlobalBroadcast: broadcastGlobally || null,
       authorId: user?.id ?? "preview",
@@ -385,7 +389,7 @@ export default function CreateScreen() {
       hypeCount: 0,
       saveCount: 0,
     };
-  }, [format, isAnnouncement, slots, caption, user, isAdmin, platformWide, broadcastGlobally, bodyImages, selectedCat, selectedCampaign]);
+  }, [format, compareLayout, isAnnouncement, slots, caption, user, isAdmin, platformWide, broadcastGlobally, bodyImages, selectedCat, selectedCampaign, isPoll]);
 
   // Platform setting: can normal users broadcast a post globally? (Phase 36)
   const { data: platformSettingsData } = useQuery<{ platformSettings: { allowUserGlobalPosts: boolean } }>(
@@ -429,6 +433,7 @@ export default function CreateScreen() {
       return;
     }
     setCaption(post.caption ?? "");
+    setCompareLayout(normalizeCompareLayout(post.compareLayout));
     setCategoryId(post.category?.id ?? "");
     setCampaignId(post.campaign?.id ?? "");
     setBroadcastGlobally(Boolean(post.isUserGlobalBroadcast));
@@ -501,6 +506,7 @@ export default function CreateScreen() {
   function resetForm() {
     editLoadedRef.current = null;
     setFormat("compare");
+    setCompareLayout("horizontal");
     setSlots([makeSlot("1"), makeSlot("2")]);
     setBodyImages([]);
     setCaption("");
@@ -772,6 +778,7 @@ export default function CreateScreen() {
         categoryId: resolvedCategoryId,
         imageUrls,
         options,
+        compareLayout: toGqlCompareLayout(compareLayout),
         // Always send caption so clearing it persists; "" clears the campaign too.
         caption: caption.trim() || undefined,
         campaignId,
@@ -795,7 +802,13 @@ export default function CreateScreen() {
       return;
     }
 
-    const input: Record<string, unknown> = { categoryId: resolvedCategoryId, format: format.toUpperCase(), imageUrls, options };
+    const input: Record<string, unknown> = {
+      categoryId: resolvedCategoryId,
+      format: format.toUpperCase(),
+      imageUrls,
+      options,
+      compareLayout: !isPoll && !isAnnouncement ? toGqlCompareLayout(compareLayout) : undefined,
+    };
     if (caption.trim()) { input.caption = caption.trim(); input.contentText = caption.trim(); }
     if (campaignId) input.campaignId = campaignId;
     // Non-admin global broadcast (admins use createSystemPost instead) — Phase 36
@@ -918,6 +931,26 @@ export default function CreateScreen() {
                       {label}
                     </Text>
                   </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        {!isPoll && !isAnnouncement && (
+          <View style={[st.layoutSwitch, { backgroundColor: colors.section, borderColor: colors.border }]}>
+            {([
+              { key: "horizontal" as const, label: "Side by side" },
+              { key: "vertical" as const, label: "Stacked" },
+            ]).map(({ key, label }) => {
+              const active = compareLayout === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[st.layoutBtn, active && { backgroundColor: colors.card, borderColor: colors.accent + "55" }]}
+                  onPress={() => setCompareLayout(key)}
+                >
+                  <Text style={[st.layoutBtnText, { color: active ? colors.text : colors.subtext }]}>{label}</Text>
                 </Pressable>
               );
             })}
@@ -1733,6 +1766,16 @@ const st = StyleSheet.create({
 
   // Format switcher (Compare / Poll)
   formatSwitch: { flexDirection: "row", borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
+  layoutSwitch: { flexDirection: "row", borderRadius: 12, borderWidth: 1, padding: 4, gap: 4, marginBottom: 10 },
+  layoutBtn: {
+    flex: 1,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "transparent",
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  layoutBtnText: { fontSize: 13, fontWeight: "700" },
   formatBtn: { flex: 1, borderRadius: 9, paddingVertical: 9, alignItems: "center" },
   formatBtnText: { fontSize: 14, fontWeight: "800" },
 

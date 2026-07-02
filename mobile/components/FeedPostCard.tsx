@@ -89,6 +89,7 @@ import {
   hasKnockoutScoreBreakdown,
   type MatchScoreBreakdown,
 } from '@ctrend/shared/lib/matchScoreCopy';
+import { isVerticalCompareLayout } from '@ctrend/shared/lib/compareLayout';
 import { ImageViewerModal } from './ImageViewerModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -593,11 +594,15 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			paddingBottom: 4,
 		},
 		compareWrap: { flexDirection: 'row' as const, gap: 6 },
+		compareWrapVertical: { flexDirection: 'column' as const },
 		compareCell: {
 			flex: 1,
 			aspectRatio: 4 / 5,
 			borderRadius: 14,
 			overflow: 'hidden' as const,
+		},
+		compareCellVertical: {
+			aspectRatio: 16 / 9,
 		},
 		compareCellLoser: { opacity: 0.78 },
 		// Colored glow border on the cell the viewer picked (mirrors web's
@@ -2130,6 +2135,8 @@ function FeedPostCardComponent({
 
 	const compareUrls = post.imageUrls.length >= 2 ? post.imageUrls : null;
 	const isBinary = compareUrls?.length === 2;
+	const isVerticalBinary =
+		isBinary && isVerticalCompareLayout(post.compareLayout);
 
 	const optionLabels = useMemo(() => {
 		if (activeStats && activeStats.length > 0)
@@ -3560,7 +3567,7 @@ function FeedPostCardComponent({
 				<View style={st.compareSection}>
 				<>
 					<View style={styles.coachAnchor}>
-					<View style={st.compareWrap}>
+					<View style={[st.compareWrap, isVerticalBinary && st.compareWrapVertical]}>
 						{compareUrls.slice(0, 2).map((url, i) => {
 							const picked =
 								(i === 0 && viewer === 'UP') || (i === 1 && viewer === 'DOWN');
@@ -3573,6 +3580,7 @@ function FeedPostCardComponent({
 									key={`${post.id}-${i}`}
 									style={[
 										st.compareCell,
+										isVerticalBinary && st.compareCellVertical,
 										isVotingClosed && !isWinner && st.compareCellLoser,
 										{
 											transform: [{ scale: cellScale[i] }],

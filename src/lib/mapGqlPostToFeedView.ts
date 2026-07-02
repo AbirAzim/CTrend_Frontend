@@ -1,4 +1,5 @@
 import type { FeedPostCampaignWinnerView, FeedPostView, PostFormat, PostStatus, ViewerVote, VoteOptionStatView } from "../types/feed";
+import { normalizeCompareLayout } from "@ctrend/shared/lib/compareLayout";
 import { normalizeMatchScoreDisplay } from "@ctrend/shared/lib/matchScoreCopy";
 
 function mapViewerVote(
@@ -26,6 +27,7 @@ export function mapGqlPostToFeedView(p: {
   id: string;
   type?: string | null;
   format?: string | null;
+  compareLayout?: string | null;
   isUserGlobalBroadcast?: boolean | null;
   authorId?: string | null;
   authorUsername: string;
@@ -167,6 +169,7 @@ export function mapGqlPostToFeedView(p: {
     id: p.id,
     postType,
     format,
+    compareLayout: normalizeCompareLayout(p.compareLayout),
     isUserGlobalBroadcast: Boolean(p.isUserGlobalBroadcast),
     authorId: p.authorId ?? null,
     authorUsername: p.authorUsername,

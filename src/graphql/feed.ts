@@ -74,6 +74,7 @@ export const FEED_POSTS = gql`
       id
       type
       format
+      compareLayout
       authorId
       authorUsername
       authorDisplayName
@@ -126,6 +127,7 @@ export const GET_POST_BY_ID = gql`
       id
       type
       format
+      compareLayout
       authorId
       authorUsername
       authorDisplayName
@@ -231,6 +233,7 @@ export const MY_SAVED_POSTS = gql`
       authorProfileImageUrl
       imageUrls
       format
+      compareLayout
       caption
       createdAt
       upvoteCount
@@ -341,6 +344,7 @@ export const MY_SCHEDULED_POSTS = gql`
     myScheduledPosts {
       id
       format
+      compareLayout
       contentText
       caption
       imageUrls
@@ -445,6 +449,7 @@ export const POST_UPDATED = gql`
       id
       type
       format
+      compareLayout
       isUserGlobalBroadcast
       imageUrls
       caption
