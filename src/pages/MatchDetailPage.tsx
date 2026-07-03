@@ -14,6 +14,7 @@ import {
   type PlayerLineupEvents,
 } from "../../packages/shared/src/lib/matchEvents";
 import {
+  estimateLiveMinuteFromKickoff,
   formatKnockoutLivePrefix,
   hasKnockoutScoreBreakdown,
   knockoutFullTimeDividerLabel,
@@ -142,6 +143,18 @@ function isLive(status: string) {
 }
 function isFinished(status: string) {
   return status === "FINISHED";
+}
+
+/**
+ * The `matchScoreCopy` helpers (knockoutMainDisplayScore etc.) expect a flat
+ * `home`/`away` on the object — but `FixtureDetails` only has it nested under
+ * `score.home`/`score.away`. Passing `fixture` straight through left `ms.home`
+ * / `ms.away` undefined, so every live (non-finished) knockout match fell
+ * through to the `?? 0` fallback and showed a permanent 0-0 regardless of the
+ * real score.
+ */
+function matchScoreBreakdownFrom(fixture: FixtureDetails) {
+  return { ...fixture, home: fixture.score.home, away: fixture.score.away };
 }
 
 function minuteLabel(e: MatchEvent) {
@@ -492,9 +505,10 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
 
   const rows: Row[] = [];
   if (finished || (score.home != null && score.away != null)) {
+    const scoreBreakdown = matchScoreBreakdownFrom(fixture);
     const label =
-      isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
-        ? knockoutFullTimeDividerLabel(fixture)
+      isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(scoreBreakdown)
+        ? knockoutFullTimeDividerLabel(scoreBreakdown)
         : finished
           ? `Full-Time  ${score.home ?? 0} – ${score.away ?? 0}`
           : `${score.home ?? 0} – ${score.away ?? 0}`;
@@ -1186,23 +1200,18 @@ function StatsTab({ fixture }: { fixture: FixtureDetails }) {
 
 // ─── Match header ─────────────────────────────────────────────────────────────
 
-function clientMinute(kickoff: string): number {
-  const elapsed = Math.floor((Date.now() - new Date(kickoff).getTime()) / 60000);
-  return Math.max(1, Math.min(elapsed, 130));
-}
-
 /**
  * Status-bar text for a live match: "HT", "ET 97'"/"ET", "Pens", or a bare
  * minute — `status` alone can't tell extra time / penalties apart from
  * regular time (both come back as IN_PLAY), so this also needs `rawStatus`
  * (the provider's original code), same as the feed card's live pill.
  *
- * The `clientMinute` wall-clock estimate only ever stands in for a genuine
- * 1H/2H elapsed value that hasn't synced yet — it must NOT be used during
- * HT/BT/ET/penalties, where the in-game clock isn't a simple function of
- * time-since-kickoff (breaks pause it; a stale/stuck sync can leave a fixture
- * sitting in one of these phases for hours, which previously showed a
- * permanently frozen "130'" instead of just the phase name).
+ * The current data plan doesn't push a real elapsed minute on every sync
+ * tick, so a plain-regular-time match falls back to a kickoff-based wall-
+ * clock estimate (same one the feed card now uses, for consistency). That
+ * estimate must NEVER be used during HT/BT/ET/penalties — the in-game clock
+ * isn't a simple function of time-since-kickoff there (breaks pause it), and
+ * a stale/stuck fixture would show a permanently frozen, meaningless number.
  */
 function liveHeaderLabel(
   status: string,
@@ -1214,7 +1223,8 @@ function liveHeaderLabel(
   const phase = formatKnockoutLivePrefix({ phase: rawStatus });
   if (phase === "Pens") return "Pens";
   if (phase === "ET") return minute != null ? `ET ${minute}'` : "ET";
-  return minute != null ? `${minute}'` : `${clientMinute(kickoff)}'`;
+  const displayMinute = minute ?? estimateLiveMinuteFromKickoff(kickoff);
+  return displayMinute != null ? `${displayMinute}'` : "LIVE";
 }
 
 
@@ -1225,11 +1235,12 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
   const hasScore = live || finished;
   const homeWon = score.winner === "home";
   const awayWon = score.winner === "away";
+  const scoreShim = matchScoreBreakdownFrom(fixture);
   const scoreBreakdown =
-    isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(fixture)
-      ? knockoutHeaderSublines(fixture)
+    isKnockoutStage(fixture.stage) && hasKnockoutScoreBreakdown(scoreShim)
+      ? knockoutHeaderSublines(scoreShim)
       : [];
-  const displayScore = knockoutMainDisplayScore(fixture);
+  const displayScore = knockoutMainDisplayScore(scoreShim);
   const penDecided = Boolean(fixture.wentToPenalties && fixture.penalty);
   const highlightHomeScore = homeWon && !(penDecided && displayScore.home === displayScore.away);
   const highlightAwayScore = awayWon && !(penDecided && displayScore.home === displayScore.away);

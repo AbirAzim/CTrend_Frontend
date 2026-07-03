@@ -107,6 +107,17 @@ function mergePaginatedList(
 
 export const cache = new InMemoryCache({
   typePolicies: {
+    // Several screens poll `worldCupFixtures` (list) and `worldCupFixture`
+    // (single, on the match detail page) concurrently at different
+    // intervals — since both return the same `FixtureGql` type, Apollo's
+    // default normalization shares ONE cache entity per fixture id across
+    // both queries. Out-of-order network responses (a slower background
+    // widget's poll landing after a fresher one) then silently overwrite the
+    // match detail page's just-polled score/minute with stale data. Turning
+    // off normalization here makes each query's fixture data live
+    // independently under its own query result, so a stale list-widget poll
+    // can no longer clobber the actively-open detail page.
+    FixtureGql: { keyFields: false },
     Query: {
       fields: {
         // Infinite-scroll feed: one cached list per filter, with pages merged by
@@ -118,9 +129,14 @@ export const cache = new InMemoryCache({
           merge: mergePaginatedList,
         },
         // Profile "My Activity" tabs — same offset-pagination merge pattern.
+        // `keyArgs: ["take"]` (not `false`) keeps the paginated take:20
+        // sequence in its own bucket, separate from the legacy standalone
+        // /profile/scheduled page (its own default-take, polling fetch) —
+        // otherwise that fetch overwrites the same shared array mid-
+        // pagination and corrupts `hasMore` tracking.
         getPostsByUser: { keyArgs: ["userId"], merge: mergePaginatedList },
-        mySavedPosts: { keyArgs: false, merge: mergePaginatedList },
-        myScheduledPosts: { keyArgs: false, merge: mergePaginatedList },
+        mySavedPosts: { keyArgs: ["take"], merge: mergePaginatedList },
+        myScheduledPosts: { keyArgs: ["take"], merge: mergePaginatedList },
         myVotedPosts: { keyArgs: ["anonymousOnly"], merge: mergePaginatedList },
       },
     },

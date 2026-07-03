@@ -151,6 +151,23 @@ export function formatKnockoutLivePrefix(ms: MatchScoreBreakdown): string | null
   return null;
 }
 
+/**
+ * Client-side minute estimate for a live match when the provider hasn't sent
+ * a real elapsed value (common on lower-tier data plans, which push a live
+ * status but not a per-tick clock). Only valid for plain regular time —
+ * during HT/BT/ET/penalties the in-game clock isn't a simple function of
+ * time-since-kickoff (breaks pause it), so callers must not use this once
+ * `formatKnockoutLivePrefix`/PAUSED indicates one of those phases, or a
+ * stale/stuck fixture will show a permanently frozen, meaningless number.
+ */
+export function estimateLiveMinuteFromKickoff(kickoff: string | null | undefined): number | null {
+  if (!kickoff) return null;
+  const kickoffMs = new Date(kickoff).getTime();
+  if (Number.isNaN(kickoffMs)) return null;
+  const elapsed = Math.floor((Date.now() - kickoffMs) / 60000);
+  return Math.max(1, Math.min(elapsed, 130));
+}
+
 /** @deprecated Prefer knockoutHeaderSublines — kept for older call sites. */
 export function formatKnockoutScoreLines(ms: MatchScoreBreakdown): string[] {
   return knockoutHeaderSublines(ms);

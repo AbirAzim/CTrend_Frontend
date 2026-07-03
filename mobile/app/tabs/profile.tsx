@@ -854,7 +854,7 @@ export default function ProfileScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={st.feedContainer}
                 onScroll={(e) => handleContentScroll(e, () => void drops.loadMore())}
-                scrollEventThrottle={200}
+                scrollEventThrottle={16}
               >
                 {posts.map((p) => (
                   <FeedPostCard key={p.id} post={p} />
@@ -877,7 +877,7 @@ export default function ProfileScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={st.feedContainer}
                 onScroll={(e) => handleContentScroll(e, () => void scheduled.loadMore())}
-                scrollEventThrottle={200}
+                scrollEventThrottle={16}
               >
                 {scheduledPosts.map((p) => {
                   const live = scheduledCountdown(p.scheduledAt) === "Going live…";
@@ -930,7 +930,7 @@ export default function ProfileScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={st.feedContainer}
                 onScroll={(e) => handleContentScroll(e, () => void kept.loadMore())}
-                scrollEventThrottle={200}
+                scrollEventThrottle={16}
               >
                 {savedPosts.map((p) => (
                   <FeedPostCard key={p.id} post={p} />
@@ -970,7 +970,7 @@ export default function ProfileScreen() {
                   contentContainerStyle={st.feedContainer}
                   style={{ flex: 1 }}
                   onScroll={(e) => handleContentScroll(e, () => void voted.loadMore())}
-                  scrollEventThrottle={200}
+                  scrollEventThrottle={16}
                 >
                   {votedPosts.map((p) => (
                     <FeedPostCard key={p.id} post={p} />

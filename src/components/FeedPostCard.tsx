@@ -63,6 +63,7 @@ import {
 } from "@ctrend/shared/lib/knockoutFixture";
 import { knockoutRoundBadgeText } from "@ctrend/shared/lib/matchPredictionCopy";
 import {
+  estimateLiveMinuteFromKickoff,
   feedCardLiveScores,
   formatKnockoutLivePrefix,
   formatKnockoutScoreChip,
@@ -737,7 +738,17 @@ function FeedPostCardComponent({
   }, [hasActiveCountdown]);
 
   const isMatchInPlay = post.matchScore?.status === "IN_PLAY";
-  const liveMinute = isMatchInPlay ? (post.matchScore?.minute ?? null) : null;
+  // Same kickoff-based estimate as the match detail page when the provider
+  // hasn't sent a real elapsed value — `votingEndsAt` doubles as kickoff time
+  // for match posts (voting closes at kickoff). Never applied during ET/Pens
+  // (formatKnockoutLivePrefix truthy), where wall-clock-since-kickoff isn't
+  // a valid stand-in for the real in-game clock.
+  const liveMinute = isMatchInPlay
+    ? post.matchScore?.minute ??
+      (formatKnockoutLivePrefix({ phase: post.matchScore?.phase })
+        ? null
+        : estimateLiveMinuteFromKickoff(post.votingEndsAt))
+    : null;
 
   function closeVotersList() {
     setShowVoters(false);
