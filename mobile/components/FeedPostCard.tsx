@@ -1698,6 +1698,27 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: c.subtext,
 			backgroundColor: c.card,
 		},
+		matchInProgressContainer: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 8,
+			marginHorizontal: 14,
+			marginTop: 4,
+			marginBottom: 10,
+			paddingHorizontal: 12,
+			paddingVertical: 10,
+			borderRadius: 12,
+			borderWidth: 1,
+			borderColor: isDark ? 'rgba(100,116,139,0.3)' : 'rgba(100,116,139,0.35)',
+			backgroundColor: isDark ? 'rgba(100,116,139,0.08)' : 'rgba(100,116,139,0.07)',
+		},
+		matchInProgressIcon: { fontSize: 18 },
+		matchInProgressText: {
+			flex: 1,
+			fontSize: 12,
+			fontWeight: '600' as const,
+			color: isDark ? '#cbd5e1' : c.text,
+		},
 	};
 }
 
@@ -3968,14 +3989,14 @@ function FeedPostCardComponent({
 					winningOptionLabel={campaignWinnerOptionLabel}
 				/>
 			) : showMatchStartsSoon ? (
-				<View style={matchInProgressStyles.container}>
-					<Text style={matchInProgressStyles.icon}>⏰</Text>
-					<Text style={matchInProgressStyles.text}>Match starts soon · voting is closed</Text>
+				<View style={st.matchInProgressContainer}>
+					<Text style={st.matchInProgressIcon}>⏰</Text>
+					<Text style={st.matchInProgressText}>Match starts soon · voting is closed</Text>
 				</View>
 			) : showMatchCalculating ? (
-				<View style={matchInProgressStyles.container}>
-					<Text style={matchInProgressStyles.icon}>⏳</Text>
-					<Text style={matchInProgressStyles.text}>
+				<View style={st.matchInProgressContainer}>
+					<Text style={st.matchInProgressIcon}>⏳</Text>
+					<Text style={st.matchInProgressText}>
 						{winnerCountdown
 							? `🏆 Winner reveals in ${winnerCountdown}`
 							: '🏆 Revealing winner…'}
@@ -5068,40 +5089,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	reportSubmitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
-
-const matchInProgressStyles = StyleSheet.create({
-	container: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		marginHorizontal: 14,
-		marginTop: 4,
-		marginBottom: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: 'rgba(100,116,139,0.3)',
-		backgroundColor: 'rgba(100,116,139,0.08)',
-	},
-	containerLive: {
-		borderColor: 'rgba(249,115,22,0.35)',
-		backgroundColor: 'rgba(249,115,22,0.08)',
-	},
-	icon: { fontSize: 18 },
-	text: {
-		flex: 1,
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#cbd5e1',
-	},
-	textLive: {
-		flex: 1,
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#f97316',
-	},
 });
 
 type MatchScore = MatchScoreBreakdown | null;
