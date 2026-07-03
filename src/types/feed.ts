@@ -59,6 +59,7 @@ export type FeedPostView = {
       id: string;
       username: string;
       displayName?: string | null;
+      profileImageUrl?: string | null;
     };
   }>;
   status?: PostStatus | null;

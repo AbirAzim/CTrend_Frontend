@@ -92,6 +92,18 @@ export const FEED_POSTS = gql`
       isVotingOpen
       endingSoonLeadMinutes
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       likeCount
       hypeCount
       saveCount
@@ -150,6 +162,18 @@ export const GET_POST_BY_ID = gql`
       isVotingOpen
       endingSoonLeadMinutes
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       likeCount
       hypeCount
       saveCount
@@ -433,6 +457,18 @@ export const POST_UPDATED = gql`
       isVotingOpen
       endingSoonLeadMinutes
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       myVoteAnonymous
       mySelectedOptionIndex
       optionStats {

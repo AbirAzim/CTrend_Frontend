@@ -58,6 +58,7 @@ export function mapGqlPostToFeedView(p: {
       id: string;
       username: string;
       displayName?: string | null;
+      profileImageUrl?: string | null;
     };
   }> | null;
   viewerVote?: string | null;

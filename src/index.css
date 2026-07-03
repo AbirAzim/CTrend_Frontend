@@ -6333,6 +6333,57 @@ a.cx-friend-avatar:hover {
   }
 }
 
+.cx-comment-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.cx-comment-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cx-comment-preview-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  overflow: hidden;
+}
+
+.cx-comment-preview-author {
+  flex: 0 0 auto;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--ig-text);
+  text-decoration: none;
+}
+
+.cx-comment-preview-author:hover {
+  text-decoration: underline;
+}
+
+.cx-comment-preview-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ig-muted);
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cx-discuss-slot {
   margin: 10px 0 0;
   animation: cx-discuss-panel-in 0.26s var(--cx-ease-spring) both;

@@ -95,6 +95,18 @@ export const FEED_POSTS = gql`
       votePrizeClaimedAt
       canClaimPrize
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       likeCount
       hypeCount
       saveCount
@@ -148,6 +160,18 @@ export const GET_POST_BY_ID = gql`
       votePrizeClaimedAt
       canClaimPrize
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       likeCount
       hypeCount
       saveCount
@@ -463,6 +487,18 @@ export const POST_UPDATED = gql`
       mySelectedOptionIndex
       myVoteAnonymous
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       optionStats {
         index
         label

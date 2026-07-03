@@ -60,6 +60,7 @@ export function mapGqlPostToFeedView(p: {
       id: string;
       username: string;
       displayName?: string | null;
+      profileImageUrl?: string | null;
     };
   }> | null;
   viewerVote?: string | null;
@@ -201,7 +202,7 @@ export function mapGqlPostToFeedView(p: {
     viewerHasSaved: p.viewerHasSaved ?? false,
     viewerHasHyped: p.viewerHasHyped ?? false,
     commentCount: p.commentCount ?? 0,
-    recentComments: [],
+    recentComments: p.recentComments ?? [],
     status: (p.status as PostStatus | null) ?? null,
     scheduledAt: p.scheduledAt ?? null,
     viewerVote: mapViewerVote(p.viewerVote, p.mySelectedOptionIndex),

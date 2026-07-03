@@ -1420,6 +1420,47 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontWeight: '700' as const,
 			color: c.subtext,
 		},
+		commentPreview: {
+			marginHorizontal: 12,
+			marginTop: 4,
+			marginBottom: 4,
+			gap: 6,
+		},
+		commentPreviewItem: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 8,
+		},
+		commentPreviewAvatar: {
+			width: 24,
+			height: 24,
+			borderRadius: 12,
+			overflow: 'hidden' as const,
+			backgroundColor: c.section,
+			alignItems: 'center' as const,
+			justifyContent: 'center' as const,
+		},
+		commentPreviewAvatarText: {
+			fontSize: 11,
+			fontWeight: '700' as const,
+			color: c.text,
+		},
+		commentPreviewRow: {
+			flex: 1,
+			flexDirection: 'row' as const,
+			alignItems: 'baseline' as const,
+			gap: 6,
+		},
+		commentPreviewAuthor: {
+			fontSize: 13,
+			fontWeight: '700' as const,
+			color: c.text,
+		},
+		commentPreviewText: {
+			flex: 1,
+			fontSize: 13,
+			color: c.subtext,
+		},
 		// Voters sheet
 		votersOverlay: {
 			flex: 1,
@@ -4224,6 +4265,7 @@ function FeedPostCardComponent({
 
 			{(() => {
 				const commentCount = post.commentCount ?? 0;
+				const recentComments = post.recentComments ?? [];
 				const userAvatar = normalizeProfileImageUrl(user?.profileImageUrl);
 				const userInitial = (user?.displayName ?? user?.username ?? '?')
 					.slice(0, 1)
@@ -4232,6 +4274,47 @@ function FeedPostCardComponent({
 					user?.displayName?.trim() || user?.username?.trim() || 'You';
 				return (
 					<>
+						{recentComments.length > 0 ? (
+							<View style={st.commentPreview}>
+								{recentComments.map((cmt) => {
+									const cmtName = cmt.author.displayName ?? cmt.author.username;
+									const cmtAvatar = normalizeProfileImageUrl(cmt.author.profileImageUrl);
+									return (
+										<View key={cmt.id} style={st.commentPreviewItem}>
+											<Pressable
+												onPress={() => router.push(`/profile/${cmt.author.id}` as `/${string}`)}
+												accessibilityLabel={`View ${cmtName}'s profile`}
+											>
+												<View style={st.commentPreviewAvatar}>
+													{cmtAvatar ? (
+														<Image
+															source={{ uri: cmtAvatar }}
+															style={StyleSheet.absoluteFill}
+															contentFit='cover'
+															cachePolicy='memory-disk'
+														/>
+													) : (
+														<Text style={st.commentPreviewAvatarText}>
+															{cmtName.slice(0, 1).toUpperCase()}
+														</Text>
+													)}
+												</View>
+											</Pressable>
+											<Pressable
+												style={st.commentPreviewRow}
+												onPress={() => openComments(false)}
+												accessibilityLabel={`View comments, including ${cmtName}'s comment`}
+											>
+												<Text style={st.commentPreviewAuthor}>{cmtName}</Text>
+												<Text style={st.commentPreviewText} numberOfLines={1}>
+													{cmt.content}
+												</Text>
+											</Pressable>
+										</View>
+									);
+								})}
+							</View>
+						) : null}
 						{commentCount > 0 ? (
 							<Pressable
 								style={st.commentCountLink}

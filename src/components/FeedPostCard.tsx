@@ -93,6 +93,17 @@ function authorAvatarUrlCandidates(
   ];
 }
 
+function commentPreviewAvatarSrc(author: {
+  profileImageUrl?: string | null;
+  displayName?: string | null;
+  username: string;
+}): string | null {
+  const normalized = normalizeProfileImageUrl(author.profileImageUrl);
+  if (normalized) return normalized;
+  const name = author.displayName?.trim() || author.username?.trim() || "user";
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=312e81&color=ffffff&size=96&format=png`;
+}
+
 function nextDirection(
   current: FeedPostView["viewerVote"],
   clicked: "UP" | "DOWN",
@@ -1681,6 +1692,7 @@ function FeedPostCardComponent({
       : binaryTotal;
   const hypeCount = hypeCountLive;
   const commentCount = post.commentCount ?? 0;
+  const recentComments = post.recentComments ?? [];
   // Flat, chronologically-sorted list (newest first, as returned by the server).
   // A flat list keeps infinite-scroll stable — appending a page never reflows
   // rows above the viewport the way regrouping would.
@@ -2960,6 +2972,55 @@ function FeedPostCardComponent({
             </div>
           ) : null}
         </div>
+
+        {!commentsOpen && recentComments.length > 0 ? (
+          <div className="cx-comment-preview">
+            {recentComments.map((c) => {
+              const authorName = c.author.displayName ?? c.author.username;
+              const avatarSrc = commentPreviewAvatarSrc(c.author);
+              return (
+                <div key={c.id} className="cx-comment-preview-item">
+                  <NavLink
+                    to={`/profile/${c.author.id}`}
+                    className="cx-comment-avatar"
+                    aria-label={`View ${authorName}'s profile`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {avatarSrc ? (
+                      <img src={avatarSrc} alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="cx-comment-avatar-initial">
+                        {authorName.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                  </NavLink>
+                  <div
+                    className="cx-comment-preview-row"
+                    role="button"
+                    tabIndex={0}
+                    onClick={toggleDiscuss}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleDiscuss();
+                      }
+                    }}
+                    aria-label={`View comments, including ${authorName}'s comment`}
+                  >
+                    <NavLink
+                      to={`/profile/${c.author.id}`}
+                      className="cx-comment-preview-author"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {authorName}
+                    </NavLink>
+                    <span className="cx-comment-preview-text">{c.content}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
 
         {commentsOpen ? (
           <div id={`post-discuss-${post.id}`} className="cx-discuss-slot">
