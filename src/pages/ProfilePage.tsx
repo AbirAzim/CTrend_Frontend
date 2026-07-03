@@ -1,9 +1,8 @@
 import { useMutation, useQuery } from "@apollo/client";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
-import { mockPostsAsFeed } from "../lib/mockFeedAdapter";
 import { useImageUpload } from "../lib/useImageUpload";
 import {
   MY_FRIENDS,
@@ -16,18 +15,12 @@ import {
   CANCEL_FRIEND_REQUEST,
 } from "../graphql/friends";
 import { START_DIRECT_CONVERSATION, CONTACT_ADMIN } from "../graphql/messages";
-import { ME, UPDATE_PROFILE, USER_POSTS, MY_VOTED_POSTS } from "../graphql/profile";
+import { ME, UPDATE_PROFILE, MY_CONTENT_SUMMARY } from "../graphql/profile";
 import { useMessenger } from "../context/MessengerContext";
-import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
-import { EditPostModal } from "../components/EditPostModal";
-import { FeedPostCard } from "../components/FeedPostCard";
 import { ProfileEngagementPanel } from "../components/ProfileEngagementPanel";
-import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { useCoins } from "../context/CoinsContext";
-import type { FeedPostView } from "../types/feed";
-import { IconCompare, IconVote } from "../components/IgIcons";
 
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
@@ -95,36 +88,6 @@ function MessageButton({ userId }: { userId: string }) {
   );
 }
 
-type ProfileContentTab = "drops" | "scheduled" | "kept" | "voted";
-
-function formatScheduledCountdown(isoDate: string): string {
-  const diff = new Date(isoDate).getTime() - Date.now();
-  if (diff <= 0) return "Publishing soon…";
-  const mins = Math.floor(diff / 60_000);
-  const hours = Math.floor(mins / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `Goes live in ${days}d ${hours % 24}h`;
-  if (hours > 0) return `Goes live in ${hours}h ${mins % 60}m`;
-  return `Goes live in ${Math.max(mins, 1)}m`;
-}
-
-function formatGoLiveDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function profileTabSearch(tab: ProfileContentTab): string {
-  if (tab === "scheduled") return "?tab=scheduled";
-  if (tab === "kept") return "?tab=kept";
-  if (tab === "voted") return "?tab=voted";
-  return "";
-}
-
 /** "Contact admin" footer link — opens (and seeds) the user's support thread. */
 function ContactAdminLink() {
   const { openChat } = useMessenger();
@@ -160,9 +123,6 @@ export function ProfilePage() {
   const { user, patchUser } = useAuth();
   const { balance } = useCoins();
   const { onlineUserIds } = useMessenger();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const initialTab = new URLSearchParams(location.search).get("tab");
   const useMockFeed = import.meta.env.VITE_USE_MOCK_FEED === "true";
 
   const [editing, setEditing] = useState(false);
@@ -204,12 +164,14 @@ export function ProfilePage() {
   // Online if the server has reported this user online OR if the browser connection is up
   const isOnline = (userId ? onlineUserIds.has(userId) : false) || browserOnline;
 
-  const { data: postsData, loading: postsLoading, refetch: refetchPosts } = useQuery(USER_POSTS, {
-    variables: { userId },
-    skip: !userId || useMockFeed,
+  // Cheap counts for the stat pills + "My Activity" summary line — no post
+  // hydration, so the profile page never waits on the heavy per-tab lists.
+  const { data: contentSummaryData } = useQuery(MY_CONTENT_SUMMARY, {
+    skip: useMockFeed || !user,
     fetchPolicy: "cache-and-network",
-    nextFetchPolicy: "cache-first",
   });
+  const contentSummary = contentSummaryData?.myContentSummary;
+
   const { data: friendsData, loading: friendsLoading, refetch: refetchFriends } = useQuery(MY_FRIENDS, {
     skip: useMockFeed,
     fetchPolicy: "cache-and-network",
@@ -234,47 +196,6 @@ export function ProfilePage() {
   });
   const [unfriendMut] = useMutation(UNFRIEND);
   const [cancelFriendMut] = useMutation(CANCEL_FRIEND_REQUEST);
-  const { data: savedPostsData, loading: savedPostsLoading } = useQuery(MY_SAVED_POSTS, {
-    skip: useMockFeed || !user,
-    fetchPolicy: "cache-and-network",
-    nextFetchPolicy: "cache-first",
-  });
-  const [votedFilter, setVotedFilter] = useState<"all" | "anonymous">("all");
-  const { data: votedPostsData, loading: votedPostsLoading } = useQuery(MY_VOTED_POSTS, {
-    variables: { anonymousOnly: votedFilter === "anonymous" },
-    skip: useMockFeed || !user,
-    fetchPolicy: "cache-and-network",
-    nextFetchPolicy: "cache-first",
-  });
-  const {
-    data: scheduledPostsData,
-    loading: scheduledPostsLoading,
-    refetch: refetchScheduled,
-  } = useQuery(MY_SCHEDULED_POSTS, {
-    skip: useMockFeed || !user,
-    fetchPolicy: "cache-and-network",
-    nextFetchPolicy: "cache-first",
-    pollInterval: 30_000,
-  });
-  const [cancelScheduledMut] = useMutation(CANCEL_SCHEDULED_POST);
-
-  const playgroundPosts = useMemo(() => {
-    if (!useMockFeed) {
-      return [];
-    }
-    return mockPostsAsFeed();
-  }, [useMockFeed]);
-
-  // Feed-shaped — rendered with the same `FeedPostCard` as the main feed.
-  const gridPosts: FeedPostView[] = useMockFeed
-    ? playgroundPosts
-    : (postsData?.getPostsByUser ?? []).map(mapGqlPostToFeedView);
-  const votedPosts: FeedPostView[] = (votedPostsData?.myVotedPosts ?? []).map(
-    mapGqlPostToFeedView,
-  );
-  const scheduledPosts: FeedPostView[] = (scheduledPostsData?.myScheduledPosts ?? []).map(
-    mapGqlPostToFeedView,
-  );
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const requestedMe = (friendRequestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
@@ -284,13 +205,11 @@ export function ProfilePage() {
     "friends" | "incoming" | "sent" | "suggestions"
   >("friends");
   const [connectionsSearch, setConnectionsSearch] = useState("");
-  // Collapsible sections. On web there's room to show your content up front, so
-  // "Your content" starts expanded; People stays collapsed to keep things tidy.
-  const [openContent, setOpenContent] = useState(true);
+  // "People" starts collapsed to keep the page tidy — "My Activity" is now its
+  // own full page (see ProfileContentPage.tsx), reached via a link below.
   const [openPeople, setOpenPeople] = useState(false);
   const [showAllInterests, setShowAllInterests] = useState(false);
   const peopleRef = useRef<HTMLElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
 
   // Friends count / stat → open People, focus Friends tab, scroll into view.
   function jumpToFriends() {
@@ -299,72 +218,6 @@ export function ProfilePage() {
     setTimeout(() => peopleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   }
 
-  // Compares / Votes / Kept stats → open "Your content" on the matching tab.
-  function openContentOn(tab: ProfileContentTab) {
-    setOpenContent(true);
-    selectProfileContentTab(tab);
-    setTimeout(() => contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
-  }
-  const [profileContentTab, setProfileContentTab] = useState<ProfileContentTab>(() => {
-    if (initialTab === "scheduled") return "scheduled";
-    if (initialTab === "kept") return "kept";
-    if (initialTab === "voted") return "voted";
-    return "drops";
-  });
-
-  async function handleCancelScheduled(postId: string) {
-    if (!window.confirm("Cancel this scheduled post? This can't be undone.")) return;
-    try {
-      await cancelScheduledMut({ variables: { postId } });
-      void refetchScheduled();
-    } catch (err) {
-      alert(getApolloErrorMessage(err));
-    }
-  }
-
-  function selectProfileContentTab(tab: ProfileContentTab) {
-    setProfileContentTab(tab);
-    const nextSearch = profileTabSearch(tab);
-    if (location.pathname === "/profile" && location.search !== nextSearch) {
-      navigate({ pathname: "/profile", search: nextSearch }, { replace: true });
-    }
-  }
-
-  // React to URL changes (e.g. clicking the Keep bottom-nav button while already on profile)
-  useEffect(() => {
-    if (initialTab === "scheduled") {
-      setProfileContentTab("scheduled");
-    } else if (initialTab === "kept") {
-      setProfileContentTab("kept");
-    } else if (initialTab === "voted") {
-      setProfileContentTab("voted");
-    } else {
-      setProfileContentTab("drops");
-    }
-  }, [initialTab]);
-  const [editingPost, setEditingPost] = useState<{
-    id: string;
-    format?: string | null;
-    caption?: string | null;
-    imageUrls: string[];
-    options?: Array<{
-      label?: string | null;
-      imageUrl?: string | null;
-      imageFocalX?: number | null;
-      imageFocalY?: number | null;
-    }> | null;
-    category?: { id: string; name?: string | null } | null;
-    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
-    votingEndsAt?: string | null;
-    isVotingOpen?: boolean | null;
-    isUserGlobalBroadcast?: boolean | null;
-    endingSoonLeadMinutes?: number | null;
-    status?: string | null;
-    scheduledAt?: string | null;
-    upvoteCount?: number | null;
-    downvoteCount?: number | null;
-    optionStats?: Array<{ index: number; count?: number | null }> | null;
-  } | null>(null);
   const [friendsPage, setFriendsPage] = useState(0);
   const [incomingPage, setIncomingPage] = useState(0);
   const [sentPage, setSentPage] = useState(0);
@@ -458,14 +311,6 @@ export function ProfilePage() {
       (u.email?.toLowerCase().includes(q) ?? false)
     );
   }
-  const savedPosts: FeedPostView[] = (savedPostsData?.mySavedPosts ?? []).map(
-    mapGqlPostToFeedView,
-  );
-
-  const totalVotes = gridPosts.reduce(
-    (a, p) => a + (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0),
-    0,
-  );
 
   const displayName =
     me?.displayName ?? user?.displayName ?? user?.email.split("@")[0] ?? "you";
@@ -648,22 +493,22 @@ export function ProfilePage() {
       </header>
 
       <div className="cx-profile-stats-row">
-        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => openContentOn("drops")}>
-          <strong>{gridPosts.length}</strong>
+        <Link to="/profile/content?tab=drops" className="cx-profile-stat cx-profile-stat--btn">
+          <strong>{contentSummary?.dropsCount ?? 0}</strong>
           <span>compares ›</span>
-        </button>
-        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => openContentOn("voted")}>
-          <strong>{totalVotes.toLocaleString()}</strong>
+        </Link>
+        <Link to="/profile/content?tab=voted" className="cx-profile-stat cx-profile-stat--btn">
+          <strong>{(contentSummary?.totalVotesOnMyPosts ?? 0).toLocaleString()}</strong>
           <span>votes ›</span>
-        </button>
+        </Link>
         <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={jumpToFriends}>
           <strong>{friends.length}</strong>
           <span>friends ›</span>
         </button>
-        <button type="button" className="cx-profile-stat cx-profile-stat--btn" onClick={() => openContentOn("kept")}>
-          <strong>{savedPosts.length}</strong>
+        <Link to="/profile/content?tab=kept" className="cx-profile-stat cx-profile-stat--btn">
+          <strong>{contentSummary?.keptCount ?? 0}</strong>
           <span>kept ›</span>
-        </button>
+        </Link>
       </div>
 
       {userId ? (
@@ -772,254 +617,21 @@ export function ProfilePage() {
         </div>
       )}
 
-      {/* ── Your content (collapsible: drops / scheduled / kept / voted) ── */}
-      <div className="cx-profile-content-card" ref={contentRef}>
-        <button
-          type="button"
-          className={`cx-section-toggle${openContent ? " cx-section-toggle--open" : ""}`}
-          onClick={() => setOpenContent((v) => !v)}
-          aria-expanded={openContent}
-        >
-          <span className="cx-section-toggle-icon" aria-hidden><IconCompare size={18} /></span>
-          <span className="cx-section-toggle-text">
-            <strong>Your content</strong>
-            <span className="muted small">
-              {gridPosts.length + savedPosts.length + scheduledPosts.length === 0
-                ? "Share your first compare"
-                : `${gridPosts.length} drops · ${scheduledPosts.length} scheduled · ${savedPosts.length} kept`}
-            </span>
+      {/* ── My Activity (full page) ─────────────────────── */}
+      <Link to="/profile/content" className="cx-profile-quick-link">
+        <span className="cx-profile-quick-link-icon" aria-hidden>📋</span>
+        <span className="cx-profile-quick-link-text">
+          <strong>My Activity</strong>
+          <span className="muted small">
+            {contentSummary
+              ? (contentSummary.dropsCount + contentSummary.scheduledCount + contentSummary.keptCount === 0
+                  ? "Share your first compare"
+                  : `${contentSummary.dropsCount} drops · ${contentSummary.scheduledCount} scheduled · ${contentSummary.keptCount} kept · ${contentSummary.votedCount} voted`)
+              : "Drops, schedule, saves & votes"}
           </span>
-          <span className="cx-section-toggle-chevron" aria-hidden>{openContent ? "▾" : "▸"}</span>
-        </button>
-        {openContent && (
-        <>
-        <div className="cx-conn-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={profileContentTab === "drops"}
-            className={`cx-conn-tab${profileContentTab === "drops" ? " cx-conn-tab--active" : ""}`}
-            onClick={() => selectProfileContentTab("drops")}
-          >
-            ✨ Your drops
-            {gridPosts.length > 0 && <span className="cx-conn-tab-badge">{gridPosts.length}</span>}
-          </button>
-          {!useMockFeed && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={profileContentTab === "scheduled"}
-              className={`cx-conn-tab${profileContentTab === "scheduled" ? " cx-conn-tab--active" : ""}`}
-              onClick={() => selectProfileContentTab("scheduled")}
-            >
-              ⏰ Scheduled
-              {scheduledPosts.length > 0 && (
-                <span className="cx-conn-tab-badge">{scheduledPosts.length}</span>
-              )}
-            </button>
-          )}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={profileContentTab === "kept"}
-            className={`cx-conn-tab${profileContentTab === "kept" ? " cx-conn-tab--active" : ""}`}
-            onClick={() => selectProfileContentTab("kept")}
-          >
-            🔖 Kept
-            {savedPosts.length > 0 && <span className="cx-conn-tab-badge">{savedPosts.length}</span>}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={profileContentTab === "voted"}
-            className={`cx-conn-tab${profileContentTab === "voted" ? " cx-conn-tab--active" : ""}`}
-            onClick={() => selectProfileContentTab("voted")}
-          >
-            <IconVote size={14} />
-            Voted
-            {votedPosts.length > 0 && <span className="cx-conn-tab-badge">{votedPosts.length}</span>}
-          </button>
-        </div>
-
-        {profileContentTab === "drops" && (
-          <div className="cx-profile-content-panel" role="tabpanel">
-      <section className="cx-profile-drops" aria-label="Your compares">
-        <h2 className="cx-profile-section-title" style={{ display: "none" }}>
-          Your drops
-        </h2>
-        {useMockFeed && (
-          <p className="cx-profile-demo-note" style={{ padding: "12px 16px" }}>
-            <strong>Playground:</strong> sample compares — connect the API to see your real posts.
-          </p>
-        )}
-        {!useMockFeed && postsLoading && gridPosts.length === 0 && (
-          <div className="cx-kept-grid" aria-label="Loading your compares">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="cx-kept-card cx-profile-card cx-profile-card--skeleton">
-                <div className="cx-kept-card-media">
-                  <span className="cx-kept-card-thumb cx-skeleton" />
-                  <span className="cx-kept-card-thumb cx-skeleton" />
-                </div>
-                <div className="cx-kept-card-info">
-                  <span className="cx-skeleton cx-skeleton-line" style={{ width: "80%", height: "12px" }} />
-                  <span className="cx-skeleton cx-skeleton-line" style={{ width: "50%", height: "10px" }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {!useMockFeed && !postsLoading && gridPosts.length === 0 && (
-          <div className="cx-conn-empty">
-            <span className="cx-conn-empty-icon">✨</span>
-            <p>No compares yet.</p>
-            <NavLink to="/create" className="cx-conn-btn cx-conn-btn--add" style={{ marginTop: "8px", textDecoration: "none" }}>
-              Create your first compare
-            </NavLink>
-          </div>
-        )}
-        {gridPosts.length > 0 && (
-          <div className="ig-feed">
-            {gridPosts.map((post) => (
-              <FeedPostCard key={post.id} post={post} voteMode={useMockFeed ? "local" : "api"} />
-            ))}
-          </div>
-        )}
-      </section>
-          </div>
-        )}
-
-        {profileContentTab === "scheduled" && (
-          <div className="cx-profile-content-panel" role="tabpanel">
-            <section className="cx-profile-drops" aria-label="Your scheduled posts">
-              {scheduledPostsLoading && scheduledPosts.length === 0 ? (
-                <p className="cx-conn-empty">Loading scheduled posts…</p>
-              ) : scheduledPosts.length === 0 ? (
-                <div className="cx-conn-empty">
-                  <span className="cx-conn-empty-icon">⏰</span>
-                  <p>No scheduled posts. Schedule a post for later from Create.</p>
-                  <NavLink
-                    to="/create"
-                    className="cx-conn-btn cx-conn-btn--add"
-                    style={{ marginTop: "8px", textDecoration: "none" }}
-                  >
-                    Create a post
-                  </NavLink>
-                </div>
-              ) : (
-                <div className="ig-feed">
-                  {scheduledPosts.map((post) => (
-                    <div key={post.id} className="cx-scheduled-feed-item">
-                      <div className="cx-scheduled-meta-bar">
-                        <p className="cx-scheduled-countdown">
-                          {post.scheduledAt ? formatScheduledCountdown(post.scheduledAt) : "Publishing soon…"}
-                        </p>
-                        <p className="cx-scheduled-date">
-                          {post.scheduledAt ? `Goes live ${formatGoLiveDate(post.scheduledAt)}` : null}
-                        </p>
-                        <div className="cx-scheduled-actions">
-                          <button
-                            type="button"
-                            className="cx-scheduled-edit-btn"
-                            onClick={() =>
-                              setEditingPost({
-                                id: post.id,
-                                format: post.format,
-                                caption: post.caption,
-                                imageUrls: post.imageUrls ?? [],
-                                options: post.postOptions,
-                                category: post.category,
-                                campaign: post.campaign,
-                                votingEndsAt: post.votingEndsAt,
-                                isVotingOpen: post.isVotingOpen,
-                                endingSoonLeadMinutes: post.endingSoonLeadMinutes,
-                                isUserGlobalBroadcast: post.isUserGlobalBroadcast,
-                                status: post.status,
-                                scheduledAt: post.scheduledAt,
-                              })
-                            }
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="cx-scheduled-cancel-btn"
-                            onClick={() => void handleCancelScheduled(post.id)}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                      <FeedPostCard post={post} voteMode="api" />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        )}
-
-        {profileContentTab === "kept" && (
-          <div className="cx-profile-content-panel" role="tabpanel">
-            {!useMockFeed && savedPostsLoading ? (
-              <p className="cx-conn-empty">Loading kept posts…</p>
-            ) : savedPosts.length === 0 ? (
-              <div className="cx-conn-empty">
-                <span className="cx-conn-empty-icon">🔖</span>
-                <p>No kept posts yet. Bookmark posts from the feed!</p>
-              </div>
-            ) : (
-              <div className="ig-feed">
-                {savedPosts.map((post) => (
-                  <FeedPostCard key={`kept-${post.id}`} post={post} voteMode="api" />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {profileContentTab === "voted" && (
-          <div className="cx-profile-content-panel" role="tabpanel">
-            <div className="cx-voted-filter" role="group" aria-label="Filter voted posts">
-              <button
-                type="button"
-                className={`cx-voted-filter-btn${votedFilter === "all" ? " cx-voted-filter-btn--active" : ""}`}
-                aria-pressed={votedFilter === "all"}
-                onClick={() => setVotedFilter("all")}
-              >
-                All votes
-              </button>
-              <button
-                type="button"
-                className={`cx-voted-filter-btn${votedFilter === "anonymous" ? " cx-voted-filter-btn--active" : ""}`}
-                aria-pressed={votedFilter === "anonymous"}
-                onClick={() => setVotedFilter("anonymous")}
-              >
-                👻 Anonymous
-              </button>
-            </div>
-            {!useMockFeed && votedPostsLoading && votedPosts.length === 0 ? (
-              <p className="cx-conn-empty">Loading voted posts…</p>
-            ) : votedPosts.length === 0 ? (
-              <div className="cx-conn-empty">
-                <span className="cx-conn-empty-icon" aria-hidden><IconVote size={28} /></span>
-                <p>
-                  {votedFilter === "anonymous"
-                    ? "You haven't voted anonymously on any posts yet."
-                    : "You haven't voted on any posts yet."}
-                </p>
-              </div>
-            ) : (
-              <div className="ig-feed">
-                {votedPosts.map((post) => (
-                  <FeedPostCard key={`voted-${post.id}`} post={post} voteMode="api" />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        </>
-        )}
-      </div>
+        </span>
+        <span className="cx-profile-quick-link-arrow" aria-hidden>→</span>
+      </Link>
 
       {/* ── People (collapsible) ─────────────────────── */}
       {!useMockFeed ? (
@@ -1411,13 +1023,6 @@ export function ProfilePage() {
         <BulkInviteModal
           inviteType={inviteType}
           onClose={() => setShowInviteModal(false)}
-        />
-      )}
-      {editingPost && (
-        <EditPostModal
-          post={editingPost}
-          onClose={() => setEditingPost(null)}
-          onSaved={() => { void refetchPosts(); void refetchScheduled(); }}
         />
       )}
     </div>

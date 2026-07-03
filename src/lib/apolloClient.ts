@@ -90,6 +90,21 @@ const link = wsLink
     )
   : httpChain;
 
+/** Shared by every offset-paginated (`skip`/`take`) list field below — appends
+ * the incoming page at its `skip` offset instead of replacing the whole list. */
+function mergePaginatedList(
+  existing: readonly unknown[] = [],
+  incoming: readonly unknown[],
+  { args }: { args: Record<string, unknown> | null },
+) {
+  const merged = existing.slice();
+  const start = typeof args?.skip === "number" ? args.skip : 0;
+  for (let i = 0; i < incoming.length; i++) {
+    merged[start + i] = incoming[i];
+  }
+  return merged;
+}
+
 export const cache = new InMemoryCache({
   typePolicies: {
     Query: {
@@ -100,19 +115,13 @@ export const cache = new InMemoryCache({
         // becoming a separate list or the poll overwriting the appended pages.
         feedPosts: {
           keyArgs: ["campaignId", "postFilter", "scope", "sort"],
-          merge(
-            existing: readonly unknown[] = [],
-            incoming: readonly unknown[],
-            { args }: { args: Record<string, unknown> | null },
-          ) {
-            const merged = existing.slice();
-            const start = typeof args?.skip === "number" ? args.skip : 0;
-            for (let i = 0; i < incoming.length; i++) {
-              merged[start + i] = incoming[i];
-            }
-            return merged;
-          },
+          merge: mergePaginatedList,
         },
+        // Profile "My Activity" tabs — same offset-pagination merge pattern.
+        getPostsByUser: { keyArgs: ["userId"], merge: mergePaginatedList },
+        mySavedPosts: { keyArgs: false, merge: mergePaginatedList },
+        myScheduledPosts: { keyArgs: false, merge: mergePaginatedList },
+        myVotedPosts: { keyArgs: ["anonymousOnly"], merge: mergePaginatedList },
       },
     },
   },

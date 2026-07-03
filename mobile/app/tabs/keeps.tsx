@@ -149,6 +149,7 @@ export default function KeepsScreen() {
   useFocusEffect(useCallback(() => { translateY.setValue(0); }, [translateY]));
 
   const { data, loading, error, refetch } = useQuery<SavedData>(MY_SAVED_POSTS, {
+    variables: { take: 100 },
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     skip: !isAuthenticated,

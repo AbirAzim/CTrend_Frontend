@@ -10162,6 +10162,24 @@ a.cx-friend-avatar:hover {
   color: var(--ig-muted);
 }
 
+/* "My Activity" full page — reuses the .ig-scheduled-back link + .cx-conn-tabs/
+   .cx-profile-content-panel styling already defined for the profile page. */
+.cx-profile-content-page {
+  padding: 0 12px 40px;
+}
+
+.cx-profile-content-page-header {
+  padding: 20px 8px 16px;
+}
+
+.cx-profile-content-page-title {
+  margin: 8px 0 2px;
+  font-family: var(--cx-font-display);
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
 .ig-scheduled-state {
   text-align: center;
   padding: 24px 0;

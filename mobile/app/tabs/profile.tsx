@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation, useQuery, useApolloClient } from "@apollo/client/react";
+import type { DocumentNode } from "@apollo/client";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -22,7 +23,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ME, MY_VOTED_POSTS, USER_POSTS } from "@ctrend/shared/graphql/profile";
+import { ME, MY_VOTED_POSTS, USER_POSTS, MY_CONTENT_SUMMARY } from "@ctrend/shared/graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "@ctrend/shared/graphql/auth";
 import { LEGAL_PAGE_URLS } from "@ctrend/shared/lib/teamCredits";
 import {
@@ -73,6 +74,91 @@ type MeData = {
 
 /** Raw GQL post row shape — fed through `mapGqlPostToFeedView` for `FeedPostCard` rendering. */
 type GqlPostRow = Parameters<typeof mapGqlPostToFeedView>[0];
+
+const PROFILE_PAGE_SIZE = 20;
+
+/**
+ * Lazy + infinite-scroll list for one "My Activity" tab. Only fetches once
+ * `active` (the tab has been opened at least once) — mirrors the main feed's
+ * offset-paging + prefetch pattern, backed by the `merge` type policy
+ * registered in `mobile/lib/apolloClient.ts`.
+ */
+function usePaginatedProfileList(
+  query: DocumentNode,
+  dataKey: string,
+  active: boolean,
+  extraVariables: Record<string, unknown>,
+  pollInterval?: number,
+) {
+  const client = useApolloClient();
+  const loadingMoreRef = useRef(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const baseVariables = { ...extraVariables, skip: 0, take: PROFILE_PAGE_SIZE };
+
+  const { data, loading, fetchMore, refetch } = useQuery<Record<string, GqlPostRow[]>>(query, {
+    variables: baseVariables,
+    skip: !active,
+    fetchPolicy: "cache-and-network",
+    notifyOnNetworkStatusChange: true,
+    pollInterval: active ? pollInterval : undefined,
+  });
+
+  const rawItems = data?.[dataKey] ?? [];
+  const serverCount = rawItems.length;
+
+  useEffect(() => {
+    setHasMore(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(extraVariables)]);
+
+  const loadMore = useCallback(async () => {
+    if (!active || loadingMoreRef.current || !hasMore || serverCount === 0) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      await fetchMore({ variables: { ...extraVariables, skip: serverCount, take: PROFILE_PAGE_SIZE } });
+      let mergedLen: number | undefined;
+      try {
+        const cached = client.readQuery<Record<string, GqlPostRow[]>>({ query, variables: baseVariables });
+        mergedLen = cached?.[dataKey]?.length;
+      } catch {
+        mergedLen = undefined;
+      }
+      if (typeof mergedLen === "number" && mergedLen <= serverCount) {
+        setHasMore(false);
+      }
+    } catch {
+      // transient failure — allow a later retry
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, hasMore, serverCount, fetchMore, client, query, dataKey]);
+
+  const items = rawItems.map(mapGqlPostToFeedView);
+
+  return {
+    items,
+    loading: active && loading && rawItems.length === 0,
+    loadingMore,
+    hasMore,
+    loadMore,
+    refetch,
+  };
+}
+
+/** Fires `onLoadMore` when a `ScrollView` is scrolled near its bottom edge. */
+function handleNearBottomScroll(
+  e: NativeSyntheticEvent<NativeScrollEvent>,
+  onLoadMore: () => void,
+) {
+  const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+  if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 800) {
+    onLoadMore();
+  }
+}
 
 function scheduledCountdown(scheduledAt?: string | null): string {
   if (!scheduledAt) return "—";
@@ -211,7 +297,25 @@ export default function ProfileScreen() {
   const [showAllInterests, setShowAllInterests] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
-  const toggleContent = () => setOpenContent((v) => !v);
+  // Only fetch a tab's list the first time it's opened — the heaviest tab
+  // (Voted) no longer loads in the background before the user even asks for it.
+  const [visited, setVisited] = useState<Record<"drops" | "scheduled" | "kept" | "voted", boolean>>({
+    drops: false,
+    scheduled: false,
+    kept: false,
+    voted: false,
+  });
+  function markVisited(tab: "drops" | "scheduled" | "kept" | "voted") {
+    setVisited((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+  }
+
+  const toggleContent = () => {
+    setOpenContent((v) => {
+      const next = !v;
+      if (next) markVisited(contentTab);
+      return next;
+    });
+  };
   const toggleLegal = () => { animateLayout(); setOpenLegal((v) => !v); };
   const togglePeople = () => setOpenPeople((v) => !v);
 
@@ -234,6 +338,7 @@ export default function ProfileScreen() {
   function openContentOn(tab: "drops" | "kept" | "voted") {
     setContentTab(tab);
     setOpenContent(true);
+    markVisited(tab);
   }
 
   const setLoading = (id: string, on: boolean) =>
@@ -245,29 +350,19 @@ export default function ProfileScreen() {
   const me = meData?.me;
   const isAdmin = (me?.role ?? storedUser?.role)?.toLowerCase() === "admin";
 
-  const { data: postsData, loading: postsLoading } = useQuery<{ getPostsByUser: GqlPostRow[] }>(USER_POSTS, {
-    fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first",
-    variables: { userId: me?.id }, skip: !me?.id,
-  });
+  // Cheap counts for the stat pills + tab badges — no post hydration, so the
+  // profile screen never waits on the heavy per-tab lists.
+  const { data: summaryData } = useQuery<{ myContentSummary: {
+    dropsCount: number; scheduledCount: number; keptCount: number; votedCount: number; totalVotesOnMyPosts: number;
+  } }>(MY_CONTENT_SUMMARY, { fetchPolicy: "cache-and-network", skip: !isAuthenticated });
+  const summary = summaryData?.myContentSummary;
 
-  const { data: savedData } = useQuery<{ mySavedPosts: GqlPostRow[] }>(MY_SAVED_POSTS, {
-    fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated,
+  const drops = usePaginatedProfileList(USER_POSTS, "getPostsByUser", visited.drops && !!me?.id, { userId: me?.id });
+  const kept = usePaginatedProfileList(MY_SAVED_POSTS, "mySavedPosts", visited.kept, {});
+  const voted = usePaginatedProfileList(MY_VOTED_POSTS, "myVotedPosts", visited.voted, {
+    anonymousOnly: votedFilter === "anonymous",
   });
-
-  const { data: votedData, loading: votedLoading } = useQuery<{ myVotedPosts: GqlPostRow[] }>(MY_VOTED_POSTS, {
-    fetchPolicy: "cache-and-network",
-    variables: { anonymousOnly: votedFilter === "anonymous" },
-    skip: !isAuthenticated,
-  });
-
-  const { data: scheduledData, loading: scheduledLoading, refetch: refetchScheduled } = useQuery<{
-    myScheduledPosts: GqlPostRow[];
-  }>(MY_SCHEDULED_POSTS, {
-    fetchPolicy: "cache-and-network",
-    nextFetchPolicy: "cache-first",
-    skip: !isAuthenticated,
-    pollInterval: 30000,
-  });
+  const scheduled = usePaginatedProfileList(MY_SCHEDULED_POSTS, "myScheduledPosts", visited.scheduled, {}, 30000);
   const [cancelScheduledMut] = useMutation(CANCEL_SCHEDULED_POST);
 
   const { data: friendsData, refetch: refetchFriends } = useQuery<{ myFriends: Person[] }>(MY_FRIENDS, {
@@ -284,9 +379,10 @@ export default function ProfileScreen() {
     useCallback(() => {
       if (isAuthenticated) {
         void refetchRequests();
-        void refetchScheduled();
+        if (visited.scheduled) void scheduled.refetch();
       }
-    }, [isAuthenticated, refetchRequests, refetchScheduled]),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, refetchRequests, visited.scheduled]),
   );
 
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery<{ friendSuggestions: Person[] }>(
@@ -329,10 +425,10 @@ export default function ProfileScreen() {
   const name = me?.displayName?.trim() || me?.username || storedUser?.displayName || storedUser?.username || "You";
   const initial = name.slice(0, 1).toUpperCase();
 
-  const posts = (postsData?.getPostsByUser ?? []).map(mapGqlPostToFeedView);
-  const savedPosts = (savedData?.mySavedPosts ?? []).map(mapGqlPostToFeedView);
-  const votedPosts = (votedData?.myVotedPosts ?? []).map(mapGqlPostToFeedView);
-  const scheduledPosts = (scheduledData?.myScheduledPosts ?? []).map(mapGqlPostToFeedView);
+  const posts = drops.items;
+  const savedPosts = kept.items;
+  const votedPosts = voted.items;
+  const scheduledPosts = scheduled.items;
 
   async function handleCancelScheduled(postId: string) {
     Alert.alert("Cancel post", "This scheduled post will be removed. Are you sure?", [
@@ -343,7 +439,7 @@ export default function ProfileScreen() {
         onPress: async () => {
           try {
             await cancelScheduledMut({ variables: { postId } });
-            void refetchScheduled();
+            void scheduled.refetch();
           } catch {
             Alert.alert("Error", "Could not cancel the scheduled post.");
           }
@@ -356,8 +452,8 @@ export default function ProfileScreen() {
   const requestedByMe = requestsData?.friendRequests?.requestedByMe ?? [];
   const suggestions = suggestionsData?.friendSuggestions ?? [];
 
-  const comparesCount = posts.length;
-  const votesCount = posts.reduce((s, p) => s + p.upvoteCount + p.downvoteCount, 0);
+  const comparesCount = summary?.dropsCount ?? 0;
+  const votesCount = summary?.totalVotesOnMyPosts ?? 0;
 
   const q = search.toLowerCase();
   const filteredFriends = friends.filter((f) => !q || (f.displayName || f.username).toLowerCase().includes(q));
@@ -571,11 +667,13 @@ export default function ProfileScreen() {
               <CompareIcon size={16} color={colors.text} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[st.sectionTitle, { color: colors.text }]}>Your content</Text>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>My Activity</Text>
               <Text style={[st.sectionSub, { color: colors.muted }]} numberOfLines={1}>
-                {posts.length + savedPosts.length + scheduledPosts.length === 0
-                  ? "Share your first compare"
-                  : `${posts.length} drops · ${scheduledPosts.length} scheduled · ${savedPosts.length} kept`}
+                {summary
+                  ? (summary.dropsCount + summary.scheduledCount + summary.keptCount === 0
+                      ? "Share your first compare"
+                      : `${summary.dropsCount} drops · ${summary.scheduledCount} scheduled · ${summary.keptCount} kept`)
+                  : "Drops, schedule, saves & votes"}
               </Text>
             </View>
             <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "600", marginRight: 2 }}>›</Text>
@@ -629,7 +727,7 @@ export default function ProfileScreen() {
 
           {/* ── Legal & about (collapsible) ── */}
           <Section
-            icon="📄"
+            icon={<Text style={{ fontSize: 16 }}>📄</Text>}
             title="Legal & about"
             subtitle="Privacy, terms & credits"
             open={openLegal}
@@ -678,64 +776,70 @@ export default function ProfileScreen() {
           <Pressable onPress={() => setOpenContent(false)} style={st.overlayBackBtn}>
             <Text style={[st.overlayBackText, { color: colors.accent }]}>‹  Back</Text>
           </Pressable>
-          <Text style={[st.overlayTitle, { color: colors.text }]}>Your content</Text>
+          <Text style={[st.overlayTitle, { color: colors.text }]}>My Activity</Text>
           <View style={{ width: 64 }} />
         </View>
         <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
           <Pressable
             style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => setContentTab("drops")}
+            onPress={() => { setContentTab("drops"); markVisited("drops"); }}
           >
             <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
-              ✦ Drops{posts.length > 0 ? ` (${posts.length})` : ""}
+              ✦ Drops{(summary?.dropsCount ?? 0) > 0 ? ` (${summary?.dropsCount})` : ""}
             </Text>
           </Pressable>
           <Pressable
             style={[st.tabBtn, contentTab === "scheduled" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => setContentTab("scheduled")}
+            onPress={() => { setContentTab("scheduled"); markVisited("scheduled"); }}
           >
             <Text numberOfLines={1} style={[st.tabBtnText, { color: contentTab === "scheduled" ? colors.accent : colors.muted }]}>
-              ⏰ Sched{scheduledPosts.length > 0 ? ` (${scheduledPosts.length})` : ""}
+              ⏰ Sched{(summary?.scheduledCount ?? 0) > 0 ? ` (${summary?.scheduledCount})` : ""}
             </Text>
           </Pressable>
           <Pressable
             style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => setContentTab("kept")}
+            onPress={() => { setContentTab("kept"); markVisited("kept"); }}
           >
             <Text style={[st.tabBtnText, { color: contentTab === "kept" ? colors.accent : colors.muted }]}>
-              🔖 Kept{savedPosts.length > 0 ? ` (${savedPosts.length})` : ""}
+              🔖 Kept{(summary?.keptCount ?? 0) > 0 ? ` (${summary?.keptCount})` : ""}
             </Text>
           </Pressable>
           <Pressable
             style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => setContentTab("voted")}
+            onPress={() => { setContentTab("voted"); markVisited("voted"); }}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
               <VoteIcon size={14} color={contentTab === "voted" ? colors.accent : colors.muted} />
               <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
-                Voted{votedPosts.length > 0 ? ` (${votedPosts.length})` : ""}
+                Voted{(summary?.votedCount ?? 0) > 0 ? ` (${summary?.votedCount})` : ""}
               </Text>
             </View>
           </Pressable>
         </View>
         <View style={{ flex: 1 }}>
           {contentTab === "drops" && (
-            postsLoading && posts.length === 0 ? (
+            drops.loading ? (
               <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
             ) : posts.length === 0 ? (
               <View style={[st.emptyBox, { borderColor: colors.border }]}>
                 <Text style={[st.emptyText, { color: colors.muted }]}>No posts yet — drop something!</Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={st.feedContainer}
+                onScroll={(e) => handleNearBottomScroll(e, () => void drops.loadMore())}
+                scrollEventThrottle={200}
+              >
                 {posts.map((p) => (
                   <FeedPostCard key={p.id} post={p} />
                 ))}
+                {drops.loadingMore && <ActivityIndicator color={colors.accent} style={{ marginVertical: 16 }} />}
               </ScrollView>
             )
           )}
           {contentTab === "scheduled" && (
-            scheduledLoading && scheduledPosts.length === 0 ? (
+            scheduled.loading ? (
               <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
             ) : scheduledPosts.length === 0 ? (
               <View style={[st.emptyBox, { borderColor: colors.border }]}>
@@ -744,7 +848,12 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={st.feedContainer}
+                onScroll={(e) => handleNearBottomScroll(e, () => void scheduled.loadMore())}
+                scrollEventThrottle={200}
+              >
                 {scheduledPosts.map((p) => {
                   const live = scheduledCountdown(p.scheduledAt) === "Going live…";
                   const goesAt = p.scheduledAt
@@ -780,19 +889,28 @@ export default function ProfileScreen() {
                     </View>
                   );
                 })}
+                {scheduled.loadingMore && <ActivityIndicator color={colors.accent} style={{ marginVertical: 16 }} />}
               </ScrollView>
             )
           )}
           {contentTab === "kept" && (
-            savedPosts.length === 0 ? (
+            kept.loading ? (
+              <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
+            ) : savedPosts.length === 0 ? (
               <View style={[st.emptyBox, { borderColor: colors.border }]}>
                 <Text style={[st.emptyText, { color: colors.muted }]}>No saved posts yet</Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={st.feedContainer}
+                onScroll={(e) => handleNearBottomScroll(e, () => void kept.loadMore())}
+                scrollEventThrottle={200}
+              >
                 {savedPosts.map((p) => (
                   <FeedPostCard key={p.id} post={p} />
                 ))}
+                {kept.loadingMore && <ActivityIndicator color={colors.accent} style={{ marginVertical: 16 }} />}
               </ScrollView>
             )
           )}
@@ -811,7 +929,7 @@ export default function ProfileScreen() {
                   </Pressable>
                 ))}
               </View>
-              {votedLoading && votedPosts.length === 0 ? (
+              {voted.loading ? (
                 <View style={st.centerBox}><ActivityIndicator color={colors.accent} /></View>
               ) : votedPosts.length === 0 ? (
                 <View style={[st.emptyBox, { borderColor: colors.border }]}>
@@ -822,10 +940,17 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               ) : (
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer} style={{ flex: 1 }}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={st.feedContainer}
+                  style={{ flex: 1 }}
+                  onScroll={(e) => handleNearBottomScroll(e, () => void voted.loadMore())}
+                  scrollEventThrottle={200}
+                >
                   {votedPosts.map((p) => (
                     <FeedPostCard key={p.id} post={p} />
                   ))}
+                  {voted.loadingMore && <ActivityIndicator color={colors.accent} style={{ marginVertical: 16 }} />}
                 </ScrollView>
               )}
             </View>

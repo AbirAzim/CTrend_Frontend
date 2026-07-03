@@ -13,6 +13,7 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ProfileContentPage } from "./pages/ProfileContentPage";
 import { ScheduledPostsPage } from "./pages/ScheduledPostsPage";
 import { FriendsPage } from "./pages/FriendsPage";
 import {
@@ -101,6 +102,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile/content"
+          element={
+            <ProtectedRoute>
+              <ProfileContentPage />
             </ProtectedRoute>
           }
         />

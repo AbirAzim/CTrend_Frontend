@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
-import { MY_SAVED_POSTS } from "@ctrend/shared/graphql/feed";
+import { MY_CONTENT_SUMMARY } from "@ctrend/shared/graphql/profile";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useTabBar } from "../context/TabBarContext";
@@ -39,13 +39,13 @@ export function BottomNav({ active }: { active?: TabName }) {
   );
   const totalUnread = (convData?.myConversations ?? []).reduce((s, c) => s + (c.unreadCount > 0 ? 1 : 0), 0);
 
-  const { data: savedData } = useQuery<{ mySavedPosts: unknown[] }>(MY_SAVED_POSTS, {
-    fetchPolicy: "cache-and-network",
-    skip: !isAuthenticated,
-  });
+  const { data: summaryData } = useQuery<{ myContentSummary: { keptCount: number } }>(
+    MY_CONTENT_SUMMARY,
+    { fetchPolicy: "cache-and-network", skip: !isAuthenticated },
+  );
   useEffect(() => {
-    if (savedData?.mySavedPosts) setSavedCount(savedData.mySavedPosts.length);
-  }, [savedData]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (summaryData?.myContentSummary) setSavedCount(summaryData.myContentSummary.keptCount);
+  }, [summaryData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function go(tab: { name: TabName; route: `/${string}` }) {
     if (!isAuthenticated && tab.name !== "index") {

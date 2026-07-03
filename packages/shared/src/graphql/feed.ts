@@ -238,8 +238,8 @@ export const SET_POST_HYPE = gql`
 `;
 
 export const MY_SAVED_POSTS = gql`
-  query MySavedPosts {
-    mySavedPosts {
+  query MySavedPosts($skip: Int, $take: Int) {
+    mySavedPosts(skip: $skip, take: $take) {
       id
       type
       category {
@@ -367,8 +367,8 @@ export const CREATE_POST = gql`
 `;
 
 export const MY_SCHEDULED_POSTS = gql`
-  query MyScheduledPosts {
-    myScheduledPosts {
+  query MyScheduledPosts($skip: Int, $take: Int) {
+    myScheduledPosts(skip: $skip, take: $take) {
       id
       type
       category {

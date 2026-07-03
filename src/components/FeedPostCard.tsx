@@ -30,7 +30,6 @@ import {
   UNPIN_POST,
   FEED_POSTS,
   GET_POST_BY_ID,
-  MY_SAVED_POSTS,
   POST_UPDATED,
   POST_VOTE_UPDATED,
   REMOVE_VOTE,
@@ -912,27 +911,6 @@ function FeedPostCardComponent({
         optimisticResponse: {
           __typename: "Mutation",
           setPostKeep: nextKeep,
-        },
-        update(cache, _result, { variables }) {
-          const pid = variables?.postId as string | undefined;
-          const keep = variables?.keep;
-          if (!pid || typeof keep !== "boolean") {
-            return;
-          }
-          cache.updateQuery({ query: MY_SAVED_POSTS }, (existing) => {
-            const prevList = (existing?.mySavedPosts ?? []) as FeedPostView[];
-            if (keep) {
-              if (prevList.some((p: FeedPostView) => p.id === pid)) {
-                return existing ?? { mySavedPosts: prevList };
-              }
-              return {
-                mySavedPosts: [...prevList, { ...post, viewerHasSaved: true }],
-              };
-            }
-            return {
-              mySavedPosts: prevList.filter((p: FeedPostView) => p.id !== pid),
-            };
-          });
         },
       });
     } catch {

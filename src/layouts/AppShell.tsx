@@ -5,8 +5,7 @@ import { useMutation, useQuery } from "@apollo/client";
 import { IconBookmark, IconHome, IconLogin, IconLogout, IconMessages, IconPlusSquare, IconShield, IconTrophy, IconUser } from "../components/IgIcons";
 import { useAuth } from "../context/AuthContext";
 import { useMessenger } from "../context/MessengerContext";
-import { MY_SAVED_POSTS } from "../graphql/feed";
-import { ME } from "../graphql/profile";
+import { ME, MY_CONTENT_SUMMARY } from "../graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "../graphql/auth";
 import { NotificationBell } from "../components/NotificationBell";
 import { CoinCounter } from "../components/CoinCounter";
@@ -110,11 +109,11 @@ export function AppShell() {
     return () => ro.disconnect();
   }, []);
 
-  const { data: savedPostsData } = useQuery(MY_SAVED_POSTS, {
+  const { data: contentSummaryData } = useQuery(MY_CONTENT_SUMMARY, {
     skip: !isAuthenticated,
     fetchPolicy: "cache-and-network",
   });
-  const savedCount = (savedPostsData?.mySavedPosts?.length as number | undefined) ?? 0;
+  const savedCount = contentSummaryData?.myContentSummary?.keptCount ?? 0;
 
   const {
     panelOpen,
