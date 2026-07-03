@@ -253,7 +253,11 @@ export function ProfileContentPage() {
         </p>
       </div>
 
-      <div className="cx-conn-tabs" role="tablist">
+      <div className="cx-profile-content-tabbar">
+        <Link to="/profile" className="cx-profile-content-tabbar-back" aria-label="Back to profile">
+          ←
+        </Link>
+        <div className="cx-conn-tabs" role="tablist">
         <button
           type="button"
           role="tab"
@@ -299,6 +303,7 @@ export function ProfileContentPage() {
           Voted
           {(summary?.votedCount ?? 0) > 0 && <span className="cx-conn-tab-badge">{summary?.votedCount}</span>}
         </button>
+        </div>
       </div>
 
       {tab === "drops" && (

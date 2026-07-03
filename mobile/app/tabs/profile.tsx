@@ -265,24 +265,43 @@ export default function ProfileScreen() {
   const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
 
-  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const y = e.nativeEvent.contentOffset.y;
-    const diff = y - lastScrollY.current;
-    lastScrollY.current = y;
+  const showTabBar = useCallback(() => {
+    if (tabBarVisible.current) return;
+    tabBarVisible.current = true;
+    Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  }, [translateY]);
+
+  const hideTabBar = useCallback(() => {
+    if (!tabBarVisible.current) return;
+    tabBarVisible.current = false;
+    Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start();
+  }, [translateY, insets.bottom]);
+
+  // Direction-based show/hide, shared by the main profile scroll and every
+  // "My Activity" tab list below — mirrors the feed's chrome behavior.
+  function applyScrollChrome(lastYRef: { current: number }, y: number) {
+    const diff = y - lastYRef.current;
+    lastYRef.current = y;
     if (y < 60) {
-      if (!tabBarVisible.current) {
-        tabBarVisible.current = true;
-        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-      }
+      showTabBar();
       return;
     }
-    if (diff > 4 && tabBarVisible.current) {
-      tabBarVisible.current = false;
-      Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start();
-    } else if (diff < -4 && !tabBarVisible.current) {
-      tabBarVisible.current = true;
-      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    }
+    if (diff > 4) hideTabBar();
+    else if (diff < -4) showTabBar();
+  }
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    applyScrollChrome(lastScrollY, e.nativeEvent.contentOffset.y);
+  }
+
+  // Separate scroll-position ref for the overlay's tab lists — each tab is a
+  // freshly-mounted ScrollView starting at offset 0, distinct from the main
+  // profile page's scroll position.
+  const contentLastScrollY = useRef(0);
+
+  function handleContentScroll(e: NativeSyntheticEvent<NativeScrollEvent>, onLoadMore: () => void) {
+    handleNearBottomScroll(e, onLoadMore);
+    applyScrollChrome(contentLastScrollY, e.nativeEvent.contentOffset.y);
   }
 
   const [contentTab, setContentTab] = useState<"drops" | "scheduled" | "kept" | "voted">("drops");
@@ -312,7 +331,11 @@ export default function ProfileScreen() {
   const toggleContent = () => {
     setOpenContent((v) => {
       const next = !v;
-      if (next) markVisited(contentTab);
+      if (next) {
+        markVisited(contentTab);
+        contentLastScrollY.current = 0;
+        showTabBar();
+      }
       return next;
     });
   };
@@ -339,6 +362,8 @@ export default function ProfileScreen() {
     setContentTab(tab);
     setOpenContent(true);
     markVisited(tab);
+    contentLastScrollY.current = 0;
+    showTabBar();
   }
 
   const setLoading = (id: string, on: boolean) =>
@@ -782,7 +807,7 @@ export default function ProfileScreen() {
         <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
           <Pressable
             style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("drops"); markVisited("drops"); }}
+            onPress={() => { setContentTab("drops"); markVisited("drops"); contentLastScrollY.current = 0; showTabBar(); }}
           >
             <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
               ✦ Drops{(summary?.dropsCount ?? 0) > 0 ? ` (${summary?.dropsCount})` : ""}
@@ -790,7 +815,7 @@ export default function ProfileScreen() {
           </Pressable>
           <Pressable
             style={[st.tabBtn, contentTab === "scheduled" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("scheduled"); markVisited("scheduled"); }}
+            onPress={() => { setContentTab("scheduled"); markVisited("scheduled"); contentLastScrollY.current = 0; showTabBar(); }}
           >
             <Text numberOfLines={1} style={[st.tabBtnText, { color: contentTab === "scheduled" ? colors.accent : colors.muted }]}>
               ⏰ Sched{(summary?.scheduledCount ?? 0) > 0 ? ` (${summary?.scheduledCount})` : ""}
@@ -798,7 +823,7 @@ export default function ProfileScreen() {
           </Pressable>
           <Pressable
             style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("kept"); markVisited("kept"); }}
+            onPress={() => { setContentTab("kept"); markVisited("kept"); contentLastScrollY.current = 0; showTabBar(); }}
           >
             <Text style={[st.tabBtnText, { color: contentTab === "kept" ? colors.accent : colors.muted }]}>
               🔖 Kept{(summary?.keptCount ?? 0) > 0 ? ` (${summary?.keptCount})` : ""}
@@ -806,7 +831,7 @@ export default function ProfileScreen() {
           </Pressable>
           <Pressable
             style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("voted"); markVisited("voted"); }}
+            onPress={() => { setContentTab("voted"); markVisited("voted"); contentLastScrollY.current = 0; showTabBar(); }}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
               <VoteIcon size={14} color={contentTab === "voted" ? colors.accent : colors.muted} />
@@ -828,7 +853,7 @@ export default function ProfileScreen() {
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={st.feedContainer}
-                onScroll={(e) => handleNearBottomScroll(e, () => void drops.loadMore())}
+                onScroll={(e) => handleContentScroll(e, () => void drops.loadMore())}
                 scrollEventThrottle={200}
               >
                 {posts.map((p) => (
@@ -851,7 +876,7 @@ export default function ProfileScreen() {
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={st.feedContainer}
-                onScroll={(e) => handleNearBottomScroll(e, () => void scheduled.loadMore())}
+                onScroll={(e) => handleContentScroll(e, () => void scheduled.loadMore())}
                 scrollEventThrottle={200}
               >
                 {scheduledPosts.map((p) => {
@@ -904,7 +929,7 @@ export default function ProfileScreen() {
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={st.feedContainer}
-                onScroll={(e) => handleNearBottomScroll(e, () => void kept.loadMore())}
+                onScroll={(e) => handleContentScroll(e, () => void kept.loadMore())}
                 scrollEventThrottle={200}
               >
                 {savedPosts.map((p) => (
@@ -944,7 +969,7 @@ export default function ProfileScreen() {
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={st.feedContainer}
                   style={{ flex: 1 }}
-                  onScroll={(e) => handleNearBottomScroll(e, () => void voted.loadMore())}
+                  onScroll={(e) => handleContentScroll(e, () => void voted.loadMore())}
                   scrollEventThrottle={200}
                 >
                   {votedPosts.map((p) => (

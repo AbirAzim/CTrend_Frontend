@@ -10168,6 +10168,21 @@ a.cx-friend-avatar:hover {
   padding: 0 12px 40px;
 }
 
+/* Desktop: match the main Feed page's column width (same grid track sizing as
+   .cx-feed-layout) instead of stretching edge-to-edge — keeps post cards the
+   same width here as on the feed. */
+@media (min-width: 980px) {
+  .cx-profile-content-page {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 260px;
+    gap: 28px;
+  }
+
+  .cx-profile-content-page > * {
+    grid-column: 2;
+  }
+}
+
 .cx-profile-content-page-header {
   padding: 20px 8px 16px;
 }
@@ -13078,6 +13093,56 @@ a.cx-profile-btn-accent {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgb(139 92 246 / 0.35) transparent;
+}
+
+/* The full "My Activity" page (unlike the old embedded profile panel this
+   class was built for) should grow with its content and scroll with the
+   window — a fixed 520px box left it stranded mid-page with dead space below
+   it, and its internal overflow silently broke the infinite-scroll sentinel
+   (which observes against the window viewport, not this box). */
+.cx-profile-content-page .cx-profile-content-panel {
+  height: auto;
+  overflow-y: visible;
+}
+
+/* Keep the Drops/Scheduled/Kept/Voted tab bar — and a way back to Profile —
+   reachable while scrolling a long list. Same sticky-under-topbar pattern as
+   .wc-tab-bar; the back link sits outside the tabs' own horizontal scroll so
+   it never scrolls out of reach. */
+.cx-profile-content-tabbar {
+  position: sticky;
+  top: calc(max(8px, env(safe-area-inset-top)) + var(--topbar-h, 60px));
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  background: var(--ig-bg);
+  transition: top 0.22s ease-out;
+}
+html[data-topbar-hidden="true"] .cx-profile-content-tabbar,
+html[data-chrome-hidden="true"] .cx-profile-content-tabbar {
+  top: max(8px, env(safe-area-inset-top));
+}
+
+.cx-profile-content-tabbar-back {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cx-accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ig-border);
+  border-right: 1px solid var(--ig-border);
+}
+
+.cx-profile-content-tabbar-back:hover {
+  background: rgb(var(--cx-ink-rgb) / 0.04);
+}
+
+.cx-profile-content-page .cx-conn-tabs {
+  flex: 1;
+  min-width: 0;
 }
 
 .cx-profile-content-panel::-webkit-scrollbar {
