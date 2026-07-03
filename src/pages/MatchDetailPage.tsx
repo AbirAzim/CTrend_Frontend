@@ -22,8 +22,8 @@ import {
   matchTopPlayerLabel,
 } from "@ctrend/shared/lib/matchScoreCopy";
 import {
+  extractPenaltyShootoutKickEvents,
   extractPenaltyShootoutKicks,
-  isPenaltyShootoutKickEvent,
   penaltyShootoutRounds,
   penaltyShootoutTeamSummaries,
   penaltyShootoutWinnerSide,
@@ -174,9 +174,10 @@ function isScoredGoal(e: { type: string; detail?: string | null }): boolean {
 }
 
 // Goal scorers per team
-function goalScorers(events: MatchEvent[], team: "home" | "away") {
+function goalScorers(events: MatchEvent[], team: "home" | "away", wentToPenalties?: boolean | null) {
+  const shootoutEvents = extractPenaltyShootoutKickEvents(events, { wentToPenalties });
   return events
-    .filter((e) => isScoredGoal(e) && !isPenaltyShootoutKickEvent(e) && e.team === team)
+    .filter((e) => isScoredGoal(e) && !shootoutEvents.includes(e) && e.team === team)
     .sort(compareEventsByMinute)
     .map((e) => {
       const min = minuteLabel(e);
@@ -317,9 +318,14 @@ function PenaltyShootoutSection({ fixture }: { fixture: FixtureDetails }) {
   ) {
     return null;
   }
-  const winnerSide =
-    penaltyShootoutWinnerSide(pen ?? {}) ??
-    (fixture.score.winner as "home" | "away" | null);
+  // Only declare a winner once the match is actually FINISHED — a running
+  // shootout tally can be unequal mid-sequence (e.g. 1-0 after two kicks)
+  // without being decided yet, so "home != away" alone isn't a safe signal
+  // while the match is still live.
+  const winnerSide = isFinished(fixture.status)
+    ? penaltyShootoutWinnerSide(pen ?? {}) ??
+      (fixture.score.winner as "home" | "away" | null)
+    : null;
   const winnerName =
     winnerSide === "home"
       ? fixture.homeTeam.name
@@ -466,8 +472,16 @@ function OverviewTab({ fixture }: { fixture: FixtureDetails }) {
     );
   }
 
+  // Shootout kicks already have their own dedicated summary above — strip
+  // them out of the general timeline instead of listing them twice. Uses the
+  // full extractor (not just the strict "shootout" text match) since API
+  // feeds often omit that word and only the trailing-kicks heuristic catches
+  // them — the same detection PenaltyShootoutSection uses to build its board.
+  const shootoutEvents = extractPenaltyShootoutKickEvents(events, {
+    wentToPenalties: fixture.wentToPenalties,
+  });
   const sorted = [...events]
-    .filter((e) => !isPenaltyShootoutKickEvent(e))
+    .filter((e) => !shootoutEvents.includes(e))
     .sort((a, b) => compareEventsByMinute(b, a));
 
   const halfScore = finished ? deriveHalfScore(events) : null;
@@ -1182,13 +1196,25 @@ function clientMinute(kickoff: string): number {
  * minute — `status` alone can't tell extra time / penalties apart from
  * regular time (both come back as IN_PLAY), so this also needs `rawStatus`
  * (the provider's original code), same as the feed card's live pill.
+ *
+ * The `clientMinute` wall-clock estimate only ever stands in for a genuine
+ * 1H/2H elapsed value that hasn't synced yet — it must NOT be used during
+ * HT/BT/ET/penalties, where the in-game clock isn't a simple function of
+ * time-since-kickoff (breaks pause it; a stale/stuck sync can leave a fixture
+ * sitting in one of these phases for hours, which previously showed a
+ * permanently frozen "130'" instead of just the phase name).
  */
-function liveHeaderLabel(status: string, rawStatus: string | null | undefined, displayMinute: number | null | undefined): string {
+function liveHeaderLabel(
+  status: string,
+  rawStatus: string | null | undefined,
+  minute: number | null | undefined,
+  kickoff: string,
+): string {
   if (status === "PAUSED") return "HT";
   const phase = formatKnockoutLivePrefix({ phase: rawStatus });
   if (phase === "Pens") return "Pens";
-  if (phase === "ET") return displayMinute != null ? `ET ${displayMinute}'` : "ET";
-  return displayMinute != null ? `${displayMinute}'` : "LIVE";
+  if (phase === "ET") return minute != null ? `ET ${minute}'` : "ET";
+  return minute != null ? `${minute}'` : `${clientMinute(kickoff)}'`;
 }
 
 
@@ -1208,10 +1234,8 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
   const highlightHomeScore = homeWon && !(penDecided && displayScore.home === displayScore.away);
   const highlightAwayScore = awayWon && !(penDecided && displayScore.home === displayScore.away);
 
-  const displayMinute = live ? (minute ?? clientMinute(kickoff)) : minute;
-
-  const homeScorers = hasScore ? goalScorers(events, "home") : [];
-  const awayScorers = hasScore ? goalScorers(events, "away") : [];
+  const homeScorers = hasScore ? goalScorers(events, "home", fixture.wentToPenalties) : [];
+  const awayScorers = hasScore ? goalScorers(events, "away", fixture.wentToPenalties) : [];
   const [motmImgFailed, setMotmImgFailed] = useState(false);
   const [scorersExpanded, setScorersExpanded] = useState(false);
   const SCORER_LIMIT = 4;
@@ -1227,7 +1251,7 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
         {live && (
           <span className="md-hdr-live">
             <span className="md-live-dot" />
-            {liveHeaderLabel(status, fixture.rawStatus, displayMinute)}
+            {liveHeaderLabel(status, fixture.rawStatus, minute, kickoff)}
           </span>
         )}
         {finished && <span className="md-hdr-ft">Full Time</span>}

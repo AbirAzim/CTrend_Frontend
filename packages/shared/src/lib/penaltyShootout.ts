@@ -65,7 +65,7 @@ function mapShootoutEvents(events: ShootoutEvent[]): PenaltyShootoutKick[] {
 }
 
 /** Trailing penalty-type goals at the end of the timeline (API omits "shootout" on some feeds). */
-function extractTrailingShootoutKicks(events: ShootoutEvent[]): PenaltyShootoutKick[] {
+function trailingShootoutRawEvents(events: ShootoutEvent[]): ShootoutEvent[] {
   const sorted = [...events].sort(compareEventsByMinute);
   const trailing: ShootoutEvent[] = [];
   for (let i = sorted.length - 1; i >= 0; i--) {
@@ -76,21 +76,34 @@ function extractTrailingShootoutKicks(events: ShootoutEvent[]): PenaltyShootoutK
     if (!isKick) break;
     trailing.unshift(e);
   }
-  return trailing.length > 0 ? mapShootoutEvents(trailing) : [];
+  return trailing;
+}
+
+/**
+ * Raw shootout-kick events (same detection `extractPenaltyShootoutKicks` uses,
+ * before mapping down to display rows) — lets callers exclude these events
+ * from a general event timeline instead of just building the shootout
+ * summary, without duplicating (and risking drifting from) the detection
+ * logic above.
+ */
+export function extractPenaltyShootoutKickEvents(
+  events: ShootoutEvent[],
+  opts: { wentToPenalties?: boolean | null } = {},
+): ShootoutEvent[] {
+  const explicit = events.filter(isPenaltyShootoutKickEvent);
+  if (explicit.length > 0) return [...explicit].sort(compareEventsByMinute);
+
+  if (opts.wentToPenalties) {
+    return trailingShootoutRawEvents(events);
+  }
+  return [];
 }
 
 export function extractPenaltyShootoutKicks(
   events: ShootoutEvent[],
   opts: { wentToPenalties?: boolean | null } = {},
 ): PenaltyShootoutKick[] {
-  const explicit = events.filter(isPenaltyShootoutKickEvent);
-  if (explicit.length > 0) return mapShootoutEvents(explicit);
-
-  if (opts.wentToPenalties) {
-    const trailing = extractTrailingShootoutKicks(events);
-    if (trailing.length > 0) return trailing;
-  }
-  return [];
+  return mapShootoutEvents(extractPenaltyShootoutKickEvents(events, opts));
 }
 
 export function penaltyShootoutRunningScores(kicks: PenaltyShootoutKick[]): PenaltyShootoutKickRow[] {
