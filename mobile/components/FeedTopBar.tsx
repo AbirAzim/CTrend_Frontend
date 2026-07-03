@@ -113,18 +113,20 @@ function FeedTopBarInner({ scrollY }: Props) {
           backgroundColor: colors.topbar,
           borderBottomColor: colors.border,
         },
+        !isDark && styles.topBarLight,
       ]}
     >
       <View style={styles.topBarRow}>
         <Pressable style={styles.brandPress} hitSlop={4} accessibilityLabel="Ke Jitbe">
           <Animated.View style={[styles.brand, brandStyle]}>
-            <View style={[styles.brandBar, styles.brandBarGradient]} />
+            <View style={[styles.brandBar, isDark ? styles.brandBarDark : styles.brandBarLight]} />
             <View style={styles.brandBody}>
               <View style={styles.logoBox}>
                 <Image
                   source={isDark ? headerLogoAsset : headerLogoLightAsset}
                   style={styles.brandLogoFill}
                   contentFit="contain"
+                  tintColor={isDark ? undefined : "#312e81"}
                   accessibilityLabel="Ke Jitbe"
                 />
               </View>
@@ -159,7 +161,7 @@ function FeedTopBarInner({ scrollY }: Props) {
 
         <View style={styles.actions}>
           <PressableScale style={styles.plainIconBtn} onPress={toggleTheme} hitSlop={6} accessibilityLabel="Toggle theme">
-            <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={22} color={colors.text} />
+            <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={22} color={isDark ? colors.text : colors.subtext} />
           </PressableScale>
 
           {isAuthenticated && <CoinCounter />}
@@ -167,7 +169,7 @@ function FeedTopBarInner({ scrollY }: Props) {
           {isAuthenticated && (
             <PressableScale style={styles.plainIconBtn} hitSlop={6} onPress={() => router.push("/notifications" as `/${string}`)} accessibilityLabel="Notifications">
               <View style={styles.notifIconWrap}>
-                <Ionicons name="notifications-outline" size={22} color={colors.text} />
+                <Ionicons name="notifications-outline" size={22} color={isDark ? colors.text : colors.subtext} />
                 {unreadCount > 0 && (
                   <View style={[styles.notifBadge, { borderColor: colors.topbar }]}>
                     <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
@@ -184,7 +186,7 @@ function FeedTopBarInner({ scrollY }: Props) {
               hitSlop={6}
               accessibilityLabel="Logout"
             >
-              <Ionicons name="log-out-outline" size={22} color={colors.text} />
+              <Ionicons name="log-out-outline" size={22} color={isDark ? colors.text : colors.subtext} />
             </PressableScale>
           ) : (
             <PressableScale
@@ -217,6 +219,14 @@ const styles = StyleSheet.create({
           shadowRadius: 8,
         }),
   },
+  topBarLight: Platform.select({
+    android: {},
+    default: {
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+    },
+  }),
   topBarClip: {
     overflow: "hidden",
   },
@@ -245,7 +255,10 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     borderRadius: 999,
   },
-  brandBarGradient: {
+  brandBarLight: {
+    backgroundColor: "#312e81",
+  },
+  brandBarDark: {
     backgroundColor: "#9b5de5",
   },
   brandBody: {
@@ -269,7 +282,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     lineHeight: TAG_H,
   },
-  brandTagLight: { color: "#6d28d9" },
+  brandTagLight: { color: "#71717a" },
   brandTagDark: { color: "#c4b5fd" },
   brandLogoFill: { width: "100%", height: "100%" },
   actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },

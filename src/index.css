@@ -1366,6 +1366,10 @@ a.auth-forgot-btn:hover {
     background 0.28s var(--cx-ease-out);
 }
 
+:root:not([data-theme="dark"]) .ig-topbar {
+  box-shadow: 0 8px 24px rgb(var(--cx-ink-rgb) / 0.06), 0 2px 8px rgb(var(--cx-ink-rgb) / 0.04);
+}
+
 /* Compact the topbar when only the feed is below it (no search, etc.) */
 @media (max-width: 720px) {
   .ig-topbar {
@@ -1415,10 +1419,14 @@ body.capacitor .ig-topbar {
 .ig-brand-bar {
   width: 3px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #f5c842 0%, #e8a0c8 48%, #9b5de5 100%);
+  background: var(--cx-accent-deep);
   flex-shrink: 0;
   align-self: stretch;
   margin: 2px 0;
+}
+
+:root[data-theme="dark"] .ig-brand-bar {
+  background: linear-gradient(180deg, #f5c842 0%, #e8a0c8 48%, #9b5de5 100%);
 }
 
 .ig-brand-body {
@@ -1437,11 +1445,7 @@ body.capacitor .ig-topbar {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   white-space: nowrap;
-  background: linear-gradient(92deg, #a16207 0%, #be185d 46%, #6d28d9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: var(--ig-muted);
 }
 
 :root[data-theme="dark"] .ig-brand-tag {
@@ -1460,6 +1464,8 @@ body.capacitor .ig-topbar {
   display: block;
   border-radius: 0;
   transition: transform 0.35s var(--cx-ease-spring), filter 0.25s ease;
+  image-rendering: auto;
+  -webkit-font-smoothing: antialiased;
 }
 
 .ig-logo-mark--light {
@@ -1475,7 +1481,18 @@ body.capacitor .ig-topbar {
 }
 
 :root[data-theme="dark"] .ig-logo-mark--dark {
-  filter: brightness(1.06);
+  display: block;
+}
+
+:root:not([data-theme="dark"]) .ig-logo-mark--light {
+  /* Pastel PNG → solid brand indigo for readable contrast on white */
+  filter: brightness(0) saturate(100%) invert(14%) sepia(42%) saturate(2800%)
+    hue-rotate(228deg) brightness(94%) contrast(94%);
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .ig-logo-mark--dark {
+  filter: brightness(1.06) drop-shadow(0 0 6px rgb(139 92 246 / 0.35));
 }
 
 .ig-brand-unit:hover .ig-logo-mark {
@@ -1518,7 +1535,15 @@ body.capacitor .ig-topbar {
 .ig-theme-toggle {
   width: 38px;
   height: 38px;
-  border: 1px solid rgb(var(--cx-accent-rgb) / 0.28);
+  border: 1px solid rgb(var(--cx-ink-rgb) / 0.1);
+  background: transparent;
+  color: var(--ig-muted);
+}
+
+:root[data-theme="dark"] .ig-theme-toggle {
+  border-color: rgb(var(--cx-accent-rgb) / 0.28);
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+  color: var(--cx-accent);
 }
 
 .ig-theme-toggle-glyph {
@@ -1563,14 +1588,23 @@ body.capacitor .ig-topbar {
 }
 
 .ig-icon-btn.ig-topbar-plain:hover {
-  color: var(--cx-accent);
-  background: transparent;
+  color: var(--cx-ink);
+  background: rgb(var(--cx-ink-rgb) / 0.05);
   transform: scale(1.08);
 }
 
 .ig-icon-btn.ig-topbar-plain--active {
-  color: var(--cx-accent);
+  color: var(--cx-ink);
   transform: scale(1.05);
+}
+
+:root[data-theme="dark"] .ig-icon-btn.ig-topbar-plain:hover {
+  color: var(--cx-accent);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .ig-icon-btn.ig-topbar-plain--active {
+  color: var(--cx-accent);
 }
 
 .ig-icon-btn.ig-topbar-plain svg {
