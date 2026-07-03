@@ -111,7 +111,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.16.1 release: **versionCode 46** across all three files.
+Current version after 1.16.2 release: **versionCode 47** across all three files.
 
 ---
 
@@ -218,6 +218,7 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.16.2 | 47 | 2026-07-03 | Light-theme header logo readability (indigo wordmark); guest feed top bar — Log in pinned top-right; scroll tagline animation when logged out |
 | 1.16.1 | 46 | 2026-07-02 | Feed infinite scroll prefetch — next page loads before you reach the bottom (matches web); includes all 1.16.0 features |
 | 1.16.0 | 45 | 2026-07-01 | Stacked compare layout when creating posts; refreshed Ke Jitbe header with scroll-aware tagline; feed top bar + filter chrome polish; profile rewards & search UI improvements |
 | 1.15.0 | 44 | 2026-07-01 | Profile rewards 3-column layout + podium badges on mobile; Android 15 edge-to-edge (`react-native-edge-to-edge`, `SystemBars`); World Cup campaign rules refresh (tiered prizes, draw/score-prediction rules — backend) |
@@ -230,6 +231,33 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.16.2 (47)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.2 — Header polish & guest feed fixes
+```
+
+**What's new** (user-facing release notes)
+```
+• Clearer header on light theme — the Ke Jitbe logo is easier to read on white backgrounds
+
+• Guest feed polish — Log in sits neatly on the top right when you're not signed in
+
+• Smoother home feed header — the tagline animates on scroll whether you're logged in or not
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Light-theme header: indigo wordmark tint (web CSS filter + mobile tintColor), simplified
+brand bar/tag colors. FeedTopBar: flex spacer + marginLeft auto for guest Log in CTA;
+unified Animated tagline collapse for logged-out users. Includes 1.16.1 feed prefetch.
+```
 
 ### Play Console copy — 1.16.1 (46)
 
@@ -589,7 +617,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.16.1 (versionCode 46) |
+| Current version | 1.16.2 (versionCode 47) |
 
 ---
 

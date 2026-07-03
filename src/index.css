@@ -1456,6 +1456,23 @@ body.capacitor .ig-topbar {
   -webkit-text-fill-color: transparent;
 }
 
+/* Light theme: vector wordmark (crisp at any DPI — avoids 122px PNG upscale) */
+.ig-logo-wordmark {
+  display: none;
+  font-family: "Caveat", cursive;
+  font-size: 1.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--cx-accent-deep);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  height: 26px;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: transform 0.35s var(--cx-ease-spring);
+}
+
 .ig-logo-mark {
   height: 26px;
   width: auto;
@@ -1468,12 +1485,12 @@ body.capacitor .ig-topbar {
   -webkit-font-smoothing: antialiased;
 }
 
-.ig-logo-mark--light {
+.ig-logo-mark--dark {
   display: none;
 }
 
-:root:not([data-theme="dark"]) .ig-logo-mark--light {
-  display: block;
+:root:not([data-theme="dark"]) .ig-logo-wordmark--light {
+  display: inline-flex;
 }
 
 :root:not([data-theme="dark"]) .ig-logo-mark--dark {
@@ -1484,18 +1501,16 @@ body.capacitor .ig-topbar {
   display: block;
 }
 
-:root:not([data-theme="dark"]) .ig-logo-mark--light {
-  /* Pastel PNG → solid brand indigo for readable contrast on white */
-  filter: brightness(0) saturate(100%) invert(14%) sepia(42%) saturate(2800%)
-    hue-rotate(228deg) brightness(94%) contrast(94%);
-  opacity: 1;
+:root[data-theme="dark"] .ig-logo-wordmark--light {
+  display: none;
 }
 
 :root[data-theme="dark"] .ig-logo-mark--dark {
   filter: brightness(1.06) drop-shadow(0 0 6px rgb(139 92 246 / 0.35));
 }
 
-.ig-brand-unit:hover .ig-logo-mark {
+.ig-brand-unit:hover .ig-logo-mark,
+.ig-brand-unit:hover .ig-logo-wordmark {
   transform: scale(1.02);
 }
 
@@ -14723,6 +14738,11 @@ a.cx-profile-btn-accent {
   .ig-logo-mark {
     height: 22px;
     max-width: 108px;
+  }
+
+  .ig-logo-wordmark {
+    font-size: 1.38rem;
+    height: 22px;
   }
 
   .ig-brand-tag {

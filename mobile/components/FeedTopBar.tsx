@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@apollo/client/react";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo } from "react";
 import { Pressable, Platform, StyleSheet, Text, View } from "react-native";
@@ -15,8 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { UNREAD_NOTIFICATION_COUNT } from "@ctrend/shared/graphql/notifications";
-import headerLogoAsset from "../assets/header-logo.png";
-import headerLogoLightAsset from "../assets/header-logo-light.png";
+import { HeaderWordmark } from "./HeaderWordmark";
 import { PressableScale } from "./PressableScale";
 import { CoinCounter } from "./CoinCounter";
 import { FeedNavSearch } from "./FeedNavSearch";
@@ -122,13 +120,7 @@ function FeedTopBarInner({ scrollY }: Props) {
             <View style={[styles.brandBar, isDark ? styles.brandBarDark : styles.brandBarLight]} />
             <View style={styles.brandBody}>
               <View style={styles.logoBox}>
-                <Image
-                  source={isDark ? headerLogoAsset : headerLogoLightAsset}
-                  style={styles.brandLogoFill}
-                  contentFit="contain"
-                  tintColor={isDark ? undefined : "#312e81"}
-                  accessibilityLabel="Ke Jitbe"
-                />
+                <HeaderWordmark isDark={isDark} color="#312e81" />
               </View>
               <Animated.View style={[styles.tagClip, tagSlotStyle]}>
                 <Animated.View style={tagStyle}>
@@ -281,7 +273,6 @@ const styles = StyleSheet.create({
   },
   brandTagLight: { color: "#71717a" },
   brandTagDark: { color: "#c4b5fd" },
-  brandLogoFill: { width: "100%", height: "100%" },
   actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" },
   plainIconBtn: {
     width: 36,

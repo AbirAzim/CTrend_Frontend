@@ -307,7 +307,7 @@ export function AppShell() {
           <NavLink to="/" className="ig-brand-unit" end aria-label="Ke Jitbe home">
             <span className="ig-brand-bar" aria-hidden="true" />
             <span className="ig-brand-body">
-              <img src="/header-logo-light.png?v=2" className="ig-logo-mark ig-logo-mark--light" alt="" />
+              <span className="ig-logo-wordmark ig-logo-wordmark--light" aria-hidden="true">Ke Jitbe</span>
               <img src="/header-logo.png?v=4" className="ig-logo-mark ig-logo-mark--dark" alt="" />
               <span className="ig-brand-tag">Compare · vote · vibe</span>
             </span>
