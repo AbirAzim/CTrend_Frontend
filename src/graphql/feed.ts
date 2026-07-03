@@ -250,16 +250,19 @@ export const MY_SAVED_POSTS = gql`
   query MySavedPosts {
     mySavedPosts {
       id
+      type
+      format
+      compareLayout
       authorId
       authorUsername
       authorDisplayName
       authorEmail
       authorProfileImageUrl
+      isUserGlobalBroadcast
       imageUrls
-      format
-      compareLayout
       caption
       createdAt
+      scheduledAt
       upvoteCount
       downvoteCount
       viewerVote
@@ -270,6 +273,18 @@ export const MY_SAVED_POSTS = gql`
       votePrizeClaimedAt
       canClaimPrize
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       likeCount
       hypeCount
       saveCount
@@ -283,9 +298,14 @@ export const MY_SAVED_POSTS = gql`
         count
         percentage
       }
-      options {
-        label
+      ${POST_OPTION_FIELDS}
+      category {
+        id
+        name
+        slug
+        color
       }
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
@@ -367,35 +387,64 @@ export const MY_SCHEDULED_POSTS = gql`
   query MyScheduledPosts {
     myScheduledPosts {
       id
+      type
       format
       compareLayout
+      authorId
+      authorUsername
+      authorDisplayName
+      authorEmail
+      authorProfileImageUrl
+      isUserGlobalBroadcast
+      imageUrls
       contentText
       caption
-      imageUrls
-      options {
-        label
-        imageUrl
-        imageFocalX
-        imageFocalY
+      createdAt
+      scheduledAt
+      upvoteCount
+      downvoteCount
+      viewerVote
+      votingEndsAt
+      endingSoonLeadMinutes
+      isVotingOpen
+      isPrizeClaimed
+      votePrizeClaimedAt
+      canClaimPrize
+      commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
       }
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      viewerHasHyped
+      mySelectedOptionIndex
+      myVoteAnonymous
+      optionStats {
+        index
+        label
+        count
+        percentage
+      }
+      ${POST_OPTION_FIELDS}
       category {
         id
         name
         slug
         color
       }
-      campaign {
-        id
-        name
-        slug
-      }
-      votingEndsAt
-      isVotingOpen
-      endingSoonLeadMinutes
-      isUserGlobalBroadcast
+      ${POST_CAMPAIGN_WINNER_FIELDS}
       status
-      scheduledAt
-      createdAt
     }
   }
 `;

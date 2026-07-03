@@ -21,13 +21,13 @@ import { useMessenger } from "../context/MessengerContext";
 import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "../graphql/feed";
 import { BulkInviteModal } from "../components/BulkInviteModal";
 import { EditPostModal } from "../components/EditPostModal";
-import { ProfileCompareCard } from "../components/ProfileCompareCard";
+import { FeedPostCard } from "../components/FeedPostCard";
 import { ProfileEngagementPanel } from "../components/ProfileEngagementPanel";
 import { mapGqlPostToFeedView } from "../lib/mapGqlPostToFeedView";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { useCoins } from "../context/CoinsContext";
 import type { FeedPostView } from "../types/feed";
-import { IconCompare, IconVote, IconImages } from "../components/IgIcons";
+import { IconCompare, IconVote } from "../components/IgIcons";
 
 function initialFromUser(name: string | undefined, email: string): string {
   const s = (name ?? email).trim();
@@ -258,44 +258,6 @@ export function ProfilePage() {
   });
   const [cancelScheduledMut] = useMutation(CANCEL_SCHEDULED_POST);
 
-  const apiPosts = (postsData?.getPostsByUser ?? []) as Array<{
-    id: string;
-    format?: string | null;
-    imageUrls: string[];
-    caption?: string | null;
-    createdAt?: string | null;
-    isUserGlobalBroadcast?: boolean | null;
-    totalVotes?: number | null;
-    upvoteCount?: number | null;
-    downvoteCount?: number | null;
-    commentCount?: number | null;
-    hypeCount?: number | null;
-    saveCount?: number | null;
-    isVotingOpen?: boolean | null;
-    votingEndsAt?: string | null;
-    isPrizeClaimed?: boolean | null;
-    votePrizeClaimedAt?: string | null;
-    canClaimPrize?: boolean | null;
-    voteWinner?: {
-      user?: {
-        id: string;
-        username: string;
-        displayName?: string | null;
-        profileImageUrl?: string | null;
-      } | null;
-      selectedOptionIndex?: number | null;
-      pickedAt?: string | null;
-    } | null;
-    options?: Array<{
-      label?: string | null;
-      imageUrl?: string | null;
-      imageFocalX?: number | null;
-      imageFocalY?: number | null;
-    }> | null;
-    category?: { id: string; name?: string | null; slug?: string | null } | null;
-    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
-  }>;
-
   const playgroundPosts = useMemo(() => {
     if (!useMockFeed) {
       return [];
@@ -303,68 +265,16 @@ export function ProfilePage() {
     return mockPostsAsFeed();
   }, [useMockFeed]);
 
-  const gridPosts: Array<{
-    id: string;
-    format?: string | null;
-    imageUrls: string[];
-    caption?: string | null;
-    createdAt?: string | null;
-    isUserGlobalBroadcast?: boolean | null;
-    totalVotes?: number | null;
-    upvoteCount?: number | null;
-    downvoteCount?: number | null;
-    commentCount?: number | null;
-    hypeCount?: number | null;
-    saveCount?: number | null;
-    isVotingOpen?: boolean | null;
-    votingEndsAt?: string | null;
-    isPrizeClaimed?: boolean | null;
-    votePrizeClaimedAt?: string | null;
-    canClaimPrize?: boolean | null;
-    voteWinner?: {
-      user?: {
-        id: string;
-        username: string;
-        displayName?: string | null;
-        profileImageUrl?: string | null;
-      } | null;
-      selectedOptionIndex?: number | null;
-      pickedAt?: string | null;
-    } | null;
-    options?: Array<{
-      label?: string | null;
-      imageUrl?: string | null;
-      imageFocalX?: number | null;
-      imageFocalY?: number | null;
-    }> | null;
-    category?: { id: string; name?: string | null; slug?: string | null } | null;
-    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
-  }> = useMockFeed
+  // Feed-shaped — rendered with the same `FeedPostCard` as the main feed.
+  const gridPosts: FeedPostView[] = useMockFeed
     ? playgroundPosts
-    : apiPosts;
-  const votedPosts = (votedPostsData?.myVotedPosts ?? []) as typeof gridPosts;
-  const scheduledPosts = (scheduledPostsData?.myScheduledPosts ?? []) as Array<{
-    id: string;
-    format?: string | null;
-    contentText?: string | null;
-    caption?: string | null;
-    imageUrls?: string[] | null;
-    options?: Array<{
-      label?: string | null;
-      imageUrl?: string | null;
-      imageFocalX?: number | null;
-      imageFocalY?: number | null;
-    }> | null;
-    category?: { id: string; name?: string | null; slug?: string | null } | null;
-    campaign?: { id: string; name?: string | null; slug?: string | null } | null;
-    votingEndsAt?: string | null;
-    isVotingOpen?: boolean | null;
-    endingSoonLeadMinutes?: number | null;
-    isUserGlobalBroadcast?: boolean | null;
-    status: string;
-    scheduledAt: string;
-    createdAt?: string | null;
-  }>;
+    : (postsData?.getPostsByUser ?? []).map(mapGqlPostToFeedView);
+  const votedPosts: FeedPostView[] = (votedPostsData?.myVotedPosts ?? []).map(
+    mapGqlPostToFeedView,
+  );
+  const scheduledPosts: FeedPostView[] = (scheduledPostsData?.myScheduledPosts ?? []).map(
+    mapGqlPostToFeedView,
+  );
   const friends = (friendsData?.myFriends ?? []) as FriendRow[];
   const requestedMe = (friendRequestsData?.friendRequests?.requestedMe ?? []) as FriendRow[];
   const requestedByMe = (friendRequestsData?.friendRequests?.requestedByMe ?? []) as FriendRow[];
@@ -553,7 +463,7 @@ export function ProfilePage() {
   );
 
   const totalVotes = gridPosts.reduce(
-    (a, p) => a + (p.totalVotes ?? (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0)),
+    (a, p) => a + (p.upvoteCount ?? 0) + (p.downvoteCount ?? 0),
     0,
   );
 
@@ -968,14 +878,9 @@ export function ProfilePage() {
           </div>
         )}
         {gridPosts.length > 0 && (
-          <div className="cx-kept-grid">
+          <div className="ig-feed">
             {gridPosts.map((post) => (
-              <ProfileCompareCard
-                key={post.id}
-                post={post}
-                variant="drops"
-                onEdit={!useMockFeed ? () => setEditingPost(post) : undefined}
-              />
+              <FeedPostCard key={post.id} post={post} voteMode={useMockFeed ? "local" : "api"} />
             ))}
           </div>
         )}
@@ -1001,88 +906,53 @@ export function ProfilePage() {
                   </NavLink>
                 </div>
               ) : (
-                <ul className="cx-scheduled-list">
-                  {scheduledPosts.map((post) => {
-                    const images = (post.imageUrls ?? [])
-                      .filter((u): u is string => Boolean(u && u.trim()))
-                      .slice(0, 2);
-                    const optionLabels = (post.options ?? [])
-                      .map((o) => o.label?.trim())
-                      .filter((l): l is string => Boolean(l))
-                      .slice(0, 4);
-                    return (
-                      <li key={post.id} className="cx-scheduled-card">
-                        <div className="cx-scheduled-card-media">
-                          {images.length > 0 ? (
-                            images.map((url, i) => (
-                              <div
-                                key={i}
-                                className="cx-scheduled-card-img"
-                                style={{ backgroundImage: `url(${url})` }}
-                                role="img"
-                                aria-label={`Option ${i + 1}`}
-                              />
-                            ))
-                          ) : (
-                            <div className="cx-scheduled-card-placeholder" aria-hidden><IconImages size={22} /></div>
-                          )}
+                <div className="ig-feed">
+                  {scheduledPosts.map((post) => (
+                    <div key={post.id} className="cx-scheduled-feed-item">
+                      <div className="cx-scheduled-meta-bar">
+                        <p className="cx-scheduled-countdown">
+                          {post.scheduledAt ? formatScheduledCountdown(post.scheduledAt) : "Publishing soon…"}
+                        </p>
+                        <p className="cx-scheduled-date">
+                          {post.scheduledAt ? `Goes live ${formatGoLiveDate(post.scheduledAt)}` : null}
+                        </p>
+                        <div className="cx-scheduled-actions">
+                          <button
+                            type="button"
+                            className="cx-scheduled-edit-btn"
+                            onClick={() =>
+                              setEditingPost({
+                                id: post.id,
+                                format: post.format,
+                                caption: post.caption,
+                                imageUrls: post.imageUrls ?? [],
+                                options: post.postOptions,
+                                category: post.category,
+                                campaign: post.campaign,
+                                votingEndsAt: post.votingEndsAt,
+                                isVotingOpen: post.isVotingOpen,
+                                endingSoonLeadMinutes: post.endingSoonLeadMinutes,
+                                isUserGlobalBroadcast: post.isUserGlobalBroadcast,
+                                status: post.status,
+                                scheduledAt: post.scheduledAt,
+                              })
+                            }
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="cx-scheduled-cancel-btn"
+                            onClick={() => void handleCancelScheduled(post.id)}
+                          >
+                            Cancel
+                          </button>
                         </div>
-                        <div className="cx-scheduled-card-body">
-                          {(post.caption ?? post.contentText) && (
-                            <p className="cx-scheduled-card-caption">
-                              {post.caption ?? post.contentText}
-                            </p>
-                          )}
-                          {optionLabels.length > 0 && (
-                            <div className="cx-scheduled-option-chips">
-                              {optionLabels.map((label) => (
-                                <span key={label} className="cx-scheduled-option-chip">{label}</span>
-                              ))}
-                            </div>
-                          )}
-                          <p className="cx-scheduled-countdown">
-                            {formatScheduledCountdown(post.scheduledAt)}
-                          </p>
-                          <p className="cx-scheduled-date">
-                            Goes live {formatGoLiveDate(post.scheduledAt)}
-                          </p>
-                          <div className="cx-scheduled-actions">
-                            <button
-                              type="button"
-                              className="cx-scheduled-edit-btn"
-                              onClick={() =>
-                                setEditingPost({
-                                  id: post.id,
-                                  format: post.format,
-                                  caption: post.caption ?? post.contentText,
-                                  imageUrls: post.imageUrls ?? [],
-                                  options: post.options,
-                                  category: post.category,
-                                  campaign: post.campaign,
-                                  votingEndsAt: post.votingEndsAt,
-                                  isVotingOpen: post.isVotingOpen,
-                                  endingSoonLeadMinutes: post.endingSoonLeadMinutes,
-                                  isUserGlobalBroadcast: post.isUserGlobalBroadcast,
-                                  status: post.status,
-                                  scheduledAt: post.scheduledAt,
-                                })
-                              }
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="cx-scheduled-cancel-btn"
-                              onClick={() => void handleCancelScheduled(post.id)}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      </div>
+                      <FeedPostCard post={post} voteMode="api" />
+                    </div>
+                  ))}
+                </div>
               )}
             </section>
           </div>
@@ -1098,9 +968,9 @@ export function ProfilePage() {
                 <p>No kept posts yet. Bookmark posts from the feed!</p>
               </div>
             ) : (
-              <div className="cx-kept-grid">
+              <div className="ig-feed">
                 {savedPosts.map((post) => (
-                  <ProfileCompareCard key={`kept-${post.id}`} post={post} variant="kept" />
+                  <FeedPostCard key={`kept-${post.id}`} post={post} voteMode="api" />
                 ))}
               </div>
             )}
@@ -1139,9 +1009,9 @@ export function ProfilePage() {
                 </p>
               </div>
             ) : (
-              <div className="cx-kept-grid">
+              <div className="ig-feed">
                 {votedPosts.map((post) => (
-                  <ProfileCompareCard key={`voted-${post.id}`} post={post} variant="voted" />
+                  <FeedPostCard key={`voted-${post.id}`} post={post} voteMode="api" />
                 ))}
               </div>
             )}

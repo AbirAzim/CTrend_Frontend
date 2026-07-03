@@ -7,7 +7,6 @@ import {
   Alert,
   Animated,
   BackHandler,
-  Dimensions,
   LayoutAnimation,
   LayoutChangeEvent,
   Linking,
@@ -38,16 +37,15 @@ import {
 import { MY_SAVED_POSTS, MY_SCHEDULED_POSTS, CANCEL_SCHEDULED_POST } from "@ctrend/shared/graphql/feed";
 import { START_DIRECT_CONVERSATION, CONTACT_ADMIN } from "@ctrend/shared/graphql/messages";
 import { normalizeProfileImageUrl } from "@ctrend/shared/lib/profileImageUrl";
+import { mapGqlPostToFeedView } from "@ctrend/shared/lib/mapGqlPostToFeedView";
 import { useAuth } from "../../context/AuthContext";
 import { useCoinsBalance } from "../../context/CoinsContext";
 import { ProfileEngagementPanel } from "../../components/ProfileEngagementPanel";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
-import ProfileCompareCard from "../../components/ProfileCompareCard";
-import { CompareIcon, VoteIcon, ImagesIcon, MessageIcon } from "../../components/ContentIcons";
+import { FeedPostCard } from "../../components/FeedPostCard";
+import { CompareIcon, VoteIcon, MessageIcon } from "../../components/ContentIcons";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-const CARD_W = Math.floor((SCREEN_W - 38) / 2); // 2×14 padding + 10 gap
 const TAB_BAR_H = 64 + 14;
 
 // Smooth height animation when expanding/collapsing accordion sections.
@@ -73,41 +71,8 @@ type MeData = {
   };
 };
 
-type UserPost = {
-  id: string;
-  imageUrls?: string[] | null;
-  caption?: string | null;
-  createdAt: string;
-  totalVotes?: number | null;
-  upvoteCount: number;
-  downvoteCount: number;
-  commentCount?: number | null;
-  hypeCount?: number | null;
-  saveCount?: number | null;
-  votingEndsAt?: string | null;
-  isVotingOpen?: boolean | null;
-  options?: Array<{ label: string }> | null;
-  category?: { id: string; name: string; slug: string } | null;
-};
-
-type SavedPost = {
-  id: string;
-  imageUrls?: string[] | null;
-  caption?: string | null;
-  isVotingOpen?: boolean | null;
-  upvoteCount: number;
-  downvoteCount: number;
-};
-
-type ScheduledPost = {
-  id: string;
-  contentText?: string | null;
-  imageUrls?: string[] | null;
-  options?: Array<{ label: string; imageUrl?: string | null }> | null;
-  category?: { id: string; name?: string | null } | null;
-  status: string;
-  scheduledAt?: string | null;
-};
+/** Raw GQL post row shape — fed through `mapGqlPostToFeedView` for `FeedPostCard` rendering. */
+type GqlPostRow = Parameters<typeof mapGqlPostToFeedView>[0];
 
 function scheduledCountdown(scheduledAt?: string | null): string {
   if (!scheduledAt) return "—";
@@ -280,23 +245,23 @@ export default function ProfileScreen() {
   const me = meData?.me;
   const isAdmin = (me?.role ?? storedUser?.role)?.toLowerCase() === "admin";
 
-  const { data: postsData, loading: postsLoading } = useQuery<{ getPostsByUser: UserPost[] }>(USER_POSTS, {
+  const { data: postsData, loading: postsLoading } = useQuery<{ getPostsByUser: GqlPostRow[] }>(USER_POSTS, {
     fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first",
     variables: { userId: me?.id }, skip: !me?.id,
   });
 
-  const { data: savedData } = useQuery<{ mySavedPosts: SavedPost[] }>(MY_SAVED_POSTS, {
+  const { data: savedData } = useQuery<{ mySavedPosts: GqlPostRow[] }>(MY_SAVED_POSTS, {
     fetchPolicy: "cache-and-network", nextFetchPolicy: "cache-first", skip: !isAuthenticated,
   });
 
-  const { data: votedData, loading: votedLoading } = useQuery<{ myVotedPosts: UserPost[] }>(MY_VOTED_POSTS, {
+  const { data: votedData, loading: votedLoading } = useQuery<{ myVotedPosts: GqlPostRow[] }>(MY_VOTED_POSTS, {
     fetchPolicy: "cache-and-network",
     variables: { anonymousOnly: votedFilter === "anonymous" },
     skip: !isAuthenticated,
   });
 
   const { data: scheduledData, loading: scheduledLoading, refetch: refetchScheduled } = useQuery<{
-    myScheduledPosts: ScheduledPost[];
+    myScheduledPosts: GqlPostRow[];
   }>(MY_SCHEDULED_POSTS, {
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
@@ -364,10 +329,10 @@ export default function ProfileScreen() {
   const name = me?.displayName?.trim() || me?.username || storedUser?.displayName || storedUser?.username || "You";
   const initial = name.slice(0, 1).toUpperCase();
 
-  const posts = postsData?.getPostsByUser ?? [];
-  const savedPosts = savedData?.mySavedPosts ?? [];
-  const votedPosts = votedData?.myVotedPosts ?? [];
-  const scheduledPosts = scheduledData?.myScheduledPosts ?? [];
+  const posts = (postsData?.getPostsByUser ?? []).map(mapGqlPostToFeedView);
+  const savedPosts = (savedData?.mySavedPosts ?? []).map(mapGqlPostToFeedView);
+  const votedPosts = (votedData?.myVotedPosts ?? []).map(mapGqlPostToFeedView);
+  const scheduledPosts = (scheduledData?.myScheduledPosts ?? []).map(mapGqlPostToFeedView);
 
   async function handleCancelScheduled(postId: string) {
     Alert.alert("Cancel post", "This scheduled post will be removed. Are you sure?", [
@@ -392,7 +357,7 @@ export default function ProfileScreen() {
   const suggestions = suggestionsData?.friendSuggestions ?? [];
 
   const comparesCount = posts.length;
-  const votesCount = posts.reduce((s, p) => s + (p.totalVotes ?? (p.upvoteCount + p.downvoteCount)), 0);
+  const votesCount = posts.reduce((s, p) => s + p.upvoteCount + p.downvoteCount, 0);
 
   const q = search.toLowerCase();
   const filteredFriends = friends.filter((f) => !q || (f.displayName || f.username).toLowerCase().includes(q));
@@ -762,14 +727,10 @@ export default function ProfileScreen() {
                 <Text style={[st.emptyText, { color: colors.muted }]}>No posts yet — drop something!</Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.gridContainer}>
-                <View style={st.grid}>
-                  {posts.map((p) => (
-                    <View key={p.id} style={{ width: CARD_W }}>
-                      <ProfileCompareCard post={p} variant="drops" onEdit={() => router.push(`/post/${p.id}` as `/${string}`)} />
-                    </View>
-                  ))}
-                </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer}>
+                {posts.map((p) => (
+                  <FeedPostCard key={p.id} post={p} />
+                ))}
               </ScrollView>
             )
           )}
@@ -783,41 +744,19 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 14, gap: 12 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer}>
                 {scheduledPosts.map((p) => {
-                  const img0 = p.imageUrls?.[0] ?? p.options?.[0]?.imageUrl ?? null;
-                  const img1 = p.imageUrls?.[1] ?? p.options?.[1]?.imageUrl ?? null;
                   const live = scheduledCountdown(p.scheduledAt) === "Going live…";
                   const goesAt = p.scheduledAt
                     ? new Date(p.scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
                     : null;
                   return (
-                    <View key={p.id} style={[st.schedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <View style={[st.schedThumbStrip, { backgroundColor: colors.section }]}>
-                        {img0 ? (
-                          <Image source={{ uri: img0 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
-                        ) : (
-                          <View style={[st.schedThumb, { alignItems: "center", justifyContent: "center" }]}>
-                            <ImagesIcon size={22} color={colors.muted} />
-                          </View>
-                        )}
-                        {img1 ? (
-                          <Image source={{ uri: img1 }} style={st.schedThumb} contentFit="cover" cachePolicy="memory-disk" />
-                        ) : null}
-                      </View>
-                      <View style={st.schedBody}>
-                        {p.contentText ? (
-                          <Text style={[st.schedCaption, { color: colors.text }]} numberOfLines={2}>{p.contentText}</Text>
-                        ) : null}
-                        <View style={st.schedMetaRow}>
-                          <View style={[st.schedPill, { backgroundColor: live ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
-                            <Text style={[st.schedPillText, { color: live ? "#22c55e" : "#f59e0b" }]}>
-                              {live ? "🟢 Going live" : `⏱ in ${scheduledCountdown(p.scheduledAt)}`}
-                            </Text>
-                          </View>
-                          {p.category?.name ? (
-                            <Text style={[st.schedCategory, { color: colors.muted }]}>{p.category.name}</Text>
-                          ) : null}
+                    <View key={p.id} style={st.schedFeedItem}>
+                      <View style={[st.schedMetaBar, { backgroundColor: colors.section, borderColor: colors.border }]}>
+                        <View style={[st.schedPill, { backgroundColor: live ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
+                          <Text style={[st.schedPillText, { color: live ? "#22c55e" : "#f59e0b" }]}>
+                            {live ? "🟢 Going live" : `⏱ in ${scheduledCountdown(p.scheduledAt)}`}
+                          </Text>
                         </View>
                         {goesAt && !live ? (
                           <Text style={[st.schedDate, { color: colors.muted }]}>Goes live at {goesAt}</Text>
@@ -837,6 +776,7 @@ export default function ProfileScreen() {
                           </Pressable>
                         </View>
                       </View>
+                      <FeedPostCard post={p} />
                     </View>
                   );
                 })}
@@ -849,14 +789,10 @@ export default function ProfileScreen() {
                 <Text style={[st.emptyText, { color: colors.muted }]}>No saved posts yet</Text>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.gridContainer}>
-                <View style={st.grid}>
-                  {savedPosts.map((p) => (
-                    <View key={p.id} style={{ width: CARD_W }}>
-                      <ProfileCompareCard post={p} variant="kept" />
-                    </View>
-                  ))}
-                </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer}>
+                {savedPosts.map((p) => (
+                  <FeedPostCard key={p.id} post={p} />
+                ))}
               </ScrollView>
             )
           )}
@@ -886,14 +822,10 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               ) : (
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.gridContainer} style={{ flex: 1 }}>
-                  <View style={st.grid}>
-                    {votedPosts.map((p) => (
-                      <View key={p.id} style={{ width: CARD_W }}>
-                        <ProfileCompareCard post={p} variant="voted" />
-                      </View>
-                    ))}
-                  </View>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={st.feedContainer} style={{ flex: 1 }}>
+                  {votedPosts.map((p) => (
+                    <FeedPostCard key={p.id} post={p} />
+                  ))}
                 </ScrollView>
               )}
             </View>
@@ -1136,25 +1068,32 @@ const st = StyleSheet.create({
   tabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabBtnActive: {},
   tabBtnText: { fontSize: 12, fontWeight: "700" },
-  schedCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  schedThumbStrip: { flexDirection: "row", height: 90 },
-  schedThumb: { flex: 1, height: 90 },
-  schedBody: { padding: 10, gap: 6 },
-  schedCaption: { fontSize: 13, fontWeight: "600", lineHeight: 18 },
-  schedMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  // Draft/scheduled post rendered as a full feed card — this strip sits above it
+  // with the countdown + Edit/Cancel controls the feed card has no concept of.
+  schedFeedItem: { marginBottom: 10 },
+  schedMetaBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
   schedPill: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
   schedPillText: { fontSize: 11, fontWeight: "700" },
-  schedCategory: { fontSize: 11 },
   schedDate: { fontSize: 11 },
-  schedActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 2 },
+  schedActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginLeft: "auto" },
   schedEditBtn: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5 },
   schedEditText: { fontSize: 12, fontWeight: "700" },
   schedCancelBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5 },
   schedCancelText: { color: "#f87171", fontSize: 12, fontWeight: "700" },
 
-  // Grid layout
-  gridContainer: { padding: 14, paddingBottom: 8 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  // Feed-card list (Drops/Kept/Voted/Scheduled — same card as the main feed)
+  feedContainer: { paddingBottom: 8 },
 
   // Voted filter (segmented control)
   votedFilterWrap: {

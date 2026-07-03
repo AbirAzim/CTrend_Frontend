@@ -241,6 +241,7 @@ export const MY_SAVED_POSTS = gql`
   query MySavedPosts {
     mySavedPosts {
       id
+      type
       category {
         id
         name
@@ -267,6 +268,18 @@ export const MY_SAVED_POSTS = gql`
       isVotingOpen
       endingSoonLeadMinutes
       commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
       likeCount
       hypeCount
       saveCount
@@ -286,6 +299,8 @@ export const MY_SAVED_POSTS = gql`
         imageFocalX
         imageFocalY
       }
+      ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;
@@ -355,21 +370,67 @@ export const MY_SCHEDULED_POSTS = gql`
   query MyScheduledPosts {
     myScheduledPosts {
       id
-      contentText
-      imageUrls
-      options {
-        label
-        imageUrl
-      }
+      type
       category {
         id
         name
         slug
         color
       }
+      authorId
+      authorUsername
+      authorDisplayName
+      authorEmail
+      authorProfileImageUrl
+      isUserGlobalBroadcast
+      format
+      compareLayout
+      imageUrls
+      contentText
+      caption
+      createdAt
       status
       scheduledAt
-      createdAt
+      upvoteCount
+      downvoteCount
+      viewerVote
+      votingEndsAt
+      isVotingOpen
+      endingSoonLeadMinutes
+      commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
+          id
+          username
+          displayName
+          profileImageUrl
+        }
+      }
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      viewerHasHyped
+      myVoteAnonymous
+      mySelectedOptionIndex
+      optionStats {
+        index
+        label
+        count
+        percentage
+      }
+      options {
+        label
+        imageUrl
+        imageFocalX
+        imageFocalY
+      }
+      ${POST_CAMPAIGN_FIELDS}
+      ${POST_VOTE_WINNER_FIELDS}
     }
   }
 `;

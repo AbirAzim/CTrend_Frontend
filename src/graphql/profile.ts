@@ -1,4 +1,5 @@
 import { gql } from "@apollo/client";
+import { POST_OPTION_FIELDS, POST_CAMPAIGN_WINNER_FIELDS } from "./feed";
 
 export const ME = gql`
   query Me {
@@ -35,102 +36,132 @@ export const UPDATE_PROFILE = gql`
   }
 `;
 
-/** Thumbnail grid — includes `category` for schema completeness. */
+/** Feed-shaped — same field selection as `FEED_POSTS`, for rendering with `FeedPostCard`. */
 export const MY_VOTED_POSTS = gql`
   query MyVotedPosts($anonymousOnly: Boolean) {
     myVotedPosts(anonymousOnly: $anonymousOnly) {
       id
-      authorId
-      authorProfileImageUrl
-      imageUrls
+      type
       format
+      compareLayout
+      authorId
+      authorUsername
+      authorDisplayName
+      authorEmail
+      authorProfileImageUrl
+      isUserGlobalBroadcast
+      imageUrls
       caption
       createdAt
-      totalVotes
+      scheduledAt
       upvoteCount
       downvoteCount
-      commentCount
-      likeCount
-      hypeCount
-      saveCount
-      viewerHasSaved
+      viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
       votePrizeClaimedAt
       canClaimPrize
-      voteWinner {
-        selectedOptionIndex
-        pickedAt
-        user {
+      commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
           id
           username
           displayName
           profileImageUrl
         }
       }
-      options {
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      viewerHasHyped
+      mySelectedOptionIndex
+      myVoteAnonymous
+      optionStats {
+        index
         label
+        count
+        percentage
       }
+      ${POST_OPTION_FIELDS}
       category {
         id
         name
         slug
+        color
       }
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;
 
+/** Feed-shaped — same field selection as `FEED_POSTS`, for rendering with `FeedPostCard`. */
 export const USER_POSTS = gql`
   query UserPosts($userId: ID!) {
     getPostsByUser(userId: $userId) {
       id
-      authorId
-      authorProfileImageUrl
-      imageUrls
+      type
       format
+      compareLayout
+      authorId
+      authorUsername
+      authorDisplayName
+      authorEmail
+      authorProfileImageUrl
+      isUserGlobalBroadcast
+      imageUrls
       caption
       createdAt
-      isUserGlobalBroadcast
-      totalVotes
+      scheduledAt
       upvoteCount
       downvoteCount
-      commentCount
-      likeCount
-      hypeCount
-      saveCount
-      viewerHasSaved
+      viewerVote
       votingEndsAt
+      endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
       votePrizeClaimedAt
       canClaimPrize
-      voteWinner {
-        selectedOptionIndex
-        pickedAt
-        user {
+      commentCount
+      recentComments {
+        id
+        content
+        createdAt
+        likeCount
+        author {
           id
           username
           displayName
           profileImageUrl
         }
       }
-      options {
+      likeCount
+      hypeCount
+      saveCount
+      viewerHasSaved
+      viewerHasHyped
+      mySelectedOptionIndex
+      myVoteAnonymous
+      optionStats {
+        index
         label
-        imageUrl
-        imageFocalX
-        imageFocalY
+        count
+        percentage
       }
+      ${POST_OPTION_FIELDS}
       category {
         id
         name
         slug
+        color
       }
-      campaign {
-        id
-        name
-        slug
-      }
+      ${POST_CAMPAIGN_WINNER_FIELDS}
     }
   }
 `;

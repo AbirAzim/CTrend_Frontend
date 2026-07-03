@@ -10361,6 +10361,29 @@ a.cx-friend-avatar:hover {
   gap: 12px;
 }
 
+/* Draft/scheduled post rendered as a full feed card — this strip sits above it
+   with the countdown + Edit/Cancel controls the feed card itself has no concept of. */
+.cx-scheduled-feed-item {
+  margin-bottom: 8px;
+}
+
+.cx-scheduled-meta-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  background: rgb(var(--cx-accent-rgb) / 0.06);
+  border: 1px solid rgb(var(--cx-accent-rgb) / 0.16);
+  border-radius: var(--cx-radius-lg, 14px) var(--cx-radius-lg, 14px) 0 0;
+  border-bottom: none;
+}
+
+.cx-scheduled-meta-bar .cx-scheduled-actions {
+  margin-left: auto;
+  margin-top: 0;
+}
+
 .cx-scheduled-card {
   display: flex;
   gap: 12px;
