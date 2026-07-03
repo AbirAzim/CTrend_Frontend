@@ -1,6 +1,7 @@
 import { useFonts, Caveat_700Bold } from "@expo-google-fonts/caveat";
 import { Image } from "expo-image";
 import { Platform, StyleSheet, Text, View } from "react-native";
+import headerLogoAsset from "../assets/header-logo.png";
 import headerLogoLightSolidAsset from "../assets/header-logo-light-solid.png";
 
 const LOGO_W = 112;
@@ -18,7 +19,7 @@ export function HeaderWordmark({ isDark, color }: Props) {
   if (isDark) {
     return (
       <Image
-        source={require("../assets/header-logo.png")}
+        source={headerLogoAsset}
         style={styles.logoFill}
         contentFit="contain"
         accessibilityLabel="Ke Jitbe"
