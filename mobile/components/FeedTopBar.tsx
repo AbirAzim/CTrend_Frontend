@@ -130,33 +130,26 @@ function FeedTopBarInner({ scrollY }: Props) {
                   accessibilityLabel="Ke Jitbe"
                 />
               </View>
-              {isAuthenticated ? (
-                <Animated.View style={[styles.tagClip, tagSlotStyle]}>
-                  <Animated.View style={tagStyle}>
-                    <Text
-                      style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
-                      numberOfLines={1}
-                    >
-                      Compare · vote · vibe
-                    </Text>
-                  </Animated.View>
+              <Animated.View style={[styles.tagClip, tagSlotStyle]}>
+                <Animated.View style={tagStyle}>
+                  <Text
+                    style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
+                    numberOfLines={1}
+                  >
+                    Compare · vote · vibe
+                  </Text>
                 </Animated.View>
-              ) : (
-                <Text
-                  style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
-                  numberOfLines={1}
-                >
-                  Compare · vote · vibe
-                </Text>
-              )}
+              </Animated.View>
             </View>
           </Animated.View>
         </Pressable>
 
-        {isAuthenticated && (
+        {isAuthenticated ? (
           <View style={styles.searchInline}>
             <FeedNavSearch />
           </View>
+        ) : (
+          <View style={styles.topBarSpacer} />
         )}
 
         <View style={styles.actions}>
@@ -241,6 +234,10 @@ const styles = StyleSheet.create({
     height: SEARCH_H,
     justifyContent: "center",
   },
+  topBarSpacer: {
+    flex: 1,
+    minWidth: 0,
+  },
   brandPress: {
     flexShrink: 0,
   },
@@ -285,7 +282,7 @@ const styles = StyleSheet.create({
   brandTagLight: { color: "#71717a" },
   brandTagDark: { color: "#c4b5fd" },
   brandLogoFill: { width: "100%", height: "100%" },
-  actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" },
   plainIconBtn: {
     width: 36,
     height: 36,
@@ -306,12 +303,21 @@ const styles = StyleSheet.create({
   },
   circleBtnLogin: {
     width: "auto",
+    height: 36,
     flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
     backgroundColor: "#ec4899",
   },
-  loginLabel: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
+  loginLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+    lineHeight: 16,
+    ...(Platform.OS === "android" ? { includeFontPadding: false, textAlignVertical: "center" as const } : {}),
+  },
   notifIconWrap: {
     width: 22,
     height: 22,
