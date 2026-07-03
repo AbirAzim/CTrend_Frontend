@@ -9,34 +9,29 @@ export function FeedNavSearch() {
 
   return (
     <Pressable
-      style={({ pressed }) => ({
-        flex: 1,
-        opacity: pressed ? 0.88 : 1,
-      })}
+      style={({ pressed }) => [
+        styles.pill,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          opacity: pressed ? 0.88 : 1,
+        },
+      ]}
       onPress={() => router.push("/search" as `/${string}`)}
       accessibilityRole="search"
       accessibilityLabel="Search people and posts"
     >
-      <Pressable
-        style={[
-          styles.pill,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <Ionicons name="search-outline" size={17} color={colors.muted} />
-        <Text style={[styles.placeholder, { color: colors.muted }]} numberOfLines={1}>
-          Search…
-        </Text>
-      </Pressable>
+      <Ionicons name="search-outline" size={17} color={colors.muted} />
+      <Text style={[styles.placeholder, { color: colors.muted }]} numberOfLines={1}>
+        Search…
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   pill: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
