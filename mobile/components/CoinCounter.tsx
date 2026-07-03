@@ -24,9 +24,11 @@ export function CoinCounter() {
         style={[styles.pill, { transform: [{ scale: counterAnim }] }]}
       >
         <View style={styles.coin}>
-          <Text style={styles.coinGlyph}>¢</Text>
+          <Text style={styles.coinGlyph} maxFontSizeMultiplier={1.2} numberOfLines={1}>¢</Text>
         </View>
-        <Text style={styles.value}>{balance ?? 0}</Text>
+        <Text style={styles.value} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+          {balance ?? 0}
+        </Text>
       </Animated.View>
     </PressableScale>
   );

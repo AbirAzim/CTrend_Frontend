@@ -107,7 +107,8 @@ function FeedTopBarInner({ scrollY }: Props) {
         styles.topBarClip,
         shellStyle,
         {
-          paddingHorizontal: 14,
+          paddingLeft: Math.max(14, insets.left),
+          paddingRight: Math.max(14, insets.right),
           backgroundColor: colors.topbar,
           borderBottomColor: colors.border,
         },
@@ -127,6 +128,7 @@ function FeedTopBarInner({ scrollY }: Props) {
                   <Text
                     style={[styles.brandTag, isDark ? styles.brandTagDark : styles.brandTagLight]}
                     numberOfLines={1}
+                    maxFontSizeMultiplier={1.1}
                   >
                     Compare · vote · vibe
                   </Text>
@@ -157,7 +159,9 @@ function FeedTopBarInner({ scrollY }: Props) {
                 <Ionicons name="notifications-outline" size={22} color={isDark ? colors.text : colors.subtext} />
                 {unreadCount > 0 && (
                   <View style={[styles.notifBadge, { borderColor: colors.topbar }]}>
-                    <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : String(unreadCount)}</Text>
+                    <Text style={styles.notifBadgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                      {unreadCount > 9 ? "9+" : String(unreadCount)}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -222,7 +226,7 @@ const styles = StyleSheet.create({
   },
   searchInline: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 80,
     height: SEARCH_H,
     justifyContent: "center",
   },

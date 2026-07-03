@@ -128,12 +128,16 @@ function FloatingTabBar(props: {
                   {icon}
                   {isMessages && totalUnread > 0 && (
                     <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-                      <Text style={styles.badgeText}>{totalUnread > 9 ? "9+" : totalUnread}</Text>
+                      <Text style={styles.badgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                        {totalUnread > 9 ? "9+" : totalUnread}
+                      </Text>
                     </View>
                   )}
                   {route.name === "keeps" && savedCount > 0 && (
                     <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-                      <Text style={styles.badgeText}>{savedCount > 99 ? "99+" : String(savedCount)}</Text>
+                      <Text style={styles.badgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                        {savedCount > 99 ? "99+" : String(savedCount)}
+                      </Text>
                     </View>
                   )}
                 </View>

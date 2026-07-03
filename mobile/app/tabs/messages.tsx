@@ -91,6 +91,7 @@ function NewDmModal({
 }) {
   const [search, setSearch] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
   const { data } = useQuery<FriendsData>(MY_FRIENDS, {
     fetchPolicy: "cache-and-network",
     skip: !visible,
@@ -121,7 +122,7 @@ function NewDmModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.modalRoot, { backgroundColor: colors.bg }]}>
-        <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+        <View style={[styles.modalHeader, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
           <Text style={[styles.modalTitle, { color: colors.text }]}>New Message</Text>
           <Pressable onPress={onClose}>
             <Text style={{ color: colors.accent, fontSize: 16, fontWeight: "700" }}>Done</Text>
@@ -151,7 +152,7 @@ function NewDmModal({
           <FlatList
             data={filtered}
             keyExtractor={(f) => f.id}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 16 }}
             renderItem={({ item: f }) => {
               const name = f.displayName?.trim() || f.username;
               const avatar = normalizeProfileImageUrl(f.profileImageUrl);

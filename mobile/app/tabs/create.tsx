@@ -1034,7 +1034,9 @@ export default function CreateScreen() {
                       </View>
                     )}
                     <View style={[st.slotBadge, { backgroundColor: colors.accent }]}>
-                      <Text style={st.slotBadgeText}>{SLOT_LABELS[idx] ?? idx + 1}</Text>
+                      <Text style={st.slotBadgeText} maxFontSizeMultiplier={1.2} numberOfLines={1}>
+                        {SLOT_LABELS[idx] ?? idx + 1}
+                      </Text>
                     </View>
                     {slot.uploading && (
                       <View style={st.slotOverlay}>
@@ -1044,7 +1046,7 @@ export default function CreateScreen() {
                     )}
                     {slot.publicUrl && !slot.uploading && (
                       <View style={st.slotDone}>
-                        <Text style={st.slotDoneText}>✓</Text>
+                        <Text style={st.slotDoneText} maxFontSizeMultiplier={1.2} numberOfLines={1}>✓</Text>
                       </View>
                     )}
                     {hasImage && (
@@ -1277,7 +1279,7 @@ export default function CreateScreen() {
                       <Text style={[st.audDesc, { color: colors.muted }]}>{o.desc}</Text>
                       {active && (
                         <View style={[st.audCheck, { backgroundColor: colors.accent }]}>
-                          <Text style={st.audCheckText}>✓</Text>
+                          <Text style={st.audCheckText} maxFontSizeMultiplier={1.2} numberOfLines={1}>✓</Text>
                         </View>
                       )}
                     </Pressable>

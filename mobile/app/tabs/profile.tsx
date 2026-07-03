@@ -183,7 +183,9 @@ function Section({
             <Text style={[st.sectionTitle, { color: colors.text }]}>{title}</Text>
             {badge != null && badge > 0 ? (
               <View style={[st.sectionBadge, { backgroundColor: colors.accent }]}>
-                <Text style={st.sectionBadgeText}>{badge > 99 ? "99+" : badge}</Text>
+                <Text style={st.sectionBadgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                  {badge > 99 ? "99+" : badge}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -633,7 +635,9 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               {requestedMe.length > 0 && (
                 <View style={[st.sectionBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={st.sectionBadgeText}>{requestedMe.length > 99 ? "99+" : requestedMe.length}</Text>
+                  <Text style={st.sectionBadgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                    {requestedMe.length > 99 ? "99+" : requestedMe.length}
+                  </Text>
                 </View>
               )}
               <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "600", marginRight: 2 }}>›</Text>
