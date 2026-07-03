@@ -16,6 +16,7 @@ import {
 	StyleSheet,
 	Text,
 	View,
+	useWindowDimensions,
 } from 'react-native';
 import { WORLD_CUP_FIXTURE_DETAILS } from '@ctrend/shared/graphql/worldcup';
 import {
@@ -761,19 +762,20 @@ const ov = StyleSheet.create({
 // ─── Lineup tab ───────────────────────────────────────────────────────────────
 
 function PitchPlayer({
-	player, ratingMap, evMap, onPress,
-}: { player: LineupPlayer; ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean; onPress?: () => void }) {
+	player, ratingMap, evMap, onPress, wrapWidth, avatarSize,
+}: { player: LineupPlayer; ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean; onPress?: () => void; wrapWidth: number; avatarSize: number }) {
 	const [imgFailed, setImgFailed] = useState(false);
 	const rating = player.id != null ? ratingMap.get(player.id) : undefined;
 	const rNum = rating ? parseFloat(rating) : null;
 	const pev = evMap.get(pEvtKey(player));
+	const avatarRadius = avatarSize / 2;
 
 	return (
-		<Pressable style={pitch.playerWrap} onPress={onPress} disabled={!onPress}>
-			<View style={pitch.avatarWrap}>
+		<Pressable style={[pitch.playerWrap, { width: wrapWidth }]} onPress={onPress} disabled={!onPress}>
+			<View style={[pitch.avatarWrap, { width: avatarSize, height: avatarSize }]}>
 				{player.photo && !imgFailed
-					? <Image source={{ uri: player.photo }} style={pitch.avatar} contentFit='cover' borderRadius={22} onError={() => setImgFailed(true)} />
-					: <View style={pitch.avatarFallback}><Text style={pitch.avatarNum}>{player.number}</Text></View>
+					? <Image source={{ uri: player.photo }} style={[pitch.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarRadius }]} contentFit='cover' borderRadius={avatarRadius} onError={() => setImgFailed(true)} />
+					: <View style={[pitch.avatarFallback, { width: avatarSize, height: avatarSize, borderRadius: avatarRadius }]}><Text style={pitch.avatarNum}>{player.number}</Text></View>
 				}
 				{/* Jersey number badge */}
 				<View style={pitch.numBadge}>
@@ -831,10 +833,11 @@ const pitch = StyleSheet.create({
 	playerName: { fontSize: 9.5, fontWeight: '600', color: '#fff', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
 
-function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark, onPlayerPress }: {
+function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark, onPlayerPress, playerWrapWidth, avatarSize }: {
 	players: LineupPlayer[]; reverse: boolean; mirrorCols: boolean;
 	ratingMap: Map<number, string>; evMap: Map<string, PEvt>; isDark: boolean;
 	onPlayerPress?: (id: number) => void;
+	playerWrapWidth: number; avatarSize: number;
 }) {
 	const byRow = new Map<number, LineupPlayer[]>();
 	for (const p of players) {
@@ -867,6 +870,8 @@ function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark,
 								evMap={evMap}
 								isDark={isDark}
 								onPress={p.id != null && onPlayerPress ? () => onPlayerPress(p.id as number) : undefined}
+								wrapWidth={playerWrapWidth}
+								avatarSize={avatarSize}
 							/>
 						))}
 					</View>
@@ -877,7 +882,10 @@ function FormationRows({ players, reverse, mirrorCols, ratingMap, evMap, isDark,
 }
 
 const fo = StyleSheet.create({
-	row: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
+	// Spread players evenly across the full row width — mirrors the web
+	// version's .md-frow (justify-content: space-evenly), which is what makes
+	// the formation fan out across the pitch instead of clumping in the middle.
+	row: { flexDirection: 'row', justifyContent: 'space-evenly', width: '100%', gap: 4 },
 });
 
 // ─── Player match-stat card (tap a player on the pitch) ─────────────────────────
@@ -1032,6 +1040,7 @@ const pc = StyleSheet.create({
 
 
 function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails; isDark: boolean; onPlayerPress?: (id: number) => void }) {
+	const { width: screenWidth } = useWindowDimensions();
 	const { lineups, playerRatings, homeTeam, awayTeam, events, playerMatchStats } = fixture;
 	const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
 	const textSub = isDark ? '#cbd5e1' : '#475569';
@@ -1074,6 +1083,29 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 	const halfHeight =
 		Math.max(distinctRows(homeL?.startXI ?? []), distinctRows(awayL?.startXI ?? [])) * PITCH_ROW_H;
 
+	// Shrink player avatars on narrow phones so the widest row (e.g. a 5-man
+	// back line) never overflows the pitch — full 64px avatars only fit rows up
+	// to ~5 wide on screens ≥360dp; below that they'd get clipped or overlap.
+	const widestRowCount = (ps: LineupPlayer[]) => {
+		const counts = new Map<number, number>();
+		for (const p of ps) {
+			if (!p.grid) continue;
+			const row = parseInt(p.grid.split(':')[0], 10);
+			counts.set(row, (counts.get(row) ?? 0) + 1);
+		}
+		return counts.size ? Math.max(...counts.values()) : 1;
+	};
+	const widestRow = Math.max(
+		widestRowCount(homeL?.startXI ?? []),
+		widestRowCount(awayL?.startXI ?? []),
+		1,
+	);
+	const PITCH_HALF_PAD_H = 8;
+	const ROW_GAP = 4;
+	const availableRowWidth = screenWidth - PITCH_HALF_PAD_H * 2 - (widestRow - 1) * ROW_GAP;
+	const playerWrapWidth = Math.max(46, Math.min(64, Math.floor(availableRowWidth / widestRow)));
+	const avatarSize = Math.round(playerWrapWidth * 0.625);
+
 	return (
 		<View style={{ paddingBottom: 24 }}>
 			{/* Goal bar */}
@@ -1113,12 +1145,12 @@ function LineupTab({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetails
 
 				{homeL && (
 					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
-						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={onPlayerPress} />
+						<FormationRows players={homeL.startXI} reverse={false} mirrorCols={true} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={onPlayerPress} playerWrapWidth={playerWrapWidth} avatarSize={avatarSize} />
 					</View>
 				)}
 				{awayL && (
 					<View style={[lu2.pitchHalf, { height: halfHeight }]}>
-						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={onPlayerPress} />
+						<FormationRows players={awayL.startXI} reverse={true} mirrorCols={false} ratingMap={ratingMap} evMap={evMap} isDark={isDark} onPlayerPress={onPlayerPress} playerWrapWidth={playerWrapWidth} avatarSize={avatarSize} />
 					</View>
 				)}
 			</View>
