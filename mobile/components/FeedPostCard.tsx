@@ -27,7 +27,6 @@ import {
 	Pressable,
 	ScrollView,
 	StyleSheet,
-	Switch,
 	Text,
 	TextInput,
 	ToastAndroid,
@@ -1267,14 +1266,40 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			backgroundColor: isDark ? 'rgba(139,92,246,0.18)' : 'rgba(109,40,217,0.1)',
 			borderColor: isDark ? 'rgba(139,92,246,0.4)' : 'rgba(109,40,217,0.35)',
 		},
-		anonIcon: { fontSize: 15 },
+		anonIcon: { fontSize: 15, lineHeight: 15 },
 		anonLabel: {
-			fontSize: 12,
+			fontSize: 12.8,
 			fontWeight: '600' as const,
 			color: c.text,
+			letterSpacing: 0.16,
 		},
 		anonLabelActive: {
 			color: isDark ? '#c4b5fd' : '#6d28d9',
+		},
+		anonSwitchTrack: {
+			width: 34,
+			height: 19,
+			borderRadius: 10,
+			backgroundColor: isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)',
+			justifyContent: 'center',
+		},
+		anonSwitchTrackActive: {
+			backgroundColor: isDark ? '#8b5cf6' : '#7c3aed',
+		},
+		anonSwitchThumb: {
+			width: 15,
+			height: 15,
+			borderRadius: 8,
+			backgroundColor: '#fff',
+			marginLeft: 2,
+			shadowColor: '#000',
+			shadowOffset: { width: 0, height: 1 },
+			shadowOpacity: 0.3,
+			shadowRadius: 4,
+			elevation: 2,
+		},
+		anonSwitchThumbOn: {
+			marginLeft: 17,
 		},
 		// ── Two-zone action rail ──
 		// Flush, full-width row separated from the media/vote area by a single
@@ -3694,18 +3719,21 @@ function FeedPostCardComponent({
 							</Text>
 						</View>
 					) : null}
-					<View style={[st.anonPill, anon && st.anonPillActive]}>
+					<Pressable
+						style={[st.anonPill, anon && st.anonPillActive]}
+						onPress={() => void handleAnonymousToggle(!anon)}
+						accessibilityRole='switch'
+						accessibilityState={{ checked: anon }}
+						accessibilityLabel='Vote anonymously'
+					>
 						<Text style={st.anonIcon}>👻</Text>
 						<Text style={[st.anonLabel, anon && st.anonLabelActive]}>
 							Vote anonymously
 						</Text>
-						<Switch
-							value={anon}
-							onValueChange={(val) => void handleAnonymousToggle(val)}
-							trackColor={{ false: colors.border, true: colors.accent }}
-							thumbColor='#ffffff'
-						/>
-					</View>
+						<View style={[st.anonSwitchTrack, anon && st.anonSwitchTrackActive]}>
+							<View style={[st.anonSwitchThumb, anon && st.anonSwitchThumbOn]} />
+						</View>
+					</Pressable>
 				</View>
 			)}
 
