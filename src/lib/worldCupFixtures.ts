@@ -13,6 +13,10 @@ export type WcFixture = {
   awayTeam: WcTeam;
   kickoff: string;
   status: string;
+  /** Provider's original status code (1H/2H/HT/ET/BT/P/PEN/FT/AET…) — needed to
+   * tell extra time and penalties apart, since `status` collapses both into
+   * IN_PLAY. */
+  rawStatus?: string | null;
   /** Live match minute from the provider while IN_PLAY/PAUSED; null otherwise. */
   minute?: number | null;
   stage: string;
@@ -53,8 +57,9 @@ export const WC_STAGE_LABELS: Record<string, string> = {
 const LIVE_WINDOW_MS = 150 * 60 * 1000;
 
 export function isLive(f: WcFixture): boolean {
-  if (f.status === "IN_PLAY" || f.status === "PAUSED" ||
-      f.status === "EXTRA_TIME" || f.status === "PENALTY") return true;
+  // ET and penalties are both reported as IN_PLAY (see liveBadgeLabel) — no
+  // separate status values to check here.
+  if (f.status === "IN_PLAY" || f.status === "PAUSED") return true;
   if (f.status === "FINISHED") return false;
   // The provider's status often lags (free-tier sync delay), leaving a kicked-off
   // match stuck on TIMED. Without this, such a match is neither "upcoming"
@@ -183,11 +188,19 @@ export function finishedFixtures(fixtures: WcFixture[]): WcFixture[] {
   );
 }
 
-/** Human-readable badge for a live fixture: "HT", "ET 93'", "PENS", "45'" etc. */
+/**
+ * Human-readable badge for a live fixture: "HT", "ET 93'", "PENS", "45'" etc.
+ *
+ * `status` only ever comes back as TIMED/IN_PLAY/PAUSED/FINISHED — extra time
+ * and penalties both collapse into IN_PLAY there, so ET/penalty detection has
+ * to go through the provider's original code (`rawStatus`: 1H/2H/HT/ET/BT/P/
+ * PEN/FT/AET) instead, same as `formatKnockoutLivePrefix` in matchScoreCopy.ts.
+ */
 export function liveBadgeLabel(f: WcFixture): string {
+  const raw = (f.rawStatus ?? "").toUpperCase();
+  if (raw === "P" || raw === "PEN") return "PENS";
+  if (raw === "ET" || raw === "BT") return f.minute != null ? `ET ${f.minute}'` : "ET";
   if (f.status === "PAUSED") return "HT";
-  if (f.status === "PENALTY") return "PENS";
-  if (f.status === "EXTRA_TIME") return f.minute != null ? `ET ${f.minute}'` : "ET";
   return f.minute != null ? `${f.minute}'` : "LIVE";
 }
 

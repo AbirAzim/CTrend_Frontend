@@ -31,6 +31,7 @@ import {
 	type PlayerLineupEvents,
 } from '@ctrend/shared/lib/matchEvents';
 import {
+	formatKnockoutLivePrefix,
 	hasKnockoutScoreBreakdown,
 	knockoutFullTimeDividerLabel,
 	knockoutHeaderSublines,
@@ -112,6 +113,18 @@ function isFinished(s: string) { return ['FINISHED','FT','AET','PEN','AWARDED'].
 function clientMinute(kickoff: string): number {
   const elapsed = Math.floor((Date.now() - new Date(kickoff).getTime()) / 60000);
   return Math.max(1, Math.min(elapsed, 130));
+}
+
+// Status-bar text for a live match: "HT", "ET 97'"/"ET", "Pens", or a bare
+// minute — `status` alone can't tell extra time / penalties apart from
+// regular time (both come back as IN_PLAY), so this also needs `rawStatus`
+// (the provider's original code), same as the feed card's live pill.
+function liveHeaderLabel(status: string, rawStatus: string | null | undefined, displayMinute: number | null | undefined): string {
+  if (status === 'PAUSED') return 'HT';
+  const phase = formatKnockoutLivePrefix({ phase: rawStatus });
+  if (phase === 'Pens') return 'Pens';
+  if (phase === 'ET') return displayMinute != null ? `ET ${displayMinute}'` : 'ET';
+  return displayMinute != null ? `${displayMinute}'` : 'LIVE';
 }
 
 function minuteLabel(e: MatchEvent) {
@@ -288,7 +301,7 @@ function MatchHeader({ fixture, isDark, onPlayerPress }: { fixture: FixtureDetai
 				{live ? (
 					<View style={mh.livePill}>
 						<View style={mh.liveDot} />
-						<Text style={mh.liveText}>{`${displayMinute}'`}</Text>
+						<Text style={mh.liveText}>{liveHeaderLabel(status, fixture.rawStatus, displayMinute)}</Text>
 					</View>
 				) : finished ? (
 					<View style={[mh.ftPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9' }]}>

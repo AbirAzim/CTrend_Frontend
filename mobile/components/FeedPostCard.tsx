@@ -1893,7 +1893,7 @@ function LiveMatchPanel({
 				<LiveDot color={dotColor} />
 				<Text style={[mdrStyles.livePanelStatus, { color: colors.subtext }]}>
 					{liveStatusPill}
-					{isLive && effectiveMinute != null ? ` · ${effectiveMinute}'` : ''}
+					{isLive && effectiveMinute != null && liveStatusPill !== 'Pens' ? ` · ${effectiveMinute}'` : ''}
 				</Text>
 			</View>
 			<View style={mdrStyles.livePanelBody}>

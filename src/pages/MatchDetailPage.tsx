@@ -14,6 +14,7 @@ import {
   type PlayerLineupEvents,
 } from "../../packages/shared/src/lib/matchEvents";
 import {
+  formatKnockoutLivePrefix,
   hasKnockoutScoreBreakdown,
   knockoutFullTimeDividerLabel,
   knockoutHeaderSublines,
@@ -1176,6 +1177,20 @@ function clientMinute(kickoff: string): number {
   return Math.max(1, Math.min(elapsed, 130));
 }
 
+/**
+ * Status-bar text for a live match: "HT", "ET 97'"/"ET", "Pens", or a bare
+ * minute — `status` alone can't tell extra time / penalties apart from
+ * regular time (both come back as IN_PLAY), so this also needs `rawStatus`
+ * (the provider's original code), same as the feed card's live pill.
+ */
+function liveHeaderLabel(status: string, rawStatus: string | null | undefined, displayMinute: number | null | undefined): string {
+  if (status === "PAUSED") return "HT";
+  const phase = formatKnockoutLivePrefix({ phase: rawStatus });
+  if (phase === "Pens") return "Pens";
+  if (phase === "ET") return displayMinute != null ? `ET ${displayMinute}'` : "ET";
+  return displayMinute != null ? `${displayMinute}'` : "LIVE";
+}
+
 
 function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPlayerClick?: (id: number) => void }) {
   const { status, minute, score, events, homeTeam, awayTeam, venue, playerRatings, kickoff } = fixture;
@@ -1212,7 +1227,7 @@ function MatchHeader({ fixture, onPlayerClick }: { fixture: FixtureDetails; onPl
         {live && (
           <span className="md-hdr-live">
             <span className="md-live-dot" />
-            {displayMinute != null ? `${displayMinute}'` : "LIVE"}
+            {liveHeaderLabel(status, fixture.rawStatus, displayMinute)}
           </span>
         )}
         {finished && <span className="md-hdr-ft">Full Time</span>}

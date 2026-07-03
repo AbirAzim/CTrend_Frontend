@@ -2492,7 +2492,7 @@ function FeedPostCardComponent({
             <span className="cx-live-panel-status">
               <span className="cx-live-panel-dot" aria-hidden />
               {liveStatusPill}
-              {ms?.status === "IN_PLAY" && liveMinute != null ? ` · ${liveMinute}'` : ""}
+              {ms?.status === "IN_PLAY" && liveMinute != null && liveStatusPill !== "Pens" ? ` · ${liveMinute}'` : ""}
             </span>
           </div>
           <div className="cx-live-panel-body">

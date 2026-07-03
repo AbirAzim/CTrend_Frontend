@@ -17,6 +17,7 @@ export const WORLD_CUP_FIXTURES = gql`
       }
       kickoff
       status
+      rawStatus
       minute
       stage
       group
