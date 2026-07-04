@@ -115,6 +115,33 @@ Current version after 1.16.5 release: **versionCode 50** across all three files.
 
 ---
 
+### Step 1.5 — Enable R8/minify (MUST for the next build)
+
+Play Console flagged this on the 1.16.5 (50) upload:
+
+> ⚠️ **1 Warning — 1 message for version code 50**
+> There is no deobfuscation file associated with this App Bundle. If you use obfuscated
+> code (R8/proguard), uploading a deobfuscation file will make crashes and ANRs easier
+> to analyze and debug. Using R8/proguard can help reduce app size.
+
+`minifyEnabled`/R8 is currently **off** (`android.enableMinifyInReleaseBuilds` isn't set in `mobile/android/gradle.properties`, so it falls back to `false` in `app/build.gradle`). Turn it on for the next release:
+
+**`mobile/android/gradle.properties`** — add:
+```properties
+android.enableMinifyInReleaseBuilds=true
+android.enableShrinkResourcesInReleaseBuilds=true
+```
+
+Then rebuild with `./scripts/build-mobile-aab-release.sh` as usual — `bundleRelease` will now run R8 and produce a `mapping.txt` deobfuscation file at:
+```
+mobile/android/app/build/outputs/mapping/release/mapping.txt
+```
+Upload this alongside the AAB in Play Console (**Create release → App bundle → Upload deobfuscation file**, or it may prompt automatically) — this silences the warning and makes future crash reports readable.
+
+**Test the release APK carefully after enabling this** — R8 can occasionally strip something needed at runtime (reflection-based code, dynamically-referenced classes) if `proguard-rules.pro` is missing a `-keep` rule for it. Do a full manual pass (login, feed, create post, chat, World Cup) on the release build before uploading, since this project skipped R8 for 1.16.4/1.16.5 specifically to isolate this risk from those releases.
+
+---
+
 ### Step 2 — Check prerequisites
 
 Before running the build script, confirm:
@@ -639,7 +666,7 @@ Google Sign-In requires the **release SHA-1** registered in Google Cloud Console
 | Never commit `keystore.properties` or `mobile/.env` | Gitignored; contains signing secrets and production API keys |
 | Never lose the release keystore | Google cannot re-sign with a different key — losing it means you cannot ship updates to the existing listing |
 | Rebuild after any `.env` change | Env vars are baked in at bundle time, not at runtime |
-| Enable `minifyEnabled` (R8) before next release | Reduces the ~55MB AAB size and silences Play's deobfuscation-file warning |
+| Enable `minifyEnabled` (R8) — **required for the build after 1.16.5** | See [Step 1.5](#step-15--enable-r8minify-must-for-the-next-build). Play flagged the missing deobfuscation file on 1.16.5 (50); reduces AAB size too |
 | `build-mobile-aab-release.sh` uses `grep -E` not `grep -P` | macOS BSD grep has no `-P` flag — PCRE patterns will break on Mac, use `-E` |
 | Use `react-native-edge-to-edge` + `SystemBars` for status/nav bar styling on Android | `expo-status-bar` uses deprecated edge-to-edge APIs on Android 15+; Play Console may flag it |
 | `AppTheme` parent must be `Theme.EdgeToEdge.Material3` (no `statusBarColor` / `navigationBarColor` in `styles.xml`) | Deprecated theme attrs trigger Play Console edge-to-edge warnings |
