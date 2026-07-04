@@ -111,7 +111,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.16.3 release: **versionCode 48** across all three files.
+Current version after 1.16.5 release: **versionCode 50** across all three files.
 
 ---
 
@@ -218,6 +218,8 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.16.5 | 50 | 2026-07-04 | Same fixes as 1.16.4 (superseded — bundled image assets losslessly recompressed ~23% smaller, addressing Play Console's bitmap optimization recommendation); requires a new Android OAuth client in Google Cloud Console for the release-key SHA-1 for Google Sign-In to work on this signed build |
+| 1.16.4 | 49 | 2026-07-04 | "My Activity" pagination reliability + scroll/footer smoothness fixes; World Cup match details live score/minute/stats fixes; penalty shootout premature-winner fix; duplicate match-event cleanup |
 | 1.16.3 | 48 | 2026-07-03 | Crisp light-theme header wordmark (Caveat vector text); guest feed Log in top-right + scroll tagline animation; light header polish |
 | 1.16.2 | 47 | — | (unreleased) Light-theme header + guest feed fixes — superseded by 1.16.3 |
 | 1.16.1 | 46 | 2026-07-02 | Feed infinite scroll prefetch — next page loads before you reach the bottom (matches web); includes all 1.16.0 features |
@@ -232,6 +234,68 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.16.5 (50)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.5 — My Activity & live match fixes
+```
+
+**What's new** (user-facing release notes)
+```
+• Faster, more reliable "My Activity" page — fixed pagination sometimes getting stuck, smoother scrolling
+
+• Fixed live match scores, timers, and stats not updating correctly on match details
+
+• Fixed penalty shootouts showing a winner before the shootout was finished
+
+• Cleaned up duplicate entries in the match events timeline
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Same app changes as 1.16.4 (never rolled out). Adds: bundled PNG assets losslessly
+recompressed with oxipng (~23% smaller, addresses Play Console bitmap-optimization
+recommendation). Requires a second Android OAuth client (same package name, release-key
+SHA-1: B0:77:73:F8:4C:06:A1:0D:0B:FE:5A:E8:7B:14:5E:0E:6A:9C:3D:71) in Google Cloud
+Console for Google Sign-In to work on this signed build — debug SHA-1 client is unchanged.
+```
+
+### Play Console copy — 1.16.4 (49)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.4 — My Activity & live match fixes
+```
+
+**What's new** (user-facing release notes)
+```
+• Faster, more reliable "My Activity" page — fixed pagination sometimes getting stuck, smoother scrolling
+
+• Fixed live match scores, timers, and stats not updating correctly on match details
+
+• Fixed penalty shootouts showing a winner before the shootout was finished
+
+• Cleaned up duplicate entries in the match events timeline
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Apollo cache keyArgs fix for mySavedPosts/myScheduledPosts pagination collisions with
+standalone Keeps/Scheduled screens. FixtureGql keyFields:false to stop background list
+polls clobbering the open match detail query. knockoutMainDisplayScore flat home/away
+shim fix (was always showing 0-0 live). Penalty shootout winner now gated on FINISHED
+status. New Post index (createdBy, status, createdAt) for My Activity query performance.
+```
 
 ### Play Console copy — 1.16.3 (48)
 
@@ -645,7 +709,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.16.3 (versionCode 48) |
+| Current version | 1.16.5 (versionCode 50) |
 
 ---
 
