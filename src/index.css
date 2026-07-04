@@ -13059,9 +13059,15 @@ a.cx-profile-btn-accent {
   padding: 0 5px;
   border-radius: 9px;
   background: rgb(139 92 246 / 0.2);
-  color: #c4b5fd;
+  /* #c4b5fd (light lavender) only had contrast against a dark surface —
+     on the light theme's pale violet-tinted background it was nearly
+     invisible. Dark text by default; lighten it back for dark theme below. */
+  color: #5b21b6;
   font-size: 0.68rem;
   font-weight: 800;
+}
+:root[data-theme="dark"] .cx-conn-tab-badge {
+  color: #c4b5fd;
 }
 
 .cx-conn-tab-badge--alert {
@@ -13143,6 +13149,42 @@ html[data-chrome-hidden="true"] .cx-profile-content-tabbar {
 .cx-profile-content-page .cx-conn-tabs {
   flex: 1;
   min-width: 0;
+  overflow-x: hidden;
+}
+
+/* The 4 tabs were left-packed at their natural content width, leaving the
+   shared bottom border trailing off into empty space on anything narrower
+   than the full desktop grid. Stretch them to evenly fill the row instead —
+   matches the mobile tab bar, which already splits the row 4 ways. */
+.cx-profile-content-page .cx-conn-tab {
+  flex: 1;
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 10px 10px 0 0;
+}
+
+/* Text + underline color alone was too subtle to spot at a glance — add a
+   background behind the active tab so it's unmistakable which tab is open.
+   A color-tinted pill (light theme) reads fine on a near-white surface, but
+   the same blue tint over dark theme's near-black background just looked
+   like a dull blue smear — dark theme instead gets a neutral light-overlay
+   highlight (a plain "raised surface" look), with the accent color still
+   carried by the text and underline. */
+.cx-profile-content-page .cx-conn-tab--active {
+  background: rgb(var(--cx-accent-rgb) / 0.14);
+  border-bottom-width: 3px;
+}
+/* Dark theme: no purple/blue accent at all — plain bright white text +
+   underline, just bolder/brighter than the muted inactive tabs. */
+:root[data-theme="dark"] .cx-profile-content-page .cx-conn-tab--active {
+  background: rgb(255 255 255 / 0.08);
+  color: #f5f5f7;
+  border-bottom-color: #f5f5f7;
+}
+:root[data-theme="dark"] .cx-profile-content-page .cx-conn-tab--active .cx-conn-tab-badge {
+  background: rgb(255 255 255 / 0.16);
+  color: #f5f5f7;
 }
 
 .cx-profile-content-panel::-webkit-scrollbar {

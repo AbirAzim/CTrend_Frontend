@@ -45,7 +45,7 @@ import { ProfileEngagementPanel } from "../../components/ProfileEngagementPanel"
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBar } from "../../context/TabBarContext";
 import { FeedPostCard } from "../../components/FeedPostCard";
-import { CompareIcon, VoteIcon, MessageIcon } from "../../components/ContentIcons";
+import { CompareIcon, MessageIcon } from "../../components/ContentIcons";
 
 const TAB_BAR_H = 64 + 14;
 
@@ -804,42 +804,28 @@ export default function ProfileScreen() {
           <Text style={[st.overlayTitle, { color: colors.text }]}>My Activity</Text>
           <View style={{ width: 64 }} />
         </View>
-        <View style={[st.tabRow, { borderBottomColor: colors.border }]}>
-          <Pressable
-            style={[st.tabBtn, contentTab === "drops" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("drops"); markVisited("drops"); contentLastScrollY.current = 0; showTabBar(); }}
-          >
-            <Text style={[st.tabBtnText, { color: contentTab === "drops" ? colors.accent : colors.muted }]}>
-              ✦ Drops{(summary?.dropsCount ?? 0) > 0 ? ` (${summary?.dropsCount})` : ""}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[st.tabBtn, contentTab === "scheduled" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("scheduled"); markVisited("scheduled"); contentLastScrollY.current = 0; showTabBar(); }}
-          >
-            <Text numberOfLines={1} style={[st.tabBtnText, { color: contentTab === "scheduled" ? colors.accent : colors.muted }]}>
-              ⏰ Sched{(summary?.scheduledCount ?? 0) > 0 ? ` (${summary?.scheduledCount})` : ""}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[st.tabBtn, contentTab === "kept" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("kept"); markVisited("kept"); contentLastScrollY.current = 0; showTabBar(); }}
-          >
-            <Text style={[st.tabBtnText, { color: contentTab === "kept" ? colors.accent : colors.muted }]}>
-              🔖 Kept{(summary?.keptCount ?? 0) > 0 ? ` (${summary?.keptCount})` : ""}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[st.tabBtn, contentTab === "voted" && [st.tabBtnActive, { borderBottomColor: colors.accent }]]}
-            onPress={() => { setContentTab("voted"); markVisited("voted"); contentLastScrollY.current = 0; showTabBar(); }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <VoteIcon size={14} color={contentTab === "voted" ? colors.accent : colors.muted} />
-              <Text style={[st.tabBtnText, { color: contentTab === "voted" ? colors.accent : colors.muted }]}>
-                Voted{(summary?.votedCount ?? 0) > 0 ? ` (${summary?.votedCount})` : ""}
-              </Text>
-            </View>
-          </Pressable>
+        <View style={[st.tabRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          {(
+            [
+              { key: "drops" as const, label: "Drops", count: summary?.dropsCount },
+              { key: "scheduled" as const, label: "Sched", count: summary?.scheduledCount },
+              { key: "kept" as const, label: "Kept", count: summary?.keptCount },
+              { key: "voted" as const, label: "Voted", count: summary?.votedCount },
+            ]
+          ).map((t) => {
+            const active = contentTab === t.key;
+            return (
+              <Pressable
+                key={t.key}
+                style={[st.tabBtn, active && { borderBottomColor: colors.accent }]}
+                onPress={() => { setContentTab(t.key); markVisited(t.key); contentLastScrollY.current = 0; showTabBar(); }}
+              >
+                <Text numberOfLines={1} style={[st.tabBtnText, { color: active ? colors.accent : colors.muted }]}>
+                  {t.label}{(t.count ?? 0) > 0 ? ` (${t.count})` : ""}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
         <View style={{ flex: 1 }}>
           {contentTab === "drops" && (
@@ -1216,7 +1202,6 @@ const st = StyleSheet.create({
   // Content tabs (drops/kept/voted)
   tabRow: { flexDirection: "row", borderBottomWidth: 1, marginHorizontal: 16, marginBottom: 4 },
   tabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  tabBtnActive: {},
   tabBtnText: { fontSize: 12, fontWeight: "700" },
   // Draft/scheduled post rendered as a full feed card — this strip sits above it
   // with the countdown + Edit/Cancel controls the feed card has no concept of.

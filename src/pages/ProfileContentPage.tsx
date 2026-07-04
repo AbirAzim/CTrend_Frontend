@@ -265,7 +265,7 @@ export function ProfileContentPage() {
           className={`cx-conn-tab${tab === "drops" ? " cx-conn-tab--active" : ""}`}
           onClick={() => selectTab("drops")}
         >
-          ✨ Your drops
+          Drops
           {(summary?.dropsCount ?? 0) > 0 && <span className="cx-conn-tab-badge">{summary?.dropsCount}</span>}
         </button>
         {!useMockFeed && (
@@ -276,7 +276,7 @@ export function ProfileContentPage() {
             className={`cx-conn-tab${tab === "scheduled" ? " cx-conn-tab--active" : ""}`}
             onClick={() => selectTab("scheduled")}
           >
-            ⏰ Scheduled
+            Scheduled
             {(summary?.scheduledCount ?? 0) > 0 && (
               <span className="cx-conn-tab-badge">{summary?.scheduledCount}</span>
             )}
@@ -289,7 +289,7 @@ export function ProfileContentPage() {
           className={`cx-conn-tab${tab === "kept" ? " cx-conn-tab--active" : ""}`}
           onClick={() => selectTab("kept")}
         >
-          🔖 Kept
+          Kept
           {(summary?.keptCount ?? 0) > 0 && <span className="cx-conn-tab-badge">{summary?.keptCount}</span>}
         </button>
         <button
@@ -299,7 +299,6 @@ export function ProfileContentPage() {
           className={`cx-conn-tab${tab === "voted" ? " cx-conn-tab--active" : ""}`}
           onClick={() => selectTab("voted")}
         >
-          <IconVote size={14} />
           Voted
           {(summary?.votedCount ?? 0) > 0 && <span className="cx-conn-tab-badge">{summary?.votedCount}</span>}
         </button>
