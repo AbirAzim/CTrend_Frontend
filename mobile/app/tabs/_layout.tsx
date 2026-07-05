@@ -3,6 +3,7 @@ import { useQuery, useApolloClient } from "@apollo/client/react";
 import { Tabs, router, usePathname } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import ReanimatedAnimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { MY_CONTENT_SUMMARY } from "@ctrend/shared/graphql/profile";
@@ -22,6 +23,9 @@ function FloatingTabBar(props: {
   const { isAuthenticated, user } = useAuth();
   const insets = useSafeAreaInsets();
   const { translateY, savedCount, setSavedCount } = useTabBar();
+  const barAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
   const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const { data: convData } = useQuery<{ myConversations: Array<{ unreadCount: number }> }>(
@@ -55,8 +59,8 @@ function FloatingTabBar(props: {
   }
 
   return (
-    <Animated.View
-      style={[styles.barWrap, { transform: [{ translateY }] }]}
+    <ReanimatedAnimated.View
+      style={[styles.barWrap, barAnimatedStyle]}
       pointerEvents="box-none"
     >
       <View
@@ -193,7 +197,7 @@ function FloatingTabBar(props: {
           </Animated.View>
         )}
       </View>
-    </Animated.View>
+    </ReanimatedAnimated.View>
   );
 }
 

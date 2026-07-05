@@ -44,7 +44,7 @@ export function PointsHub({ userId }: { userId?: string }) {
   const targetId = userId ?? user?.id ?? "";
 
   useEffect(() => {
-    translateY.setValue(0);
+    translateY.value = 0;
   }, [translateY]);
 
   const [tab, setTab] = useState<Tab>("history");

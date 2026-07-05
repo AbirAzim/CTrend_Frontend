@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   BackHandler,
   LayoutAnimation,
   LayoutChangeEvent,
@@ -22,6 +21,7 @@ import {
   UIManager,
   View,
 } from "react-native";
+import { Easing, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ME, MY_VOTED_POSTS, USER_POSTS, MY_CONTENT_SUMMARY } from "@ctrend/shared/graphql/profile";
 import { SWITCH_ACTIVE_ROLE } from "@ctrend/shared/graphql/auth";
@@ -268,13 +268,13 @@ export default function ProfileScreen() {
   const showTabBar = useCallback(() => {
     if (tabBarVisible.current) return;
     tabBarVisible.current = true;
-    Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    translateY.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
   }, [translateY]);
 
   const hideTabBar = useCallback(() => {
     if (!tabBarVisible.current) return;
     tabBarVisible.current = false;
-    Animated.timing(translateY, { toValue: TAB_BAR_H + insets.bottom, duration: 200, useNativeDriver: true }).start();
+    translateY.value = withTiming(TAB_BAR_H + insets.bottom, { duration: 260, easing: Easing.out(Easing.cubic) });
   }, [translateY, insets.bottom]);
 
   // Direction-based show/hide, shared by the main profile scroll and every

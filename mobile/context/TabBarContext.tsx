@@ -1,9 +1,8 @@
-import { createContext, useContext, useRef, useState } from "react";
-import { Animated } from "react-native";
+import { createContext, useContext, useState } from "react";
+import { useSharedValue, type SharedValue } from "react-native-reanimated";
 
 type TabBarCtx = {
-  translateY: Animated.Value;
-  onScroll: Animated.Value;
+  translateY: SharedValue<number>;
   savedCount: number;
   setSavedCount: (n: number) => void;
   adjustSavedCount: (delta: 1 | -1) => void;
@@ -12,8 +11,7 @@ type TabBarCtx = {
 const TabBarContext = createContext<TabBarCtx | null>(null);
 
 export function TabBarProvider({ children }: { children: React.ReactNode }) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const onScroll = useRef(new Animated.Value(0)).current;
+  const translateY = useSharedValue(0);
   const [savedCount, setSavedCountRaw] = useState(0);
 
   function setSavedCount(n: number) {
@@ -25,7 +23,7 @@ export function TabBarProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <TabBarContext.Provider value={{ translateY, onScroll, savedCount, setSavedCount, adjustSavedCount }}>
+    <TabBarContext.Provider value={{ translateY, savedCount, setSavedCount, adjustSavedCount }}>
       {children}
     </TabBarContext.Provider>
   );

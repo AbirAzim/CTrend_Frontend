@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@apollo/client/react";
 import { router, usePathname } from "expo-router";
 import { useEffect } from "react";
-import { Animated, Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MY_CONVERSATIONS } from "@ctrend/shared/graphql/messages";
 import { MY_CONTENT_SUMMARY } from "@ctrend/shared/graphql/profile";
@@ -29,6 +30,9 @@ export function BottomNav({ active }: { active?: TabName }) {
   const { isAuthenticated, user } = useAuth();
   const insets = useSafeAreaInsets();
   const { savedCount, setSavedCount, translateY } = useTabBar();
+  const barAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const pathname = usePathname();
   const wcActive = pathname?.includes("world-cup") ?? false;
@@ -102,8 +106,8 @@ export function BottomNav({ active }: { active?: TabName }) {
           backgroundColor: colors.tabBg,
           borderTopColor: colors.border,
           paddingBottom: insets.bottom + 6,
-          transform: [{ translateY }],
         },
+        barAnimatedStyle,
       ]}
     >
       {left.map(renderTab)}

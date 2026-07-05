@@ -5,7 +5,6 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
   InteractionManager,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Easing, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   CAMPAIGN_BY_SLUG,
@@ -596,7 +596,7 @@ export default function CampaignDetailScreen() {
   // Reset on focus so the footer is visible when entering the screen.
   useFocusEffect(
     useCallback(() => {
-      translateY.setValue(0);
+      translateY.value = 0;
     }, [translateY]),
   );
 
@@ -611,16 +611,16 @@ export default function CampaignDetailScreen() {
     if (y < 60) {
       if (!tabBarVisible.current) {
         tabBarVisible.current = true;
-        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+        translateY.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
       }
       return;
     }
     if (diff > 4 && tabBarVisible.current) {
       tabBarVisible.current = false;
-      Animated.timing(translateY, { toValue: TAB_BAR_H, duration: 200, useNativeDriver: true }).start();
+      translateY.value = withTiming(TAB_BAR_H, { duration: 260, easing: Easing.out(Easing.cubic) });
     } else if (diff < -4 && !tabBarVisible.current) {
       tabBarVisible.current = true;
-      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      translateY.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
     }
   }
 

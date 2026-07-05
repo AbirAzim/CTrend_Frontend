@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated as RNAnimated,
   ListRenderItem,
   Platform,
   RefreshControl,
@@ -13,6 +12,7 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  Easing,
   runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -76,15 +76,18 @@ export default function FeedScreen() {
   const { filter: filterParam } = useLocalSearchParams<{ filter?: string }>();
   const feedFilter = filterParam && filterParam.length > 0 ? filterParam : "all";
   const { translateY } = useTabBar();
-  const lastScrollY = useRef(0);
   const tabBarVisible = useRef(true);
   const tabBarAnimating = useRef(false);
   const filterVisible = useRef(true);
   const filterAnimating = useRef(false);
-  const scrollAccumRef = useRef(0);
   const insetsBottomRef = useRef(insets.bottom);
-  const chromeThrottleRef = useRef(0);
-  const atTopRef = useRef(true);
+  // Scroll bookkeeping lives on the UI thread as shared values — the scroll
+  // handler below is a worklet and only crosses to JS (via runOnJS) when a
+  // chrome show/hide actually needs to fire, instead of on every frame.
+  const lastScrollY = useSharedValue(0);
+  const scrollAccum = useSharedValue(0);
+  const chromeThrottle = useSharedValue(0);
+  const atTop = useSharedValue(true);
   const scrollY = useSharedValue(0);
   const filterProgress = useSharedValue(1);
   insetsBottomRef.current = insets.bottom;
@@ -134,12 +137,16 @@ export default function FeedScreen() {
     filterAnimating.current = false;
   }, []);
 
+  const finishTabBarAnim = useCallback(() => {
+    tabBarAnimating.current = false;
+  }, []);
+
   const showChrome = useCallback(() => {
     if (!tabBarVisible.current) {
       tabBarVisible.current = true;
       tabBarAnimating.current = true;
-      RNAnimated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        tabBarAnimating.current = false;
+      translateY.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) }, (done) => {
+        if (done) runOnJS(finishTabBarAnim)();
       });
     }
     if (!filterVisible.current) {
@@ -147,10 +154,10 @@ export default function FeedScreen() {
       filterAnimating.current = false;
       filterProgress.value = withTiming(1, { duration: 180 });
     }
-  }, [filterProgress, translateY]);
+  }, [filterProgress, finishTabBarAnim, translateY]);
 
   const applyChrome = useCallback((scrollingDown: boolean) => {
-    if (atTopRef.current) {
+    if (atTop.value) {
       showChrome();
       return;
     }
@@ -161,8 +168,8 @@ export default function FeedScreen() {
       if (tabBarVisible.current && !tabBarAnimating.current) {
         tabBarVisible.current = false;
         tabBarAnimating.current = true;
-        RNAnimated.timing(translateY, { toValue: bottomOffset, duration: 200, useNativeDriver: true }).start(() => {
-          tabBarAnimating.current = false;
+        translateY.value = withTiming(bottomOffset, { duration: 260, easing: Easing.out(Easing.cubic) }, (done) => {
+          if (done) runOnJS(finishTabBarAnim)();
         });
       }
       if (filterVisible.current && !filterAnimating.current) {
@@ -176,52 +183,59 @@ export default function FeedScreen() {
     }
 
     showChrome();
-  }, [filterProgress, finishFilterAnim, showChrome, translateY]);
+  }, [filterProgress, finishFilterAnim, finishTabBarAnim, showChrome, translateY]);
 
   const handleScrollEnd = useCallback(() => {
-    if (Math.abs(scrollAccumRef.current) >= CHROME_SCROLL_THRESHOLD) {
-      applyChrome(scrollAccumRef.current > 0);
-      scrollAccumRef.current = 0;
+    if (Math.abs(scrollAccum.value) >= CHROME_SCROLL_THRESHOLD) {
+      applyChrome(scrollAccum.value > 0);
+      scrollAccum.value = 0;
     }
-  }, [applyChrome]);
+  }, [applyChrome, scrollAccum]);
 
-  const handleScrollJS = useCallback((y: number) => {
-    const diff = y - lastScrollY.current;
-    lastScrollY.current = y;
-    scrollAccumRef.current += diff;
-
-    if (y < CHROME_AT_TOP_ENTER_Y) {
-      atTopRef.current = true;
-    } else if (y > CHROME_AT_TOP_EXIT_Y) {
-      atTopRef.current = false;
-    }
-
-    if (diff < -8 && !filterVisible.current) {
+  const showChromeIfFilterHidden = useCallback(() => {
+    if (!filterVisible.current) {
       showChrome();
     }
+  }, [showChrome]);
 
-    if (atTopRef.current) {
-      showChrome();
-      scrollAccumRef.current = 0;
-      return;
-    }
-
-    const now = Date.now();
-    if (
-      Math.abs(scrollAccumRef.current) >= CHROME_SCROLL_THRESHOLD &&
-      now - chromeThrottleRef.current >= CHROME_THROTTLE_MS
-    ) {
-      chromeThrottleRef.current = now;
-      const scrollingDown = scrollAccumRef.current > 0;
-      scrollAccumRef.current = 0;
-      applyChrome(scrollingDown);
-    }
-  }, [applyChrome, showChrome]);
-
+  // Runs on the UI thread as part of the scroll worklet below — only the
+  // final show/hide decision (rare, throttled) crosses the bridge via
+  // runOnJS, instead of every single scroll frame.
   const onFeedScroll = useAnimatedScrollHandler({
     onScroll: (e) => {
-      scrollY.value = e.contentOffset.y;
-      runOnJS(handleScrollJS)(e.contentOffset.y);
+      const y = e.contentOffset.y;
+      scrollY.value = y;
+
+      const diff = y - lastScrollY.value;
+      lastScrollY.value = y;
+      scrollAccum.value += diff;
+
+      if (y < CHROME_AT_TOP_ENTER_Y) {
+        atTop.value = true;
+      } else if (y > CHROME_AT_TOP_EXIT_Y) {
+        atTop.value = false;
+      }
+
+      if (diff < -8) {
+        runOnJS(showChromeIfFilterHidden)();
+      }
+
+      if (atTop.value) {
+        runOnJS(showChrome)();
+        scrollAccum.value = 0;
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        Math.abs(scrollAccum.value) >= CHROME_SCROLL_THRESHOLD &&
+        now - chromeThrottle.value >= CHROME_THROTTLE_MS
+      ) {
+        chromeThrottle.value = now;
+        const scrollingDown = scrollAccum.value > 0;
+        scrollAccum.value = 0;
+        runOnJS(applyChrome)(scrollingDown);
+      }
     },
   });
 
@@ -259,16 +273,18 @@ export default function FeedScreen() {
     setRemovedIds(new Set());
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
-    atTopRef.current = true;
-    lastScrollY.current = 0;
+    atTop.value = true;
+    lastScrollY.value = 0;
+    scrollAccum.value = 0;
+    chromeThrottle.value = 0;
     scrollY.value = 0;
     filterProgress.value = 1;
     filterVisible.current = true;
     filterAnimating.current = false;
     tabBarVisible.current = true;
     tabBarAnimating.current = false;
-    translateY.setValue(0);
-  }, [feedFilter, filterProgress, scrollY, translateY]);
+    translateY.value = 0;
+  }, [feedFilter, filterProgress, scrollY, translateY, atTop, lastScrollY, scrollAccum, chromeThrottle]);
 
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMoreRef.current) return;

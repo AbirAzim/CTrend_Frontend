@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Dimensions,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -22,6 +21,7 @@ import {
   UIManager,
   View,
 } from "react-native";
+import { withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTabBar } from "../../context/TabBarContext";
 import { CATEGORIES, CREATE_POST, FEED_POSTS, GET_POST_BY_ID, UPDATE_POST } from "@ctrend/shared/graphql/feed";
@@ -316,9 +316,9 @@ export default function CreateScreen() {
   const { translateY } = useTabBar();
   useFocusEffect(useCallback(() => {
     const TAB_TOTAL = 64 + 14 + insets.bottom;
-    Animated.timing(translateY, { toValue: TAB_TOTAL, duration: 180, useNativeDriver: true }).start();
+    translateY.value = withTiming(TAB_TOTAL, { duration: 180 });
     return () => {
-      Animated.timing(translateY, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+      translateY.value = withTiming(0, { duration: 180 });
     };
   }, [translateY, insets.bottom]));
 

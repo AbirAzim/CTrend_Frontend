@@ -35,7 +35,7 @@ export default function WorldCupRoadMapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      translateY.setValue(0);
+      translateY.value = 0;
       void refetch();
       return () => setViewRotated(false);
     }, [translateY, refetch]),

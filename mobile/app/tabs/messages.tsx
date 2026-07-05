@@ -199,7 +199,7 @@ export default function MessagesScreen() {
 
   // This screen doesn't hide the footer on scroll, so pin it visible on focus —
   // otherwise it inherits a hidden state left behind by the feed/profile scroll.
-  useFocusEffect(useCallback(() => { translateY.setValue(0); }, [translateY]));
+  useFocusEffect(useCallback(() => { translateY.value = 0; }, [translateY]));
   const [search, setSearch] = useState("");
 
   useEffect(() => {

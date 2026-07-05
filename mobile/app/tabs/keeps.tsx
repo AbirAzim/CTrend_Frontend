@@ -146,7 +146,7 @@ export default function KeepsScreen() {
 
   // This screen doesn't hide the footer on scroll, so pin it visible on focus —
   // otherwise it inherits a hidden state left behind by the feed/profile scroll.
-  useFocusEffect(useCallback(() => { translateY.setValue(0); }, [translateY]));
+  useFocusEffect(useCallback(() => { translateY.value = 0; }, [translateY]));
 
   const { data, loading, error, refetch } = useQuery<SavedData>(MY_SAVED_POSTS, {
     variables: { take: 100 },

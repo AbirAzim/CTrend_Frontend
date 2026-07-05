@@ -71,7 +71,7 @@ export function CoinsHub({ userId }: { userId?: string }) {
   // The feed hides the shared bottom nav on scroll (translateY). Reset it so the
   // footer is always visible on the coins page.
   useEffect(() => {
-    translateY.setValue(0);
+    translateY.value = 0;
   }, [translateY]);
 
   const [tab, setTab] = useState<Tab>("history");

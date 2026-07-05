@@ -18,6 +18,7 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native';
+import { withTiming, Easing as REasing } from 'react-native-reanimated';
 import { WORLD_CUP_FIXTURE_DETAILS } from '@ctrend/shared/graphql/worldcup';
 import {
 	buildPlayerEventMap,
@@ -1566,7 +1567,7 @@ export default function MatchDetailScreen() {
 	// Player match-stat card — opened from the MoTM card or any pitch player.
 	const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
 	// Always show footer when entering this screen
-	useState(() => { translateY.setValue(0); });
+	useState(() => { translateY.value = 0; });
 	const TAB_BAR_H = 60 + insets.bottom + 6;
 
 	function handleScroll(e: { nativeEvent: { contentOffset: { y: number } } }) {
@@ -1576,16 +1577,16 @@ export default function MatchDetailScreen() {
 		if (y < 60) {
 			if (!tabBarVisible.current) {
 				tabBarVisible.current = true;
-				Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+				translateY.value = withTiming(0, { duration: 260, easing: REasing.out(REasing.cubic) });
 			}
 			return;
 		}
 		if (diff > 4 && tabBarVisible.current) {
 			tabBarVisible.current = false;
-			Animated.timing(translateY, { toValue: TAB_BAR_H, duration: 200, useNativeDriver: true }).start();
+			translateY.value = withTiming(TAB_BAR_H, { duration: 260, easing: REasing.out(REasing.cubic) });
 		} else if (diff < -4 && !tabBarVisible.current) {
 			tabBarVisible.current = true;
-			Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+			translateY.value = withTiming(0, { duration: 260, easing: REasing.out(REasing.cubic) });
 		}
 	}
 

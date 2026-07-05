@@ -335,7 +335,7 @@ export default function WorldCupScreen() {
   const focusedRef = useRef(true);
   useFocusEffect(
     useCallback(() => {
-      translateY.setValue(0);
+      translateY.value = 0;
       focusedRef.current = true;
       return () => { focusedRef.current = false; };
     }, [translateY]),
