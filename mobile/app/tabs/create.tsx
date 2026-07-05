@@ -126,11 +126,10 @@ function makeSlot(id: string): Slot {
 }
 
 const QUICK_PRESETS = [
-  { icon: "⚡", label: "1 hr", sub: "Quick poll", hours: 1, color: "#f97316" },
-  { icon: "☀️", label: "12 hrs", sub: "Half day", hours: 12, color: "#f59e0b" },
-  { icon: "📅", label: "1 day", sub: "Recommended", hours: 24, color: "#22c55e" },
-  { icon: "🗓", label: "3 days", sub: "Extended", hours: 72, color: "#8b5cf6" },
-  { icon: "🌙", label: "7 days", sub: "One week", hours: 168, color: "#6366f1" },
+  { label: "1 hr", hours: 1, color: "#f97316" },
+  { label: "1 day", hours: 24, color: "#22c55e" },
+  { label: "3 days", hours: 72, color: "#8b5cf6" },
+  { label: "7 days", hours: 168, color: "#6366f1" },
 ] as const;
 
 function hoursFromNow(h: number): string {
@@ -165,31 +164,26 @@ function DateTimePicker({
 }) {
   return (
     <>
-      {/* Preset cards */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingBottom: 2 }}>
+      {/* Preset options — one compact row, no scrolling or stacking needed */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
         {QUICK_PRESETS.map((p) => {
           const active = presetHours === p.hours;
           return (
             <Pressable key={p.hours}
-              style={[st.presetCard, { borderColor: active ? p.color : colors.border, backgroundColor: active ? p.color + "18" : colors.section }]}
+              style={[st.presetChip, { borderColor: active ? p.color : colors.border, backgroundColor: active ? p.color + "18" : colors.section }]}
               onPress={() => onPresetChange(p.hours)}>
-              <Text style={st.presetIcon}>{p.icon}</Text>
-              <Text style={[st.presetLabel, { color: active ? p.color : colors.text }]}>{p.label}</Text>
-              <Text style={[st.presetSub, { color: active ? p.color + "cc" : colors.muted }]}>{p.sub}</Text>
-              {active && <View style={[st.presetDot, { backgroundColor: p.color }]} />}
+              <Ionicons name="time-outline" size={14} color={active ? p.color : colors.muted} />
+              <Text style={[st.presetChipText, { color: active ? p.color : colors.text }]} numberOfLines={1}>{p.label}</Text>
             </Pressable>
           );
         })}
         <Pressable
-          style={[st.presetCard, { borderColor: presetHours === null ? colors.accent : colors.border, backgroundColor: presetHours === null ? colors.accent + "18" : colors.section }]}
+          style={[st.presetChip, { borderColor: presetHours === null ? colors.accent : colors.border, backgroundColor: presetHours === null ? colors.accent + "18" : colors.section }]}
           onPress={() => onPresetChange(null)}>
-          <Text style={st.presetIcon}>✏️</Text>
-          <Text style={[st.presetLabel, { color: presetHours === null ? colors.accent : colors.text }]}>Custom</Text>
-          <Text style={[st.presetSub, { color: presetHours === null ? colors.accent + "cc" : colors.muted }]}>Pick date</Text>
-          {presetHours === null && <View style={[st.presetDot, { backgroundColor: colors.accent }]} />}
+          <Ionicons name="create-outline" size={14} color={presetHours === null ? colors.accent : colors.muted} />
+          <Text style={[st.presetChipText, { color: presetHours === null ? colors.accent : colors.text }]} numberOfLines={1}>Custom</Text>
         </Pressable>
-      </ScrollView>
+      </View>
 
       {/* Custom date-time picker */}
       {showCustom && presetHours === null && (
@@ -1379,7 +1373,7 @@ export default function CreateScreen() {
             <>
               <View style={[st.settingRow, !deadlineEnabled ? {} : { borderBottomColor: colors.border }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 14 }}>⏱</Text>
+                  <Ionicons name="time-outline" size={15} color={colors.muted} />
                   <Text style={[st.settingKey, { color: colors.text }]}>Set voting deadline</Text>
                   <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
                 </View>
@@ -1400,7 +1394,7 @@ export default function CreateScreen() {
                   />
                   <View style={[st.settingRow, { borderBottomWidth: 0 }]}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Text style={{ fontSize: 14 }}>🏆</Text>
+                      <Ionicons name="trophy-outline" size={15} color={colors.muted} />
                       <Text style={[st.settingKey, { color: colors.text }]}>Announce a winner after voting ends</Text>
                       <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
                     </View>
@@ -1851,12 +1845,10 @@ const st = StyleSheet.create({
 
   captionInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 70, textAlignVertical: "top" },
 
-  // Preset cards
-  presetCard: { width: 82, borderRadius: 14, borderWidth: 1.5, padding: 10, alignItems: "center", gap: 3, position: "relative" },
-  presetIcon: { fontSize: 20, marginBottom: 2 },
-  presetLabel: { fontSize: 12, fontWeight: "800" },
-  presetSub: { fontSize: 9, fontWeight: "500" },
-  presetDot: { position: "absolute", top: 7, right: 7, width: 7, height: 7, borderRadius: 4 },
+  // Preset options — stacked full-width rows (was a horizontally-scrolling card row)
+  // Preset options — compact chips that all fit on one row (icon + label only)
+  presetChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 4, paddingVertical: 9 },
+  presetChipText: { fontSize: 11.5, fontWeight: "800" },
 
   // Date-time picker
   dtCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },

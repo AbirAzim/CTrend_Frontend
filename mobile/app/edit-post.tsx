@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@apollo/client/react";
+import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -894,7 +895,10 @@ export default function EditPostScreen() {
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <View style={{ flex: 1, paddingRight: 12, gap: 2 }}>
-                <Text style={[st.rowKey, { color: colors.text }]}>⏰ Change voting deadline</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="time-outline" size={15} color={colors.text} />
+                  <Text style={[st.rowKey, { color: colors.text }]}>Change voting deadline</Text>
+                </View>
                 <Text style={{ fontSize: 12, color: colors.muted }}>
                   {initialVotingEnd
                     ? `Current: ${fmtScheduleSummary(new Date(initialVotingEnd))}${votingOpen ? "" : " · Closed"}`
@@ -940,7 +944,10 @@ export default function EditPostScreen() {
             {initialVotingEnd || deadlineEnabled ? (
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
                 <View style={{ flex: 1, paddingRight: 12, gap: 2 }}>
-                  <Text style={[st.rowKey, { color: colors.text }]}>🏆 Announce a winner after voting ends</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="trophy-outline" size={15} color={colors.text} />
+                    <Text style={[st.rowKey, { color: colors.text }]}>Announce a winner after voting ends</Text>
+                  </View>
                   <Text style={{ fontSize: 12, color: colors.muted }}>Optional — off by default.</Text>
                 </View>
                 <Switch
