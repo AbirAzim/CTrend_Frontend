@@ -89,6 +89,7 @@ export const FEED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
@@ -154,6 +155,7 @@ export const GET_POST_BY_ID = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
@@ -267,6 +269,7 @@ export const MY_SAVED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
@@ -328,6 +331,7 @@ export const UPDATE_POST = gql`
       }
       isVotingOpen
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       ${POST_CAMPAIGN_WINNER_FIELDS}
     }
@@ -378,6 +382,7 @@ export const CREATE_POST = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       isVotingOpen
     }
   }
@@ -405,6 +410,7 @@ export const MY_SCHEDULED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
@@ -472,6 +478,7 @@ export const EXTEND_POST_VOTING = gql`
     extendPostVoting(postId: $postId, newVotingEndsAt: $newVotingEndsAt) {
       id
       votingEndsAt
+      announceWinnerAfterVotingEnd
       isVotingOpen
     }
   }
@@ -487,6 +494,7 @@ export const POST_VOTE_UPDATED = gql`
       mySelectedOptionIndex
       myVoteAnonymous
       votingEndsAt
+      announceWinnerAfterVotingEnd
       isVotingOpen
       matchScore {
         status
@@ -531,6 +539,7 @@ export const POST_UPDATED = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       mySelectedOptionIndex

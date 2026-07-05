@@ -50,6 +50,7 @@ type EditablePost = {
   category?: { id: string; name?: string | null } | null;
   campaign?: { id: string; name?: string | null; slug?: string | null } | null;
   votingEndsAt?: string | null;
+  announceWinnerAfterVotingEnd?: boolean | null;
   isVotingOpen?: boolean | null;
   endingSoonLeadMinutes?: number | null;
   isUserGlobalBroadcast?: boolean | null;
@@ -155,6 +156,9 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   const [extendPreset, setExtendPreset] = useState("");
   const [extendDraft, setExtendDraft] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState(post.votingEndsAt ?? null);
+  const [announceWinnerAfterVotingEnd, setAnnounceWinnerAfterVotingEnd] = useState(
+    Boolean(post.announceWinnerAfterVotingEnd),
+  );
   const [scheduledAt, setScheduledAt] = useState(
     isScheduled && post.scheduledAt
       ? toLocalDateTimeInputValue(new Date(post.scheduledAt))
@@ -448,6 +452,7 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
       caption: caption.trim() || undefined,
       categoryId: categoryId || undefined,
       campaignId: campaignId.trim(),
+      ...(votingEndsAt ? { announceWinnerAfterVotingEnd } : {}),
       ...(scheduledAtInput ? { scheduledAt: scheduledAtInput } : {}),
       endingSoonLeadMinutes: isAdmin
         ? Math.max(1, Math.min(1440, Math.round(endingSoonLeadMinutes || 5)))
@@ -708,6 +713,22 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                   <small className="cx-extend-error" role="alert">{extendError}</small>
                 ) : null}
               </div>
+              {votingEndsAt && (
+                <label className="ig-voting-toggle">
+                  <span className="ig-settings-label" style={{ minWidth: 0, flex: 1 }}>
+                    <span className="ig-settings-icon">🏆</span> Announce a winner after voting ends
+                    <span className="ig-settings-optional">optional</span>
+                  </span>
+                  <span className="ig-toggle-switch-wrap">
+                    <input
+                      type="checkbox"
+                      checked={announceWinnerAfterVotingEnd}
+                      onChange={(e) => setAnnounceWinnerAfterVotingEnd(e.target.checked)}
+                    />
+                    <span className="ig-toggle-switch" aria-hidden />
+                  </span>
+                </label>
+              )}
             </div>
           )}
 

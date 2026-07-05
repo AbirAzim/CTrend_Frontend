@@ -84,6 +84,7 @@ type EditPostData = {
   category?: { id: string } | null;
   campaign?: { id: string } | null;
   votingEndsAt?: string | null;
+  announceWinnerAfterVotingEnd?: boolean | null;
   isUserGlobalBroadcast?: boolean | null;
   upvoteCount?: number | null;
   downvoteCount?: number | null;
@@ -298,6 +299,7 @@ export default function CreateScreen() {
 
   // Voting deadline
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
+  const [announceWinnerAfterVotingEnd, setAnnounceWinnerAfterVotingEnd] = useState(false);
   const [deadlinePreset, setDeadlinePreset] = useState<number | null>(24);
   const [deadlineCustom, setDeadlineCustom] = useState<Date>(() => {
     const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(20, 0, 0, 0); return d;
@@ -454,10 +456,12 @@ export default function CreateScreen() {
         setDeadlineEnabled(true);
         setDeadlinePreset(null);
         setDeadlineCustom(d);
+        setAnnounceWinnerAfterVotingEnd(Boolean(post.announceWinnerAfterVotingEnd));
       }
     } else {
       // Don't carry a deadline over from a previously-edited post.
       setDeadlineEnabled(false);
+      setAnnounceWinnerAfterVotingEnd(false);
     }
   }, [editData, isEdit, editId]);
 
@@ -792,6 +796,7 @@ export default function CreateScreen() {
       }
       if (deadlineEnabled) {
         updateInput.votingEndsAt = deadlinePreset !== null ? hoursFromNow(deadlinePreset) : deadlineCustom.toISOString();
+        updateInput.announceWinnerAfterVotingEnd = announceWinnerAfterVotingEnd;
       }
       try {
         await updatePost({ variables: { postId: editId, input: updateInput } });
@@ -816,6 +821,7 @@ export default function CreateScreen() {
 
     if (deadlineEnabled) {
       input.votingEndsAt = deadlinePreset !== null ? hoursFromNow(deadlinePreset) : deadlineCustom.toISOString();
+      input.announceWinnerAfterVotingEnd = announceWinnerAfterVotingEnd;
     }
     if (isSchedule && scheduleEnabled) {
       const scheduledAt = schedulePreset !== null
@@ -1392,6 +1398,19 @@ export default function CreateScreen() {
                     customDate={deadlineCustom} onCustomChange={setDeadlineCustom}
                     showCustom={deadlineEnabled}
                   />
+                  <View style={[st.settingRow, { borderBottomWidth: 0 }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={{ fontSize: 14 }}>🏆</Text>
+                      <Text style={[st.settingKey, { color: colors.text }]}>Announce a winner after voting ends</Text>
+                      <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
+                    </View>
+                    <Switch
+                      value={announceWinnerAfterVotingEnd}
+                      onValueChange={setAnnounceWinnerAfterVotingEnd}
+                      trackColor={{ false: colors.border, true: colors.accent }}
+                      thumbColor="#fff"
+                    />
+                  </View>
                 </View>
               )}
             </>

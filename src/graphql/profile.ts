@@ -71,6 +71,7 @@ export const MY_VOTED_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed
@@ -136,6 +137,7 @@ export const USER_POSTS = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       endingSoonLeadMinutes
       isVotingOpen
       isPrizeClaimed

@@ -37,6 +37,7 @@ export type FeedPostView = {
   caption: string | null;
   createdAt: string | null;
   votingEndsAt?: string | null;
+  announceWinnerAfterVotingEnd?: boolean | null;
   endingSoonLeadMinutes?: number | null;
   isVotingOpen?: boolean | null;
   isPrizeClaimed?: boolean | null;

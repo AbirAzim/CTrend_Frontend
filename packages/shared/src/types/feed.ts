@@ -37,6 +37,7 @@ export type FeedPostView = {
   caption: string | null;
   createdAt: string | null;
   votingEndsAt?: string | null;
+  announceWinnerAfterVotingEnd?: boolean | null;
   isVotingOpen?: boolean | null;
   /** Lead time (minutes) before deadline to show the "ending soon" banner. Default 5 (Phase 25). */
   endingSoonLeadMinutes?: number | null;

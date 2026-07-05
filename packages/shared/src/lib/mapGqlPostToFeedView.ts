@@ -38,6 +38,7 @@ export function mapGqlPostToFeedView(p: {
   caption?: string | null;
   createdAt?: string | null;
   votingEndsAt?: string | null;
+  announceWinnerAfterVotingEnd?: boolean | null;
   isVotingOpen?: boolean | null;
   endingSoonLeadMinutes?: number | null;
   upvoteCount: number;
@@ -177,6 +178,7 @@ export function mapGqlPostToFeedView(p: {
     caption: p.caption ?? null,
     createdAt: p.createdAt ?? null,
     votingEndsAt: p.votingEndsAt ?? null,
+    announceWinnerAfterVotingEnd: p.announceWinnerAfterVotingEnd ?? false,
     endingSoonLeadMinutes: p.endingSoonLeadMinutes ?? 5,
     isVotingOpen:
       p.isVotingOpen === undefined || p.isVotingOpen === null

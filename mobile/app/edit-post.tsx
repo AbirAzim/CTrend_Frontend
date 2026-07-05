@@ -191,6 +191,7 @@ export default function EditPostScreen() {
   const [initialized, setInitialized] = useState(false);
   // Published posts can change/extend their voting deadline (votingEndsAt).
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
+  const [announceWinnerAfterVotingEnd, setAnnounceWinnerAfterVotingEnd] = useState(false);
   const [votingEnd, setVotingEnd] = useState<Date>(() => {
     const d = new Date();
     d.setHours(d.getHours() + 24, 0, 0, 0);
@@ -249,6 +250,7 @@ export default function EditPostScreen() {
         setInitialVotingEnd(post.votingEndsAt);
       }
     }
+    setAnnounceWinnerAfterVotingEnd(Boolean(post.announceWinnerAfterVotingEnd));
     if (announcement) {
       // Announcement body images sit in imageUrls; there are no compare options.
       setBodyImages(
@@ -509,13 +511,18 @@ export default function EditPostScreen() {
     }
 
     // Change/extend the voting deadline (published posts only).
-    let deadlineInput: { votingEndsAt: string } | Record<string, never> = {};
+    const deadlineInput: { votingEndsAt?: string; announceWinnerAfterVotingEnd?: boolean } = {};
     if (!isScheduled && deadlineEnabled) {
       if (votingEnd.getTime() <= Date.now()) {
         setSubmitError("Voting deadline must be in the future.");
         return;
       }
-      deadlineInput = { votingEndsAt: votingEnd.toISOString() };
+      deadlineInput.votingEndsAt = votingEnd.toISOString();
+    }
+    // Announce-winner toggle is editable whenever a deadline exists (or is
+    // being set now), independent of whether the deadline date itself changed.
+    if (!isScheduled && (initialVotingEnd || deadlineEnabled)) {
+      deadlineInput.announceWinnerAfterVotingEnd = announceWinnerAfterVotingEnd;
     }
 
     if (isAnnouncement) {
@@ -928,6 +935,19 @@ export default function EditPostScreen() {
                     <Text style={[st.scheduleSummaryDate, { color: colors.text }]}>{fmtScheduleSummary(votingEnd)}</Text>
                   </View>
                 </View>
+              </View>
+            ) : null}
+            {initialVotingEnd || deadlineEnabled ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <View style={{ flex: 1, paddingRight: 12, gap: 2 }}>
+                  <Text style={[st.rowKey, { color: colors.text }]}>🏆 Announce a winner after voting ends</Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>Optional — off by default.</Text>
+                </View>
+                <Switch
+                  value={announceWinnerAfterVotingEnd}
+                  onValueChange={setAnnounceWinnerAfterVotingEnd}
+                  trackColor={{ true: colors.accent }}
+                />
               </View>
             ) : null}
           </View>

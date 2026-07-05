@@ -103,6 +103,7 @@ export const CREATE_WORLD_CUP_CAMPAIGN_POST = gql`
       status
       scheduledAt
       votingEndsAt
+      announceWinnerAfterVotingEnd
     }
   }
 `;

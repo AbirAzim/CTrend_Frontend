@@ -245,6 +245,7 @@ export const CREATE_SYSTEM_POST = gql`
       downvoteCount
       viewerVote
       votingEndsAt
+      announceWinnerAfterVotingEnd
       isVotingOpen
     }
   }
@@ -351,6 +352,7 @@ export const ADMIN_PLATFORM_POSTS = gql`
       status
       scheduledAt
       votingEndsAt
+      announceWinnerAfterVotingEnd
       isVotingOpen
       endingSoonLeadMinutes
       commentCount

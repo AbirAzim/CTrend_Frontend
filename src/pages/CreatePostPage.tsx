@@ -76,6 +76,7 @@ export function CreatePostPage() {
   const [categoryId, setCategoryId] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState("");
   const [votingEndEnabled, setVotingEndEnabled] = useState(false);
+  const [announceWinnerAfterVotingEnd, setAnnounceWinnerAfterVotingEnd] = useState(false);
   const [postType, setPostType] = useState<"regular" | "system">("regular");
   const [items, setItems] = useState<DraftCompareItem[]>([
     { id: "1", imageUrl: "", title: "", imageFocalX: DEFAULT_IMAGE_FOCAL, imageFocalY: DEFAULT_IMAGE_FOCAL },
@@ -387,6 +388,7 @@ export function CreatePostPage() {
       imageUrls: string[];
       options: Array<{ label: string; imageUrl?: string; imageFocalX?: number; imageFocalY?: number }>;
       votingEndsAt?: string;
+      announceWinnerAfterVotingEnd?: boolean;
       scheduledAt?: string;
       contentText?: string;
       caption?: string;
@@ -406,6 +408,7 @@ export function CreatePostPage() {
     }
     if (votingEndsAtIso) {
       input.votingEndsAt = votingEndsAtIso;
+      input.announceWinnerAfterVotingEnd = announceWinnerAfterVotingEnd;
     }
     if (scheduledAtIso) {
       input.scheduledAt = scheduledAtIso;
@@ -1120,11 +1123,27 @@ export function CreatePostPage() {
                   </span>
                 </label>
                 {votingEndEnabled && (
-                  <DateTimePicker
-                    value={votingEndsAt}
-                    onChange={setVotingEndsAt}
-                    minDate={new Date(Date.now() + 60_000).toISOString()}
-                  />
+                  <>
+                    <DateTimePicker
+                      value={votingEndsAt}
+                      onChange={setVotingEndsAt}
+                      minDate={new Date(Date.now() + 60_000).toISOString()}
+                    />
+                    <label className="ig-voting-toggle">
+                      <span className="ig-settings-label" style={{ minWidth: 0, flex: 1 }}>
+                        <span className="ig-settings-icon">🏆</span> Announce a winner after voting ends
+                        <span className="ig-settings-optional">optional</span>
+                      </span>
+                      <span className="ig-toggle-switch-wrap">
+                        <input
+                          type="checkbox"
+                          checked={announceWinnerAfterVotingEnd}
+                          onChange={(e) => setAnnounceWinnerAfterVotingEnd(e.target.checked)}
+                        />
+                        <span className="ig-toggle-switch" aria-hidden />
+                      </span>
+                    </label>
+                  </>
                 )}
               </div>
             </>
