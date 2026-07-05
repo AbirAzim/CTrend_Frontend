@@ -111,11 +111,11 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.16.5 release: **versionCode 50** across all three files.
+Current version after 1.16.6 release: **versionCode 51** across all three files.
 
 ---
 
-### Step 1.5 — Enable R8/minify (MUST for the next build)
+### Step 1.5 — Enable R8/minify (done — enabled starting with 1.16.6)
 
 Play Console flagged this on the 1.16.5 (50) upload:
 
@@ -124,7 +124,7 @@ Play Console flagged this on the 1.16.5 (50) upload:
 > code (R8/proguard), uploading a deobfuscation file will make crashes and ANRs easier
 > to analyze and debug. Using R8/proguard can help reduce app size.
 
-`minifyEnabled`/R8 is currently **off** (`android.enableMinifyInReleaseBuilds` isn't set in `mobile/android/gradle.properties`, so it falls back to `false` in `app/build.gradle`). Turn it on for the next release:
+`minifyEnabled`/R8 is now **on** (`android.enableMinifyInReleaseBuilds=true` + `android.enableShrinkResourcesInReleaseBuilds=true` in `mobile/android/gradle.properties`, added for 1.16.6). If it ever needs re-enabling from scratch:
 
 **`mobile/android/gradle.properties`** — add:
 ```properties
@@ -138,7 +138,7 @@ mobile/android/app/build/outputs/mapping/release/mapping.txt
 ```
 Upload this alongside the AAB in Play Console (**Create release → App bundle → Upload deobfuscation file**, or it may prompt automatically) — this silences the warning and makes future crash reports readable.
 
-**Test the release APK carefully after enabling this** — R8 can occasionally strip something needed at runtime (reflection-based code, dynamically-referenced classes) if `proguard-rules.pro` is missing a `-keep` rule for it. Do a full manual pass (login, feed, create post, chat, World Cup) on the release build before uploading, since this project skipped R8 for 1.16.4/1.16.5 specifically to isolate this risk from those releases.
+**Test the release APK carefully after enabling this** — R8 can occasionally strip something needed at runtime (reflection-based code, dynamically-referenced classes) if `proguard-rules.pro` is missing a `-keep` rule for it. Do a full manual pass (login, feed, create post, chat, World Cup) on the release build before uploading. 1.16.6 is the first release built with R8 on — confirmed a clean cold start with no fatal exceptions in logcat, but do the full manual pass before uploading since automated checking can't cover every screen.
 
 ---
 
@@ -245,6 +245,7 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.16.6 | 51 | 2026-07-05 | Bottom nav bar hide/show on scroll rewritten on Reanimated (was RN-core `Animated.timing` + per-frame JS bridge calls) — now glides smoothly instead of snapping; deadline-preview icon (📅) replaced with a monochrome calendar icon on create/edit-post; R8/ProGuard minify + resource shrinking enabled for the first time (mapping.txt uploaded to Play Console) |
 | 1.16.5 | 50 | 2026-07-04 | Same fixes as 1.16.4 (superseded — bundled image assets losslessly recompressed ~23% smaller, addressing Play Console's bitmap optimization recommendation); requires a new Android OAuth client in Google Cloud Console for the release-key SHA-1 for Google Sign-In to work on this signed build |
 | 1.16.4 | 49 | 2026-07-04 | "My Activity" pagination reliability + scroll/footer smoothness fixes; World Cup match details live score/minute/stats fixes; penalty shootout premature-winner fix; duplicate match-event cleanup |
 | 1.16.3 | 48 | 2026-07-03 | Crisp light-theme header wordmark (Caveat vector text); guest feed Log in top-right + scroll tagline animation; light header polish |
@@ -261,6 +262,36 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.16.6 (51)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.6 — Smoother navigation & icon polish
+```
+
+**What's new** (user-facing release notes)
+```
+• Smoother bottom navigation — the tab bar now glides in and out while you scroll instead of snapping
+
+• Cleaner deadline preview — simplified, consistent icon when setting a voting deadline or schedule
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Bottom tab bar (TabBarContext) migrated from RN-core Animated.Value to a Reanimated
+SharedValue; hide-on-scroll now driven by withTiming on the UI thread instead of
+Animated.timing triggered via runOnJS on every scroll frame, removing the JS-thread
+bridge contention that caused stutter. Applies to feed, profile, campaign, and World
+Cup match-detail screens. Deadline-preview pill icon (📅) replaced with Ionicons
+calendar-outline in create.tsx/edit-post.tsx. R8/ProGuard minifyEnabled + shrinkResources
+turned on for the first time (gradle.properties) — mapping.txt deobfuscation file must
+be uploaded alongside the AAB in Play Console.
+```
 
 ### Play Console copy — 1.16.5 (50)
 
@@ -666,7 +697,7 @@ Google Sign-In requires the **release SHA-1** registered in Google Cloud Console
 | Never commit `keystore.properties` or `mobile/.env` | Gitignored; contains signing secrets and production API keys |
 | Never lose the release keystore | Google cannot re-sign with a different key — losing it means you cannot ship updates to the existing listing |
 | Rebuild after any `.env` change | Env vars are baked in at bundle time, not at runtime |
-| Enable `minifyEnabled` (R8) — **required for the build after 1.16.5** | See [Step 1.5](#step-15--enable-r8minify-must-for-the-next-build). Play flagged the missing deobfuscation file on 1.16.5 (50); reduces AAB size too |
+| `minifyEnabled` (R8) is on since 1.16.6 — upload `mapping.txt` alongside every AAB | See [Step 1.5](#step-15--enable-r8minify-done--enabled-starting-with-1166). Play flagged the missing deobfuscation file on 1.16.5 (50) |
 | `build-mobile-aab-release.sh` uses `grep -E` not `grep -P` | macOS BSD grep has no `-P` flag — PCRE patterns will break on Mac, use `-E` |
 | Use `react-native-edge-to-edge` + `SystemBars` for status/nav bar styling on Android | `expo-status-bar` uses deprecated edge-to-edge APIs on Android 15+; Play Console may flag it |
 | `AppTheme` parent must be `Theme.EdgeToEdge.Material3` (no `statusBarColor` / `navigationBarColor` in `styles.xml`) | Deprecated theme attrs trigger Play Console edge-to-edge warnings |
@@ -736,7 +767,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.16.5 (versionCode 50) |
+| Current version | 1.16.6 (versionCode 51) |
 
 ---
 

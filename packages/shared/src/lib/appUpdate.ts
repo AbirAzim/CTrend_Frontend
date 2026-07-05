@@ -14,4 +14,4 @@ export const PLAY_STORE_CLOSED_TESTING_URL =
  * Keep in sync with mobile/app.json and android/app/build.gradle on every Play upload.
  * Server `platformSettings.minAndroidVersionCode` overrides this when set (> 0).
  */
-export const BUNDLED_ANDROID_VERSION_CODE = 50;
+export const BUNDLED_ANDROID_VERSION_CODE = 51;
