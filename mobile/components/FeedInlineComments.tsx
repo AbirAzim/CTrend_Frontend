@@ -116,7 +116,7 @@ export function FeedInlineComments({
 }) {
 	const { isDark } = useTheme();
 	const { isAuthenticated, user } = useAuth();
-	const { awardCoins } = useCoins();
+	const { awardCoins, spendCoins } = useCoins();
 	const insets = useSafeAreaInsets();
 	const fb = fbPalette(isDark);
 	const st = makeStyles(fb);
@@ -310,6 +310,7 @@ export function FeedInlineComments({
 	async function performDelete(c: GqlComment) {
 		try {
 			await deleteComment({ variables: { commentId: c.id } });
+			spendCoins(COIN_AMOUNTS.COMMENT);
 			await refetch();
 		} catch {
 			/* ignore */
