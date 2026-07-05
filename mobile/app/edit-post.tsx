@@ -1062,7 +1062,7 @@ export default function EditPostScreen() {
             </View>
 
             <View style={[st.scheduleSummary, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "44" }]}>
-              <Text style={{ fontSize: 18 }}>📅</Text>
+              <Ionicons name="calendar-outline" size={18} color={colors.accent} />
               <View style={{ flex: 1 }}>
                 <Text style={[st.scheduleSummaryTitle, { color: colors.accent }]}>Goes live</Text>
                 <Text style={[st.scheduleSummaryDate, { color: colors.text }]}>{fmtScheduleSummary(scheduleDate)}</Text>

@@ -1868,7 +1868,6 @@ const st = StyleSheet.create({
   dtAmPm: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   dtAmPmText: { color: "#fff", fontSize: 14, fontWeight: "800" },
   summaryPill: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, padding: 12 },
-  summaryIcon: { fontSize: 20 },
   summaryTitle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
   summaryDate: { fontSize: 13, fontWeight: "700", marginTop: 2 },
 
