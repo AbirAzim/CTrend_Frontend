@@ -242,7 +242,7 @@ function DateTimePicker({
 
       {/* Summary pill */}
       <View style={[st.summaryPill, { backgroundColor: colors.accent + "18", borderColor: colors.accent + "44" }]}>
-        <Text style={st.summaryIcon}>📅</Text>
+        <Ionicons name="calendar-outline" size={18} color={colors.accent} />
         <View style={{ flex: 1 }}>
           <Text style={[st.summaryTitle, { color: colors.accent }]}>
             {enabled ? "Deadline" : "Schedule"}
