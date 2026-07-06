@@ -91,6 +91,7 @@ import {
 } from '@ctrend/shared/lib/matchScoreCopy';
 import { isVerticalCompareLayout } from '@ctrend/shared/lib/compareLayout';
 import { ImageViewerModal } from './ImageViewerModal';
+import { AppConfirmDialog } from './AppDialog';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -2100,6 +2101,7 @@ function FeedPostCardComponent({
 	}, []);
 
 	const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+	const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 	const [reportMenuVisible, setReportMenuVisible] = useState(false);
 	const [reportReasonId, setReportReasonId] =
 		useState<ContentReportReasonId>('spam');
@@ -3019,24 +3021,19 @@ function FeedPostCardComponent({
 
 	function handleDelete() {
 		setMoreMenuVisible(false);
-		Alert.alert('Delete post', 'This cannot be undone.', [
-			{ text: 'Cancel', style: 'cancel' },
-			{
-				text: 'Delete',
-				style: 'destructive',
-				onPress: async () => {
-					try {
-						await deleteMut({
-							variables: { postId: post.id },
-							refetchQueries: [{ query: FEED_POSTS }],
-						});
-						if (isDetail) router.back();
-					} catch {
-						Alert.alert('Error', 'Could not delete the post.');
-					}
-				},
-			},
-		]);
+		setDeleteConfirmVisible(true);
+	}
+
+	async function performDelete() {
+		try {
+			await deleteMut({
+				variables: { postId: post.id },
+				refetchQueries: [{ query: FEED_POSTS }],
+			});
+			if (isDetail) router.back();
+		} catch {
+			Alert.alert('Error', 'Could not delete the post.');
+		}
 	}
 
 	async function handleTogglePin() {
@@ -4462,6 +4459,16 @@ function FeedPostCardComponent({
 				</Pressable>
 			</Modal>
 			) : null}
+
+			<AppConfirmDialog
+				visible={deleteConfirmVisible}
+				title="Delete post"
+				message="This cannot be undone."
+				confirmLabel="Delete"
+				destructive
+				onConfirm={performDelete}
+				onCancel={() => setDeleteConfirmVisible(false)}
+			/>
 
 			{/* ── Report post (non-owner) ── */}
 			{reportMenuVisible ? (
