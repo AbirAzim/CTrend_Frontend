@@ -245,6 +245,7 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.16.7 | 52 | 2026-07-06 | Delete-post confirmation redesigned — replaced the plain native Android `Alert.alert` popup with a themed `AppConfirmDialog` (rounded centered card matching app colors, styled Cancel/Delete buttons) in `FeedPostCard.tsx` |
 | 1.16.6 | 51 | 2026-07-05 | Bottom nav bar hide/show on scroll rewritten on Reanimated (was RN-core `Animated.timing` + per-frame JS bridge calls) — now glides smoothly instead of snapping; deadline-preview icon (📅) replaced with a monochrome calendar icon on create/edit-post; R8/ProGuard minify + resource shrinking enabled for the first time (mapping.txt uploaded to Play Console) |
 | 1.16.5 | 50 | 2026-07-04 | Same fixes as 1.16.4 (superseded — bundled image assets losslessly recompressed ~23% smaller, addressing Play Console's bitmap optimization recommendation); requires a new Android OAuth client in Google Cloud Console for the release-key SHA-1 for Google Sign-In to work on this signed build |
 | 1.16.4 | 49 | 2026-07-04 | "My Activity" pagination reliability + scroll/footer smoothness fixes; World Cup match details live score/minute/stats fixes; penalty shootout premature-winner fix; duplicate match-event cleanup |
@@ -262,6 +263,31 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.16.7 (52)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.7 — Redesigned delete confirmation
+```
+
+**What's new** (user-facing release notes)
+```
+• Redesigned delete-post confirmation — a cleaner popup that matches the app's look, instead of the old plain system dialog
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Replaced the native Alert.alert delete-post confirmation in FeedPostCard.tsx with the
+existing themed AppConfirmDialog component (centered rounded card, app colors, styled
+Cancel/Delete buttons). Delete flow split into handleDelete (opens dialog) and
+performDelete (runs the mutation) so state is managed explicitly instead of via
+Alert's callback list.
+```
 
 ### Play Console copy — 1.16.6 (51)
 
@@ -767,7 +793,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.16.6 (versionCode 51) |
+| Current version | 1.16.7 (versionCode 52) |
 
 ---
 
