@@ -251,11 +251,13 @@ export type NotifNavData = {
 // Comment-focused notifications → open the post scrolled to that comment.
 const COMMENT_NOTIF_TYPES = new Set([
   "POST_COMMENT", "NEW_COMMENT", "COMMENT_REPLY", "COMMENT_REACTION", "COMMENT_LIKE",
+  "COMMENT_MENTION",
 ]);
 // Post-focused notifications → open the post.
 const POST_NOTIF_TYPES = new Set([
   "POST_HYPE", "POST_VOTE", "NEW_POST_FRIEND",
   "VOTE_ENDED", "VOTE_WINNER", "POST_WINNER", "VOTE_PRIZE_CLAIMED",
+  "POST_MENTION",
 ]);
 // Person-focused notifications → open that user's profile.
 const PROFILE_NOTIF_TYPES = new Set([
@@ -299,7 +301,8 @@ export function resolveNotificationRoute(data: NotifNavData): string | null {
     (data.type === "MESSAGE" &&
       data.referenceType === "moderator_conversation" &&
       data.referenceId) ||
-    (data.referenceType === "CONVERSATION" && data.referenceId) ||
+    (data.notifType === "MESSAGE_MENTION" && data.referenceId) ||
+    ((data.referenceType ?? "").toUpperCase() === "CONVERSATION" && data.referenceId) ||
     (data.referenceType === "MESSAGE" && data.referenceId) ||
     null;
   if (chatId) return `/chat/${chatId}`;

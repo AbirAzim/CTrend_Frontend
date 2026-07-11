@@ -12,8 +12,10 @@ import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { normalizeProfileImageUrl } from "../lib/profileImageUrl";
 import { COIN_AMOUNTS, dispatchCoinEarned } from "../lib/coins";
-import { linkifyText } from "../lib/linkify";
+import { mentionifyText } from "../lib/mentionify";
 import { CommentLinkPreview } from "./CommentLinkPreview";
+import { useMentionAutocomplete } from "../hooks/useMentionAutocomplete";
+import { MentionAutocomplete } from "./MentionAutocomplete";
 
 type CommentAuthor = {
   id: string;
@@ -226,6 +228,13 @@ function CommentItem({
   const replyOpen = replyTargetId === row.id;
   const hidePickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { total: reactionTotal, top: topReactions } = reactionSummary(row.reactions);
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
+  const replyMention = useMentionAutocomplete({
+    value: replyDraft,
+    onChange: setReplyDraft,
+    mode: { kind: "global" },
+    textareaRef: replyInputRef,
+  });
 
   function openPicker() {
     if (hidePickerTimer.current) {
@@ -278,7 +287,7 @@ function CommentItem({
                 )}
               </span>
             ) : null}
-            <p className="cx-comment-body cx-fb-bubble-text">{linkifyText(row.content)}</p>
+            <p className="cx-comment-body cx-fb-bubble-text">{mentionifyText(row.content)}</p>
             <CommentLinkPreview text={row.content} />
           </div>
           {reactionTotal > 0 ? (
@@ -370,21 +379,40 @@ function CommentItem({
               onSubmitReply(row.id);
             }}
           >
-            <textarea
-              className="ig-post-comments-input cx-comment-reply-input"
-              rows={2}
-              maxLength={5000}
-              placeholder={`Reply to ${name}… (Enter to post)`}
-              value={replyDraft}
-              onChange={(ev) => setReplyDraft(ev.target.value)}
-              onKeyDown={(ev) => {
-                if (ev.key === "Enter" && !ev.shiftKey) {
-                  ev.preventDefault();
-                  onSubmitReply(row.id);
-                }
-              }}
-              autoFocus
-            />
+            <div className="cx-mention-input-wrap">
+              <textarea
+                ref={replyInputRef}
+                className="ig-post-comments-input cx-comment-reply-input"
+                rows={2}
+                maxLength={5000}
+                placeholder={`Reply to ${name}… (Enter to post)`}
+                value={replyDraft}
+                onChange={(ev) => {
+                  setReplyDraft(ev.target.value);
+                  replyMention.syncCursor();
+                }}
+                onKeyDown={(ev) => {
+                  if (replyMention.handleKeyDown(ev)) return;
+                  if (ev.key === "Enter" && !ev.shiftKey) {
+                    ev.preventDefault();
+                    onSubmitReply(row.id);
+                  }
+                }}
+                onKeyUp={replyMention.syncCursor}
+                onClick={replyMention.syncCursor}
+                autoFocus
+              />
+              {replyMention.isOpen ? (
+                <MentionAutocomplete
+                  candidates={replyMention.candidates}
+                  activeIndex={replyMention.activeIndex}
+                  onSelect={replyMention.select}
+                  onHover={replyMention.setActiveIndex}
+                  onClose={replyMention.close}
+                  anchorRef={replyInputRef}
+                />
+              ) : null}
+            </div>
             <div className="cx-comment-reply-actions">
               <button
                 type="button"
@@ -423,6 +451,13 @@ export function PostCommentsPanel({
   const { user: authUser } = useAuth();
   const [showAllComments, setShowAllComments] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const commentMention = useMentionAutocomplete({
+    value: commentDraft,
+    onChange: setCommentDraft,
+    mode: { kind: "global" },
+    textareaRef: commentInputRef,
+  });
   const [localComments, setLocalComments] = useState<LocalCommentRow[]>([]);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
@@ -846,7 +881,7 @@ export function PostCommentsPanel({
                       {formatRelativeTime(c.createdAt) || "just now"}
                     </time>
                   </div>
-                  <p className="cx-comment-body">{linkifyText(c.content)}</p>
+                  <p className="cx-comment-body">{mentionifyText(c.content)}</p>
                   <CommentLinkPreview text={c.content} />
                 </li>
               ))}
@@ -875,23 +910,42 @@ export function PostCommentsPanel({
                 ?
               </span>
             )}
-            <textarea
-              id={`comment-${postId}`}
-              className="ig-post-comments-input cx-discuss-composer-input"
-              rows={1}
-              maxLength={5000}
-              placeholder={
-                isAuthenticated ? "Add a comment…" : "Sign in to comment…"
-              }
-              value={commentDraft}
-              onChange={(ev) => setCommentDraft(ev.target.value)}
-              onKeyDown={(ev) => {
-                if (ev.key === "Enter" && !ev.shiftKey) {
-                  ev.preventDefault();
-                  submitTopComment();
+            <div className="cx-mention-input-wrap">
+              <textarea
+                id={`comment-${postId}`}
+                ref={commentInputRef}
+                className="ig-post-comments-input cx-discuss-composer-input"
+                rows={1}
+                maxLength={5000}
+                placeholder={
+                  isAuthenticated ? "Add a comment…" : "Sign in to comment…"
                 }
-              }}
-            />
+                value={commentDraft}
+                onChange={(ev) => {
+                  setCommentDraft(ev.target.value);
+                  commentMention.syncCursor();
+                }}
+                onKeyDown={(ev) => {
+                  if (commentMention.handleKeyDown(ev)) return;
+                  if (ev.key === "Enter" && !ev.shiftKey) {
+                    ev.preventDefault();
+                    submitTopComment();
+                  }
+                }}
+                onKeyUp={commentMention.syncCursor}
+                onClick={commentMention.syncCursor}
+              />
+              {commentMention.isOpen ? (
+                <MentionAutocomplete
+                  candidates={commentMention.candidates}
+                  activeIndex={commentMention.activeIndex}
+                  onSelect={commentMention.select}
+                  onHover={commentMention.setActiveIndex}
+                  onClose={commentMention.close}
+                  anchorRef={commentInputRef}
+                />
+              ) : null}
+            </div>
             <button
               type="submit"
               className="ig-post-comments-submit cx-discuss-post-btn"

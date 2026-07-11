@@ -46,6 +46,7 @@ import { MODERATOR_BRAND_NAME } from "@ctrend/shared/lib/moderatorBrand";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { ChatComposer } from "../../components/ChatComposer";
+import type { MentionCandidate } from "../../hooks/useMentionAutocomplete";
 import { LinkText } from "../../components/LinkText";
 import { MessageLinkPreview } from "../../components/MessageLinkPreview";
 import { useToast } from "../../components/useToast";
@@ -112,6 +113,7 @@ type MessagesData = { messages: Message[] };
 type Participant = {
   id: string;
   displayName?: string | null;
+  username?: string | null;
   avatarUrl?: string | null;
   online?: boolean | null;
 };
@@ -554,6 +556,14 @@ export default function ChatScreen() {
   const conv = convsData?.myConversations.find((c) => c.id === conversationId);
   const otherParticipants = (conv?.participants ?? []).filter((p) => p.id !== user?.id);
   const otherParticipant = otherParticipants[0] ?? null;
+  const mentionCandidates: MentionCandidate[] = otherParticipants
+    .filter((p): p is Participant & { username: string } => !!p.username)
+    .map((p) => ({
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName,
+      profileImageUrl: p.avatarUrl,
+    }));
   // Official platform conversation — brand identity + logo, not a regular user.
   const isModeratorConvo = conv?.type?.toLowerCase() === "moderator";
   const headerName = isModeratorConvo
@@ -1265,6 +1275,7 @@ export default function ChatScreen() {
           onToggleEmoji={toggleEmojiPicker}
           onFocus={() => setShowEmoji(false)}
           onKeyboardImage={handleKeyboardImage}
+          mentionCandidates={mentionCandidates}
         />
       </KeyboardAvoidingView>
 

@@ -56,6 +56,8 @@ function conversationStubFromMessage(
 export type Participant = {
   id: string;
   displayName: string;
+  /** For @mention autocomplete — moderator's synthetic participant has none. */
+  username?: string | null;
   avatarUrl?: string | null;
   online: boolean;
 };

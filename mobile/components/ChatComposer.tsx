@@ -13,6 +13,8 @@ import { AnimatedSendButton } from "./AnimatedSendButton";
 import type { KeyboardImagePayload } from "../lib/chatKeyboardImage";
 import { inferImageMimeType } from "../lib/presignedImageUpload";
 import { TextInputWrapper, type PasteEventPayload } from "expo-paste-input";
+import { MentionAutocomplete } from "./MentionAutocomplete";
+import { useMentionAutocomplete, type MentionCandidate } from "../hooks/useMentionAutocomplete";
 
 type ThemeColors = {
   bg: string;
@@ -42,6 +44,8 @@ type Props = {
   onFocus?: TextInputProps["onFocus"];
   onKeyboardImage?: (payload: KeyboardImagePayload) => void;
   inputRef?: RefObject<TextInput | null>;
+  /** Chat @mentions are restricted to people already in this conversation. */
+  mentionCandidates?: MentionCandidate[];
 };
 
 export function ChatComposer({
@@ -62,8 +66,14 @@ export function ChatComposer({
   onFocus,
   onKeyboardImage,
   inputRef,
+  mentionCandidates = [],
 }: Props) {
   const hasText = value.trim().length > 0;
+  const mention = useMentionAutocomplete({
+    value,
+    onChange: onChangeText,
+    mode: { kind: "participants", participants: mentionCandidates },
+  });
 
   function handlePaste(payload: PasteEventPayload) {
     if (payload.type !== "images" || payload.uris.length === 0) return;
@@ -79,12 +89,14 @@ export function ChatComposer({
       style={[
         st.bar,
         {
+          position: "relative",
           backgroundColor: surfaceColor ?? colors.bg,
           borderTopColor: colors.border,
           paddingBottom: bottomInset + 10,
         },
       ]}
     >
+      <MentionAutocomplete candidates={mention.candidates} onSelect={mention.select} />
       {onToggleEmoji ? (
         <Pressable
           onPress={onToggleEmoji}
@@ -135,6 +147,8 @@ export function ChatComposer({
             placeholderTextColor={colors.muted}
             value={value}
             onChangeText={onChangeText}
+            onSelectionChange={mention.onSelectionChange}
+            onBlur={mention.handleBlur}
             onFocus={onFocus}
             multiline
             maxLength={maxLength}

@@ -33,8 +33,10 @@ import { useCoins } from '../context/CoinsContext';
 import { COIN_AMOUNTS } from '@ctrend/shared/lib/coins';
 import { useTheme } from '../context/ThemeContext';
 import { AppConfirmDialog } from './AppDialog';
-import { LinkifyText } from '../lib/linkify';
+import { MentionifyText } from '../lib/mentionify';
 import { CommentLinkPreview } from './CommentLinkPreview';
+import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
+import { MentionAutocomplete } from './MentionAutocomplete';
 
 type GqlComment = {
 	id: string;
@@ -133,6 +135,14 @@ export function FeedInlineComments({
 	const listRef = useRef<KeyboardAwareScrollViewRef>(null);
 	const commentOffsets = useRef<Record<string, number>>({});
 	const textRef = useRef('');
+	const mention = useMentionAutocomplete({
+		value: text,
+		onChange: (next) => {
+			textRef.current = next;
+			setText(next);
+		},
+		mode: { kind: 'global' },
+	});
 	const replyTargetRef = useRef<{ id: string; name: string } | null>(null);
 	replyTargetRef.current = replyTarget;
 
@@ -398,10 +408,11 @@ export function FeedInlineComments({
 							</View>
 						) : (
 							<>
-								<LinkifyText
+								<MentionifyText
 									text={c.content}
 									style={st.content}
 									linkStyle={{ color: fb.link, fontWeight: '600' }}
+									mentionStyle={{ color: fb.link, fontWeight: '600' }}
 								/>
 								{c.editedAt ? (
 									<Text style={st.editedTag}> (edited)</Text>
@@ -575,6 +586,7 @@ export function FeedInlineComments({
 							)}
 						</View>
 						<View style={st.composerPill}>
+							<MentionAutocomplete candidates={mention.candidates} onSelect={mention.select} />
 							<TextInput
 								ref={inputRef}
 								style={st.input}
@@ -591,6 +603,8 @@ export function FeedInlineComments({
 									textRef.current = value;
 									setText(value);
 								}}
+								onSelectionChange={mention.onSelectionChange}
+								onBlur={mention.handleBlur}
 								editable={isAuthenticated && !sending}
 								multiline
 								maxLength={1000}
@@ -833,6 +847,7 @@ function makeStyles(fb: FbPalette) {
 		},
 		composerAvatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 		composerPill: {
+			position: 'relative',
 			flex: 1,
 			backgroundColor: fb.input,
 			borderRadius: 20,

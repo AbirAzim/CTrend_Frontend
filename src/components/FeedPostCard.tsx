@@ -57,7 +57,7 @@ import { ContentReportModal } from "./ContentReportModal";
 import { EditPostModal } from "./EditPostModal";
 import { imageObjectPosition } from "../lib/imageFocal";
 import { categoryColorRgb } from "../lib/categoryColor";
-import { linkifyText } from "../lib/linkify";
+import { mentionifyText } from "../lib/mentionify";
 import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coins";
 import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaignWinner";
 import {
@@ -2253,7 +2253,7 @@ function FeedPostCardComponent({
       {/* Caption — always visible above the compare images */}
       {post.caption && (
         <div className={`cx-post-caption-bar${isAnnouncement ? " cx-post-caption-bar--announcement" : ""}`}>
-          {linkifyText(post.caption)}
+          {mentionifyText(post.caption)}
         </div>
       )}
 
@@ -3163,7 +3163,7 @@ function FeedPostCardComponent({
                     >
                       {authorName}
                     </NavLink>
-                    <span className="cx-comment-preview-text">{linkifyText(c.content)}</span>
+                    <span className="cx-comment-preview-text">{mentionifyText(c.content)}</span>
                   </div>
                 </div>
               );

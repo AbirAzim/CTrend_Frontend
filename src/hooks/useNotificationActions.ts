@@ -115,6 +115,12 @@ export function useNotificationActions() {
         return;
       }
 
+      if (n.type === "MESSAGE_MENTION" && n.referenceId) {
+        void refetchConversations();
+        openChat(n.referenceId);
+        return;
+      }
+
       if (
         (n.type === "FRIEND_REQUEST" || n.type === "FRIEND_REQUEST_ACCEPTED") &&
         n.referenceId

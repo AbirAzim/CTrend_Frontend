@@ -13,6 +13,7 @@ export const MY_CONVERSATIONS = gql`
       participants {
         id
         displayName
+        username
         avatarUrl
         online
       }
@@ -73,6 +74,7 @@ export const START_DIRECT_CONVERSATION = gql`
       participants {
         id
         displayName
+        username
         avatarUrl
         online
       }
@@ -95,6 +97,7 @@ export const CONTACT_ADMIN = gql`
       participants {
         id
         displayName
+        username
         avatarUrl
         online
       }
@@ -116,6 +119,7 @@ export const CREATE_GROUP_CONVERSATION = gql`
       participants {
         id
         displayName
+        username
         avatarUrl
         online
       }

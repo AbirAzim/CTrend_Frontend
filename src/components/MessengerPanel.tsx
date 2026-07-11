@@ -15,6 +15,8 @@ import {
   TYPING_INDICATOR_SUB,
 } from "../graphql/messages";
 import { MY_FRIENDS } from "../graphql/friends";
+import { useMentionAutocomplete, type MentionCandidate } from "../hooks/useMentionAutocomplete";
+import { MentionAutocomplete } from "./MentionAutocomplete";
 
 const MODERATOR_SENDER_ID = "moderator";
 
@@ -579,6 +581,20 @@ function ChatWindow({
   }
 
   const otherParticipants = conversation.participants.filter((p) => p.id !== user?.id);
+  const mentionCandidates: MentionCandidate[] = otherParticipants
+    .filter((p): p is typeof p & { username: string } => !!p.username)
+    .map((p) => ({
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName,
+      profileImageUrl: p.avatarUrl,
+    }));
+  const mention = useMentionAutocomplete({
+    value: text,
+    onChange: (next) => handleInput(next),
+    mode: { kind: "participants", participants: mentionCandidates },
+    textareaRef: inputRef,
+  });
   const isModeratorConvo = conversation.type?.toLowerCase() === "moderator";
   const windowTitle =
     isModeratorConvo
@@ -945,11 +961,29 @@ function ChatWindow({
                 rows={1}
                 value={text}
                 placeholder={pendingImage ? "Add a caption…" : "Message…"}
-                onChange={(e) => handleInput(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onChange={(e) => {
+                  handleInput(e.target.value);
+                  mention.syncCursor();
+                }}
+                onKeyDown={(e) => {
+                  if (mention.handleKeyDown(e)) return;
+                  handleKeyDown(e);
+                }}
+                onKeyUp={mention.syncCursor}
+                onClick={mention.syncCursor}
                 onPaste={handlePaste}
                 disabled={uploading}
               />
+              {mention.isOpen ? (
+                <MentionAutocomplete
+                  candidates={mention.candidates}
+                  activeIndex={mention.activeIndex}
+                  onSelect={mention.select}
+                  onHover={mention.setActiveIndex}
+                  onClose={mention.close}
+                  anchorRef={inputRef}
+                />
+              ) : null}
             </div>
             <button
               type="button"

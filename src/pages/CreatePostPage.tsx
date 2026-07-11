@@ -15,6 +15,8 @@ import { ImagePositionEditor } from "../components/ImagePositionEditor";
 import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL, hasCustomFocal, imageObjectPosition } from "../lib/imageFocal";
 import { FeedPostCard } from "../components/FeedPostCard";
+import { MentionAutocomplete } from "../components/MentionAutocomplete";
+import { useMentionAutocomplete } from "../hooks/useMentionAutocomplete";
 import type { FeedPostView, CompareLayout } from "../types/feed";
 import {
   compareCellAspectRatio,
@@ -73,6 +75,13 @@ export function CreatePostPage() {
   const lastItemRef = useRef<HTMLDivElement | null>(null);
 
   const [caption, setCaption] = useState("");
+  const captionInputRef = useRef<HTMLTextAreaElement>(null);
+  const captionMention = useMentionAutocomplete({
+    value: caption,
+    onChange: setCaption,
+    mode: { kind: "global" },
+    textareaRef: captionInputRef,
+  });
   const [categoryId, setCategoryId] = useState("");
   const [votingEndsAt, setVotingEndsAt] = useState("");
   const [votingEndEnabled, setVotingEndEnabled] = useState(false);
@@ -1089,16 +1098,35 @@ export function CreatePostPage() {
               <span className="ig-settings-icon">✎</span> Caption
               <span className="ig-settings-optional">optional</span>
             </label>
-            <textarea
-              id="create-caption"
-              name="caption"
-              rows={2}
-              className="ig-settings-textarea"
-              value={caption}
-              onChange={(ev) => setCaption(ev.target.value)}
-              placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
-              autoComplete="off"
-            />
+            <div className="cx-mention-input-wrap">
+              <textarea
+                id="create-caption"
+                ref={captionInputRef}
+                name="caption"
+                rows={2}
+                className="ig-settings-textarea"
+                value={caption}
+                onChange={(ev) => {
+                  setCaption(ev.target.value);
+                  captionMention.syncCursor();
+                }}
+                onKeyDown={captionMention.handleKeyDown}
+                onKeyUp={captionMention.syncCursor}
+                onClick={captionMention.syncCursor}
+                placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
+                autoComplete="off"
+              />
+              {captionMention.isOpen ? (
+                <MentionAutocomplete
+                  candidates={captionMention.candidates}
+                  activeIndex={captionMention.activeIndex}
+                  onSelect={captionMention.select}
+                  onHover={captionMention.setActiveIndex}
+                  onClose={captionMention.close}
+                  anchorRef={captionInputRef}
+                />
+              ) : null}
+            </div>
           </div>
 
           {!isAnnouncement && (

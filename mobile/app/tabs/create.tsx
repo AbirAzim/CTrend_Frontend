@@ -39,6 +39,8 @@ import { useCoins } from "../../context/CoinsContext";
 import { COIN_AMOUNTS } from "@ctrend/shared/lib/coins";
 import { useTheme } from "../../context/ThemeContext";
 import { FeedPostCard } from "../../components/FeedPostCard";
+import { MentionAutocomplete } from "../../components/MentionAutocomplete";
+import { useMentionAutocomplete } from "../../hooks/useMentionAutocomplete";
 import type { FeedPostView, CompareLayout } from "@ctrend/shared/types/feed";
 import { toGqlCompareLayout, normalizeCompareLayout, compareCropAspect, compareCellAspectRatio } from "@ctrend/shared/lib/compareLayout";
 import { Ionicons } from "@expo/vector-icons";
@@ -278,6 +280,11 @@ export default function CreateScreen() {
   // Poll-only body/context images (post-level imageUrls). Optional, 0+.
   const [bodyImages, setBodyImages] = useState<BodyImg[]>([]);
   const [caption, setCaption] = useState("");
+  const captionMention = useMentionAutocomplete({
+    value: caption,
+    onChange: setCaption,
+    mode: { kind: "global" },
+  });
   const [categoryId, setCategoryId] = useState("");
   // Pre-select platform-wide when admin arrives from "+ New platform post"
   const [platformWide, setPlatformWide] = useState(platformParam === "1");
@@ -1356,16 +1363,21 @@ export default function CreateScreen() {
               <Text style={[st.settingKey, { color: colors.text }]}>Caption</Text>
               <Text style={[st.optional, { color: colors.muted }]}>optional</Text>
             </View>
-            <TextInput
-              style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
-              value={caption}
-              onChangeText={setCaption}
-              placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
-              placeholderTextColor={colors.muted}
-              multiline
-              numberOfLines={3}
-              maxLength={300}
-            />
+            <View style={{ position: "relative" }}>
+              <MentionAutocomplete candidates={captionMention.candidates} onSelect={captionMention.select} />
+              <TextInput
+                style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                value={caption}
+                onChangeText={setCaption}
+                onSelectionChange={captionMention.onSelectionChange}
+                onBlur={captionMention.handleBlur}
+                placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
+                placeholderTextColor={colors.muted}
+                multiline
+                numberOfLines={3}
+                maxLength={300}
+              />
+            </View>
           </View>
 
           {/* Set voting deadline — hidden for announcements */}

@@ -77,7 +77,7 @@ import {
 } from '@ctrend/shared/lib/contentReport';
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
-import { LinkifyText } from '../lib/linkify';
+import { MentionifyText } from '../lib/mentionify';
 import {
   isKnockoutStage,
 } from '@ctrend/shared/lib/knockoutFixture';
@@ -3488,7 +3488,7 @@ function FeedPostCardComponent({
 
 			{/* Caption */}
 			{post.caption ? (
-				<LinkifyText
+				<MentionifyText
 					text={post.caption}
 					style={[st.caption, ...(isAnnouncement ? [st.captionAnnouncement] : [])]}
 				/>
@@ -4545,7 +4545,7 @@ function FeedPostCardComponent({
 												accessibilityLabel={`View comments, including ${cmtName}'s comment`}
 											>
 												<Text style={st.commentPreviewAuthor}>{cmtName}</Text>
-												<LinkifyText text={cmt.content} style={st.commentPreviewText} />
+												<MentionifyText text={cmt.content} style={st.commentPreviewText} />
 											</Pressable>
 										</View>
 									);

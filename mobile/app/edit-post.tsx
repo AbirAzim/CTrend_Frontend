@@ -37,6 +37,8 @@ import { CompareImageCropper } from "../components/CompareImageCropper";
 import { DEFAULT_IMAGE_FOCAL } from "../lib/imageFocal";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { MentionAutocomplete } from "../components/MentionAutocomplete";
+import { useMentionAutocomplete } from "../hooks/useMentionAutocomplete";
 
 type UploadUrlData = { getImageUploadUrl: { uploadUrl: string; publicUrl: string; key: string } };
 
@@ -162,6 +164,11 @@ export default function EditPostScreen() {
   const categories = catData?.categories ?? [];
 
   const [caption, setCaption] = useState("");
+  const captionMention = useMentionAutocomplete({
+    value: caption,
+    onChange: setCaption,
+    mode: { kind: "global" },
+  });
   const [categoryId, setCategoryId] = useState("");
   const [options, setOptions] = useState<
     Array<{ label: string; imageUrl: string; imageFocalX?: number | null; imageFocalY?: number | null }>
@@ -837,16 +844,21 @@ export default function EditPostScreen() {
             <Text style={[st.rowKey, { color: colors.text }]}>
               Caption  <Text style={{ fontSize: 12, fontWeight: "400", color: colors.muted }}>optional</Text>
             </Text>
-            <TextInput
-              style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
-              value={caption}
-              onChangeText={setCaption}
-              placeholder={isAnnouncement ? "Write your announcement…" : isPoll ? "What's this poll about?" : "What are you comparing?"}
-              placeholderTextColor={colors.muted}
-              multiline
-              numberOfLines={2}
-              maxLength={300}
-            />
+            <View style={{ position: "relative" }}>
+              <MentionAutocomplete candidates={captionMention.candidates} onSelect={captionMention.select} />
+              <TextInput
+                style={[st.captionInput, { backgroundColor: colors.section, borderColor: colors.border, color: colors.text }]}
+                value={caption}
+                onChangeText={setCaption}
+                onSelectionChange={captionMention.onSelectionChange}
+                onBlur={captionMention.handleBlur}
+                placeholder={isAnnouncement ? "Write your announcement…" : isPoll ? "What's this poll about?" : "What are you comparing?"}
+                placeholderTextColor={colors.muted}
+                multiline
+                numberOfLines={2}
+                maxLength={300}
+              />
+            </View>
           </View>
 
           {/* Audience: friends-only ↔ platform-wide (owners only) */}

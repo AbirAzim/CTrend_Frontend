@@ -9,6 +9,8 @@ import { useImageUpload } from "../lib/useImageUpload";
 import { getApolloErrorMessage } from "../lib/apolloErrorMessage";
 import { useAuth } from "../context/AuthContext";
 import { IconPoll, IconImages } from "./IgIcons";
+import { MentionAutocomplete } from "./MentionAutocomplete";
+import { useMentionAutocomplete } from "../hooks/useMentionAutocomplete";
 import type { CompareLayout } from "../types/feed";
 import { normalizeCompareLayout, compareCropAspect, toGqlCompareLayout } from "@ctrend/shared/lib/compareLayout";
 
@@ -141,6 +143,13 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
   }));
 
   const [caption, setCaption] = useState(post.caption ?? "");
+  const captionInputRef = useRef<HTMLTextAreaElement>(null);
+  const captionMention = useMentionAutocomplete({
+    value: caption,
+    onChange: setCaption,
+    mode: { kind: "global" },
+    textareaRef: captionInputRef,
+  });
   const [items, setItems] = useState<CompareItem[]>(initialItems);
   const [pollOptions, setPollOptions] = useState<PollOption[]>(initialPollOptions);
   const [bodyImages, setBodyImages] = useState<BodyImage[]>(initialBodyImages);
@@ -568,14 +577,33 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
         <div className="cx-modal-body">
           <label className="cx-edit-label">
             Caption
-            <textarea
-              className="cx-edit-textarea"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder={isPoll ? "What's this poll about?" : "What's this compare about?"}
-              rows={2}
-              maxLength={1000}
-            />
+            <div className="cx-mention-input-wrap">
+              <textarea
+                ref={captionInputRef}
+                className="cx-edit-textarea"
+                value={caption}
+                onChange={(e) => {
+                  setCaption(e.target.value);
+                  captionMention.syncCursor();
+                }}
+                onKeyDown={captionMention.handleKeyDown}
+                onKeyUp={captionMention.syncCursor}
+                onClick={captionMention.syncCursor}
+                placeholder={isPoll ? "What's this poll about?" : "What's this compare about?"}
+                rows={2}
+                maxLength={1000}
+              />
+              {captionMention.isOpen ? (
+                <MentionAutocomplete
+                  candidates={captionMention.candidates}
+                  activeIndex={captionMention.activeIndex}
+                  onSelect={captionMention.select}
+                  onHover={captionMention.setActiveIndex}
+                  onClose={captionMention.close}
+                  anchorRef={captionInputRef}
+                />
+              ) : null}
+            </div>
           </label>
 
           {categories.length > 0 && (
