@@ -58,6 +58,7 @@ import { EditPostModal } from "./EditPostModal";
 import { imageObjectPosition } from "../lib/imageFocal";
 import { categoryColorRgb } from "../lib/categoryColor";
 import { mentionifyText } from "../lib/mentionify";
+import { ExpandableCaption } from "./ExpandableCaption";
 import { COIN_AMOUNTS, dispatchCoinEarned, dispatchCoinSpent } from "../lib/coins";
 import { isResolvedCampaignWinner } from "../../packages/shared/src/lib/campaignWinner";
 import {
@@ -692,12 +693,19 @@ function FeedPostCardComponent({
   const [hypers, setHypers] = useState<HyperRow[]>([]);
   const [hypersLoading, setHypersLoading] = useState(false);
   const [hypersError, setHypersError] = useState<string | null>(null);
+  // Facebook-style emoji tab filter for the "Reacted by" list — client-side
+  // since the full (≤200) list is already loaded in one shot.
+  const [hypersEmojiFilter, setHypersEmojiFilter] = useState<string | null>(null);
+  const filteredHypers = hypersEmojiFilter
+    ? hypers.filter((h) => h.reactionEmoji === hypersEmojiFilter)
+    : hypers;
   const [fetchHypers] = useLazyQuery<{ hypersByPost: HyperRow[] }>(HYPERS_BY_POST, {
     fetchPolicy: "network-only",
   });
   async function openHypers() {
     if (voteMode !== "api" || hypeCountLive <= 0) return;
     setShowHypers(true);
+    setHypersEmojiFilter(null);
     setHypersLoading(true);
     setHypersError(null);
     try {
@@ -2253,7 +2261,7 @@ function FeedPostCardComponent({
       {/* Caption — always visible above the compare images */}
       {post.caption && (
         <div className={`cx-post-caption-bar${isAnnouncement ? " cx-post-caption-bar--announcement" : ""}`}>
-          {mentionifyText(post.caption)}
+          <ExpandableCaption text={post.caption} />
         </div>
       )}
 
@@ -3316,15 +3324,28 @@ function FeedPostCardComponent({
                 Close
               </button>
             </div>
-            {reactionsLive.length > 0 ? (
+            {reactionsLive.length > 1 ? (
               <div className="cx-reaction-breakdown-row">
+                <button
+                  type="button"
+                  className={`cx-reaction-breakdown-chip${hypersEmojiFilter === null ? " cx-reaction-breakdown-chip--active" : ""}`}
+                  onClick={() => setHypersEmojiFilter(null)}
+                >
+                  <span className="cx-reaction-breakdown-chip-all">All</span>
+                  <span className="cx-reaction-breakdown-chip-count">{hypers.length}</span>
+                </button>
                 {[...reactionsLive]
                   .sort((a, b) => b.count - a.count)
                   .map((r) => (
-                    <span key={r.emoji} className="cx-reaction-breakdown-chip">
+                    <button
+                      type="button"
+                      key={r.emoji}
+                      className={`cx-reaction-breakdown-chip${hypersEmojiFilter === r.emoji ? " cx-reaction-breakdown-chip--active" : ""}`}
+                      onClick={() => setHypersEmojiFilter(r.emoji)}
+                    >
                       <ReactionGlyph emoji={r.emoji} size={18} />
                       <span className="cx-reaction-breakdown-chip-count">{r.count}</span>
-                    </span>
+                    </button>
                   ))}
               </div>
             ) : null}
@@ -3340,10 +3361,13 @@ function FeedPostCardComponent({
             {!hypersLoading && !hypersError && hypers.length === 0 ? (
               <p className="cx-voters-empty muted small">No reactions yet.</p>
             ) : null}
-            {!hypersLoading && hypers.length > 0 ? (
+            {!hypersLoading && !hypersError && hypers.length > 0 && filteredHypers.length === 0 ? (
+              <p className="cx-voters-empty muted small">No one reacted with this emoji.</p>
+            ) : null}
+            {!hypersLoading && filteredHypers.length > 0 ? (
               <div className="cx-voters-scroll">
                 <ul className="cx-voter-list">
-                  {hypers.map((h) => {
+                  {filteredHypers.map((h) => {
                     const src = normalizeProfileImageUrl(h.profileImageUrl);
                     const name = hyperDisplayName(h);
                     return (

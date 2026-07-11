@@ -855,8 +855,8 @@ export default function EditPostScreen() {
                 placeholder={isAnnouncement ? "Write your announcement…" : isPoll ? "What's this poll about?" : "What are you comparing?"}
                 placeholderTextColor={colors.muted}
                 multiline
-                numberOfLines={2}
-                maxLength={300}
+                numberOfLines={6}
+                maxLength={2200}
               />
             </View>
           </View>
@@ -1170,7 +1170,7 @@ const st = StyleSheet.create({
   audienceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1 },
   rowKey: { fontSize: 14, fontWeight: "600" },
   rowVal: { fontSize: 14 },
-  captionInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 60, textAlignVertical: "top" },
+  captionInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 140, textAlignVertical: "top" },
   errorBanner: { borderRadius: 10, padding: 12 },
   presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   presetChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },

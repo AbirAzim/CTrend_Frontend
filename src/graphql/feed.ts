@@ -386,10 +386,11 @@ export const VOTERS_BY_POST = gql`
   }
 `;
 
-/** Users who hyped a post — Instagram-style "hyped by" list. */
+/** Users who hyped a post — Instagram-style "hyped by" list. Pass `emoji` to
+ * filter to only that reaction (Facebook-style per-emoji tabs). */
 export const HYPERS_BY_POST = gql`
-  query HypersByPost($postId: ID!, $search: String, $skip: Int, $take: Int) {
-    hypersByPost(postId: $postId, search: $search, skip: $skip, take: $take) {
+  query HypersByPost($postId: ID!, $search: String, $skip: Int, $take: Int, $emoji: String) {
+    hypersByPost(postId: $postId, search: $search, skip: $skip, take: $take, emoji: $emoji) {
       id
       username
       displayName

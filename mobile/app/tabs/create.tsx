@@ -1374,8 +1374,8 @@ export default function CreateScreen() {
                 placeholder={isAnnouncement ? "Write your announcement… (links become clickable)" : isPoll ? "Ask your question… (links become clickable)" : "What are you comparing?"}
                 placeholderTextColor={colors.muted}
                 multiline
-                numberOfLines={3}
-                maxLength={300}
+                numberOfLines={6}
+                maxLength={2200}
               />
             </View>
           </View>
@@ -1855,7 +1855,7 @@ const st = StyleSheet.create({
   typeChip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
   typeChipText: { fontSize: 12, fontWeight: "700" },
 
-  captionInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 70, textAlignVertical: "top" },
+  captionInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, minHeight: 140, textAlignVertical: "top" },
 
   // Preset options — stacked full-width rows (was a horizontally-scrolling card row)
   // Preset options — compact chips that all fit on one row (icon + label only)

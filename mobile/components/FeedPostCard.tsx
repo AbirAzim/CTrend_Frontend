@@ -78,6 +78,7 @@ import {
 import { submitContentReport } from '@ctrend/shared/lib/submitContentReport';
 import { getApolloErrorMessage } from '../lib/apolloErrorMessage';
 import { MentionifyText } from '../lib/mentionify';
+import { ExpandableCaption } from './ExpandableCaption';
 import {
   isKnockoutStage,
 } from '@ctrend/shared/lib/knockoutFixture';
@@ -1391,8 +1392,19 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			paddingVertical: 4,
 			borderRadius: 999,
 			backgroundColor: c.section,
+			borderWidth: 1,
+			borderColor: 'transparent',
+		},
+		reactionBreakdownChipActive: {
+			borderColor: c.accent,
+			backgroundColor: withAlpha(c.accent, isDark ? 0.22 : 0.12),
 		},
 		reactionBreakdownChipCount: {
+			fontSize: 12,
+			fontWeight: '800' as const,
+			color: c.text,
+		},
+		reactionBreakdownChipAllText: {
 			fontSize: 12,
 			fontWeight: '800' as const,
 			color: c.text,
@@ -3423,7 +3435,7 @@ function FeedPostCardComponent({
 
 			{/* Caption */}
 			{post.caption ? (
-				<MentionifyText
+				<ExpandableCaption
 					text={post.caption}
 					style={[st.caption, ...(isAnnouncement ? [st.captionAnnouncement] : [])]}
 				/>
@@ -4326,7 +4338,7 @@ function FeedPostCardComponent({
 											hitSlop={4}>
 											<View style={st.chipIconWrap}>
 												{isHype && active && viewerReaction ? (
-													<ReactionGlyph emoji={viewerReaction} size={28} />
+													<ReactionGlyph emoji={viewerReaction} size={22} />
 												) : (
 													<Ionicons
 														name={
@@ -5060,12 +5072,14 @@ type FeedHypersPanelProps = {
 function FeedHypersPanel({ visible, onClose, postId, colors, st, client, reactions }: FeedHypersPanelProps) {
 	const [search, setSearch] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
+	const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
 	const [hypers, setHypers] = useState<FeedGqlHyper[]>([]);
 	const [hasMore, setHasMore] = useState(true);
 	const [loadingInitial, setLoadingInitial] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const reqIdRef = useRef(0);
 	const hypersRef = useRef<FeedGqlHyper[]>([]);
+	const totalCount = reactions.reduce((sum, r) => sum + r.count, 0);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -5081,7 +5095,13 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client, reactio
 				const base = append ? hypersRef.current : [];
 				const { data } = await client.query<{ hypersByPost: FeedGqlHyper[] }>({
 					query: HYPERS_BY_POST,
-					variables: { postId, search: debouncedSearch || null, skip: base.length, take: HYPERS_PAGE },
+					variables: {
+						postId,
+						search: debouncedSearch || null,
+						skip: base.length,
+						take: HYPERS_PAGE,
+						emoji: selectedEmoji,
+					},
 					fetchPolicy: 'network-only',
 				});
 				if (reqIdRef.current !== reqId) return;
@@ -5096,17 +5116,18 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client, reactio
 				if (reqIdRef.current === reqId) { setLoadingInitial(false); setLoadingMore(false); }
 			}
 		},
-		[client, postId, debouncedSearch],
+		[client, postId, debouncedSearch, selectedEmoji],
 	);
 
 	useEffect(() => {
 		if (!visible) return;
 		void fetchHypers(false);
-	}, [visible, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [visible, debouncedSearch, selectedEmoji]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	function handleClose() {
 		setHypers([]);
 		setSearch('');
+		setSelectedEmoji(null);
 		setHasMore(true);
 		reqIdRef.current++;
 		onClose();
@@ -5123,15 +5144,24 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client, reactio
 							<Text style={st.votersCloseText}>✕</Text>
 						</Pressable>
 					</View>
-					{reactions.length > 0 ? (
+					{reactions.length > 1 ? (
 						<View style={st.reactionBreakdownRow}>
+							<Pressable
+								style={[st.reactionBreakdownChip, selectedEmoji === null && st.reactionBreakdownChipActive]}
+								onPress={() => setSelectedEmoji(null)}>
+								<Text style={st.reactionBreakdownChipAllText}>All</Text>
+								<Text style={st.reactionBreakdownChipCount}>{totalCount}</Text>
+							</Pressable>
 							{[...reactions]
 								.sort((a, b) => b.count - a.count)
 								.map((r) => (
-									<View key={r.emoji} style={st.reactionBreakdownChip}>
+									<Pressable
+										key={r.emoji}
+										style={[st.reactionBreakdownChip, selectedEmoji === r.emoji && st.reactionBreakdownChipActive]}
+										onPress={() => setSelectedEmoji(r.emoji)}>
 										<ReactionGlyph emoji={r.emoji} size={18} />
 										<Text style={st.reactionBreakdownChipCount}>{r.count}</Text>
-									</View>
+									</Pressable>
 								))}
 						</View>
 					) : null}

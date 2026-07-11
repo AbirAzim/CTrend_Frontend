@@ -1103,7 +1103,8 @@ export function CreatePostPage() {
                 id="create-caption"
                 ref={captionInputRef}
                 name="caption"
-                rows={2}
+                rows={5}
+                maxLength={2200}
                 className="ig-settings-textarea"
                 value={caption}
                 onChange={(ev) => {

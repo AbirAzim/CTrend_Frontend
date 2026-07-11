@@ -590,8 +590,8 @@ export function EditPostModal({ post, onClose, onSaved }: Props) {
                 onKeyUp={captionMention.syncCursor}
                 onClick={captionMention.syncCursor}
                 placeholder={isPoll ? "What's this poll about?" : "What's this compare about?"}
-                rows={2}
-                maxLength={1000}
+                rows={5}
+                maxLength={2200}
               />
               {captionMention.isOpen ? (
                 <MentionAutocomplete

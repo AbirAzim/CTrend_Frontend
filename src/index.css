@@ -4898,6 +4898,35 @@ a.cx-friend-avatar:hover {
   color: #e4e6eb; /* Facebook dark-mode caption colour */
 }
 
+.cx-post-caption-bar p {
+  margin: 0;
+}
+
+.cx-caption-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+.cx-caption-more-btn {
+  display: block;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ig-muted);
+  cursor: pointer;
+}
+
+.cx-caption-more-btn:hover {
+  color: var(--ig-text);
+  text-decoration: underline;
+}
+
 .cx-pulse-card {
   padding: 12px;
   border-radius: 16px;
@@ -7952,7 +7981,21 @@ a.cx-friend-avatar:hover {
   gap: 5px;
   padding: 4px 9px;
   border-radius: 999px;
+  border: 1px solid transparent;
   background: rgb(var(--cx-accent-rgb) / 0.08);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cx-reaction-breakdown-chip--active {
+  border-color: rgb(var(--cx-accent-rgb) / 0.55);
+  background: rgb(var(--cx-accent-rgb) / 0.16);
+}
+
+.cx-reaction-breakdown-chip-all {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ig-text);
 }
 
 .cx-reaction-breakdown-chip-count {
