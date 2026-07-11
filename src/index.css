@@ -5100,15 +5100,8 @@ a.cx-friend-avatar:hover {
 .cx-split-panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
-}
-
-.cx-split-panel-title-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
 }
 
 .cx-split-panel-metric {
@@ -5117,63 +5110,6 @@ a.cx-friend-avatar:hover {
   font-weight: 700;
   color: var(--ig-muted);
   font-variant-numeric: tabular-nums;
-}
-
-.cx-split-live-dot {
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  animation: cx-split-live-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes cx-split-live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.45;
-    transform: scale(0.82);
-  }
-}
-
-.cx-split-final-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #92400e;
-  background: linear-gradient(135deg, #fffbeb, #fef3c7);
-  border: 1px solid rgb(245 158 11 / 0.45);
-}
-
-.cx-split-duel {
-  display: flex;
-  height: 7px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgb(148 163 184 / 0.18);
-  gap: 2px;
-}
-
-.cx-split-duel-seg {
-  min-width: 0;
-  transition: flex 0.45s var(--cx-ease-out);
-}
-
-.cx-split-duel-seg--a {
-  background: linear-gradient(90deg, #34d399, #10b981);
-}
-
-.cx-split-duel-seg--b {
-  background: linear-gradient(90deg, #fb923c, #f97316);
 }
 
 .cx-split-rows {
@@ -5244,27 +5180,13 @@ a.cx-friend-avatar:hover {
   overflow-wrap: anywhere;
 }
 
-.cx-split-row-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-  flex-shrink: 0;
-}
-
 .cx-split-row-pct {
+  flex-shrink: 0;
   font-size: 0.95rem;
   font-weight: 800;
   color: var(--ig-text);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
-}
-
-.cx-split-row-count {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--ig-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 .cx-split-voters-btn {
@@ -5368,13 +5290,6 @@ a.cx-friend-avatar:hover {
   color: var(--ig-muted);
 }
 
-
-:root[data-theme="dark"] .cx-split-final-badge {
-  color: #fcd34d;
-  background: #2a2210;
-  border-color: rgba(245, 158, 11, 0.22);
-}
-
 :root[data-theme="dark"] .cx-split-row {
   background: var(--ig-card);
   border-color: var(--cx-matte-border);
@@ -5409,10 +5324,6 @@ a.cx-friend-avatar:hover {
 :root[data-theme="dark"] .cx-split-row-label,
 :root[data-theme="dark"] .cx-split-row-pct {
   color: var(--ig-text);
-}
-
-:root[data-theme="dark"] .cx-split-row-count {
-  color: var(--ig-muted);
 }
 
 :root[data-theme="dark"] .cx-split-voters-btn {

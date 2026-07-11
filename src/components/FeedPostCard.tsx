@@ -2737,31 +2737,12 @@ function FeedPostCardComponent({
                 aria-live="polite"
               >
                 <div className="cx-split-panel-head">
-                  <div className="cx-split-panel-title-wrap">
-                    {isVotingClosed ? (
-                      <span className="cx-split-final-badge">Final</span>
-                    ) : (
-                      <span className="cx-split-live-dot" aria-hidden />
-                    )}
-                  </div>
                   <span className="cx-split-panel-metric">
                     {binaryTotal > 0
                       ? `${binaryTotal.toLocaleString()} votes`
                       : "No votes yet"}
                   </span>
                 </div>
-                {binaryTotal > 0 ? (
-                  <div className="cx-split-duel" aria-hidden>
-                    <div
-                      className="cx-split-duel-seg cx-split-duel-seg--a"
-                      style={{ flex: leftPct ?? 50 }}
-                    />
-                    <div
-                      className="cx-split-duel-seg cx-split-duel-seg--b"
-                      style={{ flex: rightPct ?? 50 }}
-                    />
-                  </div>
-                ) : null}
                 <div className="cx-split-rows">
                   {([0, 1] as const).map((side) => {
                     const count = side === 0 ? up : down;
@@ -2794,21 +2775,18 @@ function FeedPostCardComponent({
                             ) : null}
                             {label}
                           </span>
-                          <div className="cx-split-row-stats">
-                            <span className="cx-split-row-pct">
-                              {pct != null ? `${pct}%` : "—"}
-                            </span>
-                            <span className="cx-split-row-count">
-                              {count.toLocaleString()}
-                            </span>
-                          </div>
+                          <span className="cx-split-row-pct">
+                            {pct != null ? `${pct}%` : "—"}
+                          </span>
                           <button
                             type="button"
                             className="cx-split-voters-btn"
                             onClick={() => void openVotersList(side)}
                           >
                             <span aria-hidden>👥</span>
-                            <span className="cx-split-voters-label">Voters</span>
+                            <span className="cx-split-voters-label">
+                              {count.toLocaleString()} Voters
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -2822,13 +2800,6 @@ function FeedPostCardComponent({
                 aria-live="polite"
               >
                 <div className="cx-split-panel-head">
-                  <div className="cx-split-panel-title-wrap">
-                    {isVotingClosed ? (
-                      <span className="cx-split-final-badge">Final</span>
-                    ) : (
-                      <span className="cx-split-live-dot" aria-hidden />
-                    )}
-                  </div>
                   <span className="cx-split-panel-metric">
                     {multiTotalVotes > 0
                       ? `${multiTotalVotes.toLocaleString()} votes`
@@ -2869,19 +2840,16 @@ function FeedPostCardComponent({
                             ) : null}
                             {label}
                           </span>
-                          <div className="cx-split-row-stats">
-                            <span className="cx-split-row-pct">{pctVal}%</span>
-                            <span className="cx-split-row-count">
-                              {count.toLocaleString()}
-                            </span>
-                          </div>
+                          <span className="cx-split-row-pct">{pctVal}%</span>
                           <button
                             type="button"
                             className="cx-split-voters-btn"
                             onClick={() => void openVotersList(idx)}
                           >
                             <span aria-hidden>👥</span>
-                            <span className="cx-split-voters-label">Voters</span>
+                            <span className="cx-split-voters-label">
+                              {count.toLocaleString()} Voters
+                            </span>
                           </button>
                         </div>
                       </div>

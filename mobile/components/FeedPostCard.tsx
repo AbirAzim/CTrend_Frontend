@@ -1007,44 +1007,14 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		splitPanelHead: {
 			flexDirection: 'row' as const,
 			alignItems: 'center' as const,
-			justifyContent: 'space-between' as const,
+			justifyContent: 'flex-end' as const,
 			gap: 10,
-		},
-		splitTitleWrap: {
-			flexDirection: 'row' as const,
-			alignItems: 'center' as const,
-			gap: 8,
-			flex: 1,
-			minWidth: 0,
-		},
-		splitFinalBadge: {
-			paddingHorizontal: 8,
-			paddingVertical: 3,
-			borderRadius: 99,
-			backgroundColor: isDark ? 'rgba(120,53,15,0.45)' : '#fffbeb',
-			borderWidth: 1,
-			borderColor: 'rgba(245,158,11,0.45)',
-		},
-		splitFinalBadgeText: {
-			fontSize: 10,
-			fontWeight: '800' as const,
-			color: isDark ? '#fcd34d' : '#92400e',
-			letterSpacing: 0.8,
 		},
 		splitPanelMetric: {
 			fontSize: 12,
 			fontWeight: '700' as const,
 			color: c.muted,
 		},
-		splitDuel: {
-			flexDirection: 'row' as const,
-			height: 7,
-			borderRadius: 99,
-			overflow: 'hidden' as const,
-			backgroundColor: c.border,
-			gap: 2,
-		},
-		splitDuelSeg: { minWidth: 2 },
 		splitRows: { gap: 8 },
 		splitRow: {
 			position: 'relative' as const,
@@ -1093,16 +1063,10 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			fontWeight: '700' as const,
 			color: c.text,
 		},
-		splitRowStats: { alignItems: 'flex-end' as const, gap: 1 },
 		splitRowPct: {
 			fontSize: 15,
 			fontWeight: '800' as const,
 			color: c.text,
-		},
-		splitRowCount: {
-			fontSize: 11,
-			fontWeight: '700' as const,
-			color: c.muted,
 		},
 		splitVotersBtn: {
 			borderWidth: 1,
@@ -3994,35 +3958,10 @@ function FeedPostCardComponent({
 							isVotingClosed ? st.splitPanelFinal : null,
 						]}>
 						<View style={st.splitPanelHead}>
-							<View style={st.splitTitleWrap}>
-								{isVotingClosed ? (
-									<View style={st.splitFinalBadge}>
-										<Text style={st.splitFinalBadgeText}>FINAL</Text>
-									</View>
-								) : (
-									<LiveDot color="#10b981" />
-								)}
-							</View>
 							<Text style={st.splitPanelMetric}>
 								{binaryTotal > 0 ? `${binaryTotal} votes` : 'No votes yet'}
 							</Text>
 						</View>
-						{binaryTotal > 0 ? (
-							<View style={st.splitDuel}>
-								<View
-									style={[
-										st.splitDuelSeg,
-										{ flex: leftPct, backgroundColor: GREEN },
-									]}
-								/>
-								<View
-									style={[
-										st.splitDuelSeg,
-										{ flex: rightPct, backgroundColor: ORANGE },
-									]}
-								/>
-							</View>
-						) : null}
 						<View style={st.splitRows}>
 							{([0, 1] as const).map((i) => {
 								const count = i === 0 ? up : down;
@@ -4068,15 +4007,12 @@ function FeedPostCardComponent({
 												{isFinalWinner ? '🥇 ' : ''}
 												{label}
 											</Text>
-											<View style={st.splitRowStats}>
-												<Text style={st.splitRowPct}>{pct}%</Text>
-												<Text style={st.splitRowCount}>{count}</Text>
-											</View>
+											<Text style={st.splitRowPct}>{pct}%</Text>
 											<Pressable
 												style={st.splitVotersBtn}
 												onPress={() => openVoters(i)}
 												hitSlop={6}>
-												<Text style={st.splitVotersBtnText}>👥 Voters</Text>
+												<Text style={st.splitVotersBtnText}>👥 {count} Voters</Text>
 											</Pressable>
 										</View>
 									</View>
@@ -4096,15 +4032,6 @@ function FeedPostCardComponent({
 							isVotingClosed ? st.splitPanelFinal : null,
 						]}>
 						<View style={st.splitPanelHead}>
-							<View style={st.splitTitleWrap}>
-								{isVotingClosed ? (
-									<View style={st.splitFinalBadge}>
-										<Text style={st.splitFinalBadgeText}>FINAL</Text>
-									</View>
-								) : (
-									<LiveDot color="#10b981" />
-								)}
-							</View>
 							<Text style={st.splitPanelMetric}>
 								{multiTotal > 0 ? `${multiTotal} votes` : 'No votes yet'}
 							</Text>
@@ -4153,15 +4080,12 @@ function FeedPostCardComponent({
 												{isFinalWinner ? '🥇 ' : ''}
 												{stat.label}
 											</Text>
-											<View style={st.splitRowStats}>
-												<Text style={st.splitRowPct}>{pct}%</Text>
-												<Text style={st.splitRowCount}>{stat.count}</Text>
-											</View>
+											<Text style={st.splitRowPct}>{pct}%</Text>
 											<Pressable
 												style={st.splitVotersBtn}
 												onPress={() => openVoters(stat.index)}
 												hitSlop={6}>
-												<Text style={st.splitVotersBtnText}>👥 Voters</Text>
+												<Text style={st.splitVotersBtnText}>👥 {stat.count} Voters</Text>
 											</Pressable>
 										</View>
 									</View>
