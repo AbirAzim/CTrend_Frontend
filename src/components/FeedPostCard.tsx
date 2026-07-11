@@ -3310,7 +3310,7 @@ function FeedPostCardComponent({
           aria-label="Reacted by list"
           onClick={() => setShowHypers(false)}
         >
-          <section className="ig-modal-card cx-voters-card">
+          <section className="ig-modal-card cx-voters-card" onClick={(e) => e.stopPropagation()}>
             <div className="ig-post-comments-head cx-voters-head">
               <div className="cx-voters-head-titles">
                 <h3 className="ig-post-comments-title">Reacted by</h3>

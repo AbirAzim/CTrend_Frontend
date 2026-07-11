@@ -8132,6 +8132,7 @@ a.cx-friend-avatar:hover {
   align-items: center;
   gap: 10px;
   padding: 20px 18px;
+  min-height: min(48dvh, 400px);
 }
 
 .cx-voters-spinner {
@@ -8150,12 +8151,15 @@ a.cx-friend-avatar:hover {
 .cx-voters-empty {
   padding: 26px 18px;
   text-align: center;
+  min-height: min(48dvh, 400px);
 }
 
 .cx-voters-scroll {
   flex: 1 1 auto;
+  /* Fixed (not just capped) so switching between filter tabs with different
+     result counts doesn't resize the whole panel. */
+  height: min(48dvh, 400px);
   min-height: 0;
-  max-height: min(48dvh, 400px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 8px 10px 12px;
