@@ -6240,12 +6240,6 @@ a.cx-friend-avatar:hover {
   flex-shrink: 0;
 }
 
-.cx-action-chip-reaction-emoji {
-  font-size: 17px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
 .cx-action-chip:hover {
   background: rgb(var(--cx-accent-rgb) / 0.08);
   border-color: rgb(var(--cx-accent-rgb) / 0.35);
@@ -6342,6 +6336,8 @@ a.cx-friend-avatar:hover {
   border-radius: 50%;
   color: #fff;
   flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.35);
 }
 
 .cx-reaction-icon-plain {

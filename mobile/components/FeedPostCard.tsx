@@ -1363,7 +1363,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			alignItems: 'center' as const,
 			justifyContent: 'center' as const,
 		},
-		chipReactionEmoji: { fontSize: 19, lineHeight: 22 },
 		actionChipFlatIcon: { fontSize: 18, lineHeight: 21, color: c.subtext },
 		actionChipFlatIconHype: { color: '#fb7185' },
 		actionChipFlatIconSave: { color: c.accent },
@@ -2143,16 +2142,14 @@ const POST_REACTION_LABELS: Record<string, string> = {
 	'🔥': 'Fire',
 };
 
-/** Circle backdrop color per reaction — only for the two icon-based reactions (Like/Love),
- * which need a color to read as a reaction. Face/fire emoji are already colorful on their
- * own, so they render plain, exactly like Facebook's own reaction set. */
+/** Circle backdrop color — only 👍 needs it (a plain thumbs-up icon has no color of its
+ * own). Every other reaction, including ❤️, is already a colorful emoji and renders plain. */
 const POST_REACTION_COLORS: Record<string, string> = {
 	'👍': '#1877f2',
-	'❤️': '#f33e58',
 };
 
-/** Renders a reaction as Facebook does: 👍/❤️ get a colored circle + white icon (they're
- * plain outline glyphs otherwise), every other emoji renders as-is since it's already colorful. */
+/** Renders a reaction: 👍 gets a colored circle + white icon (it's a plain outline glyph
+ * otherwise), every other emoji renders as-is since it's already colorful. */
 function ReactionGlyph({ emoji, size = 18 }: { emoji: string; size?: number }) {
 	const color = POST_REACTION_COLORS[emoji];
 	if (color) {
@@ -2166,23 +2163,17 @@ function ReactionGlyph({ emoji, size = 18 }: { emoji: string; size?: number }) {
 					alignItems: 'center',
 					justifyContent: 'center',
 				}}>
-				<Ionicons
-					name={emoji === '👍' ? 'thumbs-up' : 'heart'}
-					size={Math.round(size * 0.56)}
-					color="#fff"
-				/>
+				<Ionicons name="thumbs-up" size={Math.round(size * 0.5)} color="#fff" />
 			</View>
 		);
 	}
 	return <Text style={{ fontSize: size, lineHeight: size + 3 }}>{emoji}</Text>;
 }
 
-/** "You and N others reacted" / "N people reacted" — single combined total, top icons are shown separately. */
-function reactionSummaryText(
-	reactions: Array<{ emoji: string; count: number }>,
-	viewerReaction: string | null,
-): string {
-	const total = reactions.reduce((sum, r) => sum + r.count, 0);
+/** `total` should be the authoritative hypeCount, not a sum of the (possibly incomplete)
+ * per-emoji breakdown — clients that haven't upgraded to setPostReaction yet only ever
+ * write the legacy hype collection, so the breakdown can lag behind the real total. */
+function reactionSummaryText(total: number, viewerReaction: string | null): string {
 	if (total === 0) return '';
 	if (viewerReaction) {
 		const others = total - 1;
@@ -4370,7 +4361,7 @@ function FeedPostCardComponent({
 						{hypeCount > 0 ? (
 							<Pressable style={st.reactionSummary} onPress={() => setHypersVisible(true)}>
 								<View style={st.reactionSummaryIcons}>
-									{[...reactionsLive]
+									{[...(reactionsLive.length > 0 ? reactionsLive : [{ emoji: '❤️', count: hypeCount }])]
 										.sort((a, b) => b.count - a.count)
 										.slice(0, 3)
 										.map((r, idx) => (
@@ -4382,7 +4373,7 @@ function FeedPostCardComponent({
 										))}
 								</View>
 								<Text style={st.reactionSummaryText} numberOfLines={1}>
-									{reactionSummaryText(reactionsLive, viewerReaction)}
+									{reactionSummaryText(hypeCount, viewerReaction)}
 								</Text>
 							</Pressable>
 						) : null}
@@ -4441,8 +4432,8 @@ function FeedPostCardComponent({
 											accessibilityLabel={accessLabel}
 											hitSlop={4}>
 											<View style={st.chipIconWrap}>
-												{isHype && active ? (
-													<Text style={st.chipReactionEmoji}>{viewerReaction}</Text>
+												{isHype && active && viewerReaction ? (
+													<ReactionGlyph emoji={viewerReaction} size={20} />
 												) : (
 													<Ionicons
 														name={
