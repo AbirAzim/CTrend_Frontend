@@ -5083,7 +5083,7 @@ a.cx-friend-avatar:hover {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
   background: var(--ig-surface);
 }
@@ -5126,24 +5126,10 @@ a.cx-friend-avatar:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.cx-split-live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #047857;
-  background: #ecfdf5;
-  border: 1px solid rgb(16 185 129 / 0.35);
-}
-
 .cx-split-live-dot {
-  width: 6px;
-  height: 6px;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #10b981;
   animation: cx-split-live-pulse 1.6s ease-in-out infinite;
@@ -5232,7 +5218,7 @@ a.cx-friend-avatar:hover {
   position: absolute;
   inset: 0 auto 0 0;
   z-index: 0;
-  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.18);
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.11);
   transition: width 0.45s var(--cx-ease-out);
 }
 
@@ -5324,7 +5310,7 @@ a.cx-friend-avatar:hover {
 }
 
 .cx-split-row--leader .cx-split-row-fill {
-  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.28);
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.19);
 }
 
 .cx-split-row--winner {
@@ -5393,11 +5379,6 @@ a.cx-friend-avatar:hover {
   color: var(--ig-muted);
 }
 
-:root[data-theme="dark"] .cx-split-live-badge {
-  color: #6ee7b7;
-  background: #1a2e28;
-  border-color: rgba(16, 185, 129, 0.22);
-}
 
 :root[data-theme="dark"] .cx-split-final-badge {
   color: #fcd34d;
@@ -5420,7 +5401,7 @@ a.cx-friend-avatar:hover {
 }
 
 :root[data-theme="dark"] .cx-split-row--leader .cx-split-row-fill {
-  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.22);
+  background: rgb(var(--cx-opt-rgb, var(--cx-accent-rgb)) / 0.15);
 }
 
 :root[data-theme="dark"] .cx-split-row--loser {

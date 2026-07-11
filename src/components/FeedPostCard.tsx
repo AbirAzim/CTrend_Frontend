@@ -2741,10 +2741,7 @@ function FeedPostCardComponent({
                     {isVotingClosed ? (
                       <span className="cx-split-final-badge">Final</span>
                     ) : (
-                      <span className="cx-split-live-badge" aria-hidden>
-                        <span className="cx-split-live-dot" />
-                        Live
-                      </span>
+                      <span className="cx-split-live-dot" aria-hidden />
                     )}
                     <span className="cx-split-panel-title">
                       {isVotingClosed ? "Results" : "Vote breakdown"}
@@ -2832,10 +2829,7 @@ function FeedPostCardComponent({
                     {isVotingClosed ? (
                       <span className="cx-split-final-badge">Final</span>
                     ) : (
-                      <span className="cx-split-live-badge" aria-hidden>
-                        <span className="cx-split-live-dot" />
-                        Live
-                      </span>
+                      <span className="cx-split-live-dot" aria-hidden />
                     )}
                     <span className="cx-split-panel-title">
                       {isVotingClosed ? "Results" : "Vote breakdown"}

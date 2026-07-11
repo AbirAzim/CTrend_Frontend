@@ -995,7 +995,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		splitPanel: {
 			marginBottom: 8,
 			padding: 12,
-			borderRadius: 14,
+			borderRadius: 16,
 			borderWidth: 1,
 			borderColor: c.border,
 			backgroundColor: c.section,
@@ -1016,29 +1016,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			gap: 8,
 			flex: 1,
 			minWidth: 0,
-		},
-		splitLiveBadge: {
-			flexDirection: 'row' as const,
-			alignItems: 'center' as const,
-			gap: 5,
-			paddingHorizontal: 8,
-			paddingVertical: 3,
-			borderRadius: 99,
-			backgroundColor: isDark ? 'rgba(6,78,59,0.55)' : '#ecfdf5',
-			borderWidth: 1,
-			borderColor: 'rgba(16,185,129,0.35)',
-		},
-		splitLiveDot: {
-			width: 6,
-			height: 6,
-			borderRadius: 3,
-			backgroundColor: '#10b981',
-		},
-		splitLiveText: {
-			fontSize: 10,
-			fontWeight: '800' as const,
-			color: isDark ? '#6ee7b7' : '#047857',
-			letterSpacing: 0.8,
 		},
 		splitFinalBadge: {
 			paddingHorizontal: 8,
@@ -4029,10 +4006,7 @@ function FeedPostCardComponent({
 										<Text style={st.splitFinalBadgeText}>FINAL</Text>
 									</View>
 								) : (
-									<View style={st.splitLiveBadge}>
-										<View style={st.splitLiveDot} />
-										<Text style={st.splitLiveText}>LIVE</Text>
-									</View>
+									<LiveDot color="#10b981" />
 								)}
 								<Text style={st.splitPanelTitle} numberOfLines={1}>
 									{isVotingClosed ? 'Results' : 'Vote breakdown'}
@@ -4088,7 +4062,7 @@ function FeedPostCardComponent({
 												{
 													width: `${pct}%`,
 													backgroundColor: barColor,
-													opacity: isLeader ? 0.28 : 0.2,
+													opacity: isLeader ? 0.2 : 0.13,
 												},
 											]}
 										/>
@@ -4137,10 +4111,7 @@ function FeedPostCardComponent({
 										<Text style={st.splitFinalBadgeText}>FINAL</Text>
 									</View>
 								) : (
-									<View style={st.splitLiveBadge}>
-										<View style={st.splitLiveDot} />
-										<Text style={st.splitLiveText}>LIVE</Text>
-									</View>
+									<LiveDot color="#10b981" />
 								)}
 								<Text style={st.splitPanelTitle} numberOfLines={1}>
 									{isVotingClosed ? 'Results' : 'Vote breakdown'}
@@ -4179,7 +4150,7 @@ function FeedPostCardComponent({
 												{
 													width: `${pct}%`,
 													backgroundColor: optColor,
-													opacity: isLeader ? 0.28 : 0.2,
+													opacity: isLeader ? 0.2 : 0.13,
 												},
 											]}
 										/>
