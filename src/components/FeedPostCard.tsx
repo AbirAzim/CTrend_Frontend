@@ -2743,9 +2743,6 @@ function FeedPostCardComponent({
                     ) : (
                       <span className="cx-split-live-dot" aria-hidden />
                     )}
-                    <span className="cx-split-panel-title">
-                      {isVotingClosed ? "Results" : "Vote breakdown"}
-                    </span>
                   </div>
                   <span className="cx-split-panel-metric">
                     {binaryTotal > 0
@@ -2831,9 +2828,6 @@ function FeedPostCardComponent({
                     ) : (
                       <span className="cx-split-live-dot" aria-hidden />
                     )}
-                    <span className="cx-split-panel-title">
-                      {isVotingClosed ? "Results" : "Vote breakdown"}
-                    </span>
                   </div>
                   <span className="cx-split-panel-metric">
                     {multiTotalVotes > 0

@@ -1031,12 +1031,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: isDark ? '#fcd34d' : '#92400e',
 			letterSpacing: 0.8,
 		},
-		splitPanelTitle: {
-			fontSize: 14,
-			fontWeight: '800' as const,
-			color: c.text,
-			flexShrink: 1,
-		},
 		splitPanelMetric: {
 			fontSize: 12,
 			fontWeight: '700' as const,
@@ -4008,9 +4002,6 @@ function FeedPostCardComponent({
 								) : (
 									<LiveDot color="#10b981" />
 								)}
-								<Text style={st.splitPanelTitle} numberOfLines={1}>
-									{isVotingClosed ? 'Results' : 'Vote breakdown'}
-								</Text>
 							</View>
 							<Text style={st.splitPanelMetric}>
 								{binaryTotal > 0 ? `${binaryTotal} votes` : 'No votes yet'}
@@ -4113,9 +4104,6 @@ function FeedPostCardComponent({
 								) : (
 									<LiveDot color="#10b981" />
 								)}
-								<Text style={st.splitPanelTitle} numberOfLines={1}>
-									{isVotingClosed ? 'Results' : 'Vote breakdown'}
-								</Text>
 							</View>
 							<Text style={st.splitPanelMetric}>
 								{multiTotal > 0 ? `${multiTotal} votes` : 'No votes yet'}

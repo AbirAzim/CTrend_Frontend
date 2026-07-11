@@ -5111,13 +5111,6 @@ a.cx-friend-avatar:hover {
   min-width: 0;
 }
 
-.cx-split-panel-title {
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: var(--ig-text);
-  letter-spacing: -0.01em;
-}
-
 .cx-split-panel-metric {
   flex-shrink: 0;
   font-size: 0.78rem;
@@ -5369,10 +5362,6 @@ a.cx-friend-avatar:hover {
 :root[data-theme="dark"] .cx-split-panel--final {
   border-color: rgba(245, 158, 11, 0.24);
   box-shadow: none;
-}
-
-:root[data-theme="dark"] .cx-split-panel-title {
-  color: var(--ig-text);
 }
 
 :root[data-theme="dark"] .cx-split-panel-metric {
