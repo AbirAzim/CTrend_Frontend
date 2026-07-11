@@ -3163,7 +3163,7 @@ function FeedPostCardComponent({
                     >
                       {authorName}
                     </NavLink>
-                    <span className="cx-comment-preview-text">{c.content}</span>
+                    <span className="cx-comment-preview-text">{linkifyText(c.content)}</span>
                   </div>
                 </div>
               );

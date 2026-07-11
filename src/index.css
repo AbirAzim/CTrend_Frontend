@@ -6905,6 +6905,81 @@ a.cx-friend-avatar:hover {
   overflow: hidden;
 }
 
+/* Chat-bubble link preview — same shape as the comment version, sized for a message bubble. */
+.cw-bubble-link-preview {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 6px;
+  border: 1px solid var(--ig-border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  background: var(--ig-surface-2, #f0f2f5);
+  max-width: 100%;
+}
+
+.cw-bubble-link-preview:hover {
+  background: var(--ig-surface-3, #e4e6eb);
+}
+
+.cw-bubble-link-preview-img-wrap {
+  flex: 0 0 72px;
+  width: 72px;
+  min-height: 72px;
+  background: #e5e7eb;
+}
+
+.cw-bubble-link-preview-img-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
+  object-fit: cover;
+}
+
+.cw-bubble-link-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  min-width: 0;
+  justify-content: center;
+}
+
+.cw-bubble-link-preview-domain {
+  font-size: 0.63rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ig-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cw-bubble-link-preview-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ig-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cw-bubble-link-preview-desc {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--ig-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .cx-comment-meta {
   display: flex;
   flex-wrap: wrap;
@@ -11780,6 +11855,19 @@ a.cx-action-chip {
 }
 
 :root[data-theme="dark"] .cx-comment-link-preview-title {
+  color: #e4e6eb;
+}
+
+:root[data-theme="dark"] .cw-bubble-link-preview {
+  background: #3a3b3c;
+  border-color: #3e4042;
+}
+
+:root[data-theme="dark"] .cw-bubble-link-preview:hover {
+  background: #4e4f50;
+}
+
+:root[data-theme="dark"] .cw-bubble-link-preview-title {
   color: #e4e6eb;
 }
 

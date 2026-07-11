@@ -4545,9 +4545,7 @@ function FeedPostCardComponent({
 												accessibilityLabel={`View comments, including ${cmtName}'s comment`}
 											>
 												<Text style={st.commentPreviewAuthor}>{cmtName}</Text>
-												<Text style={st.commentPreviewText} numberOfLines={1}>
-													{cmt.content}
-												</Text>
+												<LinkifyText text={cmt.content} style={st.commentPreviewText} />
 											</Pressable>
 										</View>
 									);

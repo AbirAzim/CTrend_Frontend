@@ -4,14 +4,22 @@
  * <a>, mobile as a pressable <Text>. Keep this in sync with the shared copy at
  * `packages/shared/src/lib/parseTextLinks.ts`.
  *
- * Detects `http(s)://…` and bare `www.…` URLs and strips trailing punctuation
+ * Detects `http(s)://…`, bare `www.…`, and bare `domain.tld[/path]` URLs (e.g.
+ * `youtu.be/x`, `kejitbe.app`) and strips trailing punctuation
  * (`. , ! ? ; : ) ] } " '`) that usually belongs to the sentence, not the link.
  */
 export type TextSegment =
   | { type: "text"; value: string }
   | { type: "link"; value: string; href: string };
 
-const URL_RE = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+// Curated TLD list for bare-domain matches (no scheme, no `www.`) — kept narrow
+// to avoid false positives like "Node.js" or "e.g.".
+const TLD =
+  "com|org|net|io|be|app|gg|co|tv|me|ly|dev|ai|xyz|info|edu|gov|news|store|shop";
+const URL_RE = new RegExp(
+  `(https?:\\/\\/[^\\s<]+|www\\.[^\\s<]+|[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9-]+)*\\.(?:${TLD})(?:\\/[^\\s<]*)?)`,
+  "gi",
+);
 const TRAILING_PUNCT_RE = /[.,!?;:)\]}'"]+$/;
 
 export function parseTextLinks(text: string | null | undefined): TextSegment[] {
@@ -49,3 +57,19 @@ export function parseTextLinks(text: string | null | undefined): TextSegment[] {
   }
   return segments;
 }
+
+/** First URL in text — used for chat message link previews. */
+export function extractFirstUrl(text: string | null | undefined): string | null {
+  for (const seg of parseTextLinks(text)) {
+    if (seg.type === "link") return seg.href;
+  }
+  return null;
+}
+
+export type LinkPreviewData = {
+  url: string;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  siteName?: string | null;
+};

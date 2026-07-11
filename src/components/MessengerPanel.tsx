@@ -6,6 +6,7 @@ import { useMessenger, type Conversation, type Message, type ReplyPreview } from
 import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { LinkifiedText } from "./LinkifiedText";
+import { MessageLinkPreview } from "./MessageLinkPreview";
 import { MODERATOR_BRAND_NAME, MODERATOR_PLATFORM_NAME } from "../lib/moderatorBrand";
 import { useImageUpload } from "../lib/useImageUpload";
 import {
@@ -783,6 +784,7 @@ function ChatWindow({
                         ].filter(Boolean).join(" ")}
                       >
                         <LinkifiedText text={msg.text ?? ""} />
+                        <MessageLinkPreview text={msg.text ?? ""} />
                         <span className="cw-bubble-time">
                           {formatRelativeTime(msg.createdAt)}
                         </span>

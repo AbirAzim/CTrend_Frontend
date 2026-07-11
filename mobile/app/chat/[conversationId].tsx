@@ -47,6 +47,7 @@ import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { ChatComposer } from "../../components/ChatComposer";
 import { LinkText } from "../../components/LinkText";
+import { MessageLinkPreview } from "../../components/MessageLinkPreview";
 import { useToast } from "../../components/useToast";
 import logoAsset from "../../assets/logo.png";
 import {
@@ -422,6 +423,7 @@ function MessageBubble({
                 style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text }]}
                 linkColor={isOwn ? "#cfe4ff" : "#0a84ff"}
               />
+              {msg.text ? <MessageLinkPreview text={msg.text} colors={colors} /> : null}
             </Pressable>
           )}
 
