@@ -6110,6 +6110,12 @@ a.cx-friend-avatar:hover {
   overflow: hidden;
 }
 
+/* While the reaction tray is open it needs to escape the rounded-corner
+   clip above — the tray is anchored to the hype chip and opens upward. */
+.cx-action-rail--overflow-visible {
+  overflow: visible;
+}
+
 /* Zone 1 — action icons in a single row (never wrap to a second line) */
 .cx-action-rail-icons {
   display: flex;
@@ -6130,6 +6136,17 @@ a.cx-friend-avatar:hover {
   min-width: 0;
   padding: 8px 4px;
   gap: 3px;
+}
+
+/* The react button is wrapped in an extra anchor div (for the reaction tray popover),
+   so it isn't a direct flex child like its siblings and was missing the same flex:1
+   distribution — it sat cramped near the left edge while later icons got extra room.
+   Give the anchor itself the same flex treatment so all six icons space out evenly. */
+.cx-action-rail-icons .cx-fb-react-anchor {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
 }
 .cx-action-rail-icons .cx-action-chip:hover {
   background: rgb(var(--cx-accent-rgb) / 0.08);
@@ -6223,6 +6240,12 @@ a.cx-friend-avatar:hover {
   flex-shrink: 0;
 }
 
+.cx-action-chip-reaction-emoji {
+  font-size: 17px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .cx-action-chip:hover {
   background: rgb(var(--cx-accent-rgb) / 0.08);
   border-color: rgb(var(--cx-accent-rgb) / 0.35);
@@ -6269,6 +6292,74 @@ a.cx-friend-avatar:hover {
 .cx-action-chip--heart .cx-action-chip-count {
   background: rgb(var(--cx-rose-rgb) / 0.16);
   color: var(--cx-rose-soft);
+}
+
+/* Combined reaction summary — top-3 reaction icons clustered together + one total.
+   Social proof, not a control, so it's its own line above the icon buttons — same
+   pattern as Facebook — but flush against them (no border/gap) so the two read as
+   one connected footer instead of separate boxed sections. Full per-emoji
+   breakdown lives in the "Reacted by" details. */
+.cx-reaction-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgb(var(--cx-accent-rgb) / 0.08);
+  background: transparent;
+  padding: 10px 14px 8px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.cx-reaction-summary:hover .cx-reaction-summary-text {
+  text-decoration: underline;
+}
+
+.cx-reaction-summary-icons {
+  display: inline-flex;
+  align-items: center;
+}
+
+.cx-reaction-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -3px;
+}
+
+.cx-reaction-summary-icon:first-child {
+  margin-left: 0;
+}
+
+/* Shared reaction glyph — 👍/❤️ get a colored circle + white icon (they're plain
+   outline glyphs otherwise); every other emoji renders plain since it's already colorful. */
+.cx-reaction-icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.cx-reaction-icon-plain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cx-reaction-summary-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ig-muted);
 }
 
 .cx-action-chip--saved .cx-action-chip-count {
@@ -7452,7 +7543,7 @@ a.cx-friend-avatar:hover {
   padding: 2px 6px 2px 4px;
   border-radius: 999px;
   border: 1px solid rgb(var(--cx-accent-rgb) / 0.12);
-  background: var(--cx-surface, #fff);
+  background: var(--ig-card, #fff);
   box-shadow: 0 1px 4px rgb(var(--cx-ink-rgb) / 0.12);
   cursor: pointer;
   font: inherit;
@@ -7503,7 +7594,7 @@ a.cx-friend-avatar:hover {
   gap: 2px;
   padding: 6px 8px;
   border-radius: 999px;
-  background: var(--cx-surface, #fff);
+  background: var(--ig-card, #fff);
   box-shadow:
     0 4px 16px rgb(var(--cx-ink-rgb) / 0.18),
     0 0 0 1px rgb(var(--cx-accent-rgb) / 0.08);
@@ -7539,6 +7630,81 @@ a.cx-friend-avatar:hover {
 
 .cx-fb-reaction-tray-btn--active {
   background: rgb(var(--cx-accent-rgb) / 0.12);
+}
+
+/* Post reaction tray — bigger, Facebook-style hover-to-pop icons with a name label. */
+.cx-post-reaction-tray {
+  position: absolute;
+  /* Left-aligned to the button, not centered — the react button is the leftmost
+     action icon, so a centered tray would overflow off the left edge. */
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--ig-card, #fff);
+  box-shadow:
+    0 8px 24px rgb(var(--cx-ink-rgb) / 0.22),
+    0 0 0 1px rgb(var(--cx-accent-rgb) / 0.08);
+  animation: cx-fb-tray-in 0.16s var(--cx-ease-spring);
+}
+
+.cx-post-reaction-tray-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.16s var(--cx-ease-spring);
+}
+
+.cx-post-reaction-tray-emoji {
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.cx-post-reaction-tray-btn:hover,
+.cx-post-reaction-tray-btn:focus-visible {
+  transform: translateY(-14px) scale(1.35);
+}
+
+.cx-post-reaction-tray-btn--active {
+  background: rgb(var(--cx-accent-rgb) / 0.14);
+}
+
+.cx-post-reaction-tray-label {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 4px 9px;
+  border-radius: 8px;
+  /* Always a dark chip + white text, regardless of page theme — a tooltip label
+     shouldn't flip with light/dark mode. */
+  background: rgba(20, 20, 20, 0.92);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.14s var(--cx-ease-out),
+    transform 0.14s var(--cx-ease-out);
+}
+
+.cx-post-reaction-tray-btn:hover .cx-post-reaction-tray-label,
+.cx-post-reaction-tray-btn:focus-visible .cx-post-reaction-tray-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .cx-fb-meta-btn {
@@ -7791,6 +7957,30 @@ a.cx-friend-avatar:hover {
 
 .cx-voters-head {
   justify-content: space-between;
+}
+
+/* Per-emoji breakdown atop the "Reacted by" modal — full details, like the per-option vote breakdown. */
+.cx-reaction-breakdown-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 4px 12px;
+}
+
+.cx-reaction-breakdown-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgb(var(--cx-accent-rgb) / 0.08);
+}
+
+.cx-reaction-breakdown-chip-count {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ig-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .cx-voters-head-titles {
@@ -8085,6 +8275,13 @@ a.cx-friend-avatar:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cx-voter-reaction-emoji {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .cx-voter-sub {

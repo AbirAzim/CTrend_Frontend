@@ -49,6 +49,10 @@ export type FeedPostView = {
   saveCount?: number;
   viewerHasSaved?: boolean;
   viewerHasHyped?: boolean;
+  /** Per-emoji reaction counts (6-emoji set, see `POST_REACTION_EMOJIS`). */
+  reactions?: Array<{ emoji: string; count: number }>;
+  /** Emoji the viewer reacted with, or null. Generalizes `viewerHasHyped`. */
+  viewerReaction?: string | null;
   commentCount?: number;
   recentComments?: Array<{
     id: string;

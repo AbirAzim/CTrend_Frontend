@@ -17,6 +17,7 @@ import {
   IconChevronUp,
   IconComment,
   IconHeart,
+  IconThumbsUp,
   IconMore,
   IconOpenPost,
   IconGlobe,
@@ -34,7 +35,8 @@ import {
   POST_VOTE_UPDATED,
   REMOVE_VOTE,
   HYPERS_BY_POST,
-  SET_POST_HYPE,
+  POST_REACTION_EMOJIS,
+  SET_POST_REACTION,
   SET_POST_KEEP,
   VOTERS_BY_POST,
   VOTE_POST,
@@ -265,6 +267,7 @@ type HyperRow = {
   username?: string | null;
   displayName?: string | null;
   profileImageUrl?: string | null;
+  reactionEmoji?: string | null;
 };
 
 function hyperDisplayName(h: HyperRow): string {
@@ -272,6 +275,60 @@ function hyperDisplayName(h: HyperRow): string {
 }
 
 const VOTERS_PAGE_SIZE = 10;
+
+/** Facebook-style reaction names shown as a tooltip label above each emoji in the tray. */
+const POST_REACTION_LABELS: Record<string, string> = {
+  "👍": "Like",
+  "❤️": "Love",
+  "😂": "Haha",
+  "😮": "Wow",
+  "😢": "Sad",
+  "🔥": "Fire",
+};
+
+/** Circle backdrop color per reaction — only for the two icon-based reactions (Like/Love),
+ * which need a color to read as a reaction. Face/fire emoji are already colorful on
+ * their own, so they render plain, exactly like Facebook's own reaction set. */
+const POST_REACTION_COLORS: Record<string, string> = {
+  "👍": "#1877f2",
+  "❤️": "#f33e58",
+};
+
+/** Renders a reaction as Facebook does: 👍/❤️ get a colored circle + white icon (they're
+ * plain outline glyphs otherwise), every other emoji renders as-is since it's already colorful. */
+function ReactionGlyph({ emoji, size = 18 }: { emoji: string; size?: number }) {
+  const color = POST_REACTION_COLORS[emoji];
+  if (color) {
+    return (
+      <span
+        className="cx-reaction-icon-circle"
+        style={{ backgroundColor: color, width: size, height: size }}
+      >
+        {emoji === "👍" ? (
+          <IconThumbsUp size={Math.round(size * 0.62)} />
+        ) : (
+          <IconHeart size={Math.round(size * 0.6)} filled />
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="cx-reaction-icon-plain" style={{ fontSize: size }} aria-hidden>
+      {emoji}
+    </span>
+  );
+}
+
+/** "You and N others reacted" / "N people reacted" — single combined total, top icons are shown separately. */
+function reactionSummaryText(reactions: Array<{ emoji: string; count: number }>, viewerReaction: string | null): string {
+  const total = reactions.reduce((sum, r) => sum + r.count, 0);
+  if (total === 0) return "";
+  if (viewerReaction) {
+    const others = total - 1;
+    return others > 0 ? `You and ${others.toLocaleString()} other${others === 1 ? "" : "s"} reacted` : "You reacted";
+  }
+  return `${total.toLocaleString()} ${total === 1 ? "person" : "people"} reacted`;
+}
 
 function voterDisplayName(v: VoterRow): string {
   if (v.anonymous || !v.user) return "Anonymous voter";
@@ -523,7 +580,11 @@ function FeedPostCardComponent({
   const { user: authUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
+  const [viewerReaction, setViewerReaction] = useState<string | null>(post.viewerReaction ?? (post.viewerHasHyped ? "❤️" : null));
+  const liked = viewerReaction !== null;
+  const [reactionsLive, setReactionsLive] = useState(post.reactions ?? []);
+  const [reactionTrayOpen, setReactionTrayOpen] = useState(false);
+  const reactionTrayHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hypeCountLive, setHypeCountLive] = useState(post.hypeCount ?? 0);
   const [saveLiveCount, setSaveLiveCount] = useState(post.saveCount ?? 0);
   const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
@@ -656,7 +717,7 @@ function FeedPostCardComponent({
   /** Monotonic id to ignore out-of-order / stale page responses. */
   const votersReqId = useRef(0);
 
-  const [setPostHypeMut, { loading: hypeUpdating }] = useMutation(SET_POST_HYPE);
+  const [setPostReactionMut, { loading: hypeUpdating }] = useMutation(SET_POST_REACTION);
   const [setPostKeepMut, { loading: keepUpdating }] = useMutation(SET_POST_KEEP);
 
   useSubscription<PostVoteUpdatedData>(POST_VOTE_UPDATED, {
@@ -867,7 +928,8 @@ function FeedPostCardComponent({
     setHypeCountLive(post.hypeCount ?? 0);
     setSaveLiveCount(post.saveCount ?? 0);
     setSaved(Boolean(post.viewerHasSaved));
-    setLiked(Boolean(post.viewerHasHyped));
+    setViewerReaction(post.viewerReaction ?? (post.viewerHasHyped ? "❤️" : null));
+    setReactionsLive(post.reactions ?? []);
   }, [
     post.id,
     post.upvoteCount,
@@ -880,33 +942,89 @@ function FeedPostCardComponent({
     post.hypeCount,
     post.viewerHasSaved,
     post.viewerHasHyped,
+    post.viewerReaction,
+    post.reactions,
     post.saveCount,
   ]);
 
-  async function handleToggleHype(e?: React.MouseEvent) {
-    const nextActive = !liked;
-    const delta = nextActive ? 1 : -1;
+  const DEFAULT_POST_REACTION = "❤️";
+
+  /** Adjusts a reaction-count breakdown for a prevEmoji -> nextEmoji transition (either side may be null). */
+  function applyOptimisticReactionCounts(
+    reactions: Array<{ emoji: string; count: number }>,
+    prevEmoji: string | null,
+    nextEmoji: string | null,
+  ): Array<{ emoji: string; count: number }> {
+    const map = new Map(reactions.map((r) => [r.emoji, r.count]));
+    if (prevEmoji) {
+      const n = (map.get(prevEmoji) ?? 1) - 1;
+      if (n <= 0) map.delete(prevEmoji);
+      else map.set(prevEmoji, n);
+    }
+    if (nextEmoji) map.set(nextEmoji, (map.get(nextEmoji) ?? 0) + 1);
+    const order = new Map(POST_REACTION_EMOJIS.map((e, i) => [e, i]));
+    return [...map.entries()]
+      .map(([emoji, count]) => ({ emoji, count }))
+      .sort((a, b) => (order.get(a.emoji as (typeof POST_REACTION_EMOJIS)[number]) ?? 99) - (order.get(b.emoji as (typeof POST_REACTION_EMOJIS)[number]) ?? 99));
+  }
+
+  /** Set/clear/switch the viewer's reaction. Coins only fire on a null<->emoji edge, never on switching between emojis. */
+  async function handleReact(nextEmoji: string | null, e?: React.MouseEvent) {
+    const prevReaction = viewerReaction;
+    const prevReactions = reactionsLive;
+    const wasActive = prevReaction !== null;
+    const nextActive = nextEmoji !== null;
+    const delta = (nextActive ? 1 : 0) - (wasActive ? 1 : 0);
     // Capture the button element now — the synthetic event is reset after await.
     const origin = (e?.currentTarget as Element | undefined) ?? null;
-    setLiked(nextActive);
+    setViewerReaction(nextEmoji);
     setHypeCountLive((prev) => Math.max(0, prev + delta));
+    setReactionsLive(applyOptimisticReactionCounts(prevReactions, prevReaction, nextEmoji));
+    setReactionTrayOpen(false);
 
     if (voteMode !== "api") {
       return;
     }
 
     try {
-      await setPostHypeMut({
-        variables: { postId: post.id, active: nextActive },
+      const { data } = await setPostReactionMut({
+        variables: { postId: post.id, emoji: nextEmoji },
       });
-      // Coins: hyping earns; un-hyping reverses the reward (symmetric).
-      if (nextActive) dispatchCoinEarned(COIN_AMOUNTS.HYPE, origin);
-      else dispatchCoinSpent(COIN_AMOUNTS.HYPE);
+      if (data?.setPostReaction?.reactions) {
+        setReactionsLive(data.setPostReaction.reactions);
+      }
+      // Coins: gaining a reaction earns; losing one reverses the reward. Switching emojis is a no-op.
+      if (wasActive !== nextActive) {
+        if (nextActive) dispatchCoinEarned(COIN_AMOUNTS.HYPE, origin);
+        else dispatchCoinSpent(COIN_AMOUNTS.HYPE);
+      }
     } catch {
       // Rollback optimistic UI on failure.
-      setLiked(!nextActive);
+      setViewerReaction(prevReaction);
       setHypeCountLive((prev) => Math.max(0, prev - delta));
+      setReactionsLive(prevReactions);
     }
+  }
+
+  function handleQuickReact(e?: React.MouseEvent) {
+    void handleReact(viewerReaction ? null : DEFAULT_POST_REACTION, e);
+  }
+
+  function handlePickReaction(emoji: string) {
+    void handleReact(viewerReaction === emoji ? null : emoji);
+  }
+
+  function openReactionTray() {
+    if (reactionTrayHideTimer.current) {
+      clearTimeout(reactionTrayHideTimer.current);
+      reactionTrayHideTimer.current = null;
+    }
+    setReactionTrayOpen(true);
+  }
+
+  function scheduleCloseReactionTray() {
+    if (reactionTrayHideTimer.current) clearTimeout(reactionTrayHideTimer.current);
+    reactionTrayHideTimer.current = setTimeout(() => setReactionTrayOpen(false), 220);
   }
 
   async function handleToggleKeep() {
@@ -2839,8 +2957,75 @@ function FeedPostCardComponent({
           </div>
         ) : null}
 
-        <div className="cx-action-rail">
+        <div className={`cx-action-rail${reactionTrayOpen ? " cx-action-rail--overflow-visible" : ""}`}>
+          {hypeCount > 0 ? (
+            <button
+              type="button"
+              className="cx-reaction-summary"
+              aria-label="See who reacted to this post"
+              onClick={() => void openHypers()}
+            >
+              <span className="cx-reaction-summary-icons">
+                {[...reactionsLive]
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 3)
+                  .map((r) => (
+                    <span key={r.emoji} className="cx-reaction-summary-icon">
+                      <ReactionGlyph emoji={r.emoji} size={17} />
+                    </span>
+                  ))}
+              </span>
+              <span className="cx-reaction-summary-text">{reactionSummaryText(reactionsLive, viewerReaction)}</span>
+            </button>
+          ) : null}
           <div className="cx-action-rail-icons" role="toolbar" aria-label="Post actions">
+          <div
+            className="cx-fb-react-anchor"
+            onMouseEnter={openReactionTray}
+            onMouseLeave={scheduleCloseReactionTray}
+          >
+            {reactionTrayOpen ? (
+              <div
+                className="cx-post-reaction-tray"
+                role="listbox"
+                aria-label="Pick a reaction"
+                onMouseEnter={openReactionTray}
+                onMouseLeave={scheduleCloseReactionTray}
+              >
+                {POST_REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className={`cx-post-reaction-tray-btn${viewerReaction === emoji ? " cx-post-reaction-tray-btn--active" : ""}`}
+                    aria-label={`React ${POST_REACTION_LABELS[emoji] ?? emoji}`}
+                    onClick={() => handlePickReaction(emoji)}
+                  >
+                    <span className="cx-post-reaction-tray-label">{POST_REACTION_LABELS[emoji] ?? emoji}</span>
+                    <span className="cx-post-reaction-tray-emoji">
+                      <ReactionGlyph emoji={emoji} size={32} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
+              aria-label={liked ? `Remove ${viewerReaction} reaction` : "React"}
+              title={liked ? `Remove ${viewerReaction} reaction` : "React"}
+              aria-pressed={liked}
+              disabled={hypeUpdating}
+              onClick={(e) => handleQuickReact(e)}
+            >
+              {liked ? (
+                <span className="cx-action-chip-reaction-emoji" aria-hidden>
+                  {viewerReaction}
+                </span>
+              ) : (
+                <IconHeart filled={false} />
+              )}
+            </button>
+          </div>
           <button
             type="button"
             className={`cx-action-chip cx-action-chip--discuss${commentsOpen ? " cx-action-chip--pressed cx-action-chip--discuss-open" : ""}`}
@@ -2858,7 +3043,6 @@ function FeedPostCardComponent({
             }}
           >
             <IconComment />
-            <span className="cx-action-chip-label">{commentsOpen ? "Hide" : "Discuss"}</span>
             {!commentsOpen && commentCount > 0 ? (
               <span className="cx-action-chip-count">{commentCount}</span>
             ) : null}
@@ -2882,30 +3066,6 @@ function FeedPostCardComponent({
               <IconOpenPost />
             </NavLink>
           ) : null}
-          <button
-            type="button"
-            className={`cx-action-chip${liked ? " cx-action-chip--heart" : ""}`}
-            aria-label={liked ? "Unhype" : "Hype"}
-            title={liked ? "Unhype" : "Hype"}
-            aria-pressed={liked}
-            disabled={hypeUpdating}
-            onClick={(e) => void handleToggleHype(e)}
-          >
-            <IconHeart filled={liked} />
-            {hypeCount > 0 ? (
-              <span
-                className="cx-action-chip-count cx-action-chip-count--tappable"
-                role="button"
-                tabIndex={0}
-                title="See who hyped"
-                aria-label="See who hyped this post"
-                onClick={(e) => { e.stopPropagation(); e.preventDefault(); void openHypers(); }}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); void openHypers(); } }}
-              >
-                {hypeCount}
-              </span>
-            ) : null}
-          </button>
           <button
             type="button"
             className={`cx-action-chip${saved ? " cx-action-chip--saved" : ""}`}
@@ -3183,13 +3343,13 @@ function FeedPostCardComponent({
           className="ig-modal-overlay cx-voters-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="Hyped by list"
+          aria-label="Reacted by list"
           onClick={() => setShowHypers(false)}
         >
           <section className="ig-modal-card cx-voters-card">
             <div className="ig-post-comments-head cx-voters-head">
               <div className="cx-voters-head-titles">
-                <h3 className="ig-post-comments-title">Hyped by</h3>
+                <h3 className="ig-post-comments-title">Reacted by</h3>
                 {!hypersLoading && !hypersError ? (
                   <span className="cx-voters-total">
                     {hypers.length} {hypers.length === 1 ? "person" : "people"}
@@ -3200,6 +3360,18 @@ function FeedPostCardComponent({
                 Close
               </button>
             </div>
+            {reactionsLive.length > 0 ? (
+              <div className="cx-reaction-breakdown-row">
+                {[...reactionsLive]
+                  .sort((a, b) => b.count - a.count)
+                  .map((r) => (
+                    <span key={r.emoji} className="cx-reaction-breakdown-chip">
+                      <ReactionGlyph emoji={r.emoji} size={18} />
+                      <span className="cx-reaction-breakdown-chip-count">{r.count}</span>
+                    </span>
+                  ))}
+              </div>
+            ) : null}
             {hypersLoading ? (
               <div className="cx-voters-loading">
                 <span className="cx-voters-spinner" aria-hidden />
@@ -3210,7 +3382,7 @@ function FeedPostCardComponent({
               <p className="ig-post-comments-error" role="alert">{hypersError}</p>
             ) : null}
             {!hypersLoading && !hypersError && hypers.length === 0 ? (
-              <p className="cx-voters-empty muted small">No hypes yet.</p>
+              <p className="cx-voters-empty muted small">No reactions yet.</p>
             ) : null}
             {!hypersLoading && hypers.length > 0 ? (
               <div className="cx-voters-scroll">
@@ -3237,6 +3409,11 @@ function FeedPostCardComponent({
                           <span className="cx-voter-meta">
                             <span className="cx-voter-name">{name}</span>
                           </span>
+                          {h.reactionEmoji ? (
+                            <span className="cx-voter-reaction-emoji">
+                              <ReactionGlyph emoji={h.reactionEmoji} size={18} />
+                            </span>
+                          ) : null}
                         </NavLink>
                       </li>
                     );

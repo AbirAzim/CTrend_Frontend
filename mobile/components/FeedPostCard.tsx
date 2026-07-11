@@ -37,8 +37,9 @@ import {
 import {
 	VOTE_POST,
 	REMOVE_VOTE,
-	SET_POST_HYPE,
 	SET_POST_KEEP,
+	SET_POST_REACTION,
+	POST_REACTION_EMOJIS,
 	POST_VOTE_UPDATED,
 	POST_UPDATED,
 	DELETE_POST,
@@ -1303,6 +1304,25 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		anonSwitchThumbOn: {
 			marginLeft: 17,
 		},
+		// Combined reaction summary — top-3 reaction icons clustered together + one
+		// total. Social proof, not a control, so it's its own line above the icon
+		// buttons — same pattern as Facebook — with a subtle divider so the two read
+		// as one connected footer, not disconnected boxed sections. Full per-emoji
+		// breakdown lives in the "Reacted by" details sheet.
+		reactionSummary: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 6,
+			paddingHorizontal: 14,
+			paddingTop: 10,
+			paddingBottom: 8,
+			borderBottomWidth: StyleSheet.hairlineWidth,
+			borderBottomColor: c.border,
+		},
+		reactionSummaryIcons: { flexDirection: 'row' as const, alignItems: 'center' as const },
+		reactionSummaryIcon: { alignItems: 'center' as const, justifyContent: 'center' as const },
+		reactionSummaryIconOverlap: { marginLeft: -6 },
+		reactionSummaryText: { fontSize: 13, fontWeight: '600' as const, color: c.subtext, flexShrink: 1 },
 		// ── Two-zone action rail ──
 		// Flush, full-width row separated from the media/vote area by a single
 		// hairline — no inset box-in-box border, tint, or margin. Reads as part
@@ -1327,11 +1347,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderRadius: 999,
 			padding: 10,
 		},
-		actionChipFlatHypeActive: {
-			backgroundColor: isDark
-				? 'rgba(251,113,133,0.14)'
-				: 'rgba(159,23,77,0.1)',
-		},
+		// Reaction chip stays background-less when active — only the emoji glyph itself indicates the reaction.
+		actionChipFlatHypeActive: {},
 		actionChipFlatSaveActive: {
 			backgroundColor: withAlpha(c.accent, isDark ? 0.16 : 0.1),
 		},
@@ -1346,6 +1363,7 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			alignItems: 'center' as const,
 			justifyContent: 'center' as const,
 		},
+		chipReactionEmoji: { fontSize: 19, lineHeight: 22 },
 		actionChipFlatIcon: { fontSize: 18, lineHeight: 21, color: c.subtext },
 		actionChipFlatIconHype: { color: '#fb7185' },
 		actionChipFlatIconSave: { color: c.accent },
@@ -1366,7 +1384,6 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderColor: c.card,
 			backgroundColor: isDark ? '#4338ca' : '#4338ca',
 		},
-		chipBadgeRose: { backgroundColor: isDark ? '#e11d48' : '#be123c' },
 		chipBadgeAmber: { backgroundColor: isDark ? '#d97706' : '#b45309' },
 		chipBadgeVoters: { backgroundColor: isDark ? '#0e7490' : '#0369a1' },
 		chipBadgeText: {
@@ -1375,6 +1392,67 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			color: '#ffffff',
 			lineHeight: 11,
 			fontVariant: ['tabular-nums'] as TextStyle['fontVariant'],
+		},
+		// Long-press-to-react tray, anchored above the hype chip. Bigger, Facebook-style icons with an always-visible name label (no hover on touch).
+		reactionAnchor: { position: 'relative' as const },
+		reactionTray: {
+			position: 'absolute' as const,
+			bottom: '100%' as const,
+			// Left-aligned to the chip, not centered — the react chip is the leftmost
+			// action icon, so a centered tray would overflow off the left edge.
+			left: 0,
+			marginBottom: 8,
+			flexDirection: 'row' as const,
+			alignItems: 'flex-start' as const,
+			gap: 4,
+			backgroundColor: c.card,
+			borderRadius: 20,
+			paddingHorizontal: 8,
+			paddingVertical: 8,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: c.border,
+			zIndex: 30,
+			elevation: 8,
+			shadowColor: '#000',
+			shadowOpacity: 0.25,
+			shadowRadius: 10,
+			shadowOffset: { width: 0, height: 3 },
+		},
+		reactionTrayBtn: {
+			width: 50,
+			alignItems: 'center' as const,
+			paddingVertical: 6,
+			borderRadius: 16,
+		},
+		reactionTrayBtnPressed: { transform: [{ scale: 1.18 }, { translateY: -6 }] },
+		reactionTrayBtnActive: { backgroundColor: withAlpha(c.accent, isDark ? 0.22 : 0.14) },
+		reactionTrayLabel: {
+			fontSize: 10,
+			fontWeight: '700' as const,
+			color: c.subtext,
+			marginTop: 2,
+		},
+		// All-emoji breakdown row atop the "Reacted by" sheet (Facebook-style per-emoji counters).
+		reactionBreakdownRow: {
+			flexDirection: 'row' as const,
+			flexWrap: 'wrap' as const,
+			gap: 6,
+			paddingHorizontal: 14,
+			paddingBottom: 10,
+		},
+		reactionBreakdownChip: {
+			flexDirection: 'row' as const,
+			alignItems: 'center' as const,
+			gap: 4,
+			paddingHorizontal: 8,
+			paddingVertical: 4,
+			borderRadius: 999,
+			backgroundColor: c.section,
+		},
+		reactionBreakdownChipCount: {
+			fontSize: 12,
+			fontWeight: '800' as const,
+			color: c.text,
 		},
 		commentComposerStub: {
 			flexDirection: 'row' as const,
@@ -2055,6 +2133,64 @@ function AnnouncementImageGrid({ urls, onImagePress }: { urls: string[]; onImage
 	);
 }
 
+/** Facebook-style reaction names shown under each emoji in the tray. */
+const POST_REACTION_LABELS: Record<string, string> = {
+	'👍': 'Like',
+	'❤️': 'Love',
+	'😂': 'Haha',
+	'😮': 'Wow',
+	'😢': 'Sad',
+	'🔥': 'Fire',
+};
+
+/** Circle backdrop color per reaction — only for the two icon-based reactions (Like/Love),
+ * which need a color to read as a reaction. Face/fire emoji are already colorful on their
+ * own, so they render plain, exactly like Facebook's own reaction set. */
+const POST_REACTION_COLORS: Record<string, string> = {
+	'👍': '#1877f2',
+	'❤️': '#f33e58',
+};
+
+/** Renders a reaction as Facebook does: 👍/❤️ get a colored circle + white icon (they're
+ * plain outline glyphs otherwise), every other emoji renders as-is since it's already colorful. */
+function ReactionGlyph({ emoji, size = 18 }: { emoji: string; size?: number }) {
+	const color = POST_REACTION_COLORS[emoji];
+	if (color) {
+		return (
+			<View
+				style={{
+					width: size,
+					height: size,
+					borderRadius: size / 2,
+					backgroundColor: color,
+					alignItems: 'center',
+					justifyContent: 'center',
+				}}>
+				<Ionicons
+					name={emoji === '👍' ? 'thumbs-up' : 'heart'}
+					size={Math.round(size * 0.56)}
+					color="#fff"
+				/>
+			</View>
+		);
+	}
+	return <Text style={{ fontSize: size, lineHeight: size + 3 }}>{emoji}</Text>;
+}
+
+/** "You and N others reacted" / "N people reacted" — single combined total, top icons are shown separately. */
+function reactionSummaryText(
+	reactions: Array<{ emoji: string; count: number }>,
+	viewerReaction: string | null,
+): string {
+	const total = reactions.reduce((sum, r) => sum + r.count, 0);
+	if (total === 0) return '';
+	if (viewerReaction) {
+		const others = total - 1;
+		return others > 0 ? `You and ${others.toLocaleString()} other${others === 1 ? '' : 's'} reacted` : 'You reacted';
+	}
+	return `${total.toLocaleString()} ${total === 1 ? 'person' : 'people'} reacted`;
+}
+
 function FeedPostCardComponent({
 	post,
 	variant = 'feed',
@@ -2074,7 +2210,12 @@ function FeedPostCardComponent({
 	const [optimisticVote, setOptimisticVote] = useState<VoteLiveState | null>(
 		null,
 	);
-	const [liked, setLiked] = useState(Boolean(post.viewerHasHyped));
+	const [viewerReaction, setViewerReaction] = useState<string | null>(
+		post.viewerReaction ?? (post.viewerHasHyped ? '❤️' : null),
+	);
+	const liked = viewerReaction !== null;
+	const [reactionsLive, setReactionsLive] = useState(post.reactions ?? []);
+	const [reactionTrayOpen, setReactionTrayOpen] = useState(false);
 	const [anon, setAnon] = useState(Boolean(post.myVoteAnonymous));
 	const [hypeCount, setHypeCount] = useState(post.hypeCount ?? 0);
 	const [saved, setSaved] = useState(Boolean(post.viewerHasSaved));
@@ -2460,7 +2601,8 @@ function FeedPostCardComponent({
 		setOptimisticVote(null);
 		setHypeCount(post.hypeCount ?? 0);
 		setSaved(Boolean(post.viewerHasSaved));
-		setLiked(Boolean(post.viewerHasHyped));
+		setViewerReaction(post.viewerReaction ?? (post.viewerHasHyped ? '❤️' : null));
+		setReactionsLive(post.reactions ?? []);
 		setAnon(Boolean(post.myVoteAnonymous));
 	}, [
 		post.id,
@@ -2473,6 +2615,8 @@ function FeedPostCardComponent({
 		post.hypeCount,
 		post.viewerHasSaved,
 		post.viewerHasHyped,
+		post.viewerReaction,
+		post.reactions,
 		post.myVoteAnonymous,
 	]);
 
@@ -2612,7 +2756,7 @@ function FeedPostCardComponent({
 	const { awardCoins, spendCoins } = useCoins();
 	const [voteMut] = useMutation<VotePostData>(VOTE_POST);
 	const [removeVoteMut] = useMutation<RemoveVoteData>(REMOVE_VOTE);
-	const [setHypeMut] = useMutation(SET_POST_HYPE);
+	const [setReactionMut] = useMutation(SET_POST_REACTION);
 	const [setKeepMut] = useMutation(SET_POST_KEEP);
 	const [deleteMut] = useMutation(DELETE_POST);
 	const [pinMut] = useMutation(PIN_POST);
@@ -2916,21 +3060,70 @@ function FeedPostCardComponent({
 		void processVoteIntent(isCurrentChoice ? -1 : idx);
 	}
 
-	async function handleHype() {
-		const next = !liked;
-		setLiked(next);
-		setHypeCount((n) => Math.max(0, n + (next ? 1 : -1)));
+	const DEFAULT_POST_REACTION = '❤️';
+
+	/** Adjusts a reaction-count breakdown for a prevEmoji -> nextEmoji transition (either side may be null). */
+	function applyOptimisticReactionCounts(
+		reactions: Array<{ emoji: string; count: number }>,
+		prevEmoji: string | null,
+		nextEmoji: string | null,
+	): Array<{ emoji: string; count: number }> {
+		const map = new Map(reactions.map((r) => [r.emoji, r.count]));
+		if (prevEmoji) {
+			const n = (map.get(prevEmoji) ?? 1) - 1;
+			if (n <= 0) map.delete(prevEmoji);
+			else map.set(prevEmoji, n);
+		}
+		if (nextEmoji) map.set(nextEmoji, (map.get(nextEmoji) ?? 0) + 1);
+		const order = new Map<string, number>(POST_REACTION_EMOJIS.map((e, i) => [e, i]));
+		return [...map.entries()]
+			.map(([emoji, count]) => ({ emoji, count }))
+			.sort((a, b) => (order.get(a.emoji) ?? 99) - (order.get(b.emoji) ?? 99));
+	}
+
+	/** Set/clear/switch the viewer's reaction. Coins only fire on a null<->emoji edge, never on switching between emojis. */
+	async function handleReact(nextEmoji: string | null) {
+		const prevReaction = viewerReaction;
+		const prevReactions = reactionsLive;
+		const wasActive = prevReaction !== null;
+		const nextActive = nextEmoji !== null;
+		setViewerReaction(nextEmoji);
+		setHypeCount((n) => Math.max(0, n + ((nextActive ? 1 : 0) - (wasActive ? 1 : 0))));
+		setReactionsLive(applyOptimisticReactionCounts(prevReactions, prevReaction, nextEmoji));
+		setReactionTrayOpen(false);
 		// Coins: fire instantly (optimistic) so the reward feels immediate and the
 		// tap registers without waiting for the server. If the mutation fails, the
-		// debounced balance reconcile inside award/spend self-corrects.
-		if (next) awardCoins(COIN_AMOUNTS.HYPE);
-		else spendCoins(COIN_AMOUNTS.HYPE);
-		try {
-			await setHypeMut({ variables: { postId: post.id, active: next } });
-		} catch {
-			setLiked(!next);
-			setHypeCount((n) => Math.max(0, n + (next ? -1 : 1)));
+		// debounced balance reconcile inside award/spend self-corrects. Switching
+		// between emojis (never passing through null) has no coin effect.
+		if (wasActive !== nextActive) {
+			if (nextActive) awardCoins(COIN_AMOUNTS.HYPE);
+			else spendCoins(COIN_AMOUNTS.HYPE);
 		}
+		try {
+			const { data } = await setReactionMut({ variables: { postId: post.id, emoji: nextEmoji } });
+			const serverReactions = (data as { setPostReaction?: { reactions?: Array<{ emoji: string; count: number }> } } | null | undefined)
+				?.setPostReaction?.reactions;
+			if (serverReactions) setReactionsLive(serverReactions);
+		} catch {
+			setViewerReaction(prevReaction);
+			setHypeCount((n) => Math.max(0, n + ((wasActive ? 1 : 0) - (nextActive ? 1 : 0))));
+			setReactionsLive(prevReactions);
+		}
+	}
+
+	function handleQuickReact() {
+		void handleReact(viewerReaction ? null : DEFAULT_POST_REACTION);
+	}
+
+	function handlePickReaction(emoji: string) {
+		void handleReact(viewerReaction === emoji ? null : emoji);
+	}
+
+	function openReactionTray() {
+		setReactionTrayOpen((cur) => {
+			if (!cur) Vibration.vibrate(12);
+			return !cur;
+		});
 	}
 
 	async function handleAnonymousToggle(val: boolean) {
@@ -4114,6 +4307,16 @@ function FeedPostCardComponent({
 				const chips: ChipDef[] = [
 					{
 						i: 0,
+						icon: 'heart-outline',
+						accessLabel: 'React',
+						onPress: handleQuickReact,
+						onLongPress: openReactionTray,
+						count: hypeCount,
+						isHype: true,
+						active: liked,
+					},
+					{
+						i: 1,
 						icon: 'chatbubble-outline',
 						accessLabel: 'View comments',
 						onPress: () => openComments(false),
@@ -4122,7 +4325,7 @@ function FeedPostCardComponent({
 						active: false,
 					},
 					{
-						i: 1,
+						i: 2,
 						icon: 'link-outline',
 						accessLabel: 'Copy link',
 						onPress: () => void copyLink(),
@@ -4132,24 +4335,12 @@ function FeedPostCardComponent({
 						? []
 						: [
 								{
-									i: 2,
+									i: 3,
 									icon: 'open-outline',
 									accessLabel: 'Full page',
 									onPress: goToPost,
 								} as ChipDef,
 							]),
-					{
-						i: 3,
-						icon: 'heart-outline',
-						accessLabel: 'Hype',
-						onPress: () => void handleHype(),
-						onLongPress: hypeCount > 0
-							? () => { Vibration.vibrate(30); setHypersVisible(true); }
-							: undefined,
-						count: hypeCount,
-						isHype: true,
-						active: liked,
-					},
 					{
 						i: 4,
 						icon: 'bookmark-outline',
@@ -4174,7 +4365,27 @@ function FeedPostCardComponent({
 				];
 
 				return (
+					<>
 					<View style={st.actionRail}>
+						{hypeCount > 0 ? (
+							<Pressable style={st.reactionSummary} onPress={() => setHypersVisible(true)}>
+								<View style={st.reactionSummaryIcons}>
+									{[...reactionsLive]
+										.sort((a, b) => b.count - a.count)
+										.slice(0, 3)
+										.map((r, idx) => (
+											<View
+												key={r.emoji}
+												style={[st.reactionSummaryIcon, idx > 0 && st.reactionSummaryIconOverlap]}>
+												<ReactionGlyph emoji={r.emoji} size={16} />
+											</View>
+										))}
+								</View>
+								<Text style={st.reactionSummaryText} numberOfLines={1}>
+									{reactionSummaryText(reactionsLive, viewerReaction)}
+								</Text>
+							</Pressable>
+						) : null}
 						{/* Zone 1 — icon chips */}
 						<View style={st.actionRailIcons}>
 							{chips.map(
@@ -4193,7 +4404,28 @@ function FeedPostCardComponent({
 								}) => (
 									<Animated.View
 										key={i}
-										style={{ transform: [{ scale: chipScales[i] }] }}>
+										style={[
+											{ transform: [{ scale: chipScales[i] }] },
+											isHype ? st.reactionAnchor : null,
+										]}>
+										{isHype && reactionTrayOpen ? (
+											<View style={st.reactionTray}>
+												{POST_REACTION_EMOJIS.map((e) => (
+													<Pressable
+														key={e}
+														onPress={() => handlePickReaction(e)}
+														style={({ pressed }) => [
+															st.reactionTrayBtn,
+															viewerReaction === e && st.reactionTrayBtnActive,
+															pressed && st.reactionTrayBtnPressed,
+														]}
+														hitSlop={4}>
+														<ReactionGlyph emoji={e} size={30} />
+														<Text style={st.reactionTrayLabel}>{POST_REACTION_LABELS[e] ?? e}</Text>
+													</Pressable>
+												))}
+											</View>
+										) : null}
 										<Pressable
 											style={[
 												st.actionChipFlat,
@@ -4205,30 +4437,27 @@ function FeedPostCardComponent({
 											onPressOut={() => chipPressOut(i)}
 											onPress={onPress}
 											onLongPress={onLongPress}
-											delayLongPress={300}
+											delayLongPress={isHype ? 200 : 300}
 											accessibilityLabel={accessLabel}
 											hitSlop={4}>
 											<View style={st.chipIconWrap}>
-												<Ionicons
-													name={
-														(active && (isHype || isSave)
-															? icon.replace('-outline', '')
-															: icon) as keyof typeof Ionicons.glyphMap
-													}
-													size={22}
-													color={
-														isHype && active
-															? '#f43f5e'
-															: isSave && active
-																? colors.accent
-																: colors.subtext
-													}
-												/>
-												{count != null && count > 0 ? (
+												{isHype && active ? (
+													<Text style={st.chipReactionEmoji}>{viewerReaction}</Text>
+												) : (
+													<Ionicons
+														name={
+															(active && isSave
+																? icon.replace('-outline', '')
+																: icon) as keyof typeof Ionicons.glyphMap
+														}
+														size={22}
+														color={isSave && active ? colors.accent : colors.subtext}
+													/>
+												)}
+												{count != null && count > 0 && !isHype ? (
 													<View
 														style={[
 															st.chipBadge,
-															isHype && st.chipBadgeRose,
 															isSave && st.chipBadgeAmber,
 															isVoters && st.chipBadgeVoters,
 														]}>
@@ -4268,6 +4497,7 @@ function FeedPostCardComponent({
 							</View>
 						) : null}
 					</View>
+					</>
 				);
 			})()}
 
@@ -4383,6 +4613,7 @@ function FeedPostCardComponent({
 				colors={colors}
 				st={st}
 				client={client}
+				reactions={reactionsLive}
 			/>
 			) : null}
 
@@ -4929,6 +5160,7 @@ type FeedGqlHyper = {
 	username?: string | null;
 	displayName?: string | null;
 	profileImageUrl?: string | null;
+	reactionEmoji?: string | null;
 };
 
 type FeedHypersPanelProps = {
@@ -4938,10 +5170,12 @@ type FeedHypersPanelProps = {
 	colors: ColorPalette;
 	st: ReturnType<typeof makeStyles>;
 	client: ReturnType<typeof useApolloClient>;
+	/** All-emoji breakdown (Facebook-style), shown as a row of counter chips above the list. */
+	reactions: Array<{ emoji: string; count: number }>;
 };
 
-// "Hyped by" list — Instagram-style sheet of users who hyped a post.
-function FeedHypersPanel({ visible, onClose, postId, colors, st, client }: FeedHypersPanelProps) {
+// "Reacted by" list — Instagram-style sheet of users who reacted to a post.
+function FeedHypersPanel({ visible, onClose, postId, colors, st, client, reactions }: FeedHypersPanelProps) {
 	const [search, setSearch] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [hypers, setHypers] = useState<FeedGqlHyper[]>([]);
@@ -5002,11 +5236,23 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client }: FeedH
 				<View style={st.votersSheet} onStartShouldSetResponder={() => true}>
 					<View style={st.votersHandle} />
 					<View style={st.votersHeader}>
-						<Text style={st.votersTitle}>Hyped by {hypers.length}{hasMore ? '+' : ''}</Text>
+						<Text style={st.votersTitle}>Reacted by {hypers.length}{hasMore ? '+' : ''}</Text>
 						<Pressable onPress={handleClose} hitSlop={8} style={st.votersCloseBtn}>
 							<Text style={st.votersCloseText}>✕</Text>
 						</Pressable>
 					</View>
+					{reactions.length > 0 ? (
+						<View style={st.reactionBreakdownRow}>
+							{[...reactions]
+								.sort((a, b) => b.count - a.count)
+								.map((r) => (
+									<View key={r.emoji} style={st.reactionBreakdownChip}>
+										<ReactionGlyph emoji={r.emoji} size={18} />
+										<Text style={st.reactionBreakdownChipCount}>{r.count}</Text>
+									</View>
+								))}
+						</View>
+					) : null}
 					<View style={st.votersSearch}>
 						<TextInput
 							value={search}
@@ -5031,7 +5277,7 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client }: FeedH
 						ListEmptyComponent={
 							loadingInitial
 								? <ActivityIndicator style={{ margin: 24 }} color={colors.accent} />
-								: <Text style={st.voterEmpty}>{debouncedSearch ? 'No matches' : 'No hypes yet'}</Text>
+								: <Text style={st.voterEmpty}>{debouncedSearch ? 'No matches' : 'No reactions yet'}</Text>
 						}
 						ListFooterComponent={
 							loadingMore
@@ -5058,6 +5304,7 @@ function FeedHypersPanel({ visible, onClose, postId, colors, st, client }: FeedH
 									<View style={{ flex: 1 }}>
 										<Text style={st.voterName}>{name}</Text>
 									</View>
+									{h.reactionEmoji ? <ReactionGlyph emoji={h.reactionEmoji} size={18} /> : null}
 								</Pressable>
 							);
 						}}

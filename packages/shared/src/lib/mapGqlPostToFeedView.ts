@@ -47,6 +47,8 @@ export function mapGqlPostToFeedView(p: {
   saveCount?: number;
   viewerHasSaved?: boolean;
   viewerHasHyped?: boolean | null;
+  reactions?: Array<{ emoji: string; count: number }> | null;
+  viewerReaction?: string | null;
   myVoteAnonymous?: boolean | null;
   commentCount?: number;
   recentComments?: Array<{
@@ -190,6 +192,8 @@ export function mapGqlPostToFeedView(p: {
     saveCount: p.saveCount ?? 0,
     viewerHasSaved: p.viewerHasSaved ?? false,
     viewerHasHyped: p.viewerHasHyped ?? false,
+    reactions: p.reactions ?? [],
+    viewerReaction: p.viewerReaction ?? null,
     myVoteAnonymous: p.myVoteAnonymous ?? false,
     commentCount: p.commentCount ?? 0,
     recentComments: p.recentComments ?? [],

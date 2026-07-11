@@ -113,6 +113,11 @@ export const FEED_POSTS = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       mySelectedOptionIndex
       myVoteAnonymous
       optionStats {
@@ -179,6 +184,11 @@ export const GET_POST_BY_ID = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       mySelectedOptionIndex
       myVoteAnonymous
       optionStats {
@@ -248,6 +258,22 @@ export const SET_POST_HYPE = gql`
   }
 `;
 
+/** Same emoji set as `COMMENT_REACTION_EMOJIS`, for visual consistency between post and comment reactions. */
+export const POST_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+
+export const SET_POST_REACTION = gql`
+  mutation SetPostReaction($postId: ID!, $emoji: String) {
+    setPostReaction(postId: $postId, emoji: $emoji) {
+      postId
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
+    }
+  }
+`;
+
 export const MY_SAVED_POSTS = gql`
   query MySavedPosts($skip: Int, $take: Int) {
     mySavedPosts(skip: $skip, take: $take) {
@@ -293,6 +319,11 @@ export const MY_SAVED_POSTS = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       mySelectedOptionIndex
       myVoteAnonymous
       optionStats {
@@ -363,6 +394,7 @@ export const HYPERS_BY_POST = gql`
       username
       displayName
       profileImageUrl
+      reactionEmoji
     }
   }
 `;
@@ -434,6 +466,11 @@ export const MY_SCHEDULED_POSTS = gql`
       saveCount
       viewerHasSaved
       viewerHasHyped
+      reactions {
+        emoji
+        count
+      }
+      viewerReaction
       mySelectedOptionIndex
       myVoteAnonymous
       optionStats {
