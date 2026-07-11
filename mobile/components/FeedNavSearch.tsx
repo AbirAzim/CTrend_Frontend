@@ -1,47 +1,36 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
-/** Top-nav search pill — matches web `GlobalSearch` bar; opens full search on tap. */
+/** Top-nav search trigger — icon-only (matches the other nav action buttons)
+ * so it can't crowd out the notification/logout icons on narrow phones.
+ * Tapping opens the full search screen. */
 export function FeedNavSearch() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.pill,
-        {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-          opacity: pressed ? 0.88 : 1,
-        },
+        styles.btn,
+        { opacity: pressed ? 0.7 : 1 },
       ]}
       onPress={() => router.push("/search" as `/${string}`)}
+      hitSlop={6}
       accessibilityRole="search"
       accessibilityLabel="Search people and posts"
     >
-      <Ionicons name="search-outline" size={17} color={colors.muted} />
-      <Text style={[styles.placeholder, { color: colors.muted }]} numberOfLines={1}>
-        Search…
-      </Text>
+      <Ionicons name="search-outline" size={22} color={isDark ? colors.text : colors.subtext} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  pill: {
-    flex: 1,
-    flexDirection: "row",
+  btn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 6,
-    height: "100%",
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  placeholder: {
-    flex: 1,
-    fontSize: 13,
   },
 });

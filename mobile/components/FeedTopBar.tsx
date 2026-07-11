@@ -29,7 +29,6 @@ const TAG_H = 16;
 const SHELL_PAD_TOP = 12;
 const SHELL_PAD_BOTTOM_EXPANDED = 14;
 const SHELL_PAD_BOTTOM_COMPACT = 12;
-const SEARCH_H = 38;
 const EXPAND_LERP = 0.16;
 
 type Props = {
@@ -138,15 +137,10 @@ function FeedTopBarInner({ scrollY }: Props) {
           </Animated.View>
         </Pressable>
 
-        {isAuthenticated ? (
-          <View style={styles.searchInline}>
-            <FeedNavSearch />
-          </View>
-        ) : (
-          <View style={styles.topBarSpacer} />
-        )}
+        {!isAuthenticated && <View style={styles.topBarSpacer} />}
 
         <View style={styles.actions}>
+          {isAuthenticated && <FeedNavSearch />}
           <PressableScale style={styles.plainIconBtn} onPress={toggleTheme} hitSlop={6} accessibilityLabel="Toggle theme">
             <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={22} color={isDark ? colors.text : colors.subtext} />
           </PressableScale>
@@ -223,12 +217,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  searchInline: {
-    flex: 1,
-    minWidth: 80,
-    height: SEARCH_H,
-    justifyContent: "center",
   },
   topBarSpacer: {
     flex: 1,
