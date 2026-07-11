@@ -111,7 +111,7 @@ export const BUNDLED_ANDROID_VERSION_CODE = 39;
 
 > All three must have the **same** versionCode. The build script checks this and exits immediately if they don't match. If the numbers drifted (happens when builds are done on different machines), set all three to the same value before building.
 
-Current version after 1.16.6 release: **versionCode 51** across all three files.
+Current version after 1.16.8 release: **versionCode 53** across all three files.
 
 ---
 
@@ -245,6 +245,7 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 
 | Version | versionCode | Date | Changes |
 |---------|-------------|------|---------|
+| 1.16.8 | 53 | 2026-07-11 | @Mention system (comments/captions/chat) with autocomplete, notifications, deep-linking; Facebook-style per-emoji reaction filtering; captions raised 300→2,200 chars with bigger compose box + feed "See more" truncation; vote-breakdown panel simplified (monochrome, no title text, no duel bar); nav search icon fixed to icon-only (was crowding out notification/logout icons on narrow phones); reaction chip icon size fix |
 | 1.16.7 | 52 | 2026-07-06 | Delete-post confirmation redesigned — replaced the plain native Android `Alert.alert` popup with a themed `AppConfirmDialog` (rounded centered card matching app colors, styled Cancel/Delete buttons) in `FeedPostCard.tsx` |
 | 1.16.6 | 51 | 2026-07-05 | Bottom nav bar hide/show on scroll rewritten on Reanimated (was RN-core `Animated.timing` + per-frame JS bridge calls) — now glides smoothly instead of snapping; deadline-preview icon (📅) replaced with a monochrome calendar icon on create/edit-post; R8/ProGuard minify + resource shrinking enabled for the first time (mapping.txt uploaded to Play Console) |
 | 1.16.5 | 50 | 2026-07-04 | Same fixes as 1.16.4 (superseded — bundled image assets losslessly recompressed ~23% smaller, addressing Play Console's bitmap optimization recommendation); requires a new Android OAuth client in Google Cloud Console for the release-key SHA-1 for Google Sign-In to work on this signed build |
@@ -263,6 +264,60 @@ Users on older versionCodes see a blocking "Update required" dialog with a link 
 | 1.10.0 | 37 | 2026-06-26 | Referral admin toggle, leaderboard rank on profile, notification fixes (background + no duplicates), branded splash, rewards UI polish, launch sound fix |
 | 1.9.0 | 36 | 2026-06-25 | Compact compare cells for 5–6 image posts, silent sound option, announcement edit fix |
 | 1.8.0 | 35 | — | World Cup tab, campaign features |
+
+### Play Console copy — 1.16.8 (53)
+
+Use when creating the closed-testing (or production) release in Play Console.
+
+**Release name**
+```
+1.16.8 — Mentions, reactions & caption upgrades
+```
+
+**What's new** (user-facing release notes)
+```
+• @Mention people — type @ in a comment, caption, or chat to tag someone; they get notified and tapping it takes them straight to that spot
+
+• See who reacted with what — tap an emoji in the "Reacted by" list to filter by 👍 ❤️ 😂 and more
+
+• Longer captions — write up to 2,200 characters, with a "See more" toggle in the feed so long posts don't take over your screen
+
+• Cleaner, simplified vote results design
+
+• Tidied up the search icon in the top bar so it no longer crowds your notifications and profile icons on smaller phones
+
+• Bug fixes and stability improvements
+```
+
+**Short description** (optional internal note for reviewers — not shown to users)
+```
+Full @mention system across comments, post captions, and chat: plain-text @username
+parsing, autocomplete (global search for comments/captions, participants-only for
+chat), COMMENT_MENTION/POST_MENTION/MESSAGE_MENTION notification types with
+createOrUpdateGrouped, deep-link navigation to the mentioned comment/post/chat.
+Backend: mentions.ts parser, searchUsers query, ParticipantGql.username field.
+
+Reaction "Reacted by" panel: hypersByPost now takes an emoji arg for server-side
+per-reaction filtering (Facebook-style tabs); panel height now fixed so switching
+tabs with different result counts doesn't resize the sheet.
+
+Caption maxLength raised 300→2200 on all composers (backend already allowed up to
+10000); compose textarea taller (numberOfLines 3→6, minHeight 70→140); new
+ExpandableCaption component clamps long captions to 4 lines in the feed with a
+"See more"/"See less" toggle (plain-text truncated preview, full mention/link-aware
+render once expanded).
+
+Vote-breakdown panel (FeedPostCard): removed "Vote breakdown"/"Results" title text
+and the redundant top duel-bar strip; vote count folded into the Voters pill instead
+of a separate stacked number; kept per-option colors (reverted an earlier monochrome
+pass per user feedback) at reduced/lighter opacity.
+
+FeedNavSearch rewritten as a fixed 36x36 icon-only button inside the topbar's action
+cluster (was a flex:1 pill with minWidth:80 that could overflow on narrow phones,
+clipping the notification/logout icons — confirmed real bug via topBarRow layout
+math). Reaction chip icon size fixed from 28→22 to match the other action-bar icons
+(Comment/Share/Save).
+```
 
 ### Play Console copy — 1.16.7 (52)
 
@@ -793,7 +848,7 @@ adb install -r mobile/android/app/build/outputs/apk/release/app-release.apk
 | App name | Ke Jitbe |
 | Device for testing | Pixel 6 · serial `1C071FDF600CCE` |
 | Stack | Expo SDK 56 · React Native 0.85 · Hermes |
-| Current version | 1.16.7 (versionCode 52) |
+| Current version | 1.16.8 (versionCode 53) |
 
 ---
 
