@@ -308,12 +308,12 @@ function ReactionGlyph({ emoji, size = 18 }: { emoji: string; size?: number }) {
           minHeight: size,
         }}
       >
-        <IconThumbsUp size={Math.round(size * 0.42)} />
+        <IconThumbsUp size={Math.round(size * 0.68)} />
       </span>
     );
   }
   return (
-    <span className="cx-reaction-icon-plain" style={{ fontSize: size }} aria-hidden>
+    <span className="cx-reaction-icon-plain" style={{ fontSize: Math.round(size * 0.82) }} aria-hidden>
       {emoji}
     </span>
   );
@@ -2973,7 +2973,7 @@ function FeedPostCardComponent({
                   .slice(0, 3)
                   .map((r) => (
                     <span key={r.emoji} className="cx-reaction-summary-icon">
-                      <ReactionGlyph emoji={r.emoji} size={17} />
+                      <ReactionGlyph emoji={r.emoji} size={20} />
                     </span>
                   ))}
               </span>
@@ -3004,7 +3004,7 @@ function FeedPostCardComponent({
                   >
                     <span className="cx-post-reaction-tray-label">{POST_REACTION_LABELS[emoji] ?? emoji}</span>
                     <span className="cx-post-reaction-tray-emoji">
-                      <ReactionGlyph emoji={emoji} size={32} />
+                      <ReactionGlyph emoji={emoji} size={40} />
                     </span>
                   </button>
                 ))}
@@ -3020,7 +3020,7 @@ function FeedPostCardComponent({
               onClick={(e) => handleQuickReact(e)}
             >
               {liked && viewerReaction ? (
-                <ReactionGlyph emoji={viewerReaction} size={19} />
+                <ReactionGlyph emoji={viewerReaction} size={24} />
               ) : (
                 <IconHeart filled={false} />
               )}

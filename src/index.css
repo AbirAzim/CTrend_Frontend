@@ -6240,6 +6240,16 @@ a.cx-friend-avatar:hover {
   flex-shrink: 0;
 }
 
+/* Higher specificity than ".cx-action-chip svg" above — the icon nested inside a
+   reaction circle is deliberately smaller than the chip's own icon size, forming
+   the white glyph inside the colored 👍 circle. Without this override the rule
+   above forces it back up to full chip size, ballooning it until it overflows
+   the circle with no visible backdrop. */
+.cx-action-chip .cx-reaction-icon-circle svg {
+  width: auto;
+  height: auto;
+}
+
 .cx-action-chip:hover {
   background: rgb(var(--cx-accent-rgb) / 0.08);
   border-color: rgb(var(--cx-accent-rgb) / 0.35);
@@ -6320,7 +6330,7 @@ a.cx-friend-avatar:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: -3px;
+  margin-left: -6px;
 }
 
 .cx-reaction-summary-icon:first-child {
@@ -6337,7 +6347,6 @@ a.cx-friend-avatar:hover {
   color: #fff;
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.35);
 }
 
 .cx-reaction-icon-plain {
@@ -6346,6 +6355,19 @@ a.cx-friend-avatar:hover {
   justify-content: center;
   line-height: 1;
   flex-shrink: 0;
+}
+
+/* Scoped to the summary row only — its icons overlap (Facebook-style stack), so they
+   need a card-colored separating ring; the tray/breakdown/voter-row instances of the
+   same glyph don't overlap and shouldn't get an unrelated background circle. */
+.cx-reaction-summary-icons .cx-reaction-icon-circle {
+  box-shadow: 0 0 0 2px var(--ig-card, #fff);
+}
+
+.cx-reaction-summary-icons .cx-reaction-icon-plain {
+  border-radius: 50%;
+  background: var(--ig-card, #fff);
+  box-shadow: 0 0 0 2px var(--ig-card, #fff);
 }
 
 .cx-reaction-summary-text {
@@ -6409,6 +6431,11 @@ a.cx-friend-avatar:hover {
   .cx-action-rail-icons .cx-action-chip svg {
     width: 17px;
     height: 17px;
+  }
+
+  .cx-action-rail-icons .cx-action-chip .cx-reaction-icon-circle svg {
+    width: auto;
+    height: auto;
   }
 
   .cx-action-rail-icons .cx-action-chip-count {

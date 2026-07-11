@@ -1320,7 +1320,16 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 			borderBottomColor: c.border,
 		},
 		reactionSummaryIcons: { flexDirection: 'row' as const, alignItems: 'center' as const },
-		reactionSummaryIcon: { alignItems: 'center' as const, justifyContent: 'center' as const },
+		// Card-colored ring around each icon so Facebook-style overlap (below) reads as
+		// intentionally stacked circles rather than icons clipping into each other.
+		reactionSummaryIcon: {
+			alignItems: 'center' as const,
+			justifyContent: 'center' as const,
+			borderRadius: 999,
+			backgroundColor: c.card,
+			borderWidth: 2,
+			borderColor: c.card,
+		},
 		reactionSummaryIconOverlap: { marginLeft: -6 },
 		reactionSummaryText: { fontSize: 13, fontWeight: '600' as const, color: c.subtext, flexShrink: 1 },
 		// ── Two-zone action rail ──
@@ -1358,8 +1367,8 @@ function makeStyles(c: ColorPalette, isDark: boolean) {
 		// Icon + superscript badge wrapper
 		chipIconWrap: {
 			position: 'relative' as const,
-			width: 26,
-			height: 26,
+			width: 28,
+			height: 28,
 			alignItems: 'center' as const,
 			justifyContent: 'center' as const,
 		},
@@ -2163,11 +2172,12 @@ function ReactionGlyph({ emoji, size = 18 }: { emoji: string; size?: number }) {
 					alignItems: 'center',
 					justifyContent: 'center',
 				}}>
-				<Ionicons name="thumbs-up" size={Math.round(size * 0.5)} color="#fff" />
+				<Ionicons name="thumbs-up" size={Math.round(size * 0.68)} color="#fff" />
 			</View>
 		);
 	}
-	return <Text style={{ fontSize: size, lineHeight: size + 3 }}>{emoji}</Text>;
+	const plainSize = Math.round(size * 0.82);
+	return <Text style={{ fontSize: plainSize, lineHeight: plainSize + 3 }}>{emoji}</Text>;
 }
 
 /** `total` should be the authoritative hypeCount, not a sum of the (possibly incomplete)
@@ -4368,7 +4378,7 @@ function FeedPostCardComponent({
 											<View
 												key={r.emoji}
 												style={[st.reactionSummaryIcon, idx > 0 && st.reactionSummaryIconOverlap]}>
-												<ReactionGlyph emoji={r.emoji} size={16} />
+												<ReactionGlyph emoji={r.emoji} size={19} />
 											</View>
 										))}
 								</View>
@@ -4433,7 +4443,7 @@ function FeedPostCardComponent({
 											hitSlop={4}>
 											<View style={st.chipIconWrap}>
 												{isHype && active && viewerReaction ? (
-													<ReactionGlyph emoji={viewerReaction} size={20} />
+													<ReactionGlyph emoji={viewerReaction} size={28} />
 												) : (
 													<Ionicons
 														name={
